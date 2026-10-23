@@ -14,6 +14,7 @@ import QuotePreview, { ModeSeg } from './quote/QuotePreview'
 import CoverEditor from './quote/CoverEditor'
 import DetailEditor, { AreaTable } from './quote/DetailEditor'
 import { HistoryModal, VersionView } from './quote/HistoryModal'
+import { bgChu_ } from './quote/docCss'
 import './quote/quote.css'
 
 /* Tab "Xuất báo giá" (PUB/baogia.js): chế độ "Xem trước & Xuất" = 2 cột (5 thẻ thiết lập + trang giấy A4 ngang, renderExport /
@@ -89,9 +90,9 @@ export default function QuoteTab() {
   if (q.bgView !== 'edit') {
     return (
       <>
-        <div className="qsq-x" key="doc" ref={xRef}>
+        <div className={`qsq-x${q.bgFull ? ' full' : ''}`} key="doc" ref={xRef}>
           <QuoteSide m={m} pages={pages.length} tk={tk} projects={projects} onExport={onExport} onHist={() => setPop({ kind: 'hist' })} />
-          <QuotePreview pages={pages} mau={m.mau} vat={cur.vat} />
+          <QuotePreview pages={pages} mau={m.mau} chu={bgChu_(m.ctx.bgCfg)} vat={cur.vat} onExport={onExport} />
         </div>
         {modals}
       </>

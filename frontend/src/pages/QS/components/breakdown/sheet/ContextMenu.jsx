@@ -4,119 +4,103 @@ import { tkSheetSua_ } from './tkModel'
 
 const NUMK = ['soLuong', 'giaNCC', 'giaDaiLy', 'donGia', 'donGiaCK', 'thanhTien', 'lnVnd', 'chietKhau', 'lnPct', 'ckKhach', 'donGiaBan', 'thanhTienBan', 'thanhTienVon']
 
-/* Menu chuột phải của bảng Bóc tách, mỗi chế độ một menu như bản gốc:
-     plain = Bảng thường: tkCtx PUB/app.js:210-269 (ô / dòng / cột / tô màu / tìm / xuất).
-     sheet = Bảng tính: tkSheetMenu_ bangtinh.js:576-606 (dòng / tầng / cột / thêm tầng / tìm).
-   Mọi việc làm qua `act` do BreakdownTab truyền vào.
-   Props: mode, at {x, y} (toạ độ chuột), entry (dòng của lưới), col ({key, label}), text (chữ của ô), ids (dòng đang chọn,
-          Bảng tính), cf (luật tô màu), sortKey, freezeN, frzRows, act {...}, onClose() */
+/* Menu chuột phải của bảng Bóc tách — MỘT menu chung cho Bảng thường và Bảng tính (2 bảng cùng tính năng, chỉ khác giao diện):
+   gộp tkCtx PUB/app.js:210-269 (Bảng thường) + tkSheetMenu_ bangtinh.js:576-606 (Bảng tính).
+   Đầu mục (Ô · Dòng · Tầng · Cột · Cố định · Hiển thị cột · Tô màu · Bảng) và tính năng con hiện cùng lúc, chia 3 cột. mode chỉ đổi vài chỗ nhỏ: xoá dòng (Bảng tính xoá các dòng đang chọn), điền xuống cột
+   (Bảng tính chỉ cột sửa được). Mọi việc làm qua `act` do BreakdownTab truyền vào.
+   Props: mode, at {x, y} (toạ độ chuột), entry (dòng của lưới), col ({key, label}), text (chữ của ô), ids (dòng đang chọn),
+          cf (luật tô màu), sortKey, freezeN, frzRows, act {...}, onClose() */
 export default function ContextMenu({ mode = 'plain', at, entry, col, text, ids, cf, sortKey, freezeN, frzRows, act, onClose }) {
+  const sheet = mode === 'sheet'
   const item = entry && entry.type === 'item' ? entry.r : null
   const group = entry && entry.type === 'group' ? entry.g : null
   const key = col ? col.key : ''
-  const run = fn => () => { onClose(); fn() }
-  const Mi = ({ ic, label, fn, hint, danger }) => (
-    <div className={`qs-tk-cmi${danger ? ' danger' : ''}`} onClick={run(fn)}>
-      <Icon name={ic} size={14} /><span>{label}</span>{hint && <i className="qs-tk-cmik">{hint}</i>}
-    </div>
-  )
-  const Sec = ({ t }) => <div className="qs-tk-cmh">{t}</div>
-  const Sep = () => <div className="qs-tk-cmsep" />
-  const groupSec = group && (
-    <>
-      <Sec t={'Tầng / phòng: ' + group.name} />
-      <Mi ic="plus" label="Thêm hạng mục trống vào tầng này" fn={() => act.addToFloor(group)} />
-      {group.id !== 'CHƯA PHÂN TẦNG' && <Mi ic="edit" label="Đổi tên tầng" fn={() => act.renameFloor(group)} />}
-      <Sep />
-    </>
-  )
-
-  if (mode === 'sheet') {
-    return (
-      <Pop anchor={at} width={260} className="qs-tk-ctx" onClose={onClose}>
-        {item && (
-          <>
-            <Sec t="Dòng" />
-            <Mi ic="search" label="Đổi sản phẩm từ danh mục…" fn={() => act.pick(item, at)} />
-            <Mi ic="copy" label="Nhân bản dòng" fn={() => act.dupRow(item)} />
-            <Mi ic="plus" label="Chèn dòng trống bên dưới" fn={() => act.insertRow(item)} />
-            <Mi ic="trash" label="Xoá các dòng đang chọn" fn={() => act.delSel(ids || [])} danger />
-            <Sep />
-          </>
-        )}
-        {groupSec}
-        {key && (
-          <>
-            <Sec t={'Cột: ' + col.label} />
-            <Mi ic="sortAsc" label="Sắp xếp tăng dần" fn={() => act.sort(key, 'asc')} />
-            <Mi ic="sortDesc" label="Sắp xếp giảm dần" fn={() => act.sort(key, 'desc')} />
-            {sortKey && <Mi ic="x" label="Bỏ sắp xếp" fn={act.resetSort} />}
-            {item && tkSheetSua_(key) && <Mi ic="importDown" label="Điền giá trị ô này xuống cả cột" fn={() => act.fillDownSheet(item, key, text, col.label)} />}
-            {key !== 'ten' && <Mi ic="eye" label="Ẩn cột này" fn={() => act.hideCol(key)} />}
-            <Mi ic="sliders" label="Chọn cột hiển thị…" fn={act.openCols} />
-            <Sep />
-          </>
-        )}
-        <Mi ic="plus" label="Thêm tầng / phòng" fn={act.addFloor} />
-        <Mi ic="search" label="Tìm & thay thế" fn={act.findReplace} hint="Ctrl+F" />
-      </Pop>
-    )
-  }
-
-  const r = cf || {}
-  const Ck = ({ rule, cls, label }) => (
-    <div className={`qs-tk-cmi qs-tk-cmck${r[rule] ? ' on' : ''}`} onClick={run(() => act.cfToggle(rule))}>
-      <span className="bx">{r[rule] ? '✓' : ''}</span><span className={`qs-tk-cfdot ${cls}`} /><span>{label}</span>
-    </div>
-  )
   const cell = item && key
+  const nSel = (ids || []).length
+  const r = cf || {}
+  const it = (ic, label, fn, o = {}) => ({ ic, label, fn, ...o })
+
+  /* Đầu mục -> tính năng con (đầu mục không có tính năng nào thì không hiện) */
+  const secs = [
+    cell && { id: 'cell', ic: 'copy', t: 'Ô đang chọn', items: [
+      it('copy', 'Sao chép ô', () => act.copyCell(text), { hint: 'Ctrl+C' }),
+      it('edit', 'Dán vào ô', () => act.pasteCell(item, key), { hint: 'Ctrl+V' }),
+      it('trash', 'Xoá nội dung ô', () => act.clearCell(item, key), { hint: 'Del' }),
+      act.clearFmt && it('eraser', 'Xoá định dạng ô đang chọn', act.clearFmt),
+      (!sheet || tkSheetSua_(key)) && it('importDown', 'Điền giá trị ô này xuống cả cột',
+        () => (sheet ? act.fillDownSheet(item, key, text, col.label) : act.fillDown(item, key, text))),
+    ] },
+    item && { id: 'row', ic: 'list', t: 'Dòng', items: [
+      it('search', 'Đổi sản phẩm từ danh mục…', () => act.pick(item, at)),
+      it('copy', 'Sao chép cả dòng', () => act.copyRow(item)),
+      it('copy', 'Nhân bản dòng', () => act.dupRow(item)),
+      it('plus', 'Chèn dòng trống bên dưới', () => act.insertRow(item)),
+      it('check', 'Chọn dòng này', () => act.selectRow(item)),
+      it('list', 'Chọn tất cả dòng đang hiện', act.selectAll),
+      sheet && nSel > 1
+        ? it('trash', 'Xoá ' + nSel + ' dòng đang chọn', () => act.delSel(ids), { danger: true })
+        : it('trash', 'Xoá dòng này', () => act.delRow(item), { danger: true }),
+    ] },
+    { id: 'floor', ic: 'layers', t: group ? 'Tầng: ' + group.name : 'Tầng / phòng', items: [
+      group && it('plus', 'Thêm hạng mục trống vào tầng này', () => act.addToFloor(group)),
+      group && group.id !== 'CHƯA PHÂN TẦNG' && it('edit', 'Đổi tên tầng', () => act.renameFloor(group)),
+      it('plus', 'Thêm tầng / phòng mới', act.addFloor),
+    ] },
+    key && { id: 'col', ic: 'sortAsc', t: 'Cột: ' + col.label, items: [
+      it('sortAsc', 'Sắp xếp tăng dần', () => act.sort(key, 'asc')),
+      it('sortDesc', 'Sắp xếp giảm dần', () => act.sort(key, 'desc')),
+      sortKey && it('x', 'Bỏ sắp xếp', act.resetSort),
+      NUMK.indexOf(key) >= 0 && it('gauge', 'Tính tổng cột', () => act.sumCol(key, col.label)),
+      key !== 'ten' && it('eye', 'Ẩn cột này', () => act.hideCol(key)),
+    ] },
+    /* Kích thước: 1 lệnh mở 1 hộp chỉnh cả hàng lẫn cột (mỗi phần có phạm vi: 1 hàng / cột, tất cả…) */
+    { id: 'size', ic: 'fitWidth', t: 'Kích thước', items: [
+      (item || key) && act.resizeSize && it('fitWidth', 'Thay đổi kích thước hàng & cột…', () => act.resizeSize(item, key, key ? col.label : '', 'both')),
+    ] },
+    { id: 'freeze', ic: 'lock', t: 'Cố định', items: [
+      key && it('lock', 'Cố định đến cột này', () => act.freezeTo(key)),
+      freezeN > 0 && it('x', 'Bỏ cố định cột', act.unfreeze),
+      item && it('lock', 'Cố định đến hàng này', () => act.freezeRowTo(item)),
+      frzRows > 0 && it('x', 'Bỏ cố định hàng', act.unfreezeRows),
+    ] },
+    { id: 'cols', ic: 'sliders', t: 'Hiển thị cột', items: [
+      it('sliders', 'Chọn cột hiển thị…', act.openCols),
+      it('list', 'Hiện lại tất cả cột', act.showAllCols),
+    ] },
+    { id: 'cf', ic: 'droplet', t: 'Tô màu điều kiện', items: [
+      it(null, 'Lợi nhuận < 0', () => act.cfToggle('ln0'), { ck: !!r.ln0, dot: 'cf-red' }),
+      it(null, 'Chưa có giá bán', () => act.cfToggle('noPrice'), { ck: !!r.noPrice, dot: 'cf-yellow' }),
+      it(null, 'Số lượng = 0', () => act.cfToggle('sl0'), { ck: !!r.sl0, dot: 'cf-grey' }),
+    ] },
+    { id: 'table', ic: 'table', t: 'Bảng', items: [
+      act.clearAllFmt && it('eraser', 'Xoá định dạng cả bảng (về chữ mặc định)', act.clearAllFmt),
+      it('search', 'Tìm & thay thế', act.findReplace, { hint: 'Ctrl+F' }),
+      it('download', 'Xuất bảng ra Excel', act.gotoExport),
+    ] },
+  ].filter(Boolean).map(s => ({ ...s, items: s.items.filter(Boolean) })).filter(s => s.items.length)
+
+  const run = fn => () => { onClose(); fn() }
+  const Row = ({ x }) => (x.dot ? (
+    <div className={`qs-tk-cmi qs-tk-cmck${x.ck ? ' on' : ''}`} onClick={run(x.fn)}>
+      <span className="bx">{x.ck ? '✓' : ''}</span><span className={`qs-tk-cfdot ${x.dot}`} /><span>{x.label}</span>
+    </div>
+  ) : (
+    <div className={`qs-tk-cmi${x.danger ? ' danger' : ''}`} onClick={run(x.fn)}>
+      <Icon name={x.ic} size={14} /><span>{x.label}</span>{x.hint && <i className="qs-tk-cmik">{x.hint}</i>}
+    </div>
+  ))
+
+  /* Mọi đầu mục + tính năng con hiện cùng lúc (1 lần bấm là tới chức năng): các khối đầu mục xếp thành 3 cột */
   return (
-    <Pop anchor={at} width={260} className="qs-tk-ctx" onClose={onClose}>
-      {cell && (
-        <>
-          <Sec t="Ô đang chọn" />
-          <Mi ic="copy" label="Sao chép ô" fn={() => act.copyCell(text)} hint="Ctrl+C" />
-          <Mi ic="copy" label="Sao chép cả dòng" fn={() => act.copyRow(item)} />
-          <Mi ic="edit" label="Dán vào ô" fn={() => act.pasteCell(item, key)} hint="Ctrl+V" />
-          <Mi ic="trash" label="Xoá nội dung ô" fn={() => act.clearCell(item, key)} hint="Del" />
-          <Sep />
-        </>
-      )}
-      {item && (
-        <>
-          <Sec t="Dòng" />
-          <Mi ic="check" label="Chọn dòng này" fn={() => act.selectRow(item)} />
-          <Mi ic="list" label="Chọn tất cả dòng đang hiện" fn={act.selectAll} />
-          <Mi ic="copy" label="Nhân bản dòng" fn={() => act.dupRow(item)} />
-          <Mi ic="plus" label="Chèn dòng trống bên dưới" fn={() => act.insertRow(item)} />
-          <Mi ic="trash" label="Xoá dòng này" fn={() => act.delRow(item)} danger />
-          <Sep />
-        </>
-      )}
-      {key && (
-        <>
-          <Sec t={'Cột: ' + col.label} />
-          <Mi ic="sortAsc" label="Sắp xếp tăng dần" fn={() => act.sort(key, 'asc')} />
-          <Mi ic="sortDesc" label="Sắp xếp giảm dần" fn={() => act.sort(key, 'desc')} />
-          {sortKey && <Mi ic="x" label="Bỏ sắp xếp" fn={act.resetSort} />}
-          {cell && <Mi ic="importDown" label="Điền giá trị ô này xuống cả cột" fn={() => act.fillDown(item, key, text)} />}
-          {NUMK.indexOf(key) >= 0 && <Mi ic="gauge" label="Tính tổng cột" fn={() => act.sumCol(key, col.label)} />}
-          <Mi ic="lock" label="Cố định đến cột này" fn={() => act.freezeTo(key)} />
-          {freezeN > 0 && <Mi ic="x" label="Bỏ cố định cột" fn={act.unfreeze} />}
-          {item && <Mi ic="lock" label="Cố định đến hàng này" fn={() => act.freezeRowTo(item)} />}
-          {frzRows > 0 && <Mi ic="x" label="Bỏ cố định hàng" fn={act.unfreezeRows} />}
-          <Mi ic="eye" label="Ẩn cột này" fn={() => act.hideCol(key)} />
-          <Mi ic="list" label="Hiện lại tất cả cột" fn={act.showAllCols} />
-          <Sep />
-        </>
-      )}
-      <Sec t="Tô màu điều kiện" />
-      <Ck rule="ln0" cls="cf-red" label="Lợi nhuận < 0" />
-      <Ck rule="noPrice" cls="cf-yellow" label="Chưa có giá bán" />
-      <Ck rule="sl0" cls="cf-grey" label="Số lượng = 0" />
-      <Sep />
-      <Mi ic="search" label="Tìm & thay thế" fn={act.findReplace} hint="Ctrl+F" />
-      <Mi ic="download" label="Xuất bảng ra Excel" fn={act.gotoExport} />
+    <Pop anchor={at} width={760} className="qs-tk-ctx qs-tk-ctx3" onClose={onClose}>
+      <div className="qs-tk-ctxgrid">
+        {secs.map(sec => (
+          <div key={sec.id} className="qs-tk-ctxblk">
+            <div className="qs-tk-ctxblkh"><Icon name={sec.ic} size={13} /><span>{sec.t}</span></div>
+            {sec.items.map((x, i) => <Row key={i} x={x} />)}
+          </div>
+        ))}
+      </div>
     </Pop>
   )
 }

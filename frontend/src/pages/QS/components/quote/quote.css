@@ -3,7 +3,7 @@
    (sáng / tối). Trang giấy báo giá dùng CSS tài liệu riêng (docCss.js, đặt trong vùng xem trước). */
 
 /* ---------- Khung 2 cột ---------- */
-.qsq-x{display:grid; grid-template-columns:330px minmax(0,1fr); gap:12px; min-height:0; flex:none;}
+.qsq-x{display:grid; grid-template-columns:390px minmax(0,1fr); gap:12px; min-height:0; flex:none;}
 .qsq-side{min-height:0; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:0 4px 4px 0; scrollbar-width:thin;}
 .qsq-main{min-width:0; min-height:0; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden;}
 
@@ -11,7 +11,7 @@
 .qsq-card{flex:none; border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:12px 14px; display:flex; flex-direction:column; gap:8px;}
 .qsq-card > header{display:flex; align-items:flex-start; gap:10px;}
 .qsq-card > header i{flex:none; width:22px; height:22px; border-radius:50%; background:var(--dash-accent-tint); color:var(--dash-accent); font-style:normal; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;}
-.qsq-card > header b{display:block; font-size:14px; font-weight:700; color:var(--text); letter-spacing:-.01em; line-height:1.3;}
+.qsq-card > header b{display:block; font-size:14px; font-weight:700; color:var(--text); line-height:1.5;}
 .qsq-card > header span{display:block; font-size:11.5px; color:var(--text-muted); margin-top:1px;}
 .qsq-lb{display:block; font-size:11.5px; font-weight:600; color:var(--text-muted); margin:2px 0 -2px;}
 .qsq-ma{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:var(--surface-alt); font-size:12.5px; min-width:0;}
@@ -34,7 +34,7 @@
 .qsq-nodebtn.on{border-color:var(--dash-accent); color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qsq-nodebtn.sm{width:auto; height:30px;}
 .qsq-sw{display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid var(--border); border-radius:9px; cursor:pointer; position:relative;}
-.qsq-sw span{flex:1; font-size:12.5px; font-weight:600; color:var(--text); line-height:1.3;}
+.qsq-sw span{flex:1; font-size:12.5px; font-weight:600; color:var(--text); line-height:1.5;}
 .qsq-sw input{position:absolute; opacity:0; width:0; height:0;}
 .qsq-sw em{flex:none; width:34px; height:20px; border-radius:99px; background:var(--border); position:relative; transition:background .15s;}
 .qsq-sw em::after{content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:transform .15s;}
@@ -47,7 +47,7 @@
 .qsq-chips{display:flex; flex-wrap:wrap; gap:5px;}
 .qsq-chips button{padding:5px 8px; border-radius:7px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted); font:inherit; font-size:11px; font-weight:600; cursor:pointer;}
 .qsq-chips button.on{background:var(--dash-navy); border-color:var(--dash-navy); color:#fff;}
-.qsq-note{margin:0; font-size:11.5px; line-height:1.45; color:var(--text-muted);}
+.qsq-note{margin:0; font-size:11.5px; line-height:1.5; color:var(--text-muted);}
 .qsq-note svg{vertical-align:-2px; margin-right:2px;}
 .qsq-note.warn{color:var(--danger); font-weight:600;}
 .qsq-mau-h{display:flex; align-items:center; gap:8px;}
@@ -88,8 +88,8 @@
 .qsq-tk-ck{display:flex; gap:6px;}
 .qsq-tk-ck input{flex:1; text-align:right;}
 .qsq-tk-ck select{width:58px;}
-.qsq-tk-chu{font-size:11.5px; color:var(--text-muted); font-style:italic; line-height:1.45; margin-top:4px;}
-/* Chữ trong QS được nhân --qs-text (1,25) còn bề rộng thì không: cột số tiền 104px của bản gốc làm "113.267.236 đ" xuống dòng.
+.qsq-tk-chu{font-size:11.5px; color:var(--text-muted); font-style:italic; line-height:1.5; margin-top:4px;}
+/* Chữ trong QS được nhân --qs-text (4/3) còn bề rộng thì không: cột số tiền 104px của bản gốc làm "113.267.236 đ" xuống dòng.
    Cột tiền lấy đúng bề rộng chữ (1 dòng), bớt cột số / % / ✕ cho ô tên đợt còn chỗ */
 .qsq-tk-dot{display:grid; grid-template-columns:14px minmax(0,1fr) 58px 10px max-content 18px; gap:5px; align-items:center;}
 .qsq-tk-c .qsq-tk-dot input{padding:0 6px;}
@@ -185,3 +185,245 @@ html[data-theme="dark"] .qsq-pgr button.on{background:var(--dash-accent); border
 .qs-qt-area.qsq-areatbl tr.qsq-dgpt td{background:var(--surface); color:var(--text); font-size:12.5px; cursor:help; border-top:1px dashed var(--border);}
 .qs-qt-area.qsq-areatbl tr.qsq-dgpt td i{color:var(--text-muted); font-weight:400;}
 .qsq-hint[data-dgpt-note]{margin-top:4px;}
+
+/* Cột trái "Xem trước & Xuất" theo hệ thống module (QuoteSide The): tiêu đề đen đậm + mô tả xám, nút tròn ⌃/⌄ thu / mở,
+   nét đứt ngăn tiêu đề với nội dung; thu gọn = chỉ còn tiêu đề */
+.qsq-mod > header{margin:0 -14px; padding:0 14px 10px; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--border); cursor:pointer;}
+.qsq-mod > header > div{min-width:0;}
+.qsq-mod > header:hover .qs-bd-mod-chev{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsq-mod.folded{gap:0;}
+.qsq-mod.folded > header{padding-bottom:0; border-bottom:none;}
+/* Cỡ chữ báo giá: 4 lựa chọn đều nhau */
+.qs-qt-mode.qsq-seg4{display:grid; grid-template-columns:repeat(4, 1fr);}
+.qs-qt-mode.qsq-seg4 button{justify-content:center; padding:0 4px;}
+
+/* Thanh trên (Tờ bìa · mẫu · VAT · khổ giấy · thu phóng · Xem trước & Xuất · Chỉnh sửa) là module riêng, tách khỏi vùng xem trang;
+   khoảng cách 12px như các khung khác của QS */
+.qsq-main{border:0; border-radius:0; background:transparent; overflow:visible; gap:12px;}
+.qsq-main > .qsq-bar{border:1px solid var(--border); border-radius:12px;}
+.qsq-main > .qsq-vp{border:1px solid var(--border); border-radius:12px 12px 0 0; border-bottom:0;}
+.qsq-main > .qsq-foot{border:1px solid var(--border); border-top:1px solid var(--border); border-radius:0 0 12px 12px; margin-top:-12px;}
+/* Cột trái (thiết lập báo giá): thanh cuộn mảnh, chỉ hiện khi rê chuột vào cột */
+.qsq-side{scrollbar-width:thin; scrollbar-color:transparent transparent;}
+.qsq-side:hover{scrollbar-color:#c3cad5 transparent;}
+.qsq-side::-webkit-scrollbar{width:6px;}
+.qsq-side::-webkit-scrollbar-thumb{background:transparent; border-radius:4px;}
+.qsq-side:hover::-webkit-scrollbar-thumb{background:#c3cad5;}
+/* Giao diện báo giá: tiêu đề nhóm con (Đề mục lớn / Viền bảng), nút 2 lựa chọn, ô tích */
+.qsq-subh{margin:14px 0 2px; padding-top:10px; border-top:1px solid var(--border); font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted);}
+.qs-qt-mode.qsq-seg2{display:grid; grid-template-columns:repeat(2, 1fr);}
+.qs-qt-mode.qsq-seg2 button{justify-content:center;}
+.qsq-chk{display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; font-weight:600; cursor:pointer;}
+.qsq-chk input{width:16px; height:16px; margin:0; accent-color:var(--dash-accent);}
+/* Nút mở module ra khung bên phải (thay nút ⌃/⌄) + khung bên phải cạnh cột trái (lưới 3 cột khi đang mở) */
+.qsq-dockbtn{flex:none; width:26px; height:26px; padding:0; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qsq-dockbtn:hover, .qsq-dockbtn.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsq-mod.docked{border-color:var(--dash-accent); box-shadow:inset 3px 0 0 var(--dash-accent);}
+.qsq-x:has(> .qsq-dock){grid-template-columns:390px 440px minmax(0,1fr);}
+.qsq-dock{min-height:0; overflow:hidden; padding:0; gap:0;}
+.qsq-dockh{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 14px 10px; border-bottom:1px solid var(--border);}
+.qsq-dockh > div{display:flex; flex-direction:column; min-width:0;}
+.qsq-dockh b{font-size:14.5px;}
+.qsq-dockh span{font-size:12px; color:var(--text-muted);}
+.qsq-dockb{flex:1; min-height:0; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:14px; scrollbar-width:thin;}
+.qs-qt-mode.qsq-seg3{display:grid; grid-template-columns:repeat(3, 1fr);}
+.qs-qt-mode.qsq-seg3 button{justify-content:center;}
+.qsq-chk input:disabled + *{opacity:.5;}
+/* Nút mở chi tiết: vòng tròn có dấu > (không viền vuông) */
+.qsq-dockbtn{border:none; background:transparent; border-radius:50%; color:var(--dash-accent);}
+.qsq-dockbtn:hover{background:var(--dash-accent-tint);}
+.qsq-dockbtn.on{border:1px solid var(--dash-accent);}
+/* Cột xuất: 3 module con (Bộ cột · Bật / tắt từng cột · Cột nội bộ), mỗi khối 1 khung có tiêu đề */
+.qsq-sub{border:1px solid var(--border); border-radius:10px; padding:12px 14px 14px; display:flex; flex-direction:column; gap:10px;}
+/* Mỗi nhãn mở 1 nhóm mới: cách xa điều khiển phía trên (~16px), sát điều khiển của nó (~5px) để các hàng không dính vào nhau */
+.qsq-sub > .qsq-lb{margin:8px 0 -3px;}
+.qsq-sub > .qsq-subt + .qsq-lb{margin-top:2px;}
+.qsq-sub > .qsq-chk{margin:4px 0 0;}
+.qsq-subt{display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted);}
+.qsq-subt span{font-weight:600; color:var(--dash-accent);}
+/* khung "Chọn nhanh cột" của Bóc tách đặt trong module: hết viền / bóng riêng, bỏ nút đóng, rộng hết khối */
+.qsq-sub .qs-tk-dock{width:auto !important; margin:0; border:0; box-shadow:none; background:transparent;}
+.qsq-sub .qs-tk-dock > .qs-tkp-h{padding:0 0 6px;}
+.qsq-sub .qs-tk-dock > .qs-tkp-h > .qsc-x:last-child{display:none;}
+.qsq-sub .qs-tk-dock .qs-tk-bgtb{max-height:none; padding:0;}
+/* dải chip cột (cùng chip của Bóc tách): xuống dòng trong khối */
+.qsq-colstrip{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+/* Tiêu đề module con: chữ đen đậm, gạch chân, nút thu gọn bên phải */
+.qsq-sub .qsq-subt{gap:8px; padding-bottom:10px; border-bottom:1px solid var(--border); font-size:12.5px; color:var(--text); cursor:pointer; user-select:none;}
+.qsq-sub .qsq-subt b{flex:1; font-weight:800; color:var(--text);}
+.qsq-subn{font-weight:600; color:var(--dash-accent); text-transform:none;}
+.qsq-subbtn{flex:none; width:24px; height:24px; padding:0; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qsq-subt:hover .qsq-subbtn{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qsq-sub.gon .qsq-subt{padding-bottom:0; border-bottom:0;}
+/* Khung bên phải: tên + tóm tắt cùng 1 hàng, nút đóng canh giữa theo chiều dọc */
+.qsq-dockh{align-items:center;}
+.qsq-dockh > div{flex-direction:row; align-items:baseline; gap:8px; flex-wrap:wrap;}
+.qsq-dockh > div span::before{content:'·'; margin-right:8px; color:var(--text-muted);}
+/* Tiêu đề module con viết thường (không in hoa) */
+.qsq-sub .qsq-subt{text-transform:none; letter-spacing:0; font-size:13.5px;}
+/* Nút "Dàn trang tối ưu" trên thanh của vùng xem trang */
+.qsq-bar .qsq-dan{height:30px; gap:6px; font-size:12.5px; font-weight:600;}
+/* Tuỳ chọn logo tờ bìa: ảnh xem trước + nút tải / xoá */
+/* Khung con của tab "Tạo logo": nền nhạt, mũi nhọn chỉ lên tab cha (tab phải của 2 tab Công ty | Tạo logo), tab con gạch chân nhỏ hơn hàng tab trên */
+.qsq-tao{position:relative; margin-top:4px; padding:4px 12px 12px; background:var(--surface-alt); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; gap:8px;}
+.qsq-tao::before{content:''; position:absolute; top:-7px; left:75%; width:12px; height:12px; background:var(--surface-alt); border-left:1px solid var(--border); border-top:1px solid var(--border); transform:translateX(-50%) rotate(45deg);}
+.qsq-taotab{display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--border);}
+.qsq-taotab button{display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:8px 2px 7px; margin-bottom:-1px; border:0; border-bottom:2px solid transparent; background:none; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer;}
+.qsq-taotab button:hover{color:var(--text);}
+.qsq-taotab button.on{color:var(--dash-accent); border-bottom-color:var(--dash-accent);}
+.qsq-tao > .qsq-lb{margin:8px 0 -3px;}
+.qsq-tao .qsq-luulogo{padding-bottom:0; border-bottom:0; margin-top:10px;}
+/* Vạch ngăn giữa các nhóm chức năng (Chữ hiển thị · Font · Màu chữ · Giãn chữ · Lưu logo); nhóm đầu ngay dưới tab con thì không có vạch */
+.qsq-tao > .qsq-lb, .qsq-tao > .qsq-lc, .qsq-tao > .qsq-luulogo{border-top:1px dashed var(--border); padding-top:10px; margin-top:4px;}
+.qsq-tao > .qsq-taotab + .qsq-lb{border-top:0; padding-top:0;}
+.qsq-tao > .qsq-lb{margin-bottom:-3px;}
+/* Thông tin công ty: mẫu chung (xem trước các dòng + nút sửa) / từng ô tự nhập */
+.qsq-ttmau{display:flex; flex-direction:column; gap:4px; padding:10px 12px; background:var(--surface-alt); border-radius:8px; font-size:12.5px; color:var(--text);}
+.qsq-ttmau i{color:var(--text-muted);}
+.qsq-ttmau .qs-qt-btn{align-self:flex-start; margin-top:6px; height:28px; font-size:12px; gap:5px;}
+.qsq-tto{display:flex; flex-direction:column; gap:5px;}
+.qsq-tto .qsq-lb{margin:0;}
+/* Tạo logo: hàng ảnh không cần vạch ngăn (nút Lưu logo có vạch riêng); nút Lưu logo + chú thích, vạch ngăn bên dưới */
+.qsq-logoup.gon{padding-bottom:0; border-bottom:0;}
+.qsq-luulogo{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px; padding-bottom:12px; border-bottom:1px solid var(--border);}
+.qsq-luulogo .qsc-btn{height:32px; gap:5px; flex:1; justify-content:center;}
+/* Kiểu chữ logo (Logo chữ): màu chữ bên trái, nút Đậm / Nghiêng bên phải */
+.qsq-lc{display:flex; align-items:center; gap:12px; margin-top:4px;}
+.qsq-lc .qsq-mau-h{flex:1; display:flex; align-items:center; gap:8px;}
+.qsq-lc-kieu{display:flex; gap:4px;}
+.qsq-lc-kieu button{width:30px; height:28px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:14px; cursor:pointer;}
+.qsq-lc-kieu button.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); color:var(--dash-accent);}
+/* 3 logo gần nhất (chế độ Công ty): 3 ô bằng nhau, logo đang dùng viền xanh */
+.qsq-logos{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:4px;}
+.qsq-logos button{height:52px; padding:6px; border:1px solid var(--border); border-radius:8px; background:#fff; display:grid; place-items:center; cursor:pointer;}
+.qsq-logos button:hover{border-color:var(--dash-accent);}
+.qsq-logos button.on{border:2px solid var(--dash-accent); padding:5px; box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qsq-logos img{max-width:100%; max-height:100%; object-fit:contain;}
+.qsq-logos-trong{font-size:12px; color:var(--text-muted); margin-top:4px;}
+/* Hàng ảnh logo riêng: cách nút chọn nguồn phía trên, vạch ngăn bên dưới tách khỏi phần Cỡ logo / Vị trí */
+.qsq-logoup{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px; padding-bottom:12px; border-bottom:1px solid var(--border);}
+.qsq-logoup img{max-height:40px; max-width:150px; object-fit:contain; border:1px solid var(--border); border-radius:6px; padding:3px; background:#fff;}
+.qsq-logoup > span{font-size:12px; color:var(--text-muted);}
+.qsq-logoup .qs-qt-btn{height:28px; font-size:12px; gap:5px; cursor:pointer;}
+/* Ô cỡ chữ dạng số (− 12 +) */
+.qsq-so{display:flex; align-items:center; gap:6px;}
+.qsq-so button{width:30px; height:30px; padding:0; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); display:grid; place-items:center; cursor:pointer;}
+.qsq-so button:hover:not(:disabled){border-color:var(--dash-accent); color:var(--dash-accent);}
+.qsq-so button:disabled{opacity:.4; cursor:default;}
+.qsq-so .qsq-in{width:64px; text-align:center;}
+.qsq-so > span{font-size:11.5px; color:var(--text-muted);}
+/* Thông tin thêm trên bìa: mỗi dòng = nhãn | nội dung | xoá; nút gợi ý thêm nhanh */
+.qsq-ttthem{display:grid; grid-template-columns:1fr 1fr 24px; gap:6px; align-items:center;}
+.qsq-ttthem .qsc-x{width:24px; height:24px; font-size:11px;}
+.qsq-ttgoi button{border-style:dashed;}
+/* Thanh kéo cỡ logo */
+.qsq-keo{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-muted);}
+.qsq-keo input[type=range]{flex:1; accent-color:var(--dash-accent); cursor:pointer;}
+.qsq-keo b{min-width:38px; text-align:right; color:var(--text); font-weight:600;}
+.qsq-keo .qsq-link{font-size:11.5px; padding:0;}
+/* Thu phóng: nút Vừa khung + thanh kéo */
+.qsq-zoom{display:flex; align-items:center; gap:8px; height:30px; padding:0 10px 0 4px; border:1px solid var(--border); border-radius:8px; background:var(--surface);}
+.qsq-zoom button{height:24px; padding:0 9px; border:0; border-radius:6px; background:none; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer;}
+.qsq-zoom button.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsq-zoom input[type=range]{width:120px; accent-color:var(--dash-accent); cursor:pointer;}
+.qsq-zoom b{min-width:40px; font-size:12.5px; text-align:right;}
+/* Xem toàn khung: ẩn cột thiết lập + khung bên phải, trang chiếm hết chiều ngang */
+.qsq-x.full{grid-template-columns:minmax(0,1fr) !important;}
+.qsq-x.full > .qsq-side, .qsq-x.full > .qsq-dock{display:none;}
+.qsq-bar .qs-qt-btn.green, .qsq-bar .qs-qt-btn.red{height:30px; font-size:12.5px; gap:5px;}
+/* Mẫu tờ bìa: số trong hình tròn ①②③… + ⊕; mẫu đang chọn nền xanh, có thay đổi chưa lưu thì chấm cam góc trên */
+.qsq-biamau{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+.qsq-biamau button{position:relative; width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-weight:700; font-size:13px; display:grid; place-items:center; cursor:pointer; padding:0;}
+.qsq-biamau button:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qsq-biamau button.on{background:var(--dash-accent); border-color:var(--dash-accent); color:#fff;}
+.qsq-biamau button.doi::after{content:''; position:absolute; top:-1px; right:-1px; width:9px; height:9px; border-radius:50%; background:#f59e0b; border:2px solid var(--surface);}
+.qsq-biamau button.moi{border-style:dashed; color:var(--dash-accent);}
+.qsq-mod > .qsq-biamau{margin-top:2px;}
+.qsq-biaact{display:flex; gap:8px; flex-wrap:wrap;}
+.qsq-biaact .qsc-btn{height:30px; gap:5px;}
+/* Khung tiêu đề: cỡ chữ (− n +) + font trên cùng 1 hàng, ngay dưới ô chữ của dòng đó */
+.qsq-tdkieu{display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center;}
+.qsq-tdkieu .qsq-so > span{display:none;}
+/* Vạch ngăn đứt nét giữa các nhóm trong 1 khung (Khung tiêu đề: tiêu đề · dòng hạng mục · dòng mã / phiên bản / ngày) */
+.qsq-sub > .qsq-ngan{border-top:1px dashed var(--border); padding-top:12px; margin-top:4px;}
+/* Chip bật / tắt mục trên tờ bìa: dùng đúng chip cột của Bóc tách (.qs-bd-strip-chip.qs-colchip, QS.css) */
+.qsq-chipcot{display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+/* Thông tin dự án: tab con 3 cột; Tuỳ biến = 2 nhóm (Nhãn / Nội dung), mỗi nhóm cỡ + font + màu */
+.qsq-taotab.ba{grid-template-columns:repeat(3, 1fr);}
+.qsq-ttkieu{display:flex; flex-direction:column; gap:8px;}
+.qsq-ttkieu > b{font-size:12.5px; color:var(--text);}
+.qsq-ttkieu + .qsq-ttkieu{border-top:1px dashed var(--border); padding-top:12px;}
+/* Tab Thông tin: 2 khung riêng Mặc định / Mở rộng (viền + tiêu đề gạch chân + dòng phụ) */
+.qsq-ttphan{display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
+.qsq-ttphan + .qsq-ttphan{margin-top:2px;}
+.qsq-ttphan-h{display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding-bottom:8px; border-bottom:1px solid var(--border);}
+.qsq-ttphan-h b{font-size:12.5px; font-weight:700; color:var(--text);}
+.qsq-ttphan-h span{font-size:11.5px; color:var(--text-muted);}
+/* Mở rộng: mỗi dòng 1 thẻ — số thứ tự · nhãn (chữ in hoa nhỏ, như nhãn trên tờ bìa) trên, nội dung dưới · nút bỏ */
+.qsq-mr{display:flex; flex-direction:column; gap:8px;}
+.qsq-mr-dong{display:grid; grid-template-columns:22px 1fr 26px; gap:8px; align-items:center; padding:8px 8px 8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface-alt);}
+.qsq-mr-dong:focus-within{border-color:var(--dash-accent); background:var(--surface); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qsq-mr-so{width:22px; height:22px; border-radius:50%; background:var(--surface); border:1px solid var(--border); display:grid; place-items:center; font-size:11px; font-weight:700; color:var(--text-muted);}
+.qsq-mr-o{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.qsq-mr-o input, .qsq-mr-o textarea{width:100%; min-width:0; border:0; background:transparent; padding:2px 4px; border-radius:5px; font:inherit; color:var(--text); outline:none;}
+.qsq-mr-o input:hover, .qsq-mr-o textarea:hover{background:var(--surface);}
+.qsq-mr-o .qsq-mr-k{font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.qsq-mr-o .qsq-mr-v{font-size:13px; font-weight:500;}
+.qsq-mr-x{width:26px; height:26px; border:0; border-radius:6px; background:transparent; color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qsq-mr-x:hover{background:var(--danger-tint, #fde8e8); color:var(--danger, #dc2626);}
+/* Mở rộng: nhãn dài xuống dòng cho đủ chữ (ô tự giãn theo nội dung) */
+.qsq-mr-o textarea.qsq-mr-k{resize:none; overflow:hidden; field-sizing:content; min-height:0; line-height:1.35; white-space:pre-wrap; word-break:break-word;}
+/* Mặc định: nút Hiện tất cả ở hàng riêng dưới vạch ngăn */
+.qsq-ttphan-f{padding-top:10px; border-top:1px solid var(--border);}
+/* Mặc định: Hiện tất cả cùng cỡ / kiểu chữ với chip mục (in hoa đậm 11,5px) · Mở rộng: nút thêm nhanh mỗi nút 1 hàng */
+.qsq-ttphan-f .qs-colchip-act{font-size:11.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase;}
+.qsq-mr-them{display:flex; flex-direction:column; gap:6px;}
+.qsq-mr-them .qs-bd-strip-btn{width:100%; text-align:left;}
+/* Khung Mặc định / Mở rộng: hàng tiêu đề bấm để thu gọn; thu gọn thì bỏ gạch chân */
+.qsq-ttphan-h{align-items:center; cursor:pointer; user-select:none;}
+.qsq-ttphan-h:hover .qsq-subbtn{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qsq-ttphan.gon .qsq-ttphan-h{padding-bottom:0; border-bottom:0;}
+/* Nút thêm nhanh ở Mở rộng: chữ đen, viền đen */
+.qsq-mr-them .qs-bd-strip-btn.qs-colchip-act{border-color:var(--text); color:var(--text);}
+.qsq-mr-them .qs-bd-strip-btn.qs-colchip-act:hover{background:var(--surface-alt);}
+/* Tuỳ biến: mỗi nhóm (Nhãn / Nội dung / Khung bảng) 1 khung riêng, hàng trong khung giãn ra */
+.qsq-ttphan > .qsq-lb{margin:4px 0 -4px;}
+.qsq-ttphan > .qsq-chk{margin:2px 0 0;}
+.qsq-ttphan{gap:12px;}
+/* Khung bảng: mỗi mục (Viền / Ngang / Dọc / Khoảng cách dòng) 1 nhóm có tiêu đề, ngăn bằng vạch đứt; độ dày + kiểu nét trên 1 hàng */
+.qsq-khnhom{display:flex; flex-direction:column; gap:10px;}
+.qsq-khnhom + .qsq-khnhom{border-top:1px dashed var(--border); padding-top:12px;}
+.qsq-khnhom > b{font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted);}
+.qsq-khnhom > .qsq-chk{margin:0;}
+.qsq-khnhom > .qsq-lb{margin:0 0 -4px;}
+.qsq-khnet{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.qsq-khnet .qs-qt-mode button{padding:0 4px; font-size:12px;}
+/* Tuỳ biến: nhóm con trong khung con (Nhãn / Nội dung / Khung bảng nằm trong "Thông tin dự án") */
+.qsq-ttphan .qsq-ttphan{background:var(--surface-alt);}
+.qsq-ttphan > .qsq-subh:first-child{margin-top:0; padding-top:0; border-top:0;}
+/* ===== Tuỳ biến: sơ đồ trang thu nhỏ (bấm vùng để chỉnh) ===== */
+.qsq-tbmap{display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface-alt);}
+.qsq-tbmap button{cursor:pointer; font:inherit;}
+.qsq-tbmap-all{display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:12.5px !important; font-weight:600;}
+.qsq-tbmap-pg{display:flex; flex-direction:column; gap:7px; padding:12px; border:1px solid var(--border); border-radius:6px; background:#fff; box-shadow:0 1px 3px rgba(15,23,42,.08);}
+.qsq-tbmap-pg > button{position:relative; display:flex; flex-direction:column; gap:4px; padding:7px 8px; border:1.5px dashed transparent; border-radius:6px; background:transparent;}
+.qsq-tbmap-pg > button:hover, .qsq-tbmap-all:hover{border-color:var(--dash-accent);}
+.qsq-tbmap-pg > button.on, .qsq-tbmap-all.on{border-style:solid; border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qsq-tbmap-all.on{background:var(--dash-accent); color:#fff;}
+.qsq-tbmap-pg i{display:block; height:4px; border-radius:2px; background:#d4dbe4;}
+/* tiêu đề: hộp nền màu + 3 dòng chữ sáng */
+.qsq-tbmap-td{background:var(--dash-navy-2, #12314f) !important; align-items:center;}
+.qsq-tbmap-td i{background:#ffffffb3; width:55%;}
+.qsq-tbmap-td i + i{width:40%;}
+.qsq-tbmap-td i + i + i{width:30%; opacity:.7;}
+/* thông tin dự án: 2 cột nhãn / nội dung */
+.qsq-tbmap-tt{display:grid !important; grid-template-columns:1fr 1fr; column-gap:10px; row-gap:5px !important;}
+.qsq-tbmap-tt i:nth-child(odd){width:60%; background:#c3cbd6;}
+/* bảng hạng mục: hàng tiêu đề màu + dòng đề mục xám + dòng thường */
+.qsq-tbmap-ct i{height:5px;}
+.qsq-tbmap-ct i.h{height:7px; background:var(--dash-navy-2, #12314f);}
+.qsq-tbmap-ct i.sec{background:#b9c2ce;}
+/* tên + mô tả vùng đang chỉnh */
+.qsq-tbvung{display:flex; flex-direction:column; gap:2px; padding:2px 2px 0;}
+.qsq-tbvung b{font-size:14px; font-weight:800; color:var(--text);}
+.qsq-tbvung span{font-size:12px; color:var(--text-muted);}

@@ -6,7 +6,7 @@
 import * as api from '../../../api/qsApi'
 import { downloadPost } from '../../../api/files'
 import {
-  getState, setState, addLine, updateLine, reloadLines, updateProject, syncProj, newTmpId, isTmp, lineOf_,
+  getState, setState, addLine, updateLine, moveLine, reloadLines, updateProject, syncProj, newTmpId, isTmp, lineOf_,
 } from '../../../state/store'
 import { projDataSet_ } from '../../../state/projData'
 import { qsToast as toast, qsConfirm, qsAsk } from '../../common/dialogs'
@@ -72,8 +72,8 @@ export async function addItemToFloor(tang, node, sheet) {
   return l
 }
 
-/* "Chèn dòng trống bên dưới" (ctxInsertRow boc.js:38-46): SL 0, cùng hạng mục + tầng + sheet của dòng đó.
-   Như bản gốc chỉ thêm dòng (cuối tầng), không đổi chỗ / đánh lại STT các dòng khác. */
+/* "Chèn dòng trống bên dưới" (ctxInsertRow boc.js:38-46): SL 0, cùng hạng mục + tầng + sheet của dòng đó,
+   rồi dời dòng mới xuống NGAY DƯỚI dòng đang chọn (bản gốc chỉ thêm vào cuối tầng). */
 export async function insertRowBelow(lineId, node, sheet) {
   const c = cur(); if (!c) return null
   const l = lineOf_(lineId)
@@ -82,6 +82,7 @@ export async function insertRowBelow(lineId, node, sheet) {
   const nl = await addLine({ ten: 'Hạng mục mới', dvt: 'Cái', donGiaVon: 0, donGiaBan: 0, nhom: nd, loai: nodeName(nd), tang,
     extra: sheetExtra(sheet, node) }, 0)
   if (!nl) return null
+  if (l && nl.lineId) await moveLine(nl.lineId, tang, lineId, false)
   toast('Đã chèn dòng trống')
   return nl
 }

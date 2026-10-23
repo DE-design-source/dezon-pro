@@ -30,9 +30,28 @@ a.qs-dash-link{text-decoration:none;}
 .qs-dash-draft-ic:hover{border-color:var(--dash-accent); color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qs-dash-draft-ic.del:hover{border-color:var(--danger); color:var(--danger); background:var(--danger-tint);}
 
+/* Thân thẻ dự án cùng dáng danh sách của các tab khác (dòng .qsa-rq, nút .qsc-btn, nhãn .qs-bd-badge):
+   các bản nháp là dòng liền nhau ngăn bằng đường kẻ thay vì từng ô có viền; bản đang dùng tô nền + vạch nhấn bên trái */
+.qs-dash-project-body{gap:0; padding:6px 8px 10px;}
+.qs-dash-draft{position:relative; height:auto; min-height:56px; gap:12px; padding:9px 10px; border:none; border-radius:10px; background:none; transition:background .12s;}
+.qs-dash-draft + .qs-dash-draft{margin-top:0; border-top:1px solid var(--border);}
+.qs-dash-draft:hover{background:var(--dash-soft);}
+.qs-dash-draft.active{background:var(--dash-accent-tint);}
+.qs-dash-draft.active::before{content:''; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:2px; background:var(--dash-accent);}
+.qs-dash-draft-icon{width:32px; height:32px; flex:none; border-radius:8px; background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center;}
+.qs-dash-draft.active .qs-dash-draft-icon{background:var(--surface); color:var(--dash-accent);}
+.qs-dash-draft-name{font-size:13.5px; font-weight:600;}
+.qs-dash-draft-meta{font-size:12px; opacity:1;}
+.qs-dash-draft-meta.qs-dash-click:hover{opacity:1; color:var(--dash-accent);}
+.qs-dash-use-btn{width:auto; height:28px; padding:0 12px; border-radius:8px; font-size:12.5px; font-weight:600;}
+.qs-dash-use-btn:hover{border-color:var(--border); color:var(--text); background:var(--surface-alt);}
+.qs-dash-using{height:24px; padding:0 8px; border:none; border-radius:6px; font-size:11.5px; font-weight:600; gap:4px;}
+.qs-dash-draft:hover .qs-dash-draft-ic, .qs-dash-draft:focus-within .qs-dash-draft-ic{width:28px; height:28px; border-radius:8px;}
+.qs-dash-add-draft{height:32px; margin-top:6px; border-radius:8px; background:none; color:var(--dash-accent); font-size:12.5px; font-weight:600; gap:6px;}
+.qs-dash-add-draft:hover{border-color:var(--dash-accent-border); background:var(--dash-accent-tint);}
+
 /* Số tiền thật dài hơn số mẫu (vd 226.534.472 đ): bớt khoảng đệm để không bị cắt "…" ở 1440 px */
 .qs-dash-kpi-grid .qs-dash-kpi{gap:8px; padding:4px 11px;}
-.qs-dash-kpi-grid .qs-dash-kpi-value{letter-spacing:-.02em;}
 
 /* Dữ liệu dự án đang tải / lỗi tải / Phần thô lỗi: 1 dòng báo giữa băng và KPI */
 .qs-dash-pd{flex:none; display:flex; align-items:center; gap:10px;}
@@ -43,3 +62,98 @@ a.qs-dash-link{text-decoration:none;}
 
 /* Chữ phụ KPI (vd "Tổng thanh toán · gồm VAT 10%") vừa ô ở 1440 px: cỡ chữ như .dh-kpi-l của bản gốc (11px) */
 .qs-dash-kpi-grid .qs-dash-kpi-sub{font-size:11px;}
+
+/* ---------- Chế độ xem Danh sách dự án: Thẻ / Dạng thanh / Biểu tượng (ProjectList, ProjectViews) ---------- */
+.qs-dash-views{flex:none; display:flex; align-items:center; gap:2px; height:30px; padding:2px; border:1px solid var(--border); border-radius:8px; background:var(--surface);}
+.qs-dash-view{width:30px; height:24px; padding:0; border:none; border-radius:6px; background:none; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.qs-dash-view:hover{color:var(--text); background:var(--surface-alt);}
+.qs-dash-view.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+
+/* Dạng thanh: bảng cột (độ rộng kéo đổi được qua --w-*, ProjectList), bấm dòng mở các bản nháp.
+   Cột: mở/thu | biểu tượng | Dự án | Khách hàng | Trạng thái | Ngày tạo | Bản nháp | (chỗ trống) | link + xoá */
+.qs-dash-rows{display:flex; flex-direction:column; padding:6px 8px 10px; overflow-x:auto;
+  --bar-cols:22px 32px var(--w-name, 300px) var(--w-kh, 240px) var(--w-st, 120px) var(--w-date, 110px) var(--w-n, 90px) minmax(0, 1fr) auto;
+  --bar-h:56px; --bar-py:8px;}
+.qs-dash-rows.d-compact{--bar-h:42px; --bar-py:4px;}
+.qs-dash-rows.d-wide{--bar-h:72px; --bar-py:14px;}
+.qs-dash-row{border-radius:10px; min-width:max-content;}
+.qs-dash-row + .qs-dash-row{border-top:1px solid var(--border);}
+.qs-dash-row.open{background:var(--dash-soft);}
+.qs-dash-row-main{position:relative; min-height:var(--bar-h); display:grid; grid-template-columns:var(--bar-cols); align-items:center; column-gap:12px; padding:var(--bar-py) 10px; border-radius:10px; cursor:pointer;}
+.qs-dash-row-main > *{min-width:0;}
+.qs-dash-row-main:hover{background:var(--dash-soft);}
+.qs-dash-row.cur .qs-dash-row-main::before{content:''; position:absolute; left:0; top:22%; bottom:22%; width:3px; border-radius:2px; background:var(--dash-accent);}
+.qs-dash-row-tg{width:22px; height:22px; border-radius:6px; color:var(--text-muted); display:flex; align-items:center; justify-content:center;}
+.qs-dash-row-main:hover .qs-dash-row-tg{color:var(--text); background:var(--surface-alt);}
+.qs-dash-project-icon.qs-dash-row-icon{width:32px; height:32px; border-radius:8px;}
+.qs-dash-rows.d-compact .qs-dash-project-icon.qs-dash-row-icon{width:28px; height:28px;}
+.qs-dash-row-name{display:flex;}
+.qs-dash-row-name .qs-dash-project-name{max-width:100%; font-size:14px; font-weight:600;}
+.qs-dash-row-name .qs-dash-project-name:hover{color:var(--dash-accent);}
+.qs-dash-row-main > .qs-dash-project-sub{font-size:13px;}
+.qs-dash-row-st, .qs-dash-row-n{display:flex;}
+.qs-dash-row-date{font-size:12.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qs-dash-row-main .qs-dash-count{height:26px; padding:0 10px; display:flex; align-items:center; font-size:12.5px;}
+.qs-dash-row-acts{display:flex; align-items:center; gap:8px;}
+.qs-dash-row-main .qs-dash-link{margin-right:0;}
+.qs-dash-row-del{width:28px; height:28px; flex:none; padding:0; border:1px solid transparent; border-radius:8px; background:none; color:var(--text-muted); opacity:.45; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.qs-dash-row-main:hover .qs-dash-row-del{opacity:.8;}
+.qs-dash-row-del:hover{opacity:1 !important; color:var(--danger); border-color:var(--danger); background:var(--danger-tint);}
+.qs-dash-project-body.qs-dash-row-body{padding:2px 10px 12px 56px;}
+.qs-dash-row-body .qs-dash-draft.active{background:var(--surface);}
+/* Hàng tiêu đề: cùng lưới cột; vạch kéo đổi độ rộng ở mép phải mỗi tiêu đề */
+.qs-dash-row-main.qs-dash-bar-head{min-height:34px; padding-top:0; padding-bottom:0; min-width:max-content; border-bottom:1px solid var(--border); border-radius:0; cursor:default;}
+.qs-dash-row-main.qs-dash-bar-head:hover{background:none;}
+.qs-dash-bar-head + .qs-dash-row{border-top:none;}
+.qs-dash-bar-sp{grid-column:span 2;}
+.qs-dash-bar-th{position:relative; align-self:stretch; display:flex; align-items:center; font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); white-space:nowrap; overflow:visible;}
+.qs-dash-bar-rz{position:absolute; top:6px; bottom:6px; right:-8px; width:9px; z-index:1; cursor:col-resize; touch-action:none;}
+.qs-dash-bar-rz::after{content:''; position:absolute; top:0; bottom:0; left:4px; width:1px; background:var(--border);}
+.qs-dash-bar-rz:hover::after, .qs-dash-bar-rz:active::after{left:3px; width:3px; border-radius:2px; background:var(--dash-accent);}
+/* Nút Gọn / Vừa / Rộng (chiều cao dòng) dùng khung .qs-dash-views, nút rộng theo chữ */
+.qs-dash-dens .qs-dash-view{width:auto; padding:0 9px; font-size:12px; font-weight:600;}
+
+/* Biểu tượng: ô vuông nhỏ, xem được nhiều dự án một lúc */
+.qs-dash-tiles{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; padding:12px 16px 16px 13px;}
+.qs-dash-tile{position:relative; min-width:0; padding:16px 10px 13px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; display:flex; flex-direction:column; align-items:center; gap:3px; text-align:center; cursor:pointer; transition:border-color .13s ease, background .13s ease;}
+.qs-dash-tile:hover{border-color:var(--dash-accent-border); background:var(--dash-soft);}
+.qs-dash-tile.cur{border-color:var(--dash-accent-border); background:var(--dash-accent-tint);}
+.qs-dash-tile-icon{position:relative; width:52px; height:52px; margin-bottom:7px; border-radius:12px; background:var(--dash-accent-tint); color:var(--dash-accent); display:flex; align-items:center; justify-content:center;}
+.qs-dash-tile.cur .qs-dash-tile-icon{background:var(--surface);}
+.qs-dash-tile-n{position:absolute; top:-6px; right:-8px; min-width:20px; height:20px; padding:0 5px; border-radius:10px; border:2px solid var(--surface); background:var(--surface-alt); color:var(--text-muted); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+.qs-dash-tile-dot{position:absolute; bottom:-3px; right:-3px; width:12px; height:12px; border-radius:50%; border:2px solid var(--surface); background:var(--dash-profit);}
+.qs-dash-tile-name{max-width:100%; font-size:13.5px; font-weight:600; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qs-dash-tile-sub{max-width:100%; font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+@media (max-width:768px){
+  .qs-dash-project-body.qs-dash-row-body{padding-left:10px;}
+}
+
+/* Khoảng cách giữa các khối của Bảng điều khiển: một giá trị chung (16 = ~12px khi hiển thị, zoom 0,75) cho
+   hàng KPI ↔ khối dưới (gap của panel 'dash' trong QS.jsx), giữa các KPI, Danh sách dự án ↔ cột phải, các thẻ cột phải */
+.qs-dash-kpi-grid{gap:16px;}
+.qs-dash-main{gap:16px;}
+.qs-dash-side{gap:16px;}
+/* Lề của Bảng điều khiển bằng đúng khoảng cách giữa các khối: thanh tab -> hàng KPI = hàng KPI -> Danh sách dự án */
+.qs-scroll.qs-scroll-dash.qs-scroll-home{padding:16px;}
+
+/* ---------- Bố cục Bảng điều khiển thẳng mép + kéo đổi độ rộng 2 cột (OverviewTab) ----------
+   Hàng 1: 4 KPI (trên Danh sách dự án) | KPI Lợi nhuận (trên cột phải); hàng 2: Danh sách dự án | cột phải.
+   Cột phải rộng --dash-side-w; vạch .qs-dash-split nằm giữa khe 16px giữa 2 cột, kéo để đổi */
+.qs-dash-main{position:relative; grid-template-columns:minmax(0, 1fr) var(--dash-side-w, 380px);}
+.qs-dash-main .qs-dash-kpi-grid{grid-template-columns:repeat(4, minmax(0, 1fr)); align-self:stretch;}
+.qs-dash-kpi-side{display:flex; align-self:stretch; min-width:0;}
+.qs-dash-kpi-side .qs-dash-kpi{flex:1; min-width:0; gap:8px; padding:4px 11px;}
+.qs-dash-kpi-side .qs-dash-kpi-sub{font-size:11px;}
+.qs-dash-side .qs-dash-side-head{height:44px;}
+.qs-dash-split{position:absolute; top:0; bottom:0; right:calc(var(--dash-side-w, 380px) + 1px); width:14px; z-index:2; cursor:col-resize; touch-action:none;}
+.qs-dash-split::after{content:''; position:absolute; top:0; bottom:0; left:6px; width:2px; border-radius:2px; background:transparent; transition:background .12s;}
+.qs-dash-split:hover::after, .qs-dash-split:active::after{background:var(--dash-accent);}
+@media (max-width:1280px){
+  .qs-dash-main{grid-template-columns:minmax(0, 1fr);}
+  .qs-dash-main .qs-dash-kpi-grid{grid-template-columns:repeat(2, minmax(0, 1fr));}
+  .qs-dash-split{display:none;}
+}
+@media (max-width:768px){
+  .qs-dash-main .qs-dash-kpi-grid{grid-template-columns:minmax(0, 1fr);}
+}

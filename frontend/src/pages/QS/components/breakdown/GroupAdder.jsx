@@ -62,7 +62,7 @@ export default function GroupAdder({ existing, onAdd, openKey }) {
           <p className="qs-bd-adder-hint">{m.hint}</p>
         </div>
       )}
-      <button className={`qs-bd-add-group${open ? ' on' : ''}`} onClick={() => setOpen(o => !o)}><Icon name="plus" size={15} />Thêm tầng / phòng</button>
+      <button className={`qs-bd-add-group${open ? ' on' : ''}`} title="Thêm tầng / phòng" onClick={() => setOpen(o => !o)}><Icon name="plusCircle" size={16} />Tầng / phòng</button>
     </div>
   )
 }

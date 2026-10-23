@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import Pop from './Pop'
 import { TREE, nodeCount, customGroups } from '../../../lib/tree.js'
 import { tkSheetCo_ } from '../../../lib/columns.js'
@@ -33,9 +34,22 @@ export default function TreePopover({ anchor, node, cur, lines, sheet, ptLoai, o
   const lo = ptLoai || 'kt_chitiet'
   const nhom = lo.indexOf('dt_') === 0 ? 'dt' : 'kt'
   const g = PT_LOAI_NHOM.filter(x => x[0] === nhom)[0]
+  /* Danh sách dài xuống gần đáy màn hình: chỗ trống từ dưới nút hạng mục tới đáy cửa sổ, trừ phần cuối popup
+     (Phân loại / Loại báo giá / Thêm hạng mục) và lề. Popup nằm trong vùng zoom nên đổi px màn hình -> px CSS theo tỉ lệ z.
+     Chạy sau khi Pop đặt vị trí (effect của con chạy trước); vẫn vừa dưới nút nên Pop không phải lật lên trên. */
+  const listRef = useRef(null)
+  useLayoutEffect(() => {
+    const list = listRef.current
+    const pop = list && list.closest('.qs-tkp')
+    if (!pop || !anchor || !anchor.getBoundingClientRect) return
+    const z = (list.getBoundingClientRect().width / list.offsetWidth) || 1
+    const rest = pop.getBoundingClientRect().height - list.getBoundingClientRect().height
+    const avail = window.innerHeight - anchor.getBoundingClientRect().bottom - rest - 14 * z
+    list.style.maxHeight = Math.round(Math.max(220 * z, avail) / z) + 'px'
+  }, [anchor, node, sheet, ptLoai])
   return (
     <Pop anchor={anchor} width={330} className="qs-tk-tree" onClose={onClose}>
-      <div className="qs-tk-tnlist">
+      <div className="qs-tk-tnlist" ref={listRef}>
         {ns.map(n => (
           <div key={n.c} className={`qs-tk-tnode lvl${n.l}${n.c === node ? ' on' : ''}`} onClick={() => onPick(n.c)}>
             <span className="rd" />

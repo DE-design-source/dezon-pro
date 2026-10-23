@@ -16,7 +16,7 @@ html[data-theme="dark"] .qsco-viewbar b{color:var(--finance);}
 .qsco-stat-ic{width:38px; height:38px; border-radius:8px; background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex:none;}
 .qsco-stat.ok .qsco-stat-ic{background:var(--success-tint); color:var(--success);}
 .qsco-stat.warn .qsco-stat-ic{background:var(--finance-tint); color:#b45309;}
-.qsco-stat b{display:block; font-size:19px; font-weight:650; color:var(--text); letter-spacing:-.028em; line-height:1.15;}
+.qsco-stat b{display:block; font-size:19px; font-weight:650; color:var(--text); line-height:1.15;}
 .qsco-stat i{font-style:normal; font-size:11px; color:var(--text-muted); font-weight:500;}
 html[data-theme="dark"] .qsco-stat.warn .qsco-stat-ic{color:var(--finance);}
 .qsco-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:14px;}
@@ -27,9 +27,9 @@ html[data-theme="dark"] .qsco-stat.warn .qsco-stat-ic{color:var(--finance);}
 .qsco-lg{width:40px; height:40px; object-fit:contain; border:1px solid var(--border); border-radius:8px; background:#fafbfc; flex:none;}
 .qsco-ini{width:40px; height:40px; border-radius:8px; background:var(--surface-alt); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex:none;}
 .qsco-card-t{flex:1; min-width:0;}
-.qsco-nm{font-size:14px; font-weight:600; color:var(--text); letter-spacing:-.015em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsco-nm{font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .qsco-sub{font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
-.qsco-ma{display:block; font-size:10.5px; color:var(--text-muted); letter-spacing:.03em;}
+.qsco-ma{display:block; font-size:10.5px; color:var(--text-muted);}
 .qsco-badge{font-size:10.5px; font-weight:600; border-radius:99px; padding:3px 10px; white-space:nowrap;}
 .qsco-badge.ok{background:var(--success-tint); color:var(--success);}
 .qsco-badge.locked{background:var(--surface-alt); color:var(--text-muted);}
@@ -105,7 +105,7 @@ html[data-theme="dark"] .qsco-sharetag{color:var(--qs);}
 .qsco-sw.on .qsco-sw-b{background:var(--dash-accent);}
 .qsco-sw.on .qsco-sw-b::after{transform:translateX(14px);}
 .qsco-sw-t b{display:block; font-size:13px; font-weight:600; color:var(--text);}
-.qsco-sw-t i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.4;}
+.qsco-sw-t i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.5;}
 .qsco-feat{margin-top:14px; border:1px solid var(--border); border-radius:10px; overflow:hidden;}
 .qsco-feat-h{display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--dash-soft); border-bottom:1px solid var(--border); font-size:12px; font-weight:600; color:var(--text);}
 .qsco-all{margin-left:auto; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); border-radius:6px; padding:3px 9px; font:inherit; font-size:11px; cursor:pointer;}

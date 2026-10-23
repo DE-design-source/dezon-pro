@@ -7,7 +7,7 @@
 
 /* Lớp gốc cho hộp thoại / popup / toast: cùng mức thu nhỏ và bù cỡ chữ với .qs-topbar/.qs-scroll (QS.css).
    Không có kích thước để không đẩy bố cục; con dùng position:fixed nên vẫn phủ cả màn hình. */
-.qs-mroot{flex:none; width:0; height:0; overflow:visible; zoom:var(--qs-zoom, .75); --fs:calc(var(--fs-user, 1) * var(--qs-text, 1.25));}
+.qs-mroot{flex:none; width:0; height:0; overflow:visible; zoom:var(--qs-zoom, .75); --fs:calc(var(--fs-user, 1) * var(--qs-text, 1.3333)); font-size:14px;}
 .qsc-ico{flex:none; display:inline-block; vertical-align:middle;}
 
 /* ---------- Nút dùng trong hộp thoại (cùng dáng .qs-modal-btn) ---------- */
@@ -26,7 +26,7 @@
 /* Xác nhận (xacNhan_ / baoLoi_, PUB/index.html:664-678) */
 .qsc-dlg.qsc-xn{width:460px; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 120px);}
 .qsc-xn-h{display:flex; align-items:center; gap:10px; padding:16px 18px 12px;}
-.qsc-xn-h h3{margin:0; font-size:15px; font-weight:700; letter-spacing:-.015em; color:var(--text);}
+.qsc-xn-h h3{margin:0; font-size:15px; font-weight:700; color:var(--text);}
 .qsc-xn-h .qsc-ico{color:var(--dash-accent);}
 .qsc-xn.red .qsc-xn-h .qsc-ico{color:#dc2626;}
 .qsc-xn-note{padding:0 18px 12px; font-size:12.5px; line-height:1.6; color:var(--text-muted); white-space:pre-line;}
@@ -39,7 +39,7 @@
 /* Hộp nhập (askInput_, PUB/index.html:3057-3066, .pd-head / .pd-x 821-824) */
 .qsc-dlg.qsc-ask{width:400px; padding:20px 22px;}
 .qsc-ask-h{display:flex; justify-content:space-between; align-items:center; gap:10px; padding-bottom:11px; margin-bottom:12px; border-bottom:1px solid var(--border);}
-.qsc-ask-h h3{margin:0; font-size:14.5px; font-weight:650; letter-spacing:-.015em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsc-ask-h h3{margin:0; font-size:14.5px; font-weight:650; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .qsc-x{flex:none; width:27px; height:27px; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); font-size:13px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;}
 .qsc-x:hover{color:var(--text); filter:brightness(.96);}
 .qsc-ask-note{margin:0 0 12px; font-size:12.5px; color:var(--text-muted); line-height:1.55;}
@@ -58,7 +58,7 @@ html[data-ui-theme="glass"] :is(.qsc-ov, .qsc-dlg, .qsc-pop){-webkit-backdrop-fi
 html[data-ui-theme="super-glass"] :is(.qsc-ov, .qsc-dlg, .qsc-pop){-webkit-backdrop-filter:blur(40px) saturate(125%); backdrop-filter:blur(40px) saturate(125%);}
 
 /* ---------- Toast (#toast, PUB/index.html:1236-1237, 1380-1381; app.js:81) ---------- */
-.qsc-toast{position:fixed; bottom:24px; left:50%; z-index:95; max-width:calc(100vw - 40px); background:rgba(17,24,32,.93); color:#fff; padding:11px 18px; border-radius:10px; font-size:13.5px; font-weight:500; letter-spacing:.2px; line-height:1.4; box-shadow:0 12px 34px rgba(10,20,40,.32); opacity:0; transform:translateX(-50%) translateY(10px); transition:opacity .2s, transform .2s; pointer-events:none; overflow-wrap:anywhere;}
+.qsc-toast{position:fixed; bottom:24px; left:50%; z-index:95; max-width:calc(100vw - 40px); background:rgba(17,24,32,.93); color:#fff; padding:11px 18px; border-radius:10px; font-size:13.5px; font-weight:500; line-height:1.5; box-shadow:0 12px 34px rgba(10,20,40,.32); opacity:0; transform:translateX(-50%) translateY(10px); transition:opacity .2s, transform .2s; pointer-events:none; overflow-wrap:anywhere;}
 .qsc-toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
 /* Nền tối của bản gốc gần trùng nền QS tối: nâng sáng để toast còn tách khỏi trang */
 html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 12px 34px rgba(0,0,0,.5);}
@@ -72,10 +72,10 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 .qsc-iv-nav:hover{background:rgba(255,255,255,.26);}
 .qsc-iv-nav.prev{left:26px;}
 .qsc-iv-nav.next{right:26px;}
-.qsc-iv-n{position:fixed; bottom:26px; left:50%; transform:translateX(-50%); color:#fff; font-size:12.5px; font-weight:600; background:rgba(0,0,0,.42); border-radius:20px; padding:5px 14px; letter-spacing:.03em;}
+.qsc-iv-n{position:fixed; bottom:26px; left:50%; transform:translateX(-50%); color:#fff; font-size:12.5px; font-weight:600; background:rgba(0,0,0,.42); border-radius:20px; padding:5px 14px;}
 
 /* ---------- Popup tài liệu (tlPop_, PUB/index.html:749, 4496-4499, 6076-6094) ---------- */
-.qsc-pop{position:fixed; z-index:96; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:12px; box-shadow:0 14px 40px rgba(18,50,76,.14); min-width:220px; max-height:440px; overflow:auto; font-size:13px; line-height:1.4;}
+.qsc-pop{position:fixed; z-index:96; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:12px; box-shadow:0 14px 40px rgba(18,50,76,.14); min-width:220px; max-height:440px; overflow:auto; font-size:13px; line-height:1.5;}
 .qsc-pop.qsc-tl{width:360px; padding:0 10px 8px;}
 .qsc-pop-h{display:flex; align-items:baseline; gap:8px; padding:12px 4px 10px; border-bottom:1px solid var(--border);}
 .qsc-pop-h b{font-size:13px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -85,7 +85,7 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 .qsc-tl-g{padding:8px 2px 4px; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
 .qsc-tl-row{display:flex; align-items:center; gap:8px; padding:6px 4px; border-radius:7px; min-width:0;}
 .qsc-tl-row:hover{background:var(--surface-alt);}
-.qsc-tl-ext{flex:none; min-width:34px; height:18px; padding:0 5px; border-radius:4px; display:inline-grid; place-items:center; font-size:9.5px; font-weight:700; letter-spacing:.03em; background:#eef1f4; color:#4a5563;}
+.qsc-tl-ext{flex:none; min-width:34px; height:18px; padding:0 5px; border-radius:4px; display:inline-grid; place-items:center; font-size:9.5px; font-weight:700; background:#eef1f4; color:#4a5563;}
 .qsc-tl-ext.e-pdf{background:#fde8e8; color:#c0392b;}
 .qsc-tl-ext.e-dwg, .qsc-tl-ext.e-dxf, .qsc-tl-ext.e-skp{background:#e8f0fe; color:#1d4ed8;}
 .qsc-tl-ext.e-png, .qsc-tl-ext.e-jpg, .qsc-tl-ext.e-jpeg, .qsc-tl-ext.e-webp{background:#e7f7ee; color:#15803d;}

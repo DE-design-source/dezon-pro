@@ -17,7 +17,7 @@ import { useSpecs } from './catalog/useSpecs'
 /* Cột "Thông tin sản phẩm" (#pdPanel) mở khi bấm 1 SP ở danh mục - port showDetail / showDetailObj_ / pdContent_ / pdMedia_ /
    pdSpecs_* / pdPriceFoot_ / pdPanelKey_ (PUB/app.js:1076-1282) và khối "Sản phẩm đi kèm" pdLoadCombo_ / pdComboVe_ /
    pdCbBoSet_ / pdCbSL_ / pdAddCombo_ (PUB/sanpham.js:1849-1930).
-   Props: product (SP của danh mục), onClose(), onAdd(product, opts?) (như CatalogPanel; trả Promise được),
+   Props: product (SP của danh mục), width (px, = bề rộng cột Hạng mục để 2 khung bằng nhau; thiếu thì 344 theo CSS), onClose(), onAdd(product, opts?) (như CatalogPanel; trả Promise được),
           addSl (tuỳ chọn: SP là thành phần combo -> "Thêm vào bóc tách" thêm đúng SL đi kèm),
           onDragProduct(product, sl) / onDragEnd() (tuỳ chọn: kéo 1 dòng "Sản phẩm đi kèm" thả vào bảng). */
 /* Ô số SL / Số bộ: tính lại ngay khi đổi (mũi tên tăng giảm hay gõ số hợp lệ, như onchange của bản gốc); ô trống thì giữ số cũ (pdCbBoSet_ / pdCbSL_, sanpham.js:1897-1910) */
@@ -32,7 +32,7 @@ function NumIn({ value, onCommit, ...rest }) {
   )
 }
 
-export default function ProductInfo({ product, onClose, onAdd, addSl, onDragProduct, onDragEnd }) {
+export default function ProductInfo({ product, width, onClose, onAdd, addSl, onDragProduct, onDragEnd }) {
   const p = product || {}
   const { toast } = useQs()
   const { specs, error: specErr } = useSpecs()
@@ -85,7 +85,7 @@ export default function ProductInfo({ product, onClose, onAdd, addSl, onDragProd
 
   const main = imgs[at]
   return (
-    <div className="qs-card qs-bd-info">
+    <div className="qs-card qs-bd-info" style={width ? { width } : undefined}>
       <div className="qs-bd-info-head">
         <span>Thông tin sản phẩm</span>
         <button className="qs-bd-info-close" title="Đóng" onClick={onClose}><Icon name="x" size={15} /></button>

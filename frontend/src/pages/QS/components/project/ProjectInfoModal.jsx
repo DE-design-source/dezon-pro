@@ -35,9 +35,11 @@ export default function ProjectInfoModal({ onClose }) {
 
   return (
     <MrootPortal>
-      <div ref={ovRef} className="qsc-ov" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      {/* Trang toàn màn hình (không còn hộp nổi): nút "Quay lại" / Esc / ✕ để về màn trước */}
+      <div ref={ovRef} className="qsc-ov qs-pi-page">
         <div className="qsc-dlg qs-pdlg qs-pi-dlg" role="dialog" aria-modal="true">
           <div className="qs-pdlg-h">
+            <button type="button" className="qsc-btn qs-pi-back" onClick={onClose}><Icon name="arrowLeft" size={15} />Quay lại</button>
             <h3><Icon name="building" size={16} />Thông tin dự án</h3>
             <button type="button" className="qsc-x" onClick={onClose}>✕</button>
           </div>

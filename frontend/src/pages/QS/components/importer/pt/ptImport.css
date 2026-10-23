@@ -5,7 +5,7 @@
 .qsip-wrap{min-width:0;}
 .qsip-form{max-width:none;}
 .qsip-s{margin-top:14px; padding:0; overflow:hidden; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 5px rgba(11,31,58,.04);}
-.qsip-h{display:flex; align-items:center; gap:10px; margin:0; padding:16px 20px; border-bottom:1px solid var(--border); background:var(--dash-soft); font-size:15px; font-weight:600; color:var(--text); letter-spacing:-.01em; line-height:1.5;}
+.qsip-h{display:flex; align-items:center; gap:10px; margin:0; padding:16px 20px; border-bottom:1px solid var(--border); background:var(--dash-soft); font-size:15px; font-weight:600; color:var(--text); line-height:1.5;}
 .qsip-hic{display:flex; width:32px; height:32px; flex:none; align-items:center; justify-content:center; border-radius:8px; background:var(--dash-accent-tint); color:var(--text-muted);}
 .qsip-hic svg{width:18px; height:18px;}
 .qsip-note.qsi-dbnote{margin:0; padding:20px 20px 0;}
@@ -16,7 +16,7 @@
 @media (max-width:560px){ .qsip-g{grid-template-columns:1fr;} }
 .qsip-g > *{min-width:0;}
 .qsip-span2{grid-column:span 2;}
-.qsip-f label{display:block; margin:0 0 6px; font-size:12px; font-weight:600; color:var(--text); letter-spacing:.2px;}
+.qsip-f label{display:block; margin:0 0 6px; font-size:12px; font-weight:600; color:var(--text);}
 .qsip-req{color:#c33;}
 .qsip-fnote.qsi-dbnote{margin:8px 0 0; font-size:11.5px;}
 .qsip-i{position:relative; display:flex; align-items:center;}

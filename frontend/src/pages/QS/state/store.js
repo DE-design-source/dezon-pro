@@ -301,6 +301,10 @@ export function showTab(tab, intent) {
   setState(patch)
   bumpVisible(tab)
 }
+/* Ghi ý định cho 1 tab mà không mở tab đó (tab nằm ở trang khác, vd Admin / Công ty ở Cài đặt) */
+export function setIntent(tab, intent) {
+  setState({ intents: { ...S.intents, [tab]: intent } })
+}
 export function consumeIntent(tab) {
   const v = S.intents[tab]
   if (v === undefined) return undefined
@@ -455,6 +459,7 @@ export function addLine(prod, soLuong, temp) {
     }
     setLines(ls => (tid && ls.some(x => x.lineId === tid) ? ls.map(x => (x.lineId === tid ? l : x)) : [...ls, l]))
     if (q) updateLine(l.lineId, q)
+    histAdd_(maDA, l.lineId)
     return l
   }).catch(e => {
     if (tid) { delete tmpQ[tid]; delete pendingDel[tid]; setLines(ls => ls.filter(x => x.lineId !== tid)) }
@@ -473,7 +478,7 @@ export async function addBlankLine(opts) {
   } catch (e) { if (!(e && e.name === 'QsAuthError')) toast('Lỗi: ' + e.message); return null }
 }
 
-/* Xoá dòng: 1 dòng không hỏi (delLine); nhiều dòng hỏi "Không hoàn tác được" (tkBulkDel_), mỗi đợt 5 request.
+/* Xoá dòng: 1 dòng không hỏi (delLine); nhiều dòng hỏi lại (tkBulkDel_), mỗi đợt 5 request; ghi lịch sử để hoàn tác (histDel_).
    Dòng tạm: đánh dấu _del (addLine xoá khi có id thật). Trả số dòng đã xoá. */
 export async function deleteLines(ids, opts = {}) {
   ids = (ids || []).filter(Boolean)
@@ -484,7 +489,7 @@ export async function deleteLines(ids, opts = {}) {
   if (ask) {
     if (tam.length) toast(tam.length + ' dòng vừa thêm đang lưu — chưa xoá các dòng đó, thử lại sau 1–2 giây')
     if (!real.length) return 0
-    if (!(await qsConfirm('Xoá ' + real.length + ' dòng đã chọn? Không hoàn tác được.'))) return 0
+    if (!(await qsConfirm('Xoá ' + real.length + ' dòng đã chọn? Hoàn tác được bằng Ctrl+Z.'))) return 0
   } else if (tam.length) {
     tam.forEach(id => { pendingDel[id] = 1 })
     setLines(ls => ls.filter(l => tam.indexOf(l.lineId) < 0))
@@ -492,12 +497,15 @@ export async function deleteLines(ids, opts = {}) {
   let loi = 0
   let loiMsg = ''
   const xong = {}
+  const snaps = real.map(id => S.lines.find(l => l.lineId === id)).filter(Boolean).map(l => ({ ...l }))
+  const maDel = S.cur && S.cur.maDA
   for (let i = 0; i < real.length; i += 5) {
     await Promise.all(real.slice(i, i + 5).map(id => api.deleteLine(id).then(() => { xong[id] = 1 }, e => { loi++; if (!loiMsg) loiMsg = (e && e.message) || String(e) })))
   }
   setLines(ls => ls.filter(l => !xong[l.lineId]))
-  dropHistoryFor(Object.keys(xong))
-  const n = Object.keys(xong).length + (ask ? 0 : tam.length)
+  if (!histMute) dropHistoryFor(Object.keys(xong))
+  histDel_(maDel, snaps.filter(l => xong[l.lineId]))
+  const n =Object.keys(xong).length + (ask ? 0 : tam.length)
   if (ask) toast('Đã xoá ' + (real.length - loi) + ' dòng' + (loi ? (' · ' + loi + ' lỗi') : ''))
   else if (loi) toast('Lỗi xoá: ' + loiMsg + (loi > 1 ? ' (' + loi + ' dòng)' : ''))
   else toast('Đã xoá')
@@ -554,13 +562,88 @@ export function setHist(maDA, h) {
 export function dropHistoryFor(ids) {
   if (!ids || !ids.length) return
   const gone = {}; ids.forEach(id => { gone[id] = 1 })
-  const ref = e => (e.patches || []).some(p => gone[p.lineId]) || (e.moves || []).some(m => gone[m.lineId])
+  const ref = e => (e.patches || []).some(p => gone[p.lineId]) || (e.moves || []).some(m => gone[m.lineId]) || (e.added || []).some(id => gone[id])
   const hist = {}
   Object.keys(S.hist).forEach(k => {
     const h = S.hist[k]
     hist[k] = { past: h.past.filter(e => !ref(e)), future: h.future.filter(e => !ref(e)) }
   })
   setState(s => ({ hist, histVer: s.histVer + 1 }))
+}
+
+/* Hoàn tác thêm / xoá dòng: bước lịch sử {label, patches:[], moves:[], added:[id] | removed:[bản chụp dòng]}.
+   histMute_ = đang chạy hoàn tác / làm lại -> không ghi thêm bước. Thêm nhiều dòng liền nhau (< 1,5 giây, vd. combo) gộp 1 bước */
+let histMute = 0
+let lastAddAt = 0
+function histAdd_(maDA, id) {
+  if (histMute || !maDA || !id) return
+  const h = histOf(maDA); const past = h.past.slice(); const last = past[past.length - 1]
+  const now = Date.now()
+  if (last && last.added && now - lastAddAt < 1500) past[past.length - 1] = { ...last, added: last.added.concat(id), label: 'Thêm ' + (last.added.length + 1) + ' dòng' }
+  else past.push({ label: 'Thêm dòng', patches: [], moves: [], added: [id] })
+  lastAddAt = now
+  setHist(maDA, { past, future: [] })
+}
+function histDel_(maDA, snaps) {
+  if (histMute || !maDA || !snaps.length) return
+  const h = histOf(maDA)
+  setHist(maDA, { past: [...h.past, { label: snaps.length > 1 ? 'Xoá ' + snaps.length + ' dòng' : 'Xoá dòng', patches: [], moves: [], removed: snaps }], future: [] })
+}
+/* đổi mã dòng cũ -> mới trong MỌI bước lịch sử (dòng được thêm lại sau hoàn tác xoá có mã mới) */
+function histRemap_(map) {
+  const f = id => map[id] || id
+  const fix = e => ({ ...e,
+    patches: (e.patches || []).map(p => ({ ...p, lineId: f(p.lineId) })),
+    moves: (e.moves || []).map(m => ({ ...m, lineId: f(m.lineId) })),
+    added: e.added && e.added.map(f),
+    removed: e.removed && e.removed.map(l => ({ ...l, lineId: f(l.lineId) })) })
+  const hist = {}
+  Object.keys(S.hist).forEach(k => { const h = S.hist[k]; hist[k] = { past: h.past.map(fix), future: h.future.map(fix) } })
+  setState(s => ({ hist, histVer: s.histVer + 1 }))
+}
+/* thêm lại các dòng đã chụp, đặt lại đúng tầng + thứ tự cũ; trả bản chụp mang mã mới */
+async function restoreLines_(snaps) {
+  const map = {}; const out = []
+  for (const sn of snaps) {
+    const prod = { ...sn, ma: sn.maSP }
+    delete prod.lineId; delete prod.recordId; delete prod.fmt; delete prod._pending
+    const l = await addLine(prod, Number(sn.soLuong) || 0)
+    if (!l) continue
+    map[sn.lineId] = l.lineId
+    if (sn.fmt) updateLine(l.lineId, { fmt: sn.fmt })
+    out.push({ ...sn, lineId: l.lineId })
+  }
+  const want = {}; out.forEach(sn => { want[sn.lineId] = sn })
+  const arr = S.lines.map((l, i) => ({ l: want[l.lineId] ? { ...l, tang: want[l.lineId].tang || '', stt: want[l.lineId].stt } : l, i, w: want[l.lineId] ? 0 : 1 }))
+    .sort((a, b) => ((Number(a.l.stt) || 0) - (Number(b.l.stt) || 0)) || (a.w - b.w) || (a.i - b.i)).map(x => x.l)
+  if (out.length) await reorderLines(arr)
+  histRemap_(map)
+  return out
+}
+/* Bước lịch sử cho thao tác HIỂN THỊ (độ rộng / thứ tự / ẩn hiện cột, chiều cao hàng…): view = {undo(), redo()} chạy lại
+   trạng thái trước / sau. Ghi vào lịch sử của dự án đang mở để Hoàn tác / Làm lại dùng chung một hàng với sửa dữ liệu */
+export function histPushView(label, undo, redo) {
+  if (histMute || !S.cur) return
+  const ma = S.cur.maDA
+  const h = histOf(ma)
+  setHist(ma, { past: [...h.past, { label, patches: [], moves: [], view: { undo, redo } }], future: [] })
+}
+
+/* Hoàn tác / làm lại 1 bước thêm / xoá dòng (useLinesSheet.step gọi); trả bước đã cập nhật (mã dòng mới, bản chụp) */
+export async function histRunAddDel(e, dir) {
+  histMute++
+  try {
+    const delNow = (e.added && dir === 'undo') || (e.removed && dir === 'redo')
+    if (delNow) {
+      const ids = e.added || e.removed.map(l => l.lineId)
+      const snaps = ids.map(id => S.lines.find(l => l.lineId === id)).filter(Boolean).map(l => ({ ...l }))
+      await deleteLines(ids, { confirm: false })
+      return e.added ? { ...e, snaps } : e
+    }
+    const snaps = e.added ? (e.snaps || []) : e.removed
+    const out = await restoreLines_(snaps)
+    return e.added ? { ...e, added: out.map(l => l.lineId), snaps: null } : { ...e, removed: out }
+  } finally { histMute-- }
 }
 
 /* ---------- Công tác (cache dùng chung, PUB/phantho.js:644-660) ---------- */

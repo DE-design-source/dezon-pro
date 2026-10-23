@@ -310,7 +310,7 @@ export function PtLibrary() {
                       <div className="qspt-it-act">
                         {ctr && (
                           <button className={`qspt-it-fav${ctr.yeuThich ? ' on' : ''}`} title={ctr.yeuThich ? 'Bỏ khỏi công tác yêu thích' : 'Thêm vào công tác yêu thích'}
-                            onClick={e => { e.stopPropagation(); ctFavToggle(ctr) }}><QsIcon name="heart" size={13} /></button>
+                            onClick={e => { e.stopPropagation(); ctFavToggle(ctr) }}><QsIcon name="star" size={13} /></button>
                         )}
                         <button className="qspt-it-add" title="Thêm vào bảng ước tính" onClick={e => { e.stopPropagation(); ptAddFromLib(sec, a) }}><QsIcon name="plus" size={14} /></button>
                       </div>

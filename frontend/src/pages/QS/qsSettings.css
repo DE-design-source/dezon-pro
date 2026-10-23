@@ -1,0 +1,4 @@
+/* QS nhúng trong trang Cài đặt (mục Công ty / Admin, QsSettingsPanels.jsx): bỏ khung toàn trang của .qs-page,
+   vùng cuộn là cột nội dung của Cài đặt; vẫn giữ zoom + cỡ chữ của .qs-scroll để giống hệt trong /qs */
+.qs-page.qs-embed{flex:none; height:auto; min-height:0; background:none;}
+.qs-embed .qs-scroll{flex:none; padding:0; overflow:visible;}

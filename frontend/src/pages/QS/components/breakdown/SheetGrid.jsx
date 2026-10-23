@@ -3,7 +3,7 @@ import Icon from '../../../../components/ui/Icon'
 import ProductThumb from '../common/ProductThumb'
 import { ROW_NUM_WIDTH, colLetter as colLetterDefault, roman as romanDefault } from './sheet/tkModel'
 
-const ACT_W = 30
+const ACT_W = 34
 const entryTextDefault = () => ''
 
 /* Kiểu chữ / màu / căn lề đã định dạng của một ô. wrap = "Xuống dòng trong ô" của bản gốc (bảng Bóc tách), nowrap = của clone */
@@ -39,13 +39,25 @@ function fmtStyle(f) {
      emptyReplace         không có dòng nào: chỉ hiện emptyNode, bỏ cả tiêu đề cột (khung trống của Bảng tính)
      plainFmt = false     Bảng thường không tô định dạng ô (btFmt chỉ áp ở Bảng tính, btFmtAp_ bangtinh.js:179-188)
    Ở chế độ plain không có cột số dòng: kéo đổi chỗ dòng / tầng bằng ô STT. */
+/* Bề rộng cột "vừa với dữ liệu" (px bố cục, trước hệ số giãn stretch): chữ dài nhất của tiêu đề + các ô cột key + đệm; null nếu không đo được */
+export function measureColW(gridEl, key, stretch = 1) {
+  if (!gridEl) return null
+  const ctx = document.createElement('canvas').getContext('2d')
+  let max = 0
+  gridEl.querySelectorAll(`th[data-ck="${key}"], td.c-${key}`).forEach(cell => {
+    ctx.font = getComputedStyle(cell).font
+    String(cell.innerText || '').split('\n').forEach(t => { max = Math.max(max, ctx.measureText(t.trim()).width) })
+  })
+  return max ? Math.min(640, Math.max(40, Math.ceil((max + 28) / (stretch || 1)))) : null
+}
+
 export default function SheetGrid({
   gridRef, flat, cols, plain, frozen, fontSize, compact, zoom, range, anchor, editing, hits, hitKey, dropMark, flashRowId,
   onCellDown, onCellEnter, onCellDouble, onEditChange, onEditKey, onEditBlur,
   onToggleGroup, onSelectRow, onSelectCol, onSelectAll, onKeyDown, onPaste, rowClass, letters = true,
   rowId = r => r.id, entryText = entryTextDefault, colLetter = colLetterDefault, rowNumWidth = ROW_NUM_WIDTH,
-  renderCell, onCellContext, onColMenu, colMarks, rowDrag, rowHeights, onRowHeight, frozenRows = 0, gridClass = '', emptyNode = null, datalists = null,
-  roman = romanDefault, onColResize, onColMove, rowAction, emptyReplace = false, plainFmt = true,
+  renderCell, onCellContext, onColMenu, colMarks, rowDrag, rowHeights, onRowHeight, onGroupHeight = null, onHeadHeight = null, frozenRows = 0, gridClass = '', emptyNode = null, datalists = null,
+  roman = romanDefault, onColResize, onColMove, rowAction, emptyReplace = false, plainFmt = true, fitCols = false,
 }) {
   /* Bề rộng khung lưới (px bố cục) để giãn các cột cho vừa khung khi tổng bề rộng cột nhỏ hơn khung */
   const [boxW, setBoxW] = useState(0)
@@ -60,10 +72,98 @@ export default function SheetGrid({
   const numW = plain ? 0 : rowNumWidth
   const actW = rowAction ? ACT_W : 0
   const baseW = cols.reduce((s, c) => s + c.w, 0)
-  const stretch = baseW > 0 ? Math.max(1, (boxW / zoom - numW - actW) / baseW) : 1
-  const widths = cols.map(c => c.w * stretch)
-  /* Vị trí left của các cột cố định (chỉ khi đang bật đóng băng cột) */
-  let left = numW
+  /* Chỗ trống cho các cột (px bố cục), chừa 2px viền */
+  const avail = boxW / zoom - numW - actW - 2
+  /* Bề rộng tối thiểu từng cột (đo thật sau khi vẽ, xem effect đo minW bên dưới): tiêu đề + nút lọc nằm gọn trong TỐI ĐA 3 dòng,
+     cột số / căn giữa đủ cho số dài nhất trên 1 dòng. Chưa đo được thì ước lượng ~9px mỗi ký tự in hoa của từ dài nhất */
+  const [minW, setMinW] = useState({})
+  const labelMin = c => minW[c.key] || (onColMenu && c.label ? Math.max(...String(c.label).split(/\s+/).map(w => w.length)) * 9 + 36 : 0)
+  /* fitCols: co / giãn cho vừa khung — Bóc tách bật ở CẢ Bảng tính lẫn Bảng thường để bề rộng cột 2 bảng giống nhau */
+  const fit = !!fitCols
+  const fixedCol = c => c.align === 'right' || c.align === 'center'
+  /* cột người dùng tự đặt bề rộng (c.fixed): giữ đúng số đã đặt, không co / giãn, không ép theo tiêu đề */
+  const widths = cols.map(c => (c.fixed ? c.w : Math.max(c.w, labelMin(c))))
+  if (baseW > 0 && avail > 0) {
+    let total = widths.reduce((s, w) => s + w, 0)
+    if (fit && total > avail) {
+      /* fitCols (Bảng thường của Bóc tách) rộng hơn khung -> co cho VỪA KHÍT khung (không cuộn, không chừa khoảng trống):
+         bước 1 co các cột chữ (căn trái, chữ tự xuống dòng) tới tối thiểu 40%; bước 2 mới co cột số / căn giữa tới 75%;
+         không cột nào hẹp hơn tiêu đề. Chia theo tỉ lệ, cột chạm mức tối thiểu thì giữ, phần còn lại chia tiếp cho cột khác */
+      const squeeze = (pick, minK) => {
+        for (let pass = 0; pass < 6 && total > avail + 0.5; pass++) {
+          const idx = cols.map((c, i) => i).filter(i => !cols[i].fixed && pick(cols[i]) && widths[i] > Math.max(labelMin(cols[i]), cols[i].w * minK) + 0.5)
+          if (!idx.length) break
+          const cur = idx.reduce((s, i) => s + widths[i], 0)
+          const k = Math.max(0, (cur - (total - avail)) / cur)
+          idx.forEach(i => { widths[i] = Math.max(labelMin(cols[i]), cols[i].w * minK, widths[i] * k) })
+          total = widths.reduce((s, w) => s + w, 0)
+        }
+      }
+      squeeze(c => !fixedCol(c), 0.4)
+      squeeze(fixedCol, 0.75)
+    } else if (total < avail) {
+      /* hẹp hơn khung: giãn đều các cột chưa tự đặt cho đầy khung (hết cột co giãn được thì giãn cả cột đã đặt) */
+      const flexW = widths.reduce((sum, w, i) => sum + (cols[i].fixed ? 0 : w), 0)
+      if (flexW > 0) { const k = (avail - (total - flexW)) / flexW; widths.forEach((w, i) => { if (!cols[i].fixed) widths[i] = w * k }) }
+      else { const k = avail / total; widths.forEach((w, i) => { widths[i] = w * k }) }
+    }
+  }
+  /* Đo bề rộng tối thiểu (minW): tiêu đề (in hoa, font thật của ô tiêu đề) xếp tối đa 3 dòng + đệm trái 8 + chỗ nút lọc 28;
+     cột số / căn giữa: chữ dài nhất trong các ô dòng sản phẩm (300 ô đầu) trên 1 dòng + đệm. Chỉ cập nhật khi lệch > 1px */
+  const colSig = cols.map(c => c.key + ':' + c.label + ':' + (c.align || '')).join('|')
+  useLayoutEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const ctx = document.createElement('canvas').getContext('2d')
+    const th = el.querySelector('tr.qs-bd-labels th[data-ck]')
+    const hFont = th ? getComputedStyle(th).font : '700 12.5px sans-serif'
+    const next = {}
+    cols.forEach(c => {
+      let need = 0
+      if (c.label) {
+        ctx.font = hFont
+        const ww = String(c.label).toUpperCase().split(/\s+/).filter(Boolean).map(w => ctx.measureText(w).width)
+        if (ww.length) {
+          const sp = ctx.measureText(' ').width
+          const lines = W => { let n = 1, cur = 0; ww.forEach(w => { if (cur && cur + sp + w > W) { n++; cur = w } else cur = cur ? cur + sp + w : w }); return n }
+          let lo = Math.max(...ww)
+          let hi = ww.reduce((s, w) => s + w, 0) + sp * (ww.length - 1)
+          if (lines(lo) > 3) { while (hi - lo > 1) { const mid = (lo + hi) / 2; if (lines(mid) <= 3) hi = mid; else lo = mid } lo = hi }
+          need = Math.ceil(lo) + 8 + (onColMenu ? 28 : 8) + 2
+        }
+      }
+      if (fixedCol(c)) {
+        const tds = el.querySelectorAll(`tr.qs-bd-row td.c-${CSS.escape(c.key)}`)
+        if (tds.length) {
+          ctx.font = getComputedStyle(tds[0]).font
+          let mx = 0
+          for (let i = 0; i < tds.length && i < 300; i++) mx = Math.max(mx, ctx.measureText(String(tds[i].innerText || '').trim()).width)
+          if (mx) need = Math.max(need, Math.ceil(mx) + 20)
+        }
+      } else if (!compact) {
+        /* Xem tối ưu: cột chữ đủ rộng cho ~6 chữ / dòng (mẫu "Dòng sản phẩm đèn âm trần"), không rộng hơn nội dung dài nhất của cột;
+           tổng rộng hơn khung thì bảng có thanh kéo ngang thay vì bóp hẹp cột */
+        const tds = el.querySelectorAll(`tr.qs-bd-row td.c-${CSS.escape(c.key)}`)
+        if (tds.length) {
+          ctx.font = getComputedStyle(tds[0]).font
+          const target = ctx.measureText('Dòng sản phẩm đèn âm trần').width
+          let mx = 0
+          for (let i = 0; i < tds.length && i < 300; i++) String(tds[i].innerText || '').split('\n').forEach(t => { mx = Math.max(mx, ctx.measureText(t.trim()).width) })
+          if (mx) need = Math.max(need, Math.ceil(Math.min(target, mx)) + 22)
+        }
+      }
+      /* Hình ảnh: xem tối ưu (không gọn) cần đủ khung vuông 120px + đệm */
+      if (c.key === 'hinhAnh' && !compact) need = Math.max(need, 140)
+      next[c.key] = need
+    })
+    const changed = cols.some(c => Math.abs((next[c.key] || 0) - (minW[c.key] || 0)) > 1)
+    if (changed) setMinW(next)
+  }, [colSig, flat, fontSize, compact])  // eslint-disable-line react-hooks/exhaustive-deps
+  /* fac[i] = hệ số bề rộng hiển thị / bề rộng đã đặt của cột i (dùng khi kéo đổi bề rộng, vừa với dữ liệu) */
+  const fac = cols.map((c, i) => (c.w > 0 ? widths[i] / c.w : 1))
+  const colsW = widths.reduce((s, w) => s + w, 0)
+  /* Vị trí left của các cột cố định (chỉ khi đang bật đóng băng cột); rãnh nút xoá / kéo (rowAction) đứng đầu dòng, trước STT */
+  let left = numW + actW
   const pinLeft = cols.map((c, i) => { const l = left; const pin = frozen && c.pin; if (pin) left += widths[i]; return pin ? l : null })
   const lastPin = pinLeft.reduce((last, l, i) => (l === null ? last : i), -1)
   const pinStyle = i => (pinLeft[i] === null ? undefined : { left: pinLeft[i] })
@@ -97,7 +197,7 @@ export default function SheetGrid({
     const scale = (th.getBoundingClientRect().width / (th.offsetWidth || 1)) || 1
     const x0 = ev.clientX
     const w0 = th.offsetWidth
-    const st = stretch
+    const st = fac[i] || 1
     let w = cols[i].w
     const mv = e2 => { w = Math.max(40, Math.round(Math.max(40, w0 + (e2.clientX - x0) / scale) / st)); onColResize(key, w, false) }
     const up = () => { document.removeEventListener('mousemove', mv, true); document.removeEventListener('mouseup', up, true); onColResize(key, w, true) }
@@ -127,12 +227,33 @@ export default function SheetGrid({
     document.addEventListener('mousemove', mv, true); document.addEventListener('mouseup', up, true)
   }
   const colDropCls = k => (!colDrop ? '' : k === colDrop.from ? ' qs-tk-cotkeo' : k === colDrop.key ? (colDrop.before ? ' qs-tk-cotl' : ' qs-tk-cotr') : '')
-  const rsz = (key, i) => onColResize && <span className="qs-tk-thrsz" title="Kéo để đổi độ rộng cột" onMouseDown={ev => startColResize(ev, key, i)} />
+  /* Bấm đúp mép cột = vừa với dữ liệu (như Google Sheets): đo chữ dài nhất của tiêu đề + các ô cột đó */
+  function fitCol(key) {
+    const w = measureColW(gridRef.current, key, fac[cols.findIndex(c => c.key === key)] || 1)
+    if (w && onColResize) onColResize(key, w, true)
+  }
+  const rsz = (key, i) => onColResize && (
+    <span className="qs-tk-thrsz" title="Kéo để đổi độ rộng cột · bấm đúp: vừa với dữ liệu" onMouseDown={ev => startColResize(ev, key, i)}
+      onDoubleClick={ev => { ev.stopPropagation(); fitCol(key) }} />
+  )
+  /* Tay kéo đổi chiều cao hàng (mép dưới ô số dòng / ô đầu của Bảng thường); bấm đúp = vừa với dữ liệu */
+  const rgrip = (id, set) => (
+    <span className="qs-tk-rgrip" title="Kéo để đổi chiều cao hàng · bấm đúp: vừa với dữ liệu / mặc định"
+      onMouseDown={ev => startRowResize(ev, id, set)} onDoubleClick={ev => { ev.stopPropagation(); if (set) set(null, true); else onRowHeight(id, null, true) }} />
+  )
 
   /* ---- Cố định N hàng sản phẩm đầu (như Excel): dính dưới hàng tiêu đề ---- */
   useLayoutEffect(() => {
     const el = gridRef.current
     if (!el) return
+    /* Vị trí + chiều cao hàng tiêu đề cột (px của khung lưới, đã nhân zoom của bảng): CSS dùng để tô dải xanh tiêu đề
+       kéo dài qua rãnh thanh cuộn / khoảng hở bên phải, và để thanh cuộn dọc bắt đầu dưới tiêu đề */
+    const lab = el.querySelector('tr.qs-bd-labels')
+    if (lab) {
+      const zt = zoom === 1 ? 1 : zoom
+      el.style.setProperty('--qs-thl-top', (lab.offsetTop * zt) + 'px')
+      el.style.setProperty('--qs-thl-h', (lab.offsetHeight * zt) + 'px')
+    }
     el.querySelectorAll('tr.qs-tk-frzrow').forEach(tr => {
       tr.classList.remove('qs-tk-frzrow')
       tr.querySelectorAll('td').forEach(td => { td.style.top = ''; td.style.zIndex = ''; if (td.dataset.frz) { td.style.position = ''; delete td.dataset.frz } })
@@ -153,16 +274,18 @@ export default function SheetGrid({
     }
   })
 
-  function startRowResize(ev, id) {
-    if (!onRowHeight) return
+  /* set(h, done): ghi chiều cao khi kéo (done = thả chuột) — dòng sản phẩm (onRowHeight), dòng tầng (onGroupHeight), hàng tiêu đề (onHeadHeight) */
+  function startRowResize(ev, id, set) {
+    if (!set) set = (h, done) => onRowHeight(id, h, done)
+    if (!onRowHeight && !set) return
     ev.preventDefault(); ev.stopPropagation()
     const tr = ev.currentTarget.closest('tr')
     const y0 = ev.clientY
     const z = (tr.getBoundingClientRect().height / (tr.offsetHeight || 1)) || 1
     const h0 = tr.offsetHeight
     let h = h0
-    const mv = e2 => { h = Math.max(24, Math.round(h0 + (e2.clientY - y0) / z)); onRowHeight(id, h, false) }
-    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); onRowHeight(id, h, true) }
+    const mv = e2 => { h = Math.max(24, Math.round(h0 + (e2.clientY - y0) / z)); set(h, false) }
+    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); set(h, true) }
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up)
   }
 
@@ -176,35 +299,36 @@ export default function SheetGrid({
       onKeyDown={onKeyDown}
       onPaste={onPaste}
     >
-      {!(emptyReplace && !flat.length && emptyNode) && <table style={{ width: numW + baseW * stretch + actW, minWidth: zoom === 1 ? '100%' : undefined, zoom: zoom === 1 ? undefined : zoom }}>
+      {!(emptyReplace && !flat.length && emptyNode) && <table style={{ width: numW + colsW + actW, minWidth: zoom === 1 ? '100%' : undefined, zoom: zoom === 1 ? undefined : zoom }}>
         <colgroup>
           {!plain && <col style={{ width: rowNumWidth }} />}
-          {cols.map((c, i) => <col key={c.key} style={{ width: widths[i] }} />)}
           {rowAction && <col style={{ width: actW }} />}
+          {cols.map((c, i) => <col key={c.key} style={{ width: widths[i] }} />)}
         </colgroup>
         <thead>
           {!plain && letters && (
             <tr className="qs-bd-letters">
               <th className="pin corner" style={{ left: 0 }} title="Chọn tất cả" onMouseDown={onSelectAll} />
+              {rowAction && <th className="qs-tk-actth" style={{ left: numW }} />}
               {cols.map((c, i) => (
                 <th key={c.key} className={`${pinClass(i)}${i >= range.c0 && i <= range.c1 ? ' on' : ''}`} style={pinStyle(i)} onMouseDown={e => onSelectCol(i, e)}>{colLetter(i)}{rsz(c.key, i)}</th>
               ))}
-              {rowAction && <th className="qs-tk-actth" />}
             </tr>
           )}
           <tr className="qs-bd-labels">
-            {!plain && <th className="pin" style={{ left: 0 }} />}
+            {/* ô cột số của hàng tiêu đề: hàng 1 (Bóc tách — có onHeadHeight); kéo mép dưới đổi chiều cao hàng tiêu đề, như Excel */}
+            {!plain && <th className="pin qs-tk-headnum" style={{ left: 0 }}>{onHeadHeight && <>1{rgrip(null, onHeadHeight)}</>}</th>}
+            {rowAction && <th className="qs-tk-actth" style={{ left: numW }} />}
             {cols.map((c, i) => (
               <th key={c.key} data-ck={c.key} className={`${pinClass(i)}${colMarks && colMarks[c.key] ? ' qs-tk-thon' : ''}${colDropCls(c.key)}`} style={pinStyle(i)}
                 onMouseDown={e => { onSelectCol(i, e); startColMove(e, c.key) }}>
-                {c.label}
+                <span className="qs-tk-thlbl">{c.label}</span>
                 {onColMenu && (
-                  <span className="qs-tk-thmenu" title="Lọc / sắp xếp cột" onMouseDown={ev => ev.stopPropagation()} onClick={ev => onColMenu(c.key, ev)}>▾</span>
+                  <span className="qs-tk-thmenu" title="Lọc / sắp xếp cột" onMouseDown={ev => ev.stopPropagation()} onClick={ev => onColMenu(c.key, ev)}><Icon name="filter" size={11} /></span>
                 )}
                 {rsz(c.key, i)}
               </th>
             ))}
-            {rowAction && <th className="qs-tk-actth" />}
           </tr>
         </thead>
         <tbody>
@@ -250,7 +374,22 @@ export default function SheetGrid({
                     onMouseDown={ev => onSelectRow(r, ev)}
                   >
                     {e.n}
-                    {isItem && onRowHeight && <span className="qs-tk-rgrip" title="Kéo để đổi chiều cao hàng" onMouseDown={ev => startRowResize(ev, id)} />}
+                    {isItem && onRowHeight && rgrip(id)}
+                    {isGroup && onGroupHeight && rgrip(null, onGroupHeight)}
+                  </td>
+                )}
+                {/* Rãnh nút đầu dòng (trước STT, bấm nút sửa trên khối công cụ mới hiện): xoá dòng (rowAction) + tay nắm kéo đổi chỗ dòng / tầng */}
+                {rowAction && (
+                  <td className="qs-tk-actcell" style={{ left: numW }}>
+                    <span className="qs-tk-agcol">
+                      {isItem ? rowAction(e) : null}
+                      {canDrag && (
+                        <span className="qs-tk-agdrag" title={isItem ? 'Kéo để đổi chỗ dòng' : 'Kéo để đổi thứ tự tầng / phòng'} onMouseDown={ev => ev.stopPropagation()}
+                          {...dragProps(e, isGroup, isItem, id)}>
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>
+                        </span>
+                      )}
+                    </span>
                   </td>
                 )}
                 {cols.map((c, i) => {
@@ -305,24 +444,27 @@ export default function SheetGrid({
                   else if (c.key === 'docs') content = e.r.docs > 0 && <span className="qs-bd-doc"><Icon name="fileText" size={13} />{e.r.docs}</span>
                   else content = live ?? entryText(e, c.key)
                   const plainDrag = plain && canDrag && c.key === 'stt'
+                  /* Bảng thường không có cột số dòng: tay kéo đổi chiều cao hàng nằm ở mép dưới ô đầu tiên */
+                  const rg = plain && isItem && onRowHeight && i === 0
                   return (
                     <td
                       key={c.key}
                       data-r={r}
                       data-c={i}
                       {...(plainDrag ? dragProps(e, isGroup, isItem, id) : null)}
-                      className={cls + (plainDrag ? ' qs-tk-drag' : '')}
+                      className={cls + (plainDrag ? ' qs-tk-drag' : '') + (rg ? ' qs-tk-rgcell' : '')}
                       style={{ ...pinStyle(i), ...(isItem && (plainFmt || !plain) ? fmtStyle(e.r.fmt && e.r.fmt[c.key]) : null) }}
                       onMouseDown={ev => onCellDown(r, i, ev)}
                       onMouseEnter={ev => onCellEnter(r, i, ev)}
                       onDoubleClick={() => onCellDouble(r, i)}
                       onContextMenu={onCellContext ? ev => onCellContext(r, i, ev) : undefined}
                     >
-                      {content}
+                      {/* hàng đã đặt chiều cao: nội dung bị cắt theo chiều cao đó (như Google Sheets) để đặt nhỏ hơn nội dung vẫn có tác dụng */}
+                      {h && !isEditing ? <div className="qs-tk-clip" style={{ maxHeight: Math.max(14, h - (compact ? 12 : 20) - 1) }}>{content}</div> : content}
+                      {rg && rgrip(id)}
                     </td>
                   )
                 })}
-                {rowAction && <td className="qs-tk-actcell">{isItem ? rowAction(e) : null}</td>}
               </tr>
             )
           })}

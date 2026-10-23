@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Icon from '../../../../components/ui/Icon'
 import * as api from '../../api/qsApi'
 import { isAbort } from '../../api/http'
-import { useQsStore, refreshNotifCount, isAdminRole_, showTab } from '../../state/store'
+import { useQsStore, refreshNotifCount, isAdminRole_, showTab, setIntent } from '../../state/store'
+import { qsSettingsPath } from '../../QsSettingsPanels'
 import { qsToast } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
 import { EXPIRY_SHOW_EVENT } from '../common/ExpiryBanner'
@@ -17,10 +19,12 @@ import './notifications.css'
      de_xuat*   : Admin -> tab Admin + chi tiết phiếu ({dxDetail}); người khác -> tab Mua hàng + chi tiết phiếu ({dxDetail},
                   đọc qua GET /my-proposals/:code - chỉ phiếu của chính mình) (M13.1)
      sp_edit*   : Danh sách SP tìm mã và mở sản phẩm ({spSearch, openFirst})
-     expiry_*   : nhắc gia hạn công ty (M17.3, chỉ bản Go; chỉ admin nhận) -> tab Admin và hiện lại dải nhắc gia hạn
+     expiry_*   : nhắc gia hạn công ty (M17.3, chỉ bản Go; chỉ admin nhận) -> hiện lại dải nhắc gia hạn ở tab đang mở
                   (common/ExpiryBanner, sự kiện EXPIRY_SHOW_EVENT) - thẻ Thông tin công ty chưa có hạn dùng
+   "Tab Admin" nay là mục Admin của trang Cài đặt (QsSettingsPanels): ghi ý định vào store rồi chuyển trang.
    Props cố định: {} (Batch 0). */
 export default function NotificationBell() {
+  const navigate = useNavigate()
   const unread = useQsStore(s => s.notifUnread)
   const me = useQsStore(s => s.me)
   const [open, setOpen] = useState(false)
@@ -51,24 +55,25 @@ export default function NotificationBell() {
     setOpen(false)
     const refId = n.refId != null ? String(n.refId) : ''
     const isAdmin = isAdminRole_(me)
+    const openAdmin = intent => { if (intent !== undefined) setIntent('admin', intent); navigate(qsSettingsPath('admin')) }
     if (/^purchase_/.test(kind)) {
-      if (isAdmin && refId) showTab('admin', { purDetail: refId })
+      if (isAdmin && refId) openAdmin({ purDetail: refId })
       else { showTab('muahang'); qsToast(refId ? ('Đơn ' + refId) : 'Mở tab Mua hàng') }
       return
     }
     if (/^de_xuat/.test(kind)) {
-      if (!refId) { showTab(isAdmin ? 'admin' : 'muahang'); return }
-      showTab(isAdmin ? 'admin' : 'muahang', { dxDetail: refId })
+      const intent = refId ? { dxDetail: refId } : undefined
+      if (isAdmin) openAdmin(intent); else showTab('muahang', intent)
       return
     }
     if (/^delete_/.test(kind)) {
-      if (isAdmin) showTab('admin', { highlightDrq: refId })
+      if (isAdmin) openAdmin({ highlightDrq: refId })
       else { showTab('sanpham'); qsToast('Yêu cầu xoá sản phẩm ' + (kind === 'delete_approved' ? 'đã được duyệt' : kind === 'delete_rejected' ? 'bị từ chối' : 'đang chờ duyệt')) }
       return
     }
     if (/^sp_edit/.test(kind)) { showTab('sanpham', refId ? { spSearch: refId, openFirst: true } : undefined); return }
     if (/^expiry_/.test(kind)) {
-      if (isAdmin) { showTab('admin'); window.dispatchEvent(new Event(EXPIRY_SHOW_EVENT)) }
+      if (isAdmin) window.dispatchEvent(new Event(EXPIRY_SHOW_EVENT))
       else qsToast('Liên hệ quản trị hệ thống để gia hạn')
     }
   }

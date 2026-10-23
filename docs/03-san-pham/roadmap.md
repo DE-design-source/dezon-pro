@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-10-15 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-10-23 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -169,6 +169,8 @@
 - Chọn sản phẩm cho dòng hoặc tạo sản phẩm mới vào danh mục
 - Sửa ô trực tiếp, tự tính giá đại lý, đơn giá, thành tiền
 - Gõ Markup, Margin hoặc Lợi nhuận (VND) để tính ngược giá bán
+- Nút sửa ở dải chip cột: bật / tắt chip rồi Lưu, đặt tên thành bộ chọn nhanh mới (tối đa 20, lưu theo tài khoản `ui_prefs.tkPresets`, xoá trong "Chọn nhanh cột") - 🟡 chưa chạy thử trên giao diện
+- Nút bộ cột trên băng dự án mở cùng lúc "Chọn nhanh cột" + dải chip cột; cột đang hiện tự lưu theo tài khoản (`ui_prefs.tkLastCols`), mở lại đúng cột lần trước - 🟡 chưa chạy thử trên giao diện
 - Sửa hàng loạt: chuyển tầng, đặt lợi nhuận, sửa cột
 - Sao chép, nhân bản, xoá nhiều dòng
 - Kéo thả đổi vị trí dòng và thứ tự tầng, đổi tên tầng
@@ -244,6 +246,8 @@
 - Chỉnh trình bày: mỗi phần 1 trang, số dòng mỗi trang, mức phóng, kéo đổi thứ tự / độ rộng cột
 - Tổng kết & điều khoản: chiết khấu tổng, ngày báo giá, hiệu lực, tiến độ thanh toán, ghi chú
 - Thông tin công ty (tên, logo, địa chỉ, liên hệ) trên bản xem trước và bản in
+- Mẫu tờ bìa: chọn nhanh bằng số ①②… (2 mẫu dựng sẵn + tối đa 6 mẫu tự lưu theo tài khoản `ui_prefs.bgBiaMau`), ⊕ lưu cài đặt đang dùng thành mẫu mới, Lưu ghi đè / Xoá mẫu tự lưu - 🟡 chưa chạy thử trên giao diện
+- Logo tờ bìa: chế độ Công ty chọn 1 trong 3 logo gần nhất, tab "Tạo logo" chọn 1 trong 2: Logo ảnh (tải ảnh) hoặc Logo chữ (gõ chữ, chỉnh font / màu / đậm / nghiêng / giãn chữ), bấm "Lưu logo" thì logo vào danh sách của mục Công ty; thông tin công ty dưới logo theo mẫu chung hoặc tự nhập riêng cho báo giá; thanh Cỡ logo đổi cả cỡ chữ khi không có ảnh - 🟡 chưa chạy thử trên giao diện
 - Xuất Excel nhiều trang tính: Tờ bìa, Tổng cộng, 3.2 Phần hoàn thiện, 3.1 Phần thô, chi tiết theo nhóm
 - Nhúng ảnh sản phẩm vào file Excel (bỏ qua ảnh webp / gif / svg và ảnh trên 5 MB)
 - Cảnh báo dòng đang dùng giá cũ trước khi xuất Excel

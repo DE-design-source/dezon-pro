@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Icon from '../../../components/ui/Icon'
 import { useQs } from '../state/QsData'
 import { useLinesSheet } from '../state/useLinesSheet'
-import { histOf, setHist, setState, isTmp, DEFAULT_NODE } from '../state/store'
+import { histOf, setHist, setState, isTmp, DEFAULT_NODE, histPushView } from '../state/store'
 import { useTicks, tickClick_, tickSet_, tickClear_ } from '../state/tickSel'
 import CatalogPanel from './breakdown/CatalogPanel'
 import SheetHeader from './breakdown/SheetHeader'
@@ -25,20 +25,24 @@ import { CHUA_PHAN_TANG, floorsList } from '../lib/sheetModel.js'
 import {
   ROW_NUM_WIDTH, colLetter, tkColumns, lineText, lineApply, lineNumber, tkFlatten, tkEntryText, tkSheetSua_, TK_SO, TK_PRICE_KEYS, tkXlsxBody,
 } from './breakdown/sheet/tkModel'
-import { useTkCols, setColsMap, hideCol, showAllCols, moveCol, setColW } from './breakdown/sheet/tkCols'
+import { useTkCols, setColsMap, hideCol, showAllCols, moveCol, setColW, quickPreset, sameCols, toggleQuick, startEdit, cancelEdit, endEdit, resetColW } from './breakdown/sheet/tkCols'
 import { PT_LOAI_NHOM, ptLoaiNgan, ptSheetPick_, mmLoai_, usePtLoai } from './breakdown/sheet/ptLoai'
 import * as act from './breakdown/sheet/bocActions'
 import TreePopover from './breakdown/sheet/TreePopover'
-import { PresetPopover, ColsStrip, presetLabel } from './breakdown/sheet/ColsTools'
+import { PresetDock, ColsStrip, presetLabel } from './breakdown/sheet/ColsTools'
 import ContextMenu from './breakdown/sheet/ContextMenu'
+import ResizeDialog from './breakdown/sheet/ResizeDialog'
+import { measureColW } from './breakdown/SheetGrid'
 import ColFilterPop from './breakdown/sheet/ColFilterPop'
 import LinePicker from './breakdown/sheet/LinePicker'
 import BulkBar from './breakdown/sheet/BulkBar'
 import { LineUpdatePop, PriceSyncModal, LnPickPop, RecentPop } from './breakdown/sheet/SyncPops'
 import './breakdown/sheet/sheet.css'
+import { setPcAlignX } from './project/pcSlot'
 
 /* Bề rộng cột sản phẩm (px bố cục): mặc định và giới hạn khi kéo vạch ngăn */
 const CATALOG_DEFAULT = 440
+const TK_RN_W = 36
 const CATALOG_MIN = 300
 const CATALOG_MAX = 760
 const INITIAL_SEL = { a: { r: 0, c: 0 }, f: { r: 0, c: 0 } }
@@ -94,12 +98,34 @@ export default function BreakdownTab() {
   const [freezeN, setFreezeN] = useState(0)
   const [frzRows, setFrzRows] = useState(0)
   const [rowH, setRowH] = useState(() => lsJson('qs_rowh'))
+  /* chiều cao dòng tầng / phòng (đề mục lớn) và hàng tiêu đề cột: đặt ở hộp Thay đổi kích thước hàng; null = mặc định */
+  const [grpH, setGrpHS] = useState(() => Number(lsGet('qs_grph')) || null)
+  const [headH, setHeadHS] = useState(() => Number(lsGet('qs_headh')) || null)
+  const setGrpH = v => { setGrpHS(v || null); lsSet('qs_grph', v ? String(v) : '') }
+  const setHeadH = v => { setHeadHS(v || null); lsSet('qs_headh', v ? String(v) : '') }
   /* Dòng đã chọn cho thanh hàng loạt (S._tkSel, dùng chung với Chi phí / Dự án qua state/tickSel):
      Bảng thường = ô đánh dấu đầu dòng; Bảng tính = chọn cả dòng (bấm số dòng) */
   const rowSel = useTicks(cur ? cur.maDA : null)
   const sheetTick = useRef(false)
   const [adderKey, setAdderKey] = useState(0)
   const [pop, setPop] = useState(null)   // {kind, anchor, ...}
+  const [presetDock, setPresetDock] = useState(false)   // khung "Chọn nhanh cột" bên trái vùng bảng
+  /* Khung "Chọn nhanh cột" và dải chip cột đi cặp: nút bộ cột mở cả hai, đóng bên nào cũng đóng cả hai (huỷ phần đang sửa) */
+  function closeColTools() { cancelEdit(); setPresetDock(false); setPanel(p => (p === 'cols' ? null : p)) }
+  const [toolSlot, setToolSlot] = useState(null)   // khung module thanh công cụ (SheetBody vẽ thanh công cụ vào đây)
+  /* Gióng hàng: hàng nút đầu cột Hạng mục cao bằng module thanh công cụ (thanh công cụ + ô công thức) -> danh sách sản phẩm
+     bắt đầu ngang mép trên của bảng. Đo bằng ResizeObserver, gán --qs-toolmod-h lên .qs-bd-body */
+  useEffect(() => {
+    if (!toolSlot || typeof ResizeObserver === 'undefined') return undefined
+    const body = toolSlot.closest('.qs-bd-body')
+    if (!body) return undefined
+    const set = () => body.style.setProperty('--qs-toolmod-h', toolSlot.offsetHeight ? toolSlot.offsetHeight + 'px' : '')
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(toolSlot)
+    return () => { ro.disconnect(); body.style.removeProperty('--qs-toolmod-h') }
+  }, [toolSlot])
+  const [rowEdit, setRowEdit] = useState(false)   // Bảng thường: cột nút xoá / kéo dòng ở mép phải (bấm nút sửa trên khối công cụ mới hiện)
   const [imgView, setImgView] = useState('')
   const sheetApi = useRef(null)
 
@@ -126,6 +152,11 @@ export default function BreakdownTab() {
   const floorNames = groups.map(g => g.id).filter(g => g !== CHUA_PHAN_TANG)
   /* Công bố tầng đang chọn cho tab khác (Danh sách SP thêm vào đúng tầng như S.selFloor, boc.js:294) */
   useEffect(() => { setState({ selFloor: target ? targetFloor : null }) }, [target ? target.id : null, targetFloor]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* mép phải cột Hạng mục + khe kéo .qs-bd-split (15): băng dự án gióng cụm "Hạng mục đã bóc" theo mép này.
+     Không cộng khung Thông tin sản phẩm: mở / đóng khung đó thì băng dự án giữ nguyên (không bị đẩy xuống 2 hàng) */
+  /* Băng dự án canh các module theo mép phải của cột trái (cột Hạng mục) và GIỮ CỐ ĐỊNH: mở thêm khung bên trái
+     (chi tiết SP, Chọn nhanh cột, Bộ lọc) thì bảng bên dưới dời, còn băng không dồn lại (tránh mất chữ) */
+  useEffect(() => { setPcAlignX(catalogOpen ? catalogW + 12 : 0) }, [catalogOpen, catalogW])
 
   /* ---- Cột: 27 cột theo thứ tự đã lưu, cột ẩn theo bộ cột của tài khoản ---- */
   const allOn = useMemo(() => { const m = {}; COLS.forEach(c => { m[c[0]] = true }); return m }, [])
@@ -154,7 +185,7 @@ export default function BreakdownTab() {
     isNumeric: k => !!TK_SO[k],
     isFav: r => { const p = spOfLine_(r, products); return !!(p && p.yeuThich) },
     priceKeys: TK_PRICE_KEYS,
-    rowNumWidth: ROW_NUM_WIDTH,
+    rowNumWidth: TK_RN_W,   // ô góc vuông: cột số 1-2-3 rộng = hàng chữ A-B-C cao (QS.css .qs-tk-grid .qs-bd-letters)
   }), [products])
   const flatten = useCallback((gs, pred) => tkFlatten(gs, pred, sort), [sort])
   const dispFlat = useMemo(() => tkFlatten(groups, basePred, sort), [groups, basePred, sort])
@@ -264,7 +295,19 @@ export default function BreakdownTab() {
     },
   }), [sort.key, cur, lines, mutate, toast, expandFloor])
 
+  /* Hoàn tác đổi chiều cao (hàng sản phẩm / dòng tầng / hàng tiêu đề): chụp {rowH, grpH, headH} lúc bắt đầu kéo hoặc trước khi đặt */
+  const sizeRef = useRef(null)
+  sizeRef.current = { rowH, grpH, headH }
+  const sizeBase = useRef(null)
+  function applySize(st) { setRowH(st.rowH || {}); lsSet('qs_rowh', JSON.stringify(st.rowH || {})); setGrpH(st.grpH); setHeadH(st.headH) }
+  function pushSize(label, base, after) { histPushView(label, () => applySize(base), () => applySize(after)) }
+  function sizeStep(done, label, patchOf) {
+    if (!done) { if (!sizeBase.current) sizeBase.current = sizeRef.current; return }
+    const base = sizeBase.current || sizeRef.current; sizeBase.current = null
+    pushSize(label, base, { ...base, ...patchOf(base) })
+  }
   function onRowHeight(id, h, done) {
+    sizeStep(done, 'Đổi chiều cao hàng', b => ({ rowH: { ...b.rowH, [id]: h } }))
     setRowH(m => {
       const n = { ...m, [id]: h }
       if (done) lsSet('qs_rowh', JSON.stringify(n))
@@ -302,7 +345,7 @@ export default function BreakdownTab() {
     if (c.key === 'hinhAnh') {
       if (!l.hinhAnh) return ''
       const src = img1(l.hinhAnh)
-      return <ProductThumb product={l} size={plain ? 72 : 44} src={src} onClick={() => setImgView(src)} title="Bấm để xem ảnh lớn" className="qs-tk-img" />
+      return <ProductThumb product={l} size={120} src={src} onClick={() => setImgView(src)} title="Bấm để xem ảnh lớn" className="qs-tk-img" />
     }
     if (c.key === 'taiLieu') {
       const dl = lineDocs_(l, products)
@@ -474,7 +517,17 @@ export default function BreakdownTab() {
       setFrzRows(n); toast(n ? ('Đã cố định ' + n + ' hàng đầu') : 'Đã bỏ cố định hàng')
     },
     unfreezeRows: () => { setFrzRows(0); toast('Đã bỏ cố định hàng') },
+    /* Hộp "Thay đổi kích thước hàng / cột" (như Google Sheets), mở từ menu chuột phải */
+    /* Hộp Thay đổi kích thước hàng & cột (1 hộp): mở từ menu chuột phải; what = phần bật sẵn ('row' | 'col' | 'both') */
+    resizeSize: (l, key, label, what) => {
+      const tr = l ? document.querySelector(`.qs-tk-grid tr[data-row="${CSS.escape(String(l.lineId))}"]`) : null
+      const c = key ? visibleCols.find(x => x.key === key) : null
+      setPop({ kind: 'rsz', what: what || 'both', id: l ? l.lineId : null, key, label,
+        rowCur: l ? (rowH[l.lineId] || (tr ? tr.offsetHeight : 40)) : 40, colCur: (c && c.w) || 120 })
+    },
     hideCol, showAllCols,
+    clearFmt: () => { if (sheetApi.current && sheetApi.current.clearFmt) sheetApi.current.clearFmt() },
+    clearAllFmt: () => { if (sheetApi.current && sheetApi.current.clearAllFmt) { sheetApi.current.clearAllFmt(); toast('Đã xoá định dạng cả bảng — chữ về mặc định') } },
     cfToggle: rule => setCfRules(r => { const n = { ...r }; if (n[rule]) delete n[rule]; else n[rule] = 1; return n }),
     findReplace: () => setPanel('find'),
     gotoExport: () => navigate('export'),
@@ -555,7 +608,7 @@ export default function BreakdownTab() {
     </button>
   )
   const giaTool = (
-    <button className="qs-bd-tb-btn badged" title={giaLech.length ? (giaLech.length + ' dòng đang lệch giá so với Danh sách sản phẩm — bấm để cập nhật') : 'Cập nhật giá dòng theo Danh sách sản phẩm (đang khớp hết)'}
+    <button className={`qs-bd-tb-btn badged${giaLech.length ? ' warn' : ''}`} title={giaLech.length ? (giaLech.length + ' dòng đang lệch giá so với Danh sách sản phẩm — bấm để cập nhật') : 'Cập nhật giá dòng theo Danh sách sản phẩm (đang khớp hết)'}
       onMouseDown={e => e.preventDefault()} onClick={openGiaSync}>
       <Icon name="refresh" size={18} />{giaLech.length ? <span className="qs-bd-tb-badge">{giaLech.length}</span> : null}
     </button>
@@ -565,13 +618,22 @@ export default function BreakdownTab() {
      Nút Bộ lọc / Yêu thích của bản gốc thuộc cột sản phẩm bên trái (CatalogPanel) nên không lặp lại ở đây. */
   const plainTools = (a, st) => (
     <div className="qs-tk-toolbox">
-      <span className="qs-tk-toolh">Công cụ bảng</span>
+      {/* nhãn "Công cụ bảng" đã bỏ: các nút công cụ đứng đầu khối, nút Thêm tầng / phòng + Thêm hạng mục ở góc phải (st.addTools) */}
+      {/* vị trí số 1: nút cập nhật giá theo danh mục (nhóm riêng, có vạch ngăn) */}
+      {!catTools && <><span className="qs-tk-tgrp">{giaTool}</span><span className="qs-tk-tsep" /></>}
       <span className="qs-tk-tgrp">
-        {recentTool}
+        <button className={`qs-bd-tb-btn${rowEdit ? ' on' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => setRowEdit(v => !v)}
+          title={rowEdit ? 'Ẩn cột nút xoá / kéo dòng ở mép phải' : 'Hiện cột nút xoá / kéo dòng ở mép phải'}>
+          <Icon name="edit" size={18} />
+        </button>
+        {!catalogOpen && recentTool}
+        {/* vị trí số 4: đóng băng cột STT / Phòng / Tên (cùng nút với Bảng tính) */}
+        <button className={`qs-bd-tb-btn${st.frozen ? ' on' : ''}`} title="Đóng băng cột STT / Phòng / Tên" onMouseDown={e => e.preventDefault()} onClick={a.toggleFrozen}>
+          <Icon name="table" size={18} />
+        </button>
         <button className={`qs-bd-tb-btn${panel === 'find' ? ' on' : ''}`} title="Tìm & thay trong bảng (Ctrl+F)" onMouseDown={e => e.preventDefault()} onClick={() => a.togglePanel('find')}>
           <Icon name="search" size={18} />
         </button>
-        {giaTool}
       </span>
       <span className="qs-tk-tsep" />
       <span className="qs-tk-tgrp">
@@ -585,12 +647,14 @@ export default function BreakdownTab() {
           <Icon name="maximize" size={18} />
         </button>
       </span>
+      <span style={{ flex: 1 }} />
+      {st.addTools && <span className="qs-tk-addgrp">{st.addTools}</span>}
     </div>
   )
   /* Bảng thường: nút xoá dòng ở mép phải (renderActGutter boc.js:830-841), xoá 1 dòng không hỏi như delLine */
   const rowAction = e => (
     <button className="qs-tk-agx" title="Xoá dòng này" aria-label="Xoá dòng này" onMouseDown={ev => ev.stopPropagation()} onClick={() => mutate.deleteLines([e.r.lineId])}>
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
     </button>
   )
 
@@ -612,13 +676,50 @@ export default function BreakdownTab() {
       ? <div className="qs-tk-emptyrow">Chưa có tầng/hạng mục. Bấm “＋ Tầng”, rồi “＋ Hạng mục” — hoặc thêm sản phẩm từ danh mục bên trái.</div>
       : <div className="qs-tk-empty"><Icon name="layers" size={30} /><b>Hạng mục này chưa có sản phẩm</b><span>Kéo sản phẩm ở danh mục bên trái thả vào đây, bấm ＋ trên thẻ sản phẩm, hoặc bấm <b>Thêm hạng mục</b> bên dưới.</span></div>
 
+  /* Nút nhanh vị trí số 2 của thanh công cụ: bộ cột gán ở "Chọn nhanh cột" (nút sửa); chưa gán thì giữ nút cột giá */
+  const qp = quickPreset()
+  const quickTool = qp ? {
+    title: qp.name,   // chú thích = đúng tên bộ đã gán
+    count: Object.keys(qp.cols).filter(k => qp.cols[k]).length, on: sameCols(colState.cols, qp.cols), onClick: toggleQuick,
+  } : null
+  /* Đầu cột Hạng mục, giữa ô đếm SKU và Bộ lọc: cập nhật giá + bộ cột nhanh + Vừa thêm + Lịch sử thao tác
+     (ẩn cột Hạng mục thì các nút về lại thanh công cụ / khối công cụ) */
+  const catTools = catalogOpen && !isPT
+  /* Bảng thường (dùng chung thanh công cụ Bảng tính): nút bút chì hiện / ẩn cột nút xoá / kéo dòng, đặt đầu thanh */
+  const rowEditBtn = (
+    <button className={`qs-bd-tb-btn${rowEdit ? ' on' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => setRowEdit(v => !v)}
+      title={rowEdit ? 'Ẩn cột nút xoá / kéo dòng' : 'Hiện cột nút xoá / kéo dòng'}>
+      <Icon name="edit" size={18} />
+    </button>
+  )
+  const catHistory = (
+    <>
+      <span className="qs-bd-hchip">
+      {giaTool}
+      {quickTool && (
+        <button className={`qs-bd-tb-btn badged${quickTool.on ? ' on' : ''}`} title={quickTool.title} onMouseDown={e => e.preventDefault()} onClick={quickTool.onClick}>
+          <Icon name="sliders" size={18} /><span className="qs-bd-tb-badge">{quickTool.count}</span>
+        </button>
+      )}
+      </span>
+      <span className="qs-bd-headsep" />
+      <span className="qs-bd-hchip">
+      {recentTool}
+      <button className={`qs-bd-tb-btn${panel === 'history' ? ' on' : ''}`} title="Lịch sử thao tác" onMouseDown={e => e.preventDefault()} onClick={() => setPanel(p => (p === 'history' ? null : 'history'))}>
+        <Icon name="history" size={18} />
+      </button>
+      </span>
+    </>
+  )
+  const colsStrip = <ColsStrip columns={columns} cols={colState.cols} editing={colState.edit} onToggle={k => { if (k === 'ten') { toast('Không thể ẩn cột Tên sản phẩm'); return } setColsMap({ ...colState.cols, [k]: !colState.cols[k] }) }} />
+
   return (
     <>
       <div className="qs-bd-body">
         {catalogOpen && (
           <>
             <CatalogPanel
-              width={catalogW}
+              width={catalogW} headTools={catHistory}
               onAdd={(product, opts) => addProduct(product, opts || {})}
               onOpen={(product, opts) => { setDetail(product); setDetailSl((opts && opts.sl) || null) }}
               activeId={detail ? String(detail.recordId || detail.ma) : null}
@@ -641,11 +742,12 @@ export default function BreakdownTab() {
           </>
         )}
         {catalogOpen && detail && (
-          <ProductInfo product={detail} addSl={detailSl} onClose={() => setDetail(null)} onAdd={(product, opts) => addProduct(product, opts || {})}
+          <ProductInfo product={detail} width={catalogW} addSl={detailSl} onClose={() => setDetail(null)} onAdd={(product, opts) => addProduct(product, opts || {})}
             onDragProduct={onDragProduct} onDragEnd={endDragProduct} />
         )}
         {/* #pdPanel của Phần thô vẫn hiện khi ẩn cột trái như bản gốc (#bocGrid.nocat.detail, PUB/index.html:5786) */}
         {isPT && <PtDetail />}
+        {!isPT && !full && presetDock && <PresetDock width={catalogW} cols={colState.cols} onEdit={opts => { setPanel('cols'); startEdit(opts) }} onEndEdit={keep => (keep ? endEdit() : cancelEdit())} onClose={closeColTools} />}
         <div className="qs-bd-right">
           <SheetHeader
             count={isPT ? ptTot.count : sheetLines.length} treeCount={isPT ? sheetLines.length : undefined} hideCols={isPT} nodeLabel={treeSel}
@@ -656,12 +758,23 @@ export default function BreakdownTab() {
             catalogOpen={catalogOpen} onToggleCatalog={() => setCatalogOpen(o => !o)}
             colsShown={visibleCols.length} colsTotal={columns.length}
             colsOpen={panel === 'cols'} onOpenCols={() => setPanel(p => (p === 'cols' ? null : 'cols'))}
-            presetLabel={presetLabel(colState.cols)} presetOpen={!!pop && pop.kind === 'preset'}
-            onOpenPreset={e => { const at = e.currentTarget; setPop(p => (p && p.kind === 'preset' ? null : { kind: 'preset', anchor: at })) }}
+            presetLabel={presetLabel(colState.cols)} presetOpen={presetDock}
+            onOpenPreset={() => (presetDock ? closeColTools() : (setPresetDock(true), setPanel('cols')))}
           />
+          {/* Module chip cột: ngay dưới hàng đầu bảng (toàn màn hình thì vẽ trong bảng như cũ) */}
+          {!isPT && !full && panel === 'cols' && (
+            <div className="qs-bd-strip qs-bd-colmod">
+              {colsStrip}
+              <span style={{ flex: 1 }} />
+              <button className="qs-bd-strip-close" title={colState.edit ? 'Đóng (huỷ phần đang sửa)' : 'Đóng'} onClick={closeColTools}><Icon name="x" size={15} /></button>
+            </div>
+          )}
+          {/* Thanh công cụ của bảng thành module riêng (khung riêng, cách bảng 12px); toàn màn hình thì về lại trong khung bảng */}
+          {!isPT && !full && <div className="qs-card qs-bd-toolmod" ref={setToolSlot} />}
           {isPT ? <PhanThoPanel tools={extraTools} /> : (
             <div
               className={`qs-card qs-bd-sheet${dragProduct ? ' drop-active' : ''}${full ? ' full' : ''}`}
+              style={{ ...(grpH ? { '--qs-grp-h': grpH + 'px' } : null), ...(headH ? { '--qs-head-h': headH + 'px' } : null) }}
               onDragOver={onDragOver}
               onDrop={onDrop}
               onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDrop(null) }}
@@ -683,7 +796,7 @@ export default function BreakdownTab() {
                 fileName={`boc-tach-${cur ? cur.maDA : ''}`}
                 printTitle={((cur && cur.ten) || '') + ' — ' + (nodeName(node) || 'Bóc tách')}
                 columns={columns} flatten={flatten} extraPred={basePred} initialSel={INITIAL_SEL} rowClass={rowClass}
-                adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv']} extraTools={extraTools}
+                adapter={adapter} wrapKey="wrap" hideTools={catTools ? ['import', 'csv', 'cols', 'history', ...(quickTool ? ['quick'] : [])] : ['import', 'csv', 'cols']} extraTools={catTools ? null : recentTool} leadTools={plain || !catTools ? <>{!catTools && giaTool}{plain && rowEditBtn}</> : null} quickTool={quickTool}
                 onRenameGroup={(g, name) => { if (g.id !== CHUA_PHAN_TANG) act.renameFloor(g.id, name) }}
                 onInsertRow={e => (e.type === 'item' ? act.insertRowBelow(e.r.lineId, node, sheetF) : A.addToFloor(e.g))}
                 onDuplicate={ids => act.dupRows(ids)}
@@ -693,14 +806,24 @@ export default function BreakdownTab() {
                 onCellContext={ctx => setPop({ kind: 'ctx', at: { x: ctx.ev.clientX, y: ctx.ev.clientY }, entry: ctx.entry, col: ctx.col, ids: ctx.ids,
                   text: ctx.entry && ctx.col ? tkEntryText(ctx.entry, ctx.col.key) : '' })}
                 onSelItems={onSheetSel} apiRef={sheetApi}
-                onApplyEdits={applyCells} onDeleteRows={delSel} plainTools={plainTools} adderOpenKey={adderKey}
-                onColResize={setColW} onColMove={moveCol} rowAction={plain ? rowAction : undefined} emptyReplace={emptyReplace} plainFmt={false}
+                onApplyEdits={applyCells} onDeleteRows={delSel} adderOpenKey={adderKey}
+                onColResize={setColW} onColMove={moveCol} footerInTools rowAction={plain && rowEdit ? rowAction : undefined} fitCols emptyReplace={emptyReplace} plainFmt
                 renderCell={renderCell}
                 onColMenu={(key, ev) => setPop({ kind: 'flt', anchor: ev.currentTarget, key })} colMarks={colMarks}
                 rowDrag={rowDrag} rowHeights={rowH} onRowHeight={onRowHeight} frozenRows={frzRows}
+                onViewMode={opt => {
+                  /* Xem tối ưu (bật): bỏ chiều cao hàng / bề rộng cột tự đặt -> hàng cao theo nội dung, cột cân theo khung + dữ liệu.
+                     Tắt: bảng tự thu gọn hàng (SheetBody compact) để thấy được giá */
+                  if (!opt) return
+                  const base = sizeRef.current
+                  if (Object.keys(base.rowH || {}).length || base.grpH) { applySize({ ...base, rowH: {}, grpH: null }); pushSize('Xem tối ưu — chiều cao theo nội dung', base, { ...base, rowH: {}, grpH: null }) }
+                  resetColW(visibleCols.map(c => c.key))
+                }}
+                onGroupHeight={(h, done) => { sizeStep(done, 'Đổi chiều cao dòng tầng', () => ({ grpH: h })); setGrpHS(h); if (done) setGrpH(h) }}
+                onHeadHeight={(h, done) => { sizeStep(done, 'Đổi chiều cao hàng tiêu đề', () => ({ headH: h })); setHeadHS(h); if (done) setHeadH(h) }}
                 datalists={TK_DATALISTS}
                 gridClass={`qs-tk-grid${plain ? ' qs-tk-plain' : ''}`} emptyNode={empty}
-                colsPanel={<ColsStrip columns={columns} cols={colState.cols} onToggle={k => { if (k === 'ten') { toast('Không thể ẩn cột Tên sản phẩm'); return } setColsMap({ ...colState.cols, [k]: !colState.cols[k] }) }} />}
+                colsPanel={full ? colsStrip : false} toolsSlot={full ? null : toolSlot}
               />
             </div>
           )}
@@ -715,10 +838,47 @@ export default function BreakdownTab() {
           onDelete={async code => { setPop(null); if (await act.delCustomGroup(code) && node === code) setState({ node: DEFAULT_NODE }) }}
           onClose={() => setPop(null)} />
       )}
-      {visible && pop && pop.kind === 'preset' && <PresetPopover anchor={pop.anchor} cols={colState.cols} onClose={() => setPop(null)} />}
       {visible && pop && pop.kind === 'ctx' && (
         <ContextMenu mode={plain ? 'plain' : 'sheet'} at={pop.at} entry={pop.entry} col={pop.col} text={pop.text} ids={pop.ids} cf={cfRules} sortKey={sort.key} freezeN={freezeN} frzRows={frzRows}
           act={A} onClose={() => setPop(null)} />
+      )}
+      {visible && pop && pop.kind === 'rsz' && (
+        <ResizeDialog
+          parts={[
+            pop.id != null && { id: 'row', t: 'Hàng', unit: 'chiều cao của hàng', value: pop.rowCur, min: 24, on: pop.what !== 'col',
+              scopes: [['one', 'Chỉ hàng này'], ['items', 'Tất cả hàng — chỉ phần nội dung'], ['all', 'Tất cả hàng — gồm cả đề mục lớn (dòng tầng / phòng)'], ['head', 'Hàng tiêu đề cột']] },
+            pop.key && { id: 'col', t: 'Cột' + (pop.label ? ' (' + pop.label + ')' : ''), unit: 'độ rộng của cột', value: pop.colCur, min: 40, on: pop.what !== 'row',
+              scopes: [['one', 'Chỉ cột này'], ['all', 'Tất cả cột đang hiện'], ['text', 'Tất cả cột chữ (tên, thương hiệu, thông tin…)'], ['num', 'Tất cả cột số (giá, số lượng, %…)']] },
+          ].filter(Boolean)}
+          onApply={({ row, col }) => {
+            if (row) {
+              const { px, scope } = row
+              if (scope === 'one') onRowHeight(pop.id, px, true)
+              else {
+                const base = sizeRef.current
+                if (scope === 'head') { setHeadH(px); pushSize('Đổi chiều cao hàng tiêu đề', base, { ...base, headH: px || null }) }
+                else {
+                  const nrh = { ...base.rowH }; lines.forEach(l => { if (px) nrh[l.lineId] = px; else delete nrh[l.lineId] })
+                  pushSize('Đổi chiều cao các hàng', base, { ...base, rowH: nrh, grpH: scope === 'all' ? (px || null) : base.grpH })
+                  setRowH(nrh); lsSet('qs_rowh', JSON.stringify(nrh))
+                  if (scope === 'all') setGrpH(px)
+                }
+              }
+            }
+            if (col) {
+              const { px, scope } = col
+              const grid = document.querySelector('.qs-tk-grid')
+              const isNum = c => c.align === 'right' || c.align === 'center'
+              const keys = scope === 'all' ? visibleCols.map(c => c.key)
+                : scope === 'text' ? visibleCols.filter(c => !isNum(c)).map(c => c.key)
+                  : scope === 'num' ? visibleCols.filter(isNum).map(c => c.key) : [pop.key]
+              keys.forEach((k, i) => {
+                const w = px || measureColW(grid, k)
+                if (w) setColW(k, w, i === keys.length - 1)
+              })
+            }
+          }}
+          onClose={() => setPop(null)} />
       )}
       {visible && pop && pop.kind === 'flt' && (
         <ColFilterPop anchor={pop.anchor} colKey={pop.key} label={(columns.filter(c => c.key === pop.key)[0] || {}).label || pop.key}

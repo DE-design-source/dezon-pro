@@ -176,7 +176,7 @@ export function MorePop({ anchor, n, canDuyet, isAdmin, onXlsx, onUnduyet, onUnf
     <FloatPop anchor={anchor} place="above-center" onClose={onClose} className="qspl-bbpop qspl-mn">
       <button type="button" onClick={run(onXlsx)}><QsIcon name="download" size={15} /> Tải Excel {n} dòng</button>
       {canDuyet && <button type="button" onClick={run(onUnduyet)}><QsIcon name="close" size={15} /> Bỏ duyệt</button>}
-      <button type="button" onClick={run(onUnfav)}><QsIcon name="heart" size={15} /> Bỏ yêu thích</button>
+      <button type="button" onClick={run(onUnfav)}><QsIcon name="star" size={15} /> Bỏ yêu thích</button>
       <div className="qspl-mn-sep" />
       <button type="button" className="danger" onClick={run(onDelete)}><QsIcon name="trash" size={15} /> {isAdmin ? 'Xoá sản phẩm' : 'Gửi yêu cầu xoá'}</button>
     </FloatPop>

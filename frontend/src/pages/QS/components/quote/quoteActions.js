@@ -21,14 +21,16 @@ import {
   getQ, setQ, setCoverRows, coverLuu_, coverCancelPending, coverVeBanLuu_, coverBatDauGhi_, coverLanGhi_, coverLanDang_, setColOrder,
 } from './quoteState'
 import { freshModel } from './quoteModel'
-import { bgDocCols_, bgExportCols_ } from './docModel'
-import { bgDocCss_, printCss_ } from './docCss'
+import { bgDocCols_, bgExportCols_, bgBia_ } from './docModel'
+import { bgDocCss_, printCss_, bgChu_, bgFontHref_ } from './docCss'
 
 const curNow = () => getState().cur
 const pdNow = () => getState().projData || {}
 
 /* ---- Cấu hình báo giá theo dự án (projData.bgCfg) ---- */
 export function bgOptSet(k, v) { projDataSet_('bgCfg', bgOptNew_(pdNow().bgCfg, k, v)) }
+/* Ghi nhiều khoá bgCfg trong 1 lần ({khoá: giá trị}, null = xoá khoá) */
+export function bgOptSetMany(m) { projDataSet_('bgCfg', Object.keys(m).reduce((c, k) => bgOptNew_(c, k, m[k]), pdNow().bgCfg)) }
 export function bgToggle(stt) { bgOptSet('an', bgToggleAn_(pdNow().bgCfg, stt)) }
 /* trả false khi màu quá nhạt (ô chọn màu phải về lại màu cũ) */
 export function bgMauDat(m) {
@@ -180,14 +182,24 @@ export function printDoc(pages, css) {
   if (!Array.isArray(pages)) {          // mỗi lần in nội dung mới = 1 phiên bản
     bgChot('pdf')
     const m = freshModel()
-    pages = m.pages(); css = bgDocCss_(m.mau)
+    pages = m.pages(); css = bgDocCss_(m.mau, bgChu_(m.ctx.bgCfg))
   }
   const html = pages.map(pg => pg.html).join('')
-  const pcss = printCss_(css || bgDocCss_(freshModel().mau))
+  const fm = css ? null : freshModel()
+  const pcss = printCss_(css || bgDocCss_(fm.mau, bgChu_(fm.ctx.bgCfg)))
+  /* font báo giá (Montserrat / font Google) nạp trong cửa sổ in; chờ font tải xong mới in */
+  const bgCfg = (pdNow() || {}).bgCfg
+  const bia = bgBia_(bgCfg)
+  /* + font chữ logo (chế độ Chỉ tên) nếu khác font báo giá */
+  const hrefs = [bgFontHref_(bgChu_(bgCfg).font), bia.logo === 'tao' && bia.taoKieu === 'chu' && bia.lcFont ? bgFontHref_(bia.lcFont) : null,
+    bia.tdFont1 ? bgFontHref_(bia.tdFont1) : null, bia.tdHm && bia.tdFont2 ? bgFontHref_(bia.tdFont2) : null,
+    ...['ttkFont', 'ttvFont'].map(k => (bgChu_(bgCfg)[k] ? bgFontHref_(bgChu_(bgCfg)[k]) : null))]
+    .filter((h, i, a) => h && a.indexOf(h) === i)
   const w = window.open('', '_blank'); if (!w) { toast('Cho phép popup để in/PDF'); return }
-  w.document.write('<!doctype html><title>Báo giá — ' + esc(c.ten || '') + '</title><style>' + pcss + '</style><div class="qsd-doc">' + html + '</div>')
+  w.document.write('<!doctype html><title>Báo giá — ' + esc(c.ten || '') + '</title>' + hrefs.map(h => '<link rel="stylesheet" href="' + esc(h) + '">').join('') + '<style>' + pcss + '</style><div class="qsd-doc">' + html + '</div>')
   w.document.close()
-  setTimeout(() => { w.focus(); w.print() }, 400)
+  const go = () => { w.focus(); w.print() }
+  setTimeout(() => { try { w.document.fonts.ready.then(go, go) } catch (e) { go() } }, 400)
 }
 
 /* ---- Xuất Excel (doExport 'xlsx'); 'pdf' = printDoc. Trả 'gia' khi người dùng muốn cập nhật giá trước. ---- */

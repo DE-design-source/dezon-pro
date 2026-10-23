@@ -1,0 +1,2 @@
+/* Bộ lọc / ★ yêu thích ở đầu cột Hạng mục: chỉ biểu tượng (tên hiện khi rê chuột), chip tròn cùng cỡ */
+.qs-bd-catalog .qs-bd-pill-btn.qs-bd-icononly, .qs-bd-catalog .qs-bd-fav-count{width:auto; min-width:32px; padding:0 8px; justify-content:center; gap:4px;}

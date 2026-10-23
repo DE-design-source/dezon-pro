@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import './CaiDat.css'
 import { useTheme } from '../../hooks/useTheme'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
@@ -18,6 +19,8 @@ import RewardsTab from './components/RewardsTab'
 import SecurityTab from './components/SecurityTab'
 import PermissionsTab from './components/PermissionsTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
+import { QsDataProvider } from '../QS/state/QsData'
+import QsSettingsPanels, { QS_SETTINGS, useQsSettingsTabs } from '../QS/QsSettingsPanels'
 
 const tabIcon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
@@ -38,9 +41,27 @@ const TABS = [
   { key: 'permissions', label: 'Phân quyền', Panel: PermissionsTab, icon: <svg {...tabIcon}><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> },
 ]
 
+/* Mục của QS Pro (Công ty / Admin, chuyển từ thanh tab của /qs): chỉ hiện với tài khoản QS có quyền */
+const QS_ICONS = {
+  'qs-congty': <svg {...tabIcon}><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" /></svg>,
+  'qs-admin': <svg {...tabIcon}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></svg>,
+}
+
 export default function CaiDat() {
+  return (
+    <QsDataProvider>
+      <CaiDatRoot />
+    </QsDataProvider>
+  )
+}
+
+function CaiDatRoot() {
   const { theme, toggleTheme } = useTheme()
-  const [activeTab, setActiveTab] = useState('account')
+  const [params, setParams] = useSearchParams()
+  const [activeTab, setTab] = useState(() => params.get('tab') || 'account')
+  const setActiveTab = key => { setTab(key); if (params.get('tab')) setParams({}, { replace: true }) }
+  const qsTabs = useQsSettingsTabs()
+  const isQs = QS_SETTINGS.some(t => t.key === activeTab)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
@@ -76,10 +97,20 @@ export default function CaiDat() {
               {t.label}
             </button>
           ))}
+          {qsTabs.length > 0 && (
+            <div style={{ margin: '14px 14px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>QS Pro</div>
+          )}
+          {qsTabs.map(t => (
+            <button key={t.key} className={`cd-settings-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
+              {QS_ICONS[t.key]}
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Các panel — luôn mount (ẩn bằng display) để giữ giá trị đã nhập khi đổi tab, giống HTML */}
-        <div style={{ flex: 1, minWidth: 0, maxWidth: 900 }}>
+        {/* Các panel — luôn mount (ẩn bằng display) để giữ giá trị đã nhập khi đổi tab, giống HTML.
+            Mục QS (Công ty / Admin) rộng như trong /qs nên bỏ giới hạn 900px */}
+        <div style={{ flex: 1, minWidth: 0, maxWidth: isQs ? 'none' : 900 }}>
           <SettingsContext.Provider value={settings}>
             {TABS.map(({ key, Panel }) => (
               <div key={key} className="cd-settings-panel" style={{ ...panelStyle, display: activeTab === key ? 'flex' : 'none' }}>
@@ -87,6 +118,7 @@ export default function CaiDat() {
               </div>
             ))}
           </SettingsContext.Provider>
+          <QsSettingsPanels active={activeTab} />
         </div>
       </div>
 

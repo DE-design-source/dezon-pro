@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import ProductThumb from '../common/ProductThumb'
 import FilterPopover from './FilterPopover'
+import FltChips, { FltChipsTitle } from './catalog/FltChips'
 import FilterSections from './FilterSections'
 import ChildBox from './catalog/ChildBox'
 import CtLibrary from './catalog/CtLibrary'
@@ -44,12 +45,15 @@ const LIMIT = 300      // bản gốc chỉ vẽ 300 thẻ đầu (app.js:1040),
      ptCount                      chữ đếm cạnh tiêu đề, vd "156 công việc"
      ptFilters                    khối lọc riêng của Phần thô (#ptFilters, nằm chỗ khối lọc)
      ptLib                        thư viện nội dung công việc (#catList, vùng cuộn) */
-export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, onDragProduct, onDragEnd, onOpenCt, activeCt, ptCount, ptFilters, ptLib }) {
+/* Bảng "Sản phẩm yêu thích" (nút ★ ở đầu cột): mọi SP yêu thích trong hạng mục đang chọn - bỏ các lọc khác */
+const FAV_SCOPE = { fWatt: {}, fKelvin: {}, fAngle: {}, fIP: {}, fCRI: {}, fVolt: {}, fBrand: '', fCombo: '', fVs: {}, min: '', max: '', q: '', fFav: true }
+
+export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, onDragProduct, onDragEnd, onOpenCt, activeCt, ptCount, ptFilters, ptLib, headTools = null }) {
   const { products, lines, projects, cur, node, congTac, toast } = useQs()
   const { specs, error: specErr } = useSpecs()
   const st = useFilters()
   const combos = useComboCache()
-  const [popOpen, setPopOpen] = useState(false)
+  const [popOpen, setPopOpen] = useState(false)   // false | 'filter' (nút Bộ lọc) | 'fav' (nút ★: bảng Sản phẩm yêu thích)
   const [acc, setAcc] = useState({ nhom: false, inproj: false })
   const [accQ, setAccQ] = useState({ nhom: '', inproj: '' })
   const [filterH, setFilterH] = useState(null)
@@ -83,12 +87,13 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
   }), [st, vsModel, node, products, lines, projects])
 
   const list = useMemo(() => (isPT ? [] : filteredProducts(stEff, specs)), [isPT, stEff, specs])
+  const favList = useMemo(() => (popOpen === 'fav' && !isPT ? filteredProducts({ ...stEff, ...FAV_SCOPE }, specs) : []), [popOpen, isPT, stEff, specs])
   const ctSecs = useMemo(() => (isPT ? [] : ctSecsOfNode_(node, congTac)), [isPT, node, congTac])
   const shown = useMemo(() => list.slice(0, LIMIT), [list])
   const groups = useMemo(() => catVarGroups_(shown), [shown])
   const favN = favCount_(products)
   const nCt = ctSecs.reduce((a, s) => a + s.items.length, 0)
-  const countText = ctSecs.length ? nCt + ' công tác' + (list.length ? ' · ' + list.length + ' SP' : '') : list.length + ' SP'
+  const countText = ctSecs.length ? nCt + ' công tác' + (list.length ? ' · ' + list.length + ' SKU' : '') : list.length + ' SKU'
   const filtN = activeFiltCount_(stEff)
   const tags = useMemo(() => catActiveTags_(stEff, specs, dbLabelMaps_(specs).SP_COL2LABEL_), [stEff, specs])
   const hideDen = isPT || ctSecs.length > 0 || node === '3.2.5'
@@ -223,43 +228,47 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
       >
         <span className="qs-bd-product-no">{i + 1}</span>
         <div className="qs-bd-product-thumb">
-          <ProductThumb product={p} size={44} src={p.hinhAnh ? mediaUrl(String(p.hinhAnh).split('\n')[0].trim()) : ''} />
+          <ProductThumb product={p} size={76} src={p.hinhAnh ? mediaUrl(String(p.hinhAnh).split('\n')[0].trim()) : ''} />
         </div>
         <div className="qs-bd-product-main">
           <div className="qs-bd-product-name">{spTenDay_(p)}</div>
           <div className="qs-bd-product-price">{money(p.donGiaBan)} đ</div>
-          {(brand || p.comboN > 0 || kids.length > 0) && (
-            <div className="qs-bd-chips">
-              {brand && <span className="qs-bd-chip brand">{brand}</span>}
-              {p.comboN > 0 && (
-                <button className={`qs-bd-chip combo qs-bdc-chipbtn${cbMo ? ' on' : ''}`} title={'Xem ' + p.comboN + ' sản phẩm đi kèm'}
-                  onClick={e => { e.stopPropagation(); comboToggle(p) }}>
-                  <Icon name="layers" size={11} />Combo {p.comboN}<Caret up={cbMo} />
-                </button>
-              )}
-              {kids.length > 0 && (
-                <button className={`qs-bd-chip variant qs-bdc-chipbtn${varMo ? ' on' : ''}`} title={'Xem ' + (kids.length + 1) + ' biến thể của sản phẩm này'}
-                  onClick={e => { e.stopPropagation(); varToggle(p) }}>
-                  <Icon name="copy" size={11} />Biến thể {kids.length + 1}<Caret up={varMo} />
-                </button>
-              )}
-              {mau.length > 0 && (
-                <span className="qs-bdc-mau" title={mau.length + ' màu: ' + mau.join(' · ')}>
-                  {mau.slice(0, 6).map(m => { const c = spMauCss_(m); return <i key={m} className={c ? '' : 'x'} style={c ? { background: c } : undefined} /> })}
-                  {mau.length > 6 && <b>+{mau.length - 6}</b>}
-                </span>
-              )}
-            </div>
-          )}
-          {specsChips.length > 0 && (
-            <div className="qs-bdc-specs">{specsChips.map((s, j) => <span key={j} className={s.k ? 'k' : ''} title={s.t}>{s.t}</span>)}</div>
-          )}
         </div>
         <div className="qs-bd-product-actions">
           <button className={`qs-bd-heart${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'}
-            onClick={e => { e.stopPropagation(); catFav(p, !p.yeuThich) }}><Icon name="heart" size={18} /></button>
-          <button className="qs-bd-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); onAdd(p) }}><Icon name="plus" size={14} /></button>
+            onClick={e => { e.stopPropagation(); catFav(p, !p.yeuThich) }}><Icon name="star" size={18} /></button>
+          <button className="qs-bd-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); onAdd(p) }}><Icon name="plus" size={16} stroke={2.8} /></button>
         </div>
+        {(brand || p.comboN > 0 || kids.length > 0 || specsChips.length > 0) && (
+          <div className="qs-bd-product-tags">
+            {(brand || p.comboN > 0 || kids.length > 0) && (
+              <div className="qs-bd-chips">
+                {brand && <span className="qs-bd-chip brand">{brand}</span>}
+                {p.comboN > 0 && (
+                  <button className={`qs-bd-chip combo qs-bdc-chipbtn${cbMo ? ' on' : ''}`} title={'Xem ' + p.comboN + ' sản phẩm đi kèm'}
+                    onClick={e => { e.stopPropagation(); comboToggle(p) }}>
+                    <Icon name="layers" size={11} />Combo {p.comboN}<Caret up={cbMo} />
+                  </button>
+                )}
+                {kids.length > 0 && (
+                  <button className={`qs-bd-chip variant qs-bdc-chipbtn${varMo ? ' on' : ''}`} title={'Xem ' + (kids.length + 1) + ' biến thể của sản phẩm này'}
+                    onClick={e => { e.stopPropagation(); varToggle(p) }}>
+                    <Icon name="copy" size={11} />Biến thể {kids.length + 1}<Caret up={varMo} />
+                  </button>
+                )}
+                {mau.length > 0 && (
+                  <span className="qs-bdc-mau" title={mau.length + ' màu: ' + mau.join(' · ')}>
+                    {mau.slice(0, 6).map(m => { const c = spMauCss_(m); return <i key={m} className={c ? '' : 'x'} style={c ? { background: c } : undefined} /> })}
+                    {mau.length > 6 && <b>+{mau.length - 6}</b>}
+                  </span>
+                )}
+              </div>
+            )}
+            {specsChips.length > 0 && (
+              <div className="qs-bdc-specs">{specsChips.map((s, j) => <span key={j} className={s.k ? 'k' : ''} title={s.t}>{s.t}</span>)}</div>
+            )}
+          </div>
+        )}
       </div>
     )]
     if (cbMo) {
@@ -288,7 +297,8 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
           rows={G.kids.map((ix, j) => {
             const x = shown[ix]
             const lbl = catVarLbl_(x) || x.ten || ''
-            const phu = [x.thuongHieu, catVarLbl_(x) ? '' : ccSpecTxt_(x), x.comboN ? 'Combo ' + x.comboN : ''].map(t => String(t || '').trim()).filter(Boolean).join(' · ')
+            /* biến thể: không ghi lại thương hiệu (trùng sản phẩm chính ngay trên) */
+            const phu = [catVarLbl_(x) ? '' : ccSpecTxt_(x), x.comboN ? 'Combo ' + x.comboN : ''].map(t => String(t || '').trim()).filter(Boolean).join(' · ')
             return {
               stt: (i + 1) + '.' + (j + 2), x, phu, ten: coSpec_(nganhCuaSP_(x, specs)) ? spTenDay_(x) : lbl,
               onOpen: () => open(x), onAdd: () => onAdd(x),
@@ -301,34 +311,25 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
     return out
   }
 
-  return (
-    <div className="qs-card qs-bd-catalog" style={{ width }}>
-      <div className="qs-bd-catalog-head">
-        <span className="qs-bd-h">{isPT ? 'Nội dung công việc' : 'Hạng mục'}</span>
-        {isPT ? (ptCount ? <span className="qs-bd-badge">{ptCount}</span> : null) : <span className="qs-bd-badge">{countText}</span>}
-        <span style={{ flex: 1 }} />
-        {!isPT && (
-          <button ref={filtBtnRef} className={`qs-bd-pill-btn${popOpen ? ' on' : ''}`} onClick={() => setPopOpen(o => !o)}>
-            <Icon name="filter" size={14} />Bộ lọc{filtN > 0 && <span className="qs-bdc-badge">{filtN}</span>}<Caret up={popOpen} />
-          </button>
-        )}
-        {!isPT && (
-          <button className={`qs-bd-fav-count qs-bdc-favgo${st.fFav ? ' on' : ''}${favN ? '' : ' empty'}`}
-            title={st.fFav ? 'Đang lọc sản phẩm yêu thích — bấm để bỏ lọc' : (favN ? 'Chỉ hiện ' + favN + ' sản phẩm yêu thích' : 'Chưa có sản phẩm yêu thích nào')}
-            onClick={() => setF(f => ({ fFav: !f.fFav }))}>
-            <Icon name="heart" size={15} />{favN || ''}
-          </button>
-        )}
-      </div>
-      {popOpen && !isPT && (
-        <FilterPopover secs={fltSecs_(stEff, specs)} st={stEff} anchorRef={filtBtnRef} onClose={() => setPopOpen(false)} />
-      )}
-
-      {isPT && ptFilters ? (
-        <div className="qs-bdc-ptf" ref={filtersRef} style={filterH === null ? undefined : { height: filterH, maxHeight: 'none' }}>{ptFilters}</div>
-      ) : null}
-      {!isPT && (
-        <div className="qs-bd-filters" ref={filtersRef} style={filterH === null ? undefined : { height: filterH, maxHeight: 'none' }}>
+  /* Bảng Bộ lọc (mở bên phải cột) = danh sách module chung, kéo thả đổi thứ tự (FilterSections): 3 module đầu bảng dựng ở đây
+     (Khối hiển thị = chip bật / tắt khối, Đang lọc = thẻ, Phạm vi sản phẩm = Hạng mục sản phẩm + Đèn trong dự án)
+     + các module khối lọc. Cột Hạng mục chỉ còn ô tìm + danh sách sản phẩm. */
+  const fltSecs = fltSecs_(stEff, specs)
+  const lead = [
+    { id: 'chips', cls: 'qs-bd-mod-chips', title: <FltChipsTitle secs={fltSecs} st={stEff} />, body: <FltChips secs={fltSecs} st={stEff} /> },
+    tags.length > 0 && {
+      id: 'tags', cls: 'qs-bd-mod-tags', title: 'Đang lọc', body: (
+        <div className="qs-bdc-tags">
+          {tags.map(t => (
+            <span key={t.clear} className="qs-bdc-tag" title={t.lb}><i>{t.lb}</i>{t.val}<b onClick={() => clearTag(t.clear)} title="Bỏ lọc này">✕</b></span>
+          ))}
+          <button className="qs-bdc-tags-x" onClick={() => { clearAllFilters(); clearTag('nhom') }}>Xoá hết</button>
+        </div>
+      ),
+    },
+    {
+      id: 'scope', cls: 'qs-bd-mod-scope', title: 'Phạm vi sản phẩm', body: (
+        <>
           <button className={`qs-bd-accordion${nhomSel.length ? ' qs-bdc-on' : ''}`} onClick={() => setAcc(a => ({ ...a, nhom: !a.nhom }))}>
             <span className="qs-bdc-acc-lb">{nhomLabel}</span>
             <span className="qs-bd-acc-plus"><Icon name={acc.nhom ? 'minus' : 'plus'} size={10} stroke={3} /></span>
@@ -374,22 +375,67 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
               </div>
             </div>
           )}
+        </>
+      ),
+    },
+  ]
+  const filtersInner = (
+    <FilterSections st={stEff} node={node} products={products} vsModel={vsModel} hideDen={hideDen} favMode={popOpen === 'fav'} lead={lead} />
+  )
 
-          <FilterSections st={stEff} node={node} products={products} vsModel={vsModel} hideDen={hideDen} />
-
-          {tags.length > 0 && (
-            <div className="qs-bdc-tags">
-              {tags.map(t => (
-                <span key={t.clear} className="qs-bdc-tag" title={t.lb}><i>{t.lb}</i>{t.val}<b onClick={() => clearTag(t.clear)} title="Bỏ lọc này">✕</b></span>
-              ))}
-              <button className="qs-bdc-tags-x" onClick={() => { clearAllFilters(); clearTag('nhom') }}>Xoá hết</button>
-            </div>
-          )}
-        </div>
+  return (
+    <div className={`qs-card qs-bd-catalog${popOpen ? ' pop-open' : ''}`} style={{ width }}>
+      <div className="qs-bd-catalog-head">
+        {isPT && <span className="qs-bd-h">Nội dung công việc</span>}
+        {isPT ? (ptCount ? <span className="qs-bd-badge">{ptCount}</span> : null) : <span className="qs-bd-badge qs-bd-badge-pill">{countText}</span>}
+        {/* headTools: nút của bảng đặt giữa ô đếm SKU và Bộ lọc (Bóc tách: Vừa thêm + Lịch sử thao tác) */}
+        {!isPT && headTools && <><span className="qs-bd-headsep" /><span className="qs-bd-headtools">{headTools}</span></>}
+        {/* có nhóm nút đầu cột thì các nhóm dàn đều (space-between, QS.css), không cần khoảng đẩy */}
+        {!(headTools && !isPT) && <span style={{ flex: 1 }} />}
+        {!isPT && headTools && <span className="qs-bd-headsep" />}
+        {!isPT && (
+          <button ref={filtBtnRef} title={'Bộ lọc' + (filtN > 0 ? ' (' + filtN + ' đang lọc)' : '')} aria-label="Bộ lọc" className={`qs-bd-pill-btn qs-bd-icononly qs-bd-pop-anchor${popOpen === 'filter' ? ' on' : ''}`} onClick={() => setPopOpen(o => (o === 'filter' ? false : 'filter'))}>
+            <Icon name="filter" size={15} />{filtN > 0 && <span className="qs-bdc-badge">{filtN}</span>}
+          </button>
+        )}
+        {!isPT && headTools && <span className="qs-bd-headsep" />}
+        {!isPT && (
+          <button className={`qs-bd-fav-count qs-bdc-favgo qs-bd-pop-anchor${st.fFav || popOpen === 'fav' ? ' on' : ''}${favN ? '' : ' empty'}`}
+            title="Sản phẩm yêu thích" aria-label="Sản phẩm yêu thích"
+            onClick={() => setPopOpen(o => (o === 'fav' ? false : 'fav'))}>
+            <Icon name="star" size={15} />
+          </button>
+        )}
+      </div>
+      {popOpen && !isPT && (
+        popOpen === 'fav'
+          ? (
+            <FilterPopover title={'Sản phẩm yêu thích · ' + favList.length} anchorRef={filtBtnRef} onClose={() => setPopOpen(false)}
+              foot={<button className="qs-modal-btn primary" onClick={() => setPopOpen(false)}>Đóng</button>}>
+              {favList.length
+                ? (
+                  <ChildBox title="Trong hạng mục đang chọn" n={favList.length} cls="fav"
+                    rows={favList.map((x, j) => ({
+                      stt: String(j + 1), x, phu: x.thuongHieu || '',
+                      onOpen: () => open(x), onAdd: () => onAdd(x),
+                      drag: { onStart: e => dragStart(e, x, 1), onEnd: dragEnd },
+                    }))}
+                  />
+                )
+                : <div className="qs-bdc-favnone">Chưa có sản phẩm yêu thích trong hạng mục này. Bấm ☆ trên một sản phẩm để thêm.</div>}
+            </FilterPopover>
+          )
+          : <FilterPopover anchorRef={filtBtnRef} onClose={() => setPopOpen(false)}>{filtersInner}</FilterPopover>
       )}
+
+      {/* Thân cột (ô tìm + danh sách sản phẩm): module riêng, tách khỏi hàng nút đầu cột */}
+      <div className="qs-bd-catbody">
+      {isPT && ptFilters ? (
+        <div className="qs-bdc-ptf" ref={filtersRef} style={filterH === null ? undefined : { height: filterH, maxHeight: 'none' }}>{ptFilters}</div>
+      ) : null}
       {/* 3.1 cũng có thanh kéo + ô tìm như bản gốc (.catpanel-top -> cat-split -> #catFind, PUB/index.html:6670-6720);
           ô tìm ở đây không lọc thư viện Phần thô (renderPTLibrary bỏ qua catQ) */}
-      {(!isPT || ptFilters) && (
+      {isPT && ptFilters && (
         <div
           className={`qs-bd-grip${dragging ? ' dragging' : ''}`}
           title="Kéo lên/xuống để thu gọn · bấm đúp để gập nhanh"
@@ -418,11 +464,12 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
         {!isPT && groups.map(G => renderCard(G))}
         {!isPT && !list.length && !ctSecs.length && (st.fFav ? (
           <div className="qs-bdc-empty fav">
-            <Icon name="heart" size={22} />
+            <Icon name="star" size={22} />
             <b>Chưa có sản phẩm yêu thích</b>
             <span>Bấm biểu tượng trái tim ở một sản phẩm (tại đây hoặc trong Danh sách sản phẩm) để lưu lại, lần sau mở dự án mới là lấy ra dùng ngay.</span>
           </div>
         ) : <div className="qs-bdc-empty">Không có sản phẩm khớp lọc.</div>)}
+      </div>
       </div>
     </div>
   )

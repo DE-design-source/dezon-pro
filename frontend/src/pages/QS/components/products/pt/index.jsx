@@ -300,7 +300,7 @@ export default function ProductsPtMode({ catBtn } = {}) {
             <div className="qspl-bb-count"><b>{nSel}</b><span>công tác đã chọn</span><button type="button" className="qspl-bb-x" title="Bỏ chọn (Esc)" onClick={clearSel}>✕</button></div>
             <div className="qspl-bb-sep" />
             <button type="button" className="qspl-bb-b primary" onClick={() => ptBulkAdd_(tpl, selRows())}><QsIcon name="plus" size={15} /> Thêm vào bảng khái toán</button>
-            <button type="button" className="qspl-bb-b" onClick={() => ctFavBulk_(selRows(), 1)} title="Lưu vào danh sách yêu thích"><QsIcon name="heart" size={15} /> Yêu thích</button>
+            <button type="button" className="qspl-bb-b" onClick={() => ctFavBulk_(selRows(), 1)} title="Lưu vào danh sách yêu thích"><QsIcon name="star" size={15} /> Yêu thích</button>
             {canDuyet && <button type="button" className="qspl-bb-b" onClick={() => ctDuyetBulk_(selRows(), 1)} title="Đánh dấu Đã duyệt"><QsIcon name="check" size={15} /> Duyệt</button>}
             <button type="button" className="qspl-bb-b" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbedit' ? null : { kind: 'bbedit', anchor: a })) }} title="Đổi một trường cho tất cả dòng đã chọn">
               <QsIcon name="edit" size={15} /> Sửa hàng loạt <i className="car">▾</i>

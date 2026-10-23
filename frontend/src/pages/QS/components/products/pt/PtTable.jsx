@@ -279,7 +279,7 @@ function RowActions({ r, da, canDuyet, isAdmin, on }) {
   const c = ctOf_(r.a)
   return (
     <>
-      {c && <button type="button" className={`qspl-act fav${c.yeuThich ? ' on' : ''}`} title={c.yeuThich ? 'Bỏ khỏi công tác yêu thích' : 'Thêm vào công tác yêu thích'} onClick={() => on.fav(r)}><QsIcon name="heart" size={16} /></button>}
+      {c && <button type="button" className={`qspl-act fav${c.yeuThich ? ' on' : ''}`} title={c.yeuThich ? 'Bỏ khỏi công tác yêu thích' : 'Thêm vào công tác yêu thích'} onClick={() => on.fav(r)}><QsIcon name="star" size={16} /></button>}
       <button type="button" className="qspl-act add" title={da ? 'Đã có trong bảng — bấm để thêm 1 dòng nữa' : 'Thêm vào bảng khái toán của dự án đang chọn'} onClick={() => on.add(r)}><QsIcon name="pluscircle" size={18} /></button>
       {c && canDuyet && <button type="button" className={`qspl-act ${c.daDuyet ? 'undo' : 'ok'}`} title={c.daDuyet ? 'Bỏ duyệt' : 'Duyệt công tác này'} onClick={() => on.duyet(r)}><QsIcon name="check" size={16} /></button>}
       {c && <button type="button" className="qspl-act edit" title="Cập nhật công tác" onClick={() => on.editCt(r)}><QsIcon name="edit" size={16} /></button>}

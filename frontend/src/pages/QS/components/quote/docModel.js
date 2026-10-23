@@ -220,28 +220,121 @@ export function bgTongKetHTML_(q, org, ctx, me) {
 
 /* Dựng danh sách trang: [tờ bìa] + [các trang chi tiết] + [phần thô] (+ trang "Tổng kết" khi trang cuối đã quá nửa).
    Trả [{html, meta:{trang, ten, dong, tien}}]; html đã đổi tên class (docHtml_). */
+/* Các mục thông tin dự án trên tờ bìa — lấy đúng các ô của hộp "Thông tin dự án" (Bảng điều khiển), cùng tên + thứ tự;
+   in theo cặp 2 cột. BG_TT_MAC = các mục hiện sẵn (như tờ bìa cũ) */
+export const BG_TT_DS = [['ten', 'Tên dự án'], ['kh', 'Khách hàng'], ['sdt', 'Số điện thoại'], ['dc', 'Địa chỉ'], ['ma', 'Mã báo giá'],
+  ['qm', 'Quy mô'], ['dt', 'Tổng DT XD'], ['dtbg', 'DT báo giá'], ['nc', 'Nhu cầu'], ['pc', 'Phân khúc'], ['ht', 'Hiện trạng'], ['gc', 'Ghi chú']]
+export const BG_LOGO_MIN = 20
+export const BG_LOGO_MAX = 72
+export const BG_TT_MAC = ['kh', 'ht', 'ten', 'qm', 'dt', 'nc', 'pc', 'dtbg']
+/* Tuỳ chọn tờ bìa trong bgCfg: logo 'cty' (logo công ty, mặc định) | 'tao' (đang tạo logo); logoAn = true: ẩn logo (bia.logo = 'an');
+   taoKieu: 'anh' (Logo ảnh: ảnh tải lên logoAnh) | 'chu' (Logo chữ: logoChu + kiểu chữ lc*) — chọn 1 trong 2;
+   bản cũ lưu logo 'anh' (ảnh riêng) / 'chu' (chỉ tên) -> 'tao' với taoKieu tương ứng;
+   logoCo nho / vua / lon; ttCty (địa chỉ, liên hệ công ty, mặc định bật);
+   tdTen (chữ tiêu đề), tdHm / tdMa (dòng hạng mục / dòng mã-ngày, mặc định bật), tdHmTen (chữ dòng hạng mục), tdSo (cỡ chữ khung tiêu đề, mặc định 12); hienTT = mục thông tin hiện trên bìa */
+const TD_CO = [['tdCo1', 12.5], ['tdCo2', 11], ['tdCo3', 10]]
+export const TD_CO_MIN = 6
+export const TD_CO_MAX = 48
+const fontOk_ = v => (/^[A-Za-z0-9 ,'-]{1,80}$/.test(v || '') ? v : '')
+function tdCo_(c) {
+  const tk = (Number(c.tdSo) >= 8 && Number(c.tdSo) <= 24 ? Number(c.tdSo) : 12) / 12
+  const o = { tdFont1: fontOk_(c.tdFont1), tdFont2: fontOk_(c.tdFont2) }
+  TD_CO.forEach(([k, px]) => { o[k] = Number(c[k]) >= TD_CO_MIN && Number(c[k]) <= TD_CO_MAX ? Number(c[k]) : Math.round(px * tk * 10) / 10 })
+  return o
+}
+export function bgBia_(bgCfg) {
+  const c = bgCfg || {}
+  return {
+    /* logoAn: ẩn logo (bản cũ lưu logo 'an') — c.logo (tab Công ty / Tạo logo) giữ nguyên nên ẩn rồi hiện lại về đúng tab cũ */
+    logo: c.logoAn === true || c.logo === 'an' ? 'an' : (['tao', 'anh', 'chu'].indexOf(c.logo) >= 0 ? 'tao' : 'cty'), logoAnh: String(c.logoAnh || ''),
+    taoKieu: c.taoKieu === 'anh' || c.taoKieu === 'chu' ? c.taoKieu : (c.logo === 'chu' ? 'chu' : 'anh'),
+    /* logoChon: logo chọn trong 3 logo gần nhất ở chế độ Công ty (trống = logo của Thông tin công ty);
+       logoChu: chữ hiện ở chế độ Chỉ tên (trống = tên công ty) */
+    logoChon: String(c.logoChon || ''), logoChu: String(c.logoChu || ''),
+    /* kiểu chữ của chế độ Chỉ tên: font ('' = font báo giá), màu ('' = màu tiêu đề), đậm (mặc định bật), nghiêng, giãn chữ (em, -0,1–0,5, mặc định .16) */
+    /* thông tin công ty dưới logo: ttKieu 'chung' (mẫu chung bgOrg / công ty) | 'rieng' (tự nhập ttRieng {diaChi, sdt, email, web, xuong}) */
+    ttKieu: c.ttKieu === 'rieng' ? 'rieng' : 'chung',
+    ttRieng: c.ttRieng && typeof c.ttRieng === 'object' ? Object.fromEntries(['diaChi', 'sdt', 'email', 'web', 'xuong']
+      .filter(k => String(c.ttRieng[k] || '').trim()).map(k => [k, String(c.ttRieng[k]).trim()])) : {},
+    lcFont: /^[A-Za-z0-9 ,'-]{1,80}$/.test(c.lcFont || '') ? c.lcFont : '', lcMau: /^#[0-9a-f]{6}$/i.test(c.lcMau || '') ? c.lcMau : '',
+    lcDam: c.lcDam !== false, lcNghieng: !!c.lcNghieng,
+    /* cỡ chữ Logo chữ (px, 1–100); chưa đặt thì theo Cỡ logo như trước (46px ứng với chữ 26px) */
+    lcCo: Number(c.lcCo) >= 1 && Number(c.lcCo) <= 100 ? Math.round(Number(c.lcCo))
+      : Math.round((Number(c.logoPx) >= BG_LOGO_MIN && Number(c.logoPx) <= BG_LOGO_MAX ? Number(c.logoPx) : ({ nho: 34, vua: 46, lon: 64 }[c.logoCo] || 46)) * 26 / 46),
+    lcGian: c.lcGian !== '' && c.lcGian != null && Number(c.lcGian) >= -0.1 && Number(c.lcGian) <= 0.5 ? Number(c.lcGian) : 0.16,
+    logoCo: ['nho', 'vua', 'lon'].indexOf(c.logoCo) >= 0 ? c.logoCo : 'vua',
+    /* chiều cao logo (px) chỉnh bằng thanh kéo BG_LOGO_MIN–MAX, mặc định giữa = 46; bản cũ lưu logoCo nhỏ / vừa / lớn */
+    logoPx: Number(c.logoPx) >= BG_LOGO_MIN && Number(c.logoPx) <= BG_LOGO_MAX ? Number(c.logoPx) : ({ nho: 34, vua: 46, lon: 64 }[c.logoCo] || 46),
+    tenCty: !!c.tenCty, ttCty: c.ttCty !== false,
+    /* vị trí logo: 'trai' | 'giua' | 'phai' (hàng trên cùng của tờ bìa) */
+    logoVt: ['trai', 'giua', 'phai'].indexOf(c.logoVt) >= 0 ? c.logoVt : 'trai',
+    /* dòng thứ 3 của khung tiêu đề tách riêng 3 mục (bản cũ tdMa = false thì tắt cả 3) */
+    tdMaBG: c.tdMaBG != null ? c.tdMaBG !== false : c.tdMa !== false, tdPB: c.tdPB != null ? c.tdPB !== false : c.tdMa !== false,
+    tdNgay: c.tdNgay != null ? c.tdNgay !== false : c.tdMa !== false,
+    /* dòng thông tin thêm do người dùng tự đặt: [{k: nhãn, v: giá trị}] (vd. Nhân viên phụ trách báo giá, Chủ trì thiết kế) */
+    ttThem: Array.isArray(c.ttThem) ? c.ttThem.filter(x => x && (x.k || x.v)) : [],
+    tdTen: String(c.tdTen || ''), tdHm: c.tdHm !== false,
+    tdHmTen: String(c.tdHmTen || ''), tdSo: Number(c.tdSo) >= 8 && Number(c.tdSo) <= 24 ? Number(c.tdSo) : 12,
+    /* cỡ chữ (px) + font riêng từng dòng khung tiêu đề: 1 = chữ tiêu đề, 2 = dòng hạng mục, 3 = dòng mã / phiên bản / ngày;
+       chưa đặt thì theo tdSo cũ (12,5 / 11 / 10 px nhân tdSo / 12) */
+    ...tdCo_(c),
+    /* hienTT = các mục đang hiện; bản cũ lưu anTT (mục ẩn) thì đổi sang danh sách hiện */
+    hienTT: Array.isArray(c.hienTT) ? c.hienTT : BG_TT_MAC.filter(k => !(Array.isArray(c.anTT) && c.anTT.indexOf(k) >= 0)),
+  }
+}
 export function bgBuildPages(ctx, ui, ver, me) {
   const p = ctx.cur || {}; const comp = coverCosts(ctx)
   const inners = []; const metas = []
   function themTrang(html, meta) { inners.push(html); metas.push(meta || {}) }
   const hangMuc = 'TỔNG HỢP CHI PHÍ'                // trang 1 luôn là tờ bìa của cả dự án
   const org = bgOrg_(ctx.congTy, ctx.bgOrg); const opt = bgOpt_(ctx.bgCfg)
-  const logo = org.logo ? docImg_(org.logo) : ''
-  const decoxHead = '<div class="qx-head"><div class="qx-brandbox">'
-      + (logo ? '<img class="qx-logo" src="' + esc(logo) + '" alt="">' : '')
-      + '<div class="qx-brand' + (logo ? ' sm' : '') + '">' + esc(org.ten) + '</div>'
-    + '<div class="qx-org">' + org.lines.map(esc).join('<br>') + '</div></div>'
-    + '<div class="qx-titlebox"><div class="t1">BẢNG ƯỚC TÍNH CHI PHÍ DỰ ÁN</div><div class="t2">HẠNG MỤC: ' + esc(String(hangMuc).toUpperCase()) + '</div>'
-      + '<div class="t3">Mã: <b>' + esc(ver.ma) + '</b> · ' + esc(ver.nhan) + ' · Ngày ' + esc(fmtVN_(opt.ngay)) + '</div></div></div>'
-  function ip(k, v) { return '<td class="k">' + k + '</td><td class="v">' + esc(v || '') + '</td>' }
-  const infoBlock = '<table class="qx-info">'
+  /* Tuỳ chọn tờ bìa (bgCfg, thẻ "Logo" + "Trang bìa"): logo, khung tiêu đề, các mục thông tin dự án hiện trên bìa */
+  const cf = bgBia_(ctx.bgCfg)
+  const logoCty = cf.logoChon || org.logo
+  const tao = cf.logo === 'tao'
+  const taoChu = tao && cf.taoKieu === 'chu'
+  const logoSrc = tao ? (cf.taoKieu === 'anh' ? cf.logoAnh || '' : '') : (cf.logo === 'cty' && logoCty ? docImg_(logoCty) : '')
+  const tenLogo = taoChu && cf.logoChu.trim() ? cf.logoChu.trim() : org.ten
+  /* logo đã lưu (logoChon) / Logo ảnh là logo trọn vẹn: không in thêm tên công ty bên dưới */
+  const anTen = !!logoSrc && (tao || !!cf.logoChon)
+  const lcCss = (cf.lcFont ? ';font-family:' + esc(cf.lcFont) + ', Arial, sans-serif' : '') + (cf.lcMau ? ';color:' + cf.lcMau : '')
+    + ';font-weight:' + (cf.lcDam ? 700 : 400) + (cf.lcNghieng ? ';font-style:italic' : '') + ';letter-spacing:' + cf.lcGian + 'em'
+  const logoH = cf.logoPx
+  /* dòng thông tin công ty: tự nhập thì in đúng các ô đã điền (cùng cách ghép như bgOrg_), không thì mẫu chung */
+  const tr = cf.ttRieng
+  const ttLines = cf.ttKieu === 'rieng'
+    ? [tr.diaChi, [tr.sdt ? 'ĐT: ' + tr.sdt : '', tr.email ? 'Email: ' + tr.email : ''].filter(Boolean).join('   '), tr.xuong, tr.web ? 'Website: ' + tr.web : ''].filter(Boolean)
+    : org.lines
+  const brandbox = cf.logo === 'an' ? ''
+    : '<div class="qx-brandbox" style="display:flex;flex-direction:column;align-items:' + ({ trai: 'flex-start', giua: 'center', phai: 'flex-end' }[cf.logoVt])
+      + ';text-align:' + ({ trai: 'left', giua: 'center', phai: 'right' }[cf.logoVt]) + '">'
+      + (logoSrc ? '<img class="qx-logo" style="max-height:' + logoH + 'px;max-width:' + Math.round(logoH * 4.2) + 'px" src="' + esc(logoSrc) + '" alt="">' : '')
+      /* không có ảnh logo: tên công ty là logo -> cỡ chữ theo thanh kéo Cỡ logo (mặc định 46px ứng với chữ 26px của docCss) */
+      /* Logo chữ: kiểu chữ tự chỉnh (lcCss) */
+      + (anTen ? '' : '<div class="qx-brand' + (logoSrc ? ' sm' : '') + '"'
+        + (logoSrc ? '' : ' style="font-size:' + (taoChu ? cf.lcCo : Math.round(logoH * 26 / 46 * 10) / 10) + 'px' + (taoChu ? lcCss : '') + '"') + '>' + esc(tenLogo) + '</div>')
+      + (cf.ttCty && ttLines.length ? '<div class="qx-org">' + ttLines.map(esc).join('<br>') + '</div>' : '') + '</div>'
+  /* Khung tiêu đề luôn mở rộng hết phần còn lại của đầu trang (.qx-head.rong); cỡ chữ theo số tdSo (mặc định 12) */
+  const fz = (px, font) => ' style="font-size:' + px + 'px' + (font ? ';font-family:' + esc(font) + ', Arial, sans-serif' : '') + '"'
+  const t3 = [cf.tdMaBG && ('Mã: <b>' + esc(ver.ma) + '</b>'), cf.tdPB && esc(ver.nhan), cf.tdNgay && ('Ngày ' + esc(fmtVN_(opt.ngay)))].filter(Boolean)
+  const decoxHead = '<div class="qx-head rong">' + brandbox
+    + '<div class="qx-titlebox"><div class="t1"' + fz(cf.tdCo1, cf.tdFont1) + '>' + esc(cf.tdTen || 'BẢNG ƯỚC TÍNH CHI PHÍ DỰ ÁN') + '</div>'
+      + (cf.tdHm ? '<div class="t2"' + fz(cf.tdCo2, cf.tdFont2) + '>' + esc(cf.tdHmTen || ('HẠNG MỤC: ' + String(hangMuc).toUpperCase())) + '</div>' : '')
+      + (t3.length ? '<div class="t3"' + fz(cf.tdCo3) + '>' + t3.join(' · ') + '</div>' : '') + '</div></div>'
+  function ip(k, v) { return '<td class="k">' + k + '</td><td class="v">' + v + '</td>' }
+  const ttVal = {
+    kh: esc(p.khachHang || ''), ten: esc(p.ten || ''), dt: p.tongDT ? esc(p.tongDT + ' m²') : '', pc: esc(p.phanKhuc || ''),
     // Hiện trạng nhập bằng textarea (M8.3): giữ xuống dòng như Excel (service_export_opts.go writeHienTrang)
-    + '<tr>' + ip('Khách hàng', p.khachHang) + '<td class="k">Hiện trạng</td><td class="v">'
-      + esc(p.hienTrang || '').replace(/\r\n?/g, '\n').replace(/\n/g, '<br>') + '</td></tr>'
-    + '<tr>' + ip('Tên dự án', p.ten) + ip('Quy mô', p.quyMo) + '</tr>'
-    + '<tr>' + ip('DT sử dụng', p.tongDT ? p.tongDT + ' m²' : '') + ip('Nhu cầu', p.nhuCau) + '</tr>'
-    + '<tr>' + ip('Phong cách', p.phanKhuc) + ip('DT báo giá [nhân hệ số]', p.dtBaoGia ? p.dtBaoGia + ' m²' : '') + '</tr>'
-    + '</table>'
+    ht: esc(p.hienTrang || '').replace(/\r\n?/g, '\n').replace(/\n/g, '<br>'), qm: esc(p.quyMo || ''), nc: esc(p.nhuCau || ''),
+    dtbg: p.dtBaoGia ? esc(p.dtBaoGia + ' m²') : '',
+    sdt: esc(p.sdt || ''), dc: esc(p.diaChi || ''), ma: esc(p.maBaoGia || ''), gc: esc(p.ghiChu || '').replace(/\r?\n/g, '<br>'),
+  }
+  cf.ttThem.forEach(function (x, i) { ttVal['them' + i] = esc(x.v || '') })
+  const tt = BG_TT_DS.filter(function (x) { return cf.hienTT.indexOf(x[0]) >= 0 })
+    .concat(cf.ttThem.map(function (x, i) { return ['them' + i, esc(x.k || '')] }))
+  let rowsTT = ''
+  for (let i = 0; i < tt.length; i += 2) rowsTT += '<tr>' + ip(tt[i][1], ttVal[tt[i][0]]) + (tt[i + 1] ? ip(tt[i + 1][1], ttVal[tt[i + 1][0]]) : '<td class="k"></td><td class="v"></td>') + '</tr>'
+  const infoBlock = tt.length ? '<table class="qx-info">' + rowsTT + '</table>' : ''
   // ===== TRANG 1 = TỜ BÌA (Mẫu 1 hoặc Mẫu 2) =====
   themTrang(decoxHead + infoBlock + bgCoverPage_(comp, ctx, ui.coverMau), { ten: 'Tờ bìa' })
   // ===== Từ trang 2: bảng chi tiết các hạng mục đã bóc được chọn, THEO ĐÚNG CHIP CỘT đang bật =====

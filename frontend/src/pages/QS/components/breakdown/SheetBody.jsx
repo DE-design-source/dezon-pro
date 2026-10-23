@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../../../../components/ui/Icon'
 import SheetToolbar from './SheetToolbar'
 import SheetGrid from './SheetGrid'
@@ -73,9 +74,10 @@ function mapRows(groups, ids, fn, rid) {
      adapter            cách đọc / ghi ô (xem LINE_ADAPTER); editable(key, row) nhận thêm dòng để bảng sửa được theo từng ô
      onRenameGroup(g, name) · onInsertRow(entry) · onDuplicate(ids) · onSort(key, dir) · onDownload() · onReplaceAll(q, rep)
      onCellContext({entry, col, r, c, ev, ids, keys}) (keys = khoá các cột của vùng chọn, hoặc cột được bấm) · onSelItems(ids) · apiRef (selectRows(ids), selectAll())
-     wrapKey = 'nowrap' | 'wrap' (nút "Xuống dòng" bật / tắt khoá nào trong fmt) · hideTools [tên nút ẩn] · extraTools (node)
+     wrapKey = 'nowrap' | 'wrap' (nút "Xuống dòng" bật / tắt khoá nào trong fmt) · hideTools [tên nút ẩn] · extraTools (node, cuối thanh) · leadTools (node, đầu thanh)
+     · quickTool {title, count, on, onClick}: thay nút ẩn / hiện cột giá ở vị trí số 2 bằng nút bộ cột nhanh
      printTitle · và các prop chuyển thẳng cho SheetGrid: renderCell, onColMenu, colMarks, rowDrag, rowHeights, onRowHeight,
-     frozenRows, gridClass, emptyNode, frozenDefault, onColResize, onColMove, rowAction, emptyReplace, plainFmt
+     frozenRows, gridClass, emptyNode, frozenDefault, onColResize, onColMove, rowAction, emptyReplace, plainFmt, fitCols
      onSelItems(ids, {fullRow})  fullRow = vùng chọn phủ hết các cột (bấm số dòng / chọn cả dòng)
      onApplyEdits(info, cells)  dán / xoá / cắt / điền nhiều ô: bảng cha tự ghi theo lô (tkApplyEdits_) thay vì commit từng dòng.
                                 info {kind: 'paste'|'fill'|'clear', label, value}, cells [{id, key, text}]
@@ -87,17 +89,17 @@ export default function SheetBody({
   full, onFull, dropMark, flash, onClearMark, dropHint, fileName,
   /* Tuỳ biến cho bảng khác (tab Chi phí): bộ cột, cách trải dòng, lọc thêm, ô chọn ban đầu, lớp CSS của dòng… */
   columns = NO_COLS, flatten = LINE_FLATTEN, extraPred = null, initialSel = null, rowClass = null, onToggleGroupOverride = null,
-  footer = true, toolbarOpen = true, colCount = null, letters = true,
+  footer = true, footerInTools = false, colCount = null, letters = true,
   adapter = LINE_ADAPTER, onRenameGroup = null, onInsertRow = null, onDuplicate = null, onSort = null, onDownload = null,
-  onReplaceAll = null, onCellContext = null, onSelItems = null, apiRef = null, wrapKey = 'nowrap', hideTools = null, extraTools = null,
-  printTitle = null, renderCell, onColMenu, colMarks, rowDrag, rowHeights, onRowHeight, frozenRows, gridClass, emptyNode, frozenDefault = true,
-  compactDefault = true, colsPanel = null, datalists = null,
-  onApplyEdits = null, onDeleteRows = null, plainTools = null, adderOpenKey, onColResize, onColMove, rowAction, emptyReplace, plainFmt,
+  onReplaceAll = null, onCellContext = null, onSelItems = null, apiRef = null, wrapKey = 'nowrap', hideTools = null, extraTools = null, leadTools = null, quickTool = null,
+  printTitle = null, renderCell, onColMenu, colMarks, rowDrag, rowHeights, onRowHeight, onGroupHeight, onHeadHeight, frozenRows, gridClass, emptyNode, frozenDefault = true,
+  compactDefault = true, colsPanel = null, datalists = null, toolsSlot = null, onViewMode = null,
+  onApplyEdits = null, onDeleteRows = null, plainTools = null, adderOpenKey, onColResize, onColMove, rowAction, emptyReplace, plainFmt, fitCols,
 }) {
   const A = adapter
   const rid = A.rowId
   const { groups, commit } = sheet
-  const [fontSize, setFontSize] = useState(13)
+  const [fontSize, setFontSize] = useState(12)
   const [compact, setCompact] = useState(compactDefault)
   const [frozen, setFrozen] = useState(frozenDefault)
   const [zoom, setZoom] = useState(100)
@@ -120,6 +122,12 @@ export default function SheetBody({
   const edRef = useRef(null)
   const setEditing = v => { edRef.current = v; setEditingState(v) }
   const gridRef = useRef(null)
+  /* Cỡ chữ bảng chia sẻ cho cả vùng (.qs-bd-body): cột Hạng mục bên trái dùng cùng cỡ chữ với bảng (QS.css --qs-tbl-fs) */
+  useEffect(() => {
+    const body = gridRef.current && gridRef.current.closest('.qs-bd-body')
+    /* bảng vẽ ở cỡ fontSize + 1 (SheetGrid bên dưới) nên cột trái lấy đúng cỡ đó */
+    if (body) body.style.setProperty('--qs-tbl-fs', (fontSize + 1) + 'px')
+  }, [fontSize])
   const clipRef = useRef(null)
   const dragSel = useRef(false)
   const reveal = useRef(false)
@@ -172,6 +180,13 @@ export default function SheetBody({
       },
       focus: () => { if (gridRef.current) gridRef.current.focus({ preventScroll: true }) },
       clear: () => setSel(s => ({ a: s.a, f: s.a })),
+      /* Xoá định dạng: ô đang chọn (clearFmt) · cả bảng: mọi ô về mặc định (màu, đậm, nghiêng, gạch chân, căn lề) + cỡ chữ mặc định */
+      clearFmt: () => clearFmt(),
+      clearAllFmt: () => {
+        setFontSize(12)
+        commit('Xoá toàn bộ định dạng', gs => gs.map(g => (g.rows && g.rows.some(r => r.fmt && Object.keys(r.fmt).length)
+          ? { ...g, rows: g.rows.map(r => (r.fmt && Object.keys(r.fmt).length ? { ...r, fmt: {} } : r)) } : g)))
+      },
     }
   }
 
@@ -412,9 +427,16 @@ export default function SheetBody({
   /* ---------- Hiển thị / xuất ---------- */
   const numW = plain ? 0 : A.rowNumWidth
   const tableWidth = cols.reduce((s, c) => s + c.w, numW)
+  /* Vừa chiều rộng: bấm lần 1 = thu phóng cho bảng vừa khung; bấm lần 2 (vẫn đang ở mức vừa tính) = trả về 100%.
+     Đã tự đổi thu phóng sau đó thì bấm lại = tính vừa khung lần nữa. */
+  const fitRef = useRef(null)
+  const fitOn = fitRef.current != null && zoom === fitRef.current && zoom !== 100
   function fitWidth() {
+    if (fitOn) { fitRef.current = null; setZoom(100); return }
     if (!gridRef.current || !tableWidth) return
-    setZoom(Math.max(30, Math.min(150, Math.floor((gridRef.current.clientWidth / tableWidth) * 100))))
+    const z = Math.max(30, Math.min(150, Math.floor((gridRef.current.clientWidth / tableWidth) * 100)))
+    fitRef.current = z
+    setZoom(z)
   }
   const priceShown = A.priceKeys.filter(k => !hiddenCols.has(k)).length
   function togglePrice() {
@@ -510,11 +532,19 @@ export default function SheetBody({
 
   const togglePanel = name => onPanel(panel === name ? null : name)
   const wrapOn = wrapKey === 'wrap' ? !!anchorFmt.wrap : !anchorFmt.nowrap
+  const addTools = (
+    <>
+      <GroupAdder existing={new Set(groupNames)} onAdd={onAddGroup} openKey={adderOpenKey} />
+      <button className="qs-bd-add-row" onClick={onAddBlank} title={'Thêm hạng mục' + (targetName ? ' vào ' + targetName : '')}><Icon name="plusCircle" size={16} />Hạng mục</button>
+    </>
+  )
   const s = {
     canUndo: sheet.canUndo, canRedo: sheet.canRedo, fontSize, fmt: anchorFmt, showStats, stats, panel, frozen, compact, zoom,
     filterOn: filterText.trim() !== '', colFilterOn: Boolean(colFilter), favOnly, priceShown, full,
-    cols: colCount || { shown: cols.length, total: columns.length }, lastColor, wrapOn, hide: new Set([...(hideTools || []), 'import']), extraTools,
+    fitOn, cols: colCount || { shown: cols.length, total: columns.length }, lastColor, wrapOn, hide: new Set([...(hideTools || []), 'import']), extraTools, leadTools, quick: quickTool,
     wrapTitle: wrapKey === 'wrap' ? 'Xuống dòng trong ô' : undefined,
+    /* footerInTools: nút Thêm tầng / phòng + Thêm hạng mục lên khối công cụ (plainTools tự đặt st.addTools) thay cho chân bảng */
+    addTools: footer && footerInTools ? addTools : null,
   }
   const a = {
     undo: sheet.undo, redo: sheet.redo, cut, copy, paste,
@@ -526,7 +556,7 @@ export default function SheetBody({
     toggleWrap: () => (wrapKey === 'wrap' ? toggleFmt('wrap') : setFmt('Xuống dòng tự động', f => ({ ...f, nowrap: !anchorFmt.nowrap }))),
     toggleStats: () => setShowStats(v => !v),
     insertRow, duplicate, deleteRows, sort, importFile: null,
-    toggleFrozen: () => setFrozen(v => !v), toggleCompact: () => setCompact(v => !v),
+    toggleFrozen: () => setFrozen(v => !v), toggleCompact: () => { setCompact(!compact); if (onViewMode) onViewMode(compact) }   /* onViewMode(true) = vừa bật xem tối ưu */,
     setZoom, zoomOut: () => setZoom(z => Math.max(30, z - 10)), fitWidth, print, download,
     toggleColFilter, toggleFav: () => setFavOnly(v => !v), togglePrice, toggleFull: onFull,
   }
@@ -541,11 +571,15 @@ export default function SheetBody({
     onBlur: () => { if (barEditing) commitEdit() },
   }
 
+  /* plainTools: bảng tự vẽ khối công cụ riêng cho Bảng thường; không có thì Bảng thường dùng chung thanh công cụ (không ô công thức) */
+  const tools = plain && plainTools ? plainTools(a, s) : <SheetToolbar s={s} a={a} formula={plain ? null : formula} />
   return (
     <>
-      {plain && plainTools ? plainTools(a, s) : <SheetToolbar s={s} a={a} formula={formula} defaultOpen={toolbarOpen} />}
+      {/* toolsSlot: trang gọi có khung riêng cho thanh công cụ (Bóc tách: module tách khỏi bảng) thì vẽ vào đó */}
+      {toolsSlot ? createPortal(tools, toolsSlot) : tools}
 
-      {panel && (
+      {/* colsPanel === false: trang gọi tự vẽ dải chip cột ở chỗ khác (Bóc tách: ngay dưới hàng đầu bảng) */}
+      {panel && !(panel === 'cols' && colsPanel === false) && (
         <div className="qs-bd-strip">
           {panel === 'find' && (
             <>
@@ -580,7 +614,7 @@ export default function SheetBody({
           {panel === 'cols' && (colsPanel || (
             <>
               <span className="qs-bd-strip-label">Cột hiển thị</span>
-              {columns.map(c => <button key={c.key} className={`qs-bd-strip-chip${hiddenCols.has(c.key) ? '' : ' on'}`} onClick={() => toggleCol(c.key)}>{c.label}</button>)}
+              {columns.map(c => <button key={c.key} className={`qs-bd-strip-chip qs-colchip${hiddenCols.has(c.key) ? '' : ' on'}`} aria-pressed={!hiddenCols.has(c.key)} onClick={() => toggleCol(c.key)}>{c.label}</button>)}
               <button className="qs-bd-strip-btn" onClick={() => onHiddenCols(new Set())}>Hiện tất cả</button>
             </>
           ))}
@@ -617,14 +651,11 @@ export default function SheetBody({
         onKeyDown={onKeyDown} onPaste={onPaste}
         rowId={rid} entryText={A.entryText} colLetter={A.colLetter} rowNumWidth={A.rowNumWidth}
         renderCell={renderCell} onCellContext={onCellContext ? onCellContextMenu : undefined} onColMenu={onColMenu} colMarks={colMarks}
-        rowDrag={rowDrag} rowHeights={rowHeights} onRowHeight={onRowHeight} frozenRows={frozenRows} gridClass={gridClass} emptyNode={emptyNode} datalists={datalists}
-        roman={A.roman} onColResize={onColResize} onColMove={onColMove} rowAction={rowAction} emptyReplace={emptyReplace} plainFmt={plainFmt}
+        rowDrag={rowDrag} rowHeights={rowHeights} onRowHeight={onRowHeight} onGroupHeight={onGroupHeight} onHeadHeight={onHeadHeight} frozenRows={frozenRows} gridClass={gridClass} emptyNode={emptyNode} datalists={datalists}
+        roman={A.roman} onColResize={onColResize} onColMove={onColMove} rowAction={rowAction} emptyReplace={emptyReplace} plainFmt={plainFmt} fitCols={fitCols}
       />
       {dropHint && <div className="qs-bd-drop-hint">{dropHint}</div>}
-      {footer && <div className="qs-bd-foot">
-        <GroupAdder existing={new Set(groupNames)} onAdd={onAddGroup} openKey={adderOpenKey} />
-        <button className="qs-bd-add-row" onClick={onAddBlank}><Icon name="plus" size={16} />Thêm hạng mục{targetName ? <span>vào {targetName}</span> : null}</button>
-      </div>}
+      {footer && !footerInTools && <div className="qs-bd-foot">{addTools}</div>}
     </>
   )
 }

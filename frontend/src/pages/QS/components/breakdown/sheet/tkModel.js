@@ -29,7 +29,7 @@ export const TK_PRICE_KEYS = ['giaNCC', 'chietKhau', 'giaDaiLy', 'lnPct', 'donGi
    không quá 40% bề ngang (tkSheetVe_), không thì chỉ STT + cột kế; freezeN > 0 = "Cố định đến cột này". */
 export function tkColumns(order, cols, node, colWMap, freezeN, boxW) {
   const vc = visCols(order, cols, vsFltNganh_(node))
-  const width = k => Math.max((colWMap || {})[k] || DEFW[k] || 110, TK_MINW_[k] || 60)
+  const width = k => ((colWMap || {})[k] ? Math.max(colWMap[k], 40) : Math.max(DEFW[k] || 110, TK_MINW_[k] || 60))
   let frz = 2
   if (freezeN > 0) frz = freezeN
   else {
@@ -38,7 +38,9 @@ export function tkColumns(order, cols, node, colWMap, freezeN, boxW) {
     let cw = 0
     if (iTen >= 1) { for (let i = 0; i <= iTen; i++) cw += width(vc[i][0]); if (cw <= rong) frz = iTen + 1 }
   }
-  return vc.map((c, i) => ({ key: c[0], label: c[1], w: width(c[0]), align: TK_SO[c[0]] ? 'right' : (TK_GIUA[c[0]] ? 'center' : undefined), pin: i < frz }))
+  return vc.map((c, i) => ({ key: c[0], label: c[1], w: width(c[0]), align: TK_SO[c[0]] ? 'right' : (TK_GIUA[c[0]] ? 'center' : undefined), pin: i < frz,
+    /* fixed: người dùng đã tự đặt bề rộng cột này (kéo / hộp Thay đổi kích thước) -> SheetGrid giữ đúng số đó, không co giãn */
+    fixed: !!(colWMap || {})[c[0]] }))
 }
 
 const btMoney_ = v => { v = Math.round(Number(v) || 0); return v ? money(v) : '' }
@@ -87,10 +89,11 @@ export function lineApply(l, k, text) {
 }
 
 /* Trải nhóm tầng thành các dòng đang hiện. pred(l) lọc dòng; sort = {key, dir} sắp xếp hiển thị (sortLines_);
-   STT gi.ri đánh theo dòng đang hiện như bản gốc; n = số thứ tự hàng của lưới. */
+   STT gi.ri đánh theo dòng đang hiện như bản gốc; n = số hàng ở cột 1-2-3 của lưới, đánh liền như Excel: hàng tiêu đề cột = 1,
+   rồi mọi dòng (tầng / phòng và sản phẩm) nối tiếp 2, 3, 4… */
 export function tkFlatten(groups, pred, sort) {
   const out = []
-  let n = 0
+  let n = 1   // hàng tiêu đề cột (STT, TÊN SẢN PHẨM…) là hàng 1 (SheetGrid ghi số 1 ở ô cột số của hàng tiêu đề)
   groups.forEach((g, gi) => {
     const list = (g.rows || []).filter(r => !pred || pred(r))
     const sum = list.reduce((s, l) => s + ttBan_(l), 0)

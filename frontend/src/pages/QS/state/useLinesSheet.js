@@ -13,7 +13,7 @@
      fmt -> projData.btFmt.
    Hoàn tác (D12): chỉ vá trường + đổi chỗ, theo dự án, tối đa 100 bước; thêm / xoá dòng không hoàn tác được. */
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { useQsStore, getState, updateLine, addLine, deleteLines, moveLine, reorderLines, histOf, setHist, lineOf_, toast, DEFAULT_NODE } from './store'
+import { useQsStore, getState, updateLine, addLine, deleteLines, moveLine, reorderLines, histOf, setHist, lineOf_, toast, DEFAULT_NODE, histRunAddDel } from './store'
 import { projDataSet_ } from './projData'
 import { tkFieldsFor_, editProfit_ } from '../lib/calc.js'
 import { nodeName } from '../lib/tree.js'
@@ -160,7 +160,8 @@ export function useLinesSheet(scope) {
 
     /* 1) ô đổi */
     const patches = []
-    const fmtAll = { ...((S.projData && S.projData.btFmt) || {}) }
+    const fmtPrev = (S.projData && S.projData.btFmt) || {}   // định dạng ô trước khi đổi (để hoàn tác)
+    const fmtAll = { ...fmtPrev }
     let fmtChanged = false
     newSeq.forEach(x => {
       const o = oldById[x.id]; if (!o) return
@@ -206,8 +207,9 @@ export function useLinesSheet(scope) {
       else moves = await reorderLines(slotFill(getState().lines, nKeep))
     }
 
-    /* 4) ghi lịch sử (chỉ vá trường + đổi chỗ) */
-    if (opts.record && (patches.length || moves.length)) {
+    /* 4) ghi lịch sử: vá trường + đổi chỗ + định dạng ô (màu chữ / nền, đậm, căn lề… lưu ở projData.btFmt) */
+    const fmtStep = fmtChanged ? { before: fmtPrev, after: fmtAll } : null
+    if (opts.record && (patches.length || moves.length || fmtStep)) {
       const h = histOf(ma)
       const past = h.past.slice()
       const last = past[past.length - 1]
@@ -217,8 +219,9 @@ export function useLinesSheet(scope) {
           const i = merged.findIndex(q => q.lineId === p.lineId && q.field === p.field)
           if (i >= 0) merged[i] = { ...merged[i], new: p.new }; else merged.push(p)
         })
-        past[past.length - 1] = { ...last, patches: merged, moves: last.moves.concat(moves) }
-      } else past.push({ label, patches, moves })
+        const fm = fmtStep ? { before: last.fmt ? last.fmt.before : fmtStep.before, after: fmtStep.after } : last.fmt
+        past[past.length - 1] = { ...last, patches: merged, moves: last.moves.concat(moves), fmt: fm }
+      } else past.push({ label, patches, moves, fmt: fmtStep })
       setHist(ma, { past, future: [] })
     }
 
@@ -276,6 +279,15 @@ export function useLinesSheet(scope) {
     else setHist(ma, { past: [...h.past, e], future: h.future.slice(1) })
     Object.keys(by).forEach(id => { if (lineOf_(id)) updateLine(id, by[id]) })
     if (e.moves && e.moves.length) await runMoves(e.moves, dir)
+    /* bước thêm / xoá dòng: xoá lại hoặc thêm lại dòng; cập nhật bước (mã dòng mới / bản chụp) vào đúng chỗ trong lịch sử */
+    if (e.view) e.view[dir]()
+    if (e.fmt) projDataSet_('btFmt', dir === 'undo' ? e.fmt.before : e.fmt.after)
+    if (e.added || e.removed) {
+      const ne = await histRunAddDel(e, dir)
+      const h2 = histOf(ma)
+      if (dir === 'undo' && h2.future.length) setHist(ma, { past: h2.past, future: [ne, ...h2.future.slice(1)] })
+      else if (dir === 'redo' && h2.past.length) setHist(ma, { past: [...h2.past.slice(0, -1), ne], future: h2.future })
+    }
   }, [])
   const undo = useCallback(() => step('undo'), [step])
   const redo = useCallback(() => step('redo'), [step])

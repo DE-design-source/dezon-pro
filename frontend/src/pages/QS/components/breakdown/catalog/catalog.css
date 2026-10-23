@@ -6,7 +6,7 @@
 .qs-bd-pill-btn.on .qs-bdc-badge{background:#fff; color:var(--dash-navy);}
 .qs-bdc-favgo{cursor:pointer; font-family:inherit;}
 .qs-bdc-favgo:hover{filter:brightness(.97);}
-.qs-bdc-favgo.on{background:#E5386D; border-color:#E5386D; color:#fff;}
+.qs-bdc-favgo.on{background:#F59E0B; border-color:#F59E0B; color:#fff;}
 .qs-bdc-favgo.on svg{fill:#fff;}
 .qs-bdc-favgo.empty{opacity:.65;}
 
@@ -18,7 +18,7 @@
 .qs-bdc-pick-q{width:100%; height:30px; padding:0 10px; margin-bottom:6px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; outline:none;}
 .qs-bdc-pick-q:focus{border-color:var(--dash-accent);}
 .qs-bdc-pick-list{max-height:220px; overflow-y:auto;}
-.qs-bdc-chk, .qs-bdc-opt{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; font-size:13px; line-height:1.35; color:var(--text); cursor:pointer;}
+.qs-bdc-chk, .qs-bdc-opt{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; font-size:13px; line-height:1.5; color:var(--text); cursor:pointer;}
 .qs-bdc-chk:hover, .qs-bdc-opt:hover{background:var(--dash-soft);}
 .qs-bdc-chk .bx{width:16px; height:16px; flex:none; border-radius:4px; border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff;}
 .qs-bdc-chk.on .bx{background:var(--dash-accent); border-color:var(--dash-accent);}
@@ -32,6 +32,9 @@
 .qs-bdc-nil{font-size:12px; color:var(--text-muted);}
 .qs-bdc-err{color:var(--danger);}
 .qs-bd-fchip.qs-bdc-wide{min-width:46px; justify-content:center;}
+/* Công suất: mọi chip cùng một bề rộng (lưới cột đều) thay vì rộng theo chữ ("1W" hẹp, "7.2W" rộng) */
+.qs-bd-fchips.qs-bdc-eq{display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr));}
+.qs-bdc-eq .qs-bd-fchip.qs-bdc-wide{min-width:0; padding:0 8px; overflow:hidden; text-overflow:ellipsis;}
 .qs-bdc-dot{width:9px; height:9px; flex:none; border-radius:50%; border:1px solid rgba(0,0,0,.12);}
 
 /* Thẻ "đang lọc" (catActiveChips_) */
@@ -63,34 +66,37 @@
 .qs-bd-product.qs-bdc-cbopen{border-bottom-color:transparent;}
 
 /* Khối con dưới thẻ: combo (xanh) / biến thể (cam) */
-.qs-bdc-cc{margin:0 12px 10px 34px; border:1px solid var(--dash-accent-border); border-radius:10px; background:var(--dash-soft); overflow:hidden;}
+/* khung biến thể / sản phẩm đi kèm: cân giữa cột (lề trái = phải) và cách đường kẻ dưới thẻ sản phẩm chính */
+.qs-bdc-cc{margin:12px 16px 14px; border:1px solid var(--dash-accent-border); border-radius:10px; background:var(--dash-soft); overflow:hidden;}
 .qs-bdc-cc.bt{border-color:#F5D3A4;}
 html[data-theme="dark"] .qs-bdc-cc.bt{border-color:#5C4219;}
-.qs-bdc-cc-h{padding:6px 10px; display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; letter-spacing:.02em; color:var(--dash-accent); background:var(--dash-accent-tint);}
+.qs-bdc-cc-h{padding:6px 10px; display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qs-bdc-cc.bt .qs-bdc-cc-h{color:#C2670B; background:#FFF6EA;}
 html[data-theme="dark"] .qs-bdc-cc.bt .qs-bdc-cc-h{color:#E9A24C; background:#33240F;}
 .qs-bdc-cc-h i{font-style:normal; padding:0 6px; border-radius:8px; background:var(--surface); font-size:11px;}
-.qs-bdc-ccr{display:flex; align-items:center; gap:8px; padding:7px 8px 7px 10px; border-top:1px solid var(--border); cursor:pointer;}
+/* dòng biến thể / sản phẩm đi kèm (ChildBox): [số | ảnh vuông 56 | tên (thường) + thương hiệu | giá (đậm) | + tròn xanh] */
+.qs-bdc-ccr{display:flex; align-items:center; gap:10px; padding:8px 10px; border-top:1px solid var(--border); cursor:pointer;}
+.qs-bdc-ccr-th{flex:none; border:1px solid var(--border); border-radius:8px; background:var(--surface); overflow:hidden;}
 .qs-bdc-ccr:hover{background:var(--surface);}
 .qs-bdc-ccr[draggable="true"]{cursor:grab;}
 .qs-bdc-ccr-no{width:28px; flex:none; font-size:10.5px; color:var(--text-muted);}
 .qs-bdc-ccr-m{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
-.qs-bdc-ccr-m b{font-size:12.5px; font-weight:600; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-bdc-ccr-m b{font-size:13px; font-weight:400; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
 .qs-bdc-ccr-r{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-muted);}
 .qs-bdc-ccr-r i{flex:1; min-width:0; font-style:normal; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.qs-bdc-ccr-r em{flex:none; font-style:normal; font-weight:600; color:var(--text);}
+.qs-bdc-ccr-p{flex:none; font-size:13.5px; font-weight:700; color:var(--text); white-space:nowrap;}
 .qs-bdc-ccr-gc{font-size:11.5px; font-style:italic; color:var(--text); white-space:normal; word-break:break-word;}
-.qs-bdc-ccr-add{width:22px; height:22px; flex:none; padding:0; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer;}
-.qs-bdc-ccr-add:hover{border-color:var(--dash-accent); background:var(--dash-accent); color:#fff;}
+.qs-bdc-ccr-add{width:24px; height:24px; flex:none; padding:0; border-radius:50%; border:none; background:var(--dash-accent); color:#fff; box-shadow:0 2px 5px rgba(0,136,255,.28); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .12s ease, filter .12s ease;}
+.qs-bdc-ccr-add:hover{filter:brightness(1.1); transform:scale(1.08);}
 .qs-bdc-ccfoot{padding:7px 10px; border-top:1px solid var(--border); font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; gap:8px;}
 .qs-bdc-ccfoot b{color:var(--text);}
-.qs-bdc-ccnote{margin:0 12px 10px 34px; padding:8px 10px; border-radius:8px; background:var(--dash-soft); font-size:12.5px; color:var(--text-muted);}
+.qs-bdc-ccnote{margin:12px 16px 14px; padding:8px 10px; border-radius:8px; background:var(--dash-soft); font-size:12.5px; color:var(--text-muted);}
 .qs-bdc-ccnote.err{color:var(--danger); background:var(--danger-tint);}
 
 /* Danh sách rỗng */
 .qs-bdc-empty{margin:14px 12px; padding:34px 18px; border-radius:12px; border:1px solid var(--border); background:var(--dash-soft); text-align:center; font-size:13px; color:var(--text-muted);}
 .qs-bdc-empty.fav{display:flex; flex-direction:column; align-items:center; gap:8px; line-height:1.5;}
-.qs-bdc-empty.fav svg{color:#E5386D;}
+.qs-bdc-empty.fav svg{color:#F59E0B;}
 .qs-bdc-empty.fav b{font-size:14px; color:var(--text);}
 
 /* ---------- Thư viện công tác của đề mục ---------- */
@@ -111,7 +117,7 @@ html[data-theme="dark"] .qs-bdc-cc.bt .qs-bdc-cc-h{color:#E9A24C; background:#33
 .qs-bdc-ptf{flex:0 1 auto; min-height:0; max-height:55%; overflow-x:hidden; overflow-y:auto;}
 .qs-bdc-ctit-go:hover{border-color:var(--dash-accent-border);}
 .qs-bdc-ctit.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); box-shadow:0 0 0 1px var(--dash-accent) inset;}
-.qs-bdc-ctit-nm{font-size:13px; font-weight:500; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-bdc-ctit-nm{font-size:13px; font-weight:500; line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .qs-bdc-ctit-meta{display:flex; align-items:center; gap:8px; margin-top:3px; font-size:12px;}
 .qs-bdc-ctit-dvt{font-style:italic; color:var(--text-muted);}
 .qs-bdc-ctit-dg{font-weight:700;}
@@ -159,7 +165,7 @@ html[data-theme="dark"] .qs-bdc-cc.bt .qs-bdc-cc-h{color:#E9A24C; background:#33
 .qs-bdc-pcb-r{display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px solid var(--border);}
 .qs-bdc-pcb-r[draggable="true"]{cursor:grab;}
 .qs-bdc-pcb-m{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--text-muted);}
-.qs-bdc-pcb-m b{font-size:12.5px; font-weight:600; color:var(--text); line-height:1.3;}
+.qs-bdc-pcb-m b{font-size:12.5px; font-weight:600; color:var(--text); line-height:1.5;}
 .qs-bdc-pcb-m .rev{color:var(--dash-accent);}
 .qs-bdc-pcb-p{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:3px; font-size:12px;}
 .qs-bdc-pcb-p label{display:flex; align-items:center; gap:4px; color:var(--text-muted);}
@@ -182,3 +188,11 @@ html[data-theme="dark"] .qs-bdc-cc.bt .qs-bdc-cc-h{color:#E9A24C; background:#33
 /* Đầu cột hẹp: tên "Hạng mục" tự cắt "…", các nút không xuống dòng (như .cat-hd bản gốc) */
 .qs-bd-catalog-head > .qs-bd-h{flex:0 1 auto; min-width:28px; overflow:hidden; text-overflow:ellipsis;}
 .qs-bd-catalog-head > .qs-bd-badge, .qs-bd-catalog-head > .qs-bd-pill-btn, .qs-bd-catalog-head > .qs-bdc-favgo{flex:none; white-space:nowrap;}
+
+/* Bảng "Sản phẩm yêu thích" (nút ★ ở đầu cột Hạng mục, CatalogPanel): danh sách dạng ChildBox, tiêu đề tông vàng của ngôi sao */
+.qs-bd-pop .qs-bdc-cc{margin:0;}
+.qs-bdc-cc.fav{border-color:#FDE3A7;}
+.qs-bdc-cc.fav .qs-bdc-cc-h{color:#B45309; background:#FFF8E6;}
+html[data-theme="dark"] .qs-bdc-cc.fav{border-color:#5A4416;}
+html[data-theme="dark"] .qs-bdc-cc.fav .qs-bdc-cc-h{color:#FBBF24; background:#33280C;}
+.qs-bdc-favnone{padding:28px 16px; border:1px dashed var(--border); border-radius:12px; background:var(--surface); text-align:center; font-size:13px; color:var(--text-muted);}

@@ -9,16 +9,16 @@
 .qsppt-row.da td{background:color-mix(in srgb, var(--success-tint) 45%, var(--surface));}
 .qsppt-row.da:hover td{background:var(--dash-soft);}
 .qsppt-row.selrow td{background:var(--dash-accent-tint);}
-.qsppt-table td.sp-name .qsppt-code{white-space:normal; font-size:10.5px; line-height:1.35;}
+.qsppt-table td.sp-name .qsppt-code{white-space:normal; font-size:10.5px; line-height:1.5;}
 .qsppt-da{display:inline-block; margin-left:8px; padding:1px 6px; border-radius:999px; border:1px solid color-mix(in srgb, var(--success) 30%, transparent); background:var(--success-tint); color:var(--success); font-size:10px; font-weight:600; white-space:nowrap; vertical-align:1px;}
 .qsppt-root .qsppt-table td.sp-name b{display:inline;}
 .qsppt-sua{margin-left:6px; padding:0 5px; border-radius:999px; border:1px solid color-mix(in srgb, var(--finance) 30%, transparent); background:var(--finance-tint); color:var(--finance); font-size:9.5px; font-weight:600; text-transform:none; letter-spacing:0;}
-.qsppt-tag{display:inline-block; max-width:100%; padding:2px 8px; border-radius:999px; border:1px solid var(--dash-accent-border); background:var(--dash-accent-tint); color:var(--dash-accent); font-size:10.5px; font-weight:600; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:middle;}
+.qsppt-tag{display:inline-block; max-width:100%; padding:2px 8px; border-radius:999px; border:1px solid var(--dash-accent-border); background:var(--dash-accent-tint); color:var(--dash-accent); font-size:10.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:middle;}
 .qsppt-tag.kt_sobo{background:var(--finance-tint); color:var(--finance); border-color:color-mix(in srgb, var(--finance) 25%, transparent);}
 .qsppt-tag.dt_nhancong, .qsppt-tag.dt_vattu{background:var(--success-tint); color:var(--success); border-color:color-mix(in srgb, var(--success) 25%, transparent);}
-.qsppt-nhom{display:block; font-size:11.5px; color:var(--text-muted); line-height:1.35; white-space:normal; cursor:pointer;}
+.qsppt-nhom{display:block; font-size:11.5px; color:var(--text-muted); line-height:1.5; white-space:normal; cursor:pointer;}
 .qsppt-nhom:hover{color:var(--dash-accent); text-decoration:underline;}
-.qsppt-gc{display:block; font-size:11.5px; color:var(--text-muted); line-height:1.45; white-space:normal;}
+.qsppt-gc{display:block; font-size:11.5px; color:var(--text-muted); line-height:1.5; white-space:normal;}
 .qspl-duyet.qsppt-mau{background:var(--surface-alt); color:var(--text-muted);}
 .qsc-btn.qspl-xs.qsppt-sua{margin:0; height:26px; padding:0 9px; font-size:12px; border-color:color-mix(in srgb, var(--finance) 35%, transparent);}
 .qsppt-ctnote{display:flex; align-items:center; gap:10px; padding:6px 14px;}
@@ -34,7 +34,7 @@
 .qsppt-detail .qspl-pd-gal + .qspl-pd-code.qsppt-pcode{margin-top:10px;}
 .qsppt-hero{margin:14px 0 4px; padding:14px 16px; border-radius:12px; border:1px solid var(--dash-accent-border); background:linear-gradient(150deg, var(--dash-soft) 0%, var(--dash-accent-tint) 100%);}
 .qsppt-hero-t{font-size:10px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-muted);}
-.qsppt-hero-v{margin-top:4px; font-size:26px; font-weight:600; letter-spacing:-.035em; color:var(--dash-navy); line-height:1.05; font-variant-numeric:tabular-nums;}
+.qsppt-hero-v{margin-top:4px; font-size:26px; font-weight:600; color:var(--dash-navy); line-height:1.05; font-variant-numeric:tabular-nums;}
 html[data-theme="dark"] .qsppt-hero-v{color:var(--text);}
 .qsppt-hero-v i{margin-left:5px; font-style:normal; font-size:12px; font-weight:500; color:var(--text-muted); letter-spacing:0;}
 .qsppt-hero-r{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px; padding-top:11px; border-top:1px solid var(--dash-accent-border);}
@@ -52,13 +52,13 @@ html[data-theme="dark"] .qsppt-hero-v{color:var(--text);}
 .qsppt-spec .k{color:var(--text-muted); font-weight:500;}
 .qsppt-spec .v{color:var(--text); font-weight:600; text-align:right;}
 .qsppt-spec.stack{display:block;}
-.qsppt-spec.stack .k{display:block; margin-bottom:3px; font-size:11px; line-height:1.35;}
-.qsppt-spec.stack .v{display:block; max-width:100%; text-align:left; line-height:1.45; white-space:normal;}
+.qsppt-spec.stack .k{display:block; margin-bottom:3px; font-size:11px; line-height:1.5;}
+.qsppt-spec.stack .v{display:block; max-width:100%; text-align:left; line-height:1.5; white-space:normal;}
 .qsppt-grp{margin:12px 0 4px; font-size:11.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--text-muted);}
 .qsppt-grp:first-child{margin-top:2px;}
 .qsppt-notes{display:flex; flex-direction:column; gap:7px; margin-top:9px;}
 .qsppt-note{padding:8px 10px; border:1px solid var(--border); border-left:3px solid var(--dash-accent); border-radius:8px; background:var(--surface); color:var(--text); font-size:12px; line-height:1.55;}
-.qsppt-goc{margin-top:7px; font-size:11px; line-height:1.45; color:var(--text-muted); font-style:italic;}
+.qsppt-goc{margin-top:7px; font-size:11px; line-height:1.5; color:var(--text-muted); font-style:italic;}
 .qsppt-uls{list-style:none; margin:9px 0 0; padding:0; display:flex; flex-direction:column; gap:7px;}
 .qsppt-uls li{position:relative; padding-left:15px; font-size:12px; line-height:1.5; color:var(--text);}
 .qsppt-uls li::before{content:''; position:absolute; left:3px; top:6px; width:5px; height:5px; border-radius:50%; background:var(--dash-accent); opacity:.55;}
@@ -68,7 +68,7 @@ html[data-theme="dark"] .qsppt-hero-v{color:var(--text);}
 .qsppt-inf-f label{display:block; margin-bottom:4px; font-size:11.5px; font-weight:600; color:var(--text-muted);}
 .qsppt-inf-f textarea{width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; resize:vertical;}
 .qsppt-inf-f textarea:focus{outline:none; border-color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint);}
-.qsppt-inf-h{display:block; margin-top:4px; font-size:11px; line-height:1.4; color:var(--text-muted); font-style:normal;}
+.qsppt-inf-h{display:block; margin-top:4px; font-size:11px; line-height:1.5; color:var(--text-muted); font-style:normal;}
 .qsppt-inf-act{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
 @media (max-width:1000px){
   .qspl-pdm-grid.qsppt-pdm-grid{grid-template-columns:1fr;}

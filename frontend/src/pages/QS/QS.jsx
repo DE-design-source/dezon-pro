@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './QS.css'
 import { useTheme } from '../../hooks/useTheme'
 import Icon from '../../components/ui/Icon'
@@ -11,8 +11,6 @@ import QuoteTab from './components/QuoteTab'
 import PurchaseTab from './components/PurchaseTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import ImportTab from './components/importer/ImportTab'
-import AdminTab from './components/admin/AdminTab'
-import CongTyTab from './components/congty/CongTyTab'
 import PCard from './components/project/PCard'
 import QuickBar from './components/project/QuickBar'
 import NotificationBell from './components/notifications/NotificationBell'
@@ -32,20 +30,22 @@ import DevSheetProbe from './state/DevSheetProbe'
 
 /* Tab chính, đúng thứ tự + mã tab của bản gốc (PUB/index.html:6580-6587); quyền theo canTab */
 const TABS = [
-  { key: 'dash', label: 'Bảng điều khiển', icon: 'grid' },
-  { key: 'boc', label: 'Bóc tách', icon: 'layers' },
-  { key: 'chiphi', label: 'Chi phí', icon: 'banknote' },
-  { key: 'export', label: 'Xuất báo giá', icon: 'fileText' },
-  { key: 'muahang', label: 'Mua hàng', icon: 'cart' },
-  { key: 'duan', label: 'Dự án', icon: 'scan' },
+  { key: 'dash', label: 'Bảng điều khiển' },
+  { key: 'boc', label: 'Bóc tách' },
+  { key: 'chiphi', label: 'Chi phí' },
+  { key: 'export', label: 'Xuất báo giá' },
+  { key: 'muahang', label: 'Mua hàng' },
+  { key: 'duan', label: 'Dự án' },
 ]
 /* Băng dự án ẩn ở trang không thuộc 1 dự án và ở Bảng điều khiển (PUB/app.js:350-353) */
-const NO_PCARD = { dash: 1, admin: 1, sanpham: 1, import: 1, congty: 1 }
+const NO_PCARD = { dash: 1, sanpham: 1, import: 1 }
+/* Công ty / Admin đã chuyển sang trang Cài đặt (QsSettingsPanels): tab của store còn trỏ tới đó thì /qs về tab đầu tiên được phép */
+const SETTINGS_TABS = { admin: 1, congty: 1 }
 const QB_TABS = { boc: 1, chiphi: 1, duan: 1, muahang: 1 }
 
 /* Hướng bố cục và khoảng cách của từng tab (giống style inline của các .qs-panel trong bản HTML) */
 const PANEL_LAYOUT = {
-  dash: { flexDirection: 'column', gap: 10 },
+  dash: { flexDirection: 'column', gap: 16 },   // = khoảng cách giữa các khối trong Bảng điều khiển (dashboard.css)
   duan: { flexDirection: 'column', gap: 8, minHeight: '100%' },
   /* PCard nằm trên panel trong .qs-scroll: panel lấy phần còn lại (flex) để vừa khít màn hình như #v-boc (requests/1-1B.txt) */
   boc: { flexDirection: 'column', gap: 10, flex: '1 1 0', minHeight: 560 },
@@ -55,8 +55,6 @@ const PANEL_LAYOUT = {
   export: { flexDirection: 'column', gap: 8 },
   muahang: { flexDirection: 'column', gap: 8 },
   import: { flexDirection: 'column', gap: 10 },
-  admin: { flexDirection: 'column', gap: 10 },
-  congty: { flexDirection: 'column', gap: 10 },
 }
 
 let splashShown = false   // màn chờ chỉ hiện ở lần nạp đầu của trang, không hiện lại khi quay lại /qs
@@ -89,6 +87,8 @@ function QsRoot() {
   const ready = auth === 'ready'
   const me = session.me
   const can = t => !!me && session.canTab(t)
+
+  useEffect(() => { if (SETTINGS_TABS[tab]) showTab(session.firstAllowedTab() || 'dash') }, [tab, me])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const loading = configured && (auth === 'init' || auth === 'checking' || (ready && (boot === 'idle' || boot === 'loading')))
   const showSplash = configured && !splashGone
@@ -123,8 +123,6 @@ function QsRoot() {
         <div style={panel('export')}>{guard('export', <QuoteTab />)}</div>
         <div style={panel('muahang')}>{guard('muahang', <PurchaseTab />)}</div>
         <div style={panel('import')}>{guard('import', <ImportTab />)}</div>
-        {can('admin') && <div style={panel('admin')}>{guard('admin', <AdminTab />)}</div>}
-        {can('congty') && <div style={panel('congty')}>{guard('congty', <CongTyTab />)}</div>}
       </>
     )
   }
@@ -135,10 +133,14 @@ function QsRoot() {
       style={{ '--ai-panel-width': `${aiWidth}px`, ...brand }}
     >
       <div className="qs-topbar">
+        {/* đầu trang giống các trang khác (vd. Tài chính): ô biểu tượng + tên trang | vạch | các tab */}
+        <div className="qs-hdr-icon" aria-hidden="true">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
+        </div>
+        <span className="qs-hdr-title">QS</span>
         <div className="qs-tabs-row">
           {me && TABS.filter(t => can(t.key)).map(t => (
             <button key={t.key} className={`qs-tab${tab === t.key ? ' active' : ''}`} onClick={() => showTab(t.key)}>
-              <Icon name={t.icon} size={14} />
               {t.label}
             </button>
           ))}
@@ -146,8 +148,6 @@ function QsRoot() {
         <div className="qs-top-actions">
           {can('sanpham') && <button className={`qs-top-btn${tab === 'sanpham' ? ' on' : ''}`} title="Danh sách sản phẩm" onClick={() => showTab('sanpham')}><Icon name="listLines" size={14} /><span>Danh sách sản phẩm</span></button>}
           {can('import') && <button className={`qs-top-btn primary${tab === 'import' ? ' on' : ''}`} title="Nhập dữ liệu" onClick={() => showTab('import')}><Icon name="upload" size={14} /><span>Nhập dữ liệu</span></button>}
-          {can('congty') && <button className={`qs-top-btn${tab === 'congty' ? ' on' : ''}`} title="Quản lý công ty (toàn hệ thống)" onClick={() => showTab('congty')}><Icon name="building" size={14} /><span>Công ty</span></button>}
-          {can('admin') && <button className={`qs-top-btn${tab === 'admin' ? ' on' : ''}`} title="Admin" onClick={() => showTab('admin')}><Icon name="settings" size={14} /><span>Admin</span></button>}
           <button className="qs-top-btn icon" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
           </button>
@@ -156,7 +156,7 @@ function QsRoot() {
         </div>
       </div>
 
-      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}`} style={tab === 'boc' ? { display: 'flex', flexDirection: 'column' } : undefined}>
+      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}${tab === 'dash' ? ' qs-scroll-home' : ''}`} style={tab === 'boc' || tab === 'export' ? { display: 'flex', flexDirection: 'column', gap: 12, padding: 12 } : undefined}>
         {body}
       </div>
 

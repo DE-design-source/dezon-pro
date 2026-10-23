@@ -100,7 +100,7 @@ export function ptTabs_(all) {
   const chua = db.filter(r => !ctOf_(r.a).daDuyet).length
   const da = db.filter(r => ctOf_(r.a).daDuyet).length
   const fav = db.filter(r => ctOf_(r.a).yeuThich).length
-  return [['all', 'Tất cả', all.length], ['__chua', 'Chưa duyệt', chua], ['__da', 'Đã duyệt', da], ['__fav', '♥ Yêu thích', fav]]
+  return [['all', 'Tất cả', all.length], ['__chua', 'Chưa duyệt', chua], ['__da', 'Đã duyệt', da], ['__fav', '★ Yêu thích', fav]]
 }
 export const PT_FLT_KEYS = ['ptLoai', 'ptDvt', 'ptNhom', 'ptDa', 'ptSua', 'min', 'max']
 export function ptFltCount_(f) { f = f || {}; let n = 0; PT_FLT_KEYS.forEach(k => { if (f[k]) n++ }); return n }

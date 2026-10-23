@@ -22,7 +22,7 @@
 /* ---------- Thanh thống kê + ô Ngành hàng ---------- */
 .qsi-statbar{display:flex; align-items:center; gap:22px; flex-wrap:wrap; margin:8px 0 8px; padding:6px 14px; border:1px solid var(--border); border-radius:12px; background:var(--dash-soft);}
 .qsi-stat{padding-left:22px; border-left:1px solid var(--border);}
-.qsi-stat-v{font-size:16px; font-weight:600; color:var(--text); letter-spacing:-.02em;}
+.qsi-stat-v{font-size:16px; font-weight:600; color:var(--text);}
 .qsi-stat-l{font-size:11px; color:var(--text-muted);}
 .qsi-hm-wrap{position:relative; display:inline-flex; align-items:center; gap:8px; flex:none;}
 .qsi-hm-lbl{font-size:12.5px; font-weight:650; color:var(--text); white-space:nowrap;}
@@ -97,7 +97,7 @@ html[data-theme="dark"] .qsi-field input.qsi-calc{color:var(--dash-bar-2);}
 .qsi-upzone:hover .qsi-upic, .qsi-upzone.qsi-drag .qsi-upic{color:var(--dash-accent);}
 .qsi-up-t{font-size:12.5px; font-weight:600; color:var(--text);}
 .qsi-upzone:hover .qsi-up-t{color:var(--dash-accent);}
-.qsi-up-s{font-size:11px; color:var(--text-muted); line-height:1.4;}
+.qsi-up-s{font-size:11px; color:var(--text-muted); line-height:1.5;}
 .qsi-up-s b{color:var(--text); font-weight:600;}
 .qsi-up-paste{margin-top:7px; display:inline-flex; align-items:center; gap:5px; font-size:10px; color:#a8b2be; border:1px solid var(--border); border-radius:99px; padding:3px 9px; background:var(--surface);}
 .qsi-upgrid{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-content:flex-start; flex:none;}
@@ -146,7 +146,7 @@ html[data-theme="dark"] .qsi-field input.qsi-calc{color:var(--dash-bar-2);}
 .qsi-docf-b.qsi-up{border-color:var(--dash-accent-border); background:var(--dash-accent-tint); color:var(--dash-accent);}
 .qsi-docf-b[disabled]{opacity:.6; cursor:wait;}
 .qsi-docf-b.qsi-up svg{transform:rotate(180deg);}
-.qsi-tl-ext{flex:none; min-width:34px; height:18px; padding:0 5px; border-radius:4px; display:inline-grid; place-items:center; font-size:9.5px; font-weight:700; letter-spacing:.03em; background:#eef1f4; color:#4a5563;}
+.qsi-tl-ext{flex:none; min-width:34px; height:18px; padding:0 5px; border-radius:4px; display:inline-grid; place-items:center; font-size:9.5px; font-weight:700; background:#eef1f4; color:#4a5563;}
 .qsi-tl-ext.qsi-e-pdf{background:#fde8e8; color:#c0392b;}
 .qsi-tl-ext.qsi-e-dwg, .qsi-tl-ext.qsi-e-dxf, .qsi-tl-ext.qsi-e-skp{background:#e8f0fe; color:#1d4ed8;}
 .qsi-tl-ext.qsi-e-png, .qsi-tl-ext.qsi-e-jpg, .qsi-tl-ext.qsi-e-jpeg, .qsi-tl-ext.qsi-e-webp{background:#e7f7ee; color:#15803d;}
@@ -248,16 +248,16 @@ html[data-theme="dark"] .qsi-pvtbl tbody tr td.qsi-iimiss{background:var(--dange
 .qsi-rtbl th.qsi-c, .qsi-rtbl td.qsi-c{text-align:center;}
 .qsi-rtbl td{padding:8px 8px; border-bottom:1px solid var(--border); vertical-align:middle;}
 .qsi-rtbl .qsi-ract{width:44px;}
-.qsi-rtbl .qsi-rname{font-weight:600; color:var(--text); line-height:1.3; max-width:120px; font-size:12.5px;}
-.qsi-rtbl .qsi-rdate{font-size:10.5px; color:#98a6b3; white-space:nowrap; line-height:1.35;}
+.qsi-rtbl .qsi-rname{font-weight:600; color:var(--text); line-height:1.5; max-width:120px; font-size:12.5px;}
+.qsi-rtbl .qsi-rdate{font-size:10.5px; color:#98a6b3; white-space:nowrap; line-height:1.5;}
 .qsi-rtbl td.qsi-empty{padding:24px 12px; font-size:12.5px; line-height:1.5; text-align:center; color:var(--text-muted);}
-.qsi-rma{display:block; margin-top:1px; font-style:normal; font-size:10.5px; color:var(--text-muted); letter-spacing:.01em; font-weight:500;}
+.qsi-rma{display:block; margin-top:1px; font-style:normal; font-size:10.5px; color:var(--text-muted); font-weight:500;}
 .qsi-rth{display:inline-block; width:40px; height:40px; border-radius:7px; object-fit:contain; background:var(--surface-alt); border:1px solid var(--border); vertical-align:middle;}
 .qsi-redit{width:28px; height:28px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; border:1px solid transparent; background:transparent; color:var(--text-muted); cursor:pointer; transition:.12s; padding:0;}
 .qsi-redit:hover{background:var(--surface-alt); color:var(--text);}
 .qsi-redit.qsi-dis{opacity:.35; cursor:not-allowed;}
 .qsi-rfoot{padding:8px 12px; border-top:1px solid var(--border); background:var(--surface);}
-.qsi-rfoot-note{font-size:12px; color:#b45309; margin-bottom:8px; line-height:1.4;}
+.qsi-rfoot-note{font-size:12px; color:#b45309; margin-bottom:8px; line-height:1.5;}
 .qsi-pc-hd{display:flex; align-items:center; gap:6px; padding:10px 14px 6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#92400e;}
 .qsi-pc-hd span{background:#fdecc8; color:#92400e; border-radius:6px; padding:1px 6px; font-size:10.5px;}
 .qsi-pc-hd i{margin-left:auto; font-style:normal; font-weight:500; text-transform:none; letter-spacing:0; color:#b08a4a; font-size:11px;}
@@ -273,10 +273,10 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-pc-th{width:40px; height:40px; border-radius:7px; object-fit:contain; background:#fff; border:1px solid var(--border); flex:none;}
 .qsi-pc-noimg{display:grid; place-items:center; color:#b8c0ca;}
 .qsi-pc-mid{flex:1; min-width:0;}
-.qsi-pc-name{font-weight:600; font-size:12.5px; color:var(--text); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;}
+.qsi-pc-name{font-weight:600; font-size:12.5px; color:var(--text); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;}
 .qsi-pc-sub{font-size:11px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.qsi-pc-bt{font-size:11px; font-weight:600; color:var(--dash-accent); margin-top:2px; line-height:1.35; word-break:break-word;}
-.qsi-pc-loi{font-size:11px; color:#b42318; margin-top:3px; line-height:1.35;}
+.qsi-pc-bt{font-size:11px; font-weight:600; color:var(--dash-accent); margin-top:2px; line-height:1.5; word-break:break-word;}
+.qsi-pc-loi{font-size:11px; color:#b42318; margin-top:3px; line-height:1.5;}
 .qsi-pc-tag{display:inline-block; margin-top:5px; margin-right:4px; padding:1px 7px; border-radius:6px; background:#fdecc8; color:#92400e; font-size:10.5px; font-weight:600;}
 .qsi-pc.qsi-err .qsi-pc-tag{background:#fde2e2; color:#b42318;}
 .qsi-pc.qsi-editing .qsi-pc-tag{background:#dbe8ff; color:#1d4ed8;}

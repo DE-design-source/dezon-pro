@@ -14,6 +14,7 @@ export default function DraftItem({ draft: d, index, active }) {
   const meta = `${d.maDA} · ${fmtDate(d.ngayTao)}`
   return (
     <div className={`qs-dash-draft${active ? ' active' : ''}`}>
+      <div className="qs-dash-draft-icon"><Icon name="fileText" size={15} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
         {edit
           ? <NameInput init={name} width={edit.w} maDA={d.maDA} onDone={() => setEdit(null)} />

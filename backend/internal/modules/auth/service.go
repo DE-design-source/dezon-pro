@@ -238,6 +238,61 @@ func colsOK(v any) bool {
 	return true
 }
 
+// presetsOK: tối đa 20 bộ, mỗi bộ {name: chuỗi 1-39 ký tự, cols: như colsOK}.
+func presetsOK(v any) bool {
+	arr, ok := v.([]any)
+	if !ok || len(arr) > 20 {
+		return false
+	}
+	for _, x := range arr {
+		m, ok := x.(*omap.Map)
+		if !ok {
+			return false
+		}
+		name, ok := m.Val("name").(string)
+		if !ok || name == "" || jsval.Len16(name) >= 40 || !colsOK(m.Val("cols")) {
+			return false
+		}
+	}
+	return true
+}
+
+// idsOK: tkOrder - tối đa 60 id, mỗi id là chuỗi 1-59 ký tự.
+func idsOK(v any) bool {
+	arr, ok := v.([]any)
+	if !ok || len(arr) > 60 {
+		return false
+	}
+	for _, x := range arr {
+		str, ok := x.(string)
+		if !ok || str == "" || jsval.Len16(str) >= 60 {
+			return false
+		}
+	}
+	return true
+}
+
+// biaMauOK: bgBiaMau - tối đa 10 mẫu, mỗi mẫu {id: chuỗi 1-39, ten: chuỗi 1-39, cfg: object}.
+func biaMauOK(v any) bool {
+	arr, ok := v.([]any)
+	if !ok || len(arr) > 10 {
+		return false
+	}
+	for _, x := range arr {
+		m, ok := x.(*omap.Map)
+		if !ok {
+			return false
+		}
+		id, ok1 := m.Val("id").(string)
+		ten, ok2 := m.Val("ten").(string)
+		_, ok3 := m.Val("cfg").(*omap.Map)
+		if !ok1 || !ok2 || !ok3 || id == "" || ten == "" || jsval.Len16(id) >= 40 || jsval.Len16(ten) >= 40 {
+			return false
+		}
+	}
+	return true
+}
+
 // SetMyPref = setMyPref (A:271-287). value null / thiếu -> xoá khoá đó.
 func (s *Service) SetMyPref(ctx context.Context, a *actor.Actor, key, value any) (*omap.Map, error) {
 	k, isStr := key.(string)
@@ -249,6 +304,18 @@ func (s *Service) SetMyPref(ctx context.Context, a *actor.Actor, key, value any)
 		return nil, apperr.New(msgPrefKey)
 	}
 	if !jsval.IsNullish(value) && strings.HasSuffix(k, "Cols") && !colsOK(value) {
+		return nil, apperr.New(msgPrefCols)
+	}
+	if !jsval.IsNullish(value) && k == "tkPresets" && !presetsOK(value) {
+		return nil, apperr.New(msgPrefCols)
+	}
+	if str, ok := value.(string); !jsval.IsNullish(value) && k == "tkQuick" && (!ok || str == "" || jsval.Len16(str) >= 60) {
+		return nil, apperr.New(msgPrefCols)
+	}
+	if !jsval.IsNullish(value) && k == "tkOrder" && !idsOK(value) {
+		return nil, apperr.New(msgPrefCols)
+	}
+	if !jsval.IsNullish(value) && k == "bgBiaMau" && !biaMauOK(value) {
 		return nil, apperr.New(msgPrefCols)
 	}
 	u, err := s.users.GetByID(ctx, a.UID)

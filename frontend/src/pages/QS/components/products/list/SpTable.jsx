@@ -357,7 +357,7 @@ function SpInp({ p, e, val, bare, code, placeholder }) {
 function RowActions({ p, canEdit, canDuyet, isAdmin, on }) {
   return (
     <>
-      <button type="button" className={`qspl-act fav${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'} onClick={() => on.fav(p)}><QsIcon name="heart" size={16} /></button>
+      <button type="button" className={`qspl-act fav${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'} onClick={() => on.fav(p)}><QsIcon name="star" size={16} /></button>
       <button type="button" className="qspl-act add" title="Ghi danh vào dự án" onClick={() => on.add(p)}><QsIcon name="pluscircle" size={18} /></button>
       {canDuyet && !p.spChung && <button type="button" className={`qspl-act ${p.daDuyet ? 'undo' : 'ok'}`} title={p.daDuyet ? 'Bỏ duyệt' : 'Duyệt sản phẩm này'} onClick={() => on.duyet(p)}><QsIcon name="check" size={16} /></button>}
       {!p.spChung && <button type="button" className="qspl-act edit" title="Cập nhật sản phẩm" onClick={() => on.editP(p)}><QsIcon name="edit" size={16} /></button>}

@@ -2,18 +2,23 @@ import { useMemo } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
 import { cpTong_ } from '../../lib/totals.js'
-import { money, fmtDate, safeUrl_ } from '../../lib/format.js'
+import { money, safeUrl_ } from '../../lib/format.js'
 import { dezonUrl_ } from '../../lib/dashModel.js'
 import { useFold, foldToggle_, projCtx_, usePdState, pdRetry_ } from './projectShell'
-import { projInfoModal, dezonSet_, openProjDlg } from './projectActions'
+import { projInfoModal, dezonSet_ } from './projectActions'
+import { useQsStore } from '../../state/store'
+import { setPcTotalsEl, setPcNodeEl, usePcAlignX } from './pcSlot'
 import './project.css'
 
 /* Băng thông tin dự án #pcard (port PUB/index.html:6643-6661, renderCard app.js:424-447; shot tab-boc.png).
    Một bản duy nhất, QS.jsx đặt trên các panel (ẩn ở dash/admin/sanpham/import/congty). Props: không có.
    Bấm băng = mở hộp Thông tin dự án; gập / mở nhớ ở qs_fold.pcard (chung với nút "Mở rộng bảng" của Bóc tách).
-   Dạng gập dùng lại thanh .qs-bd-bar của bản clone. Số tiền chỉ hiện khi đã có projData của bản nháp (usePdState). */
+   Dạng gập dùng lại thanh .qs-bd-bar của bản clone. Số tiền chỉ hiện khi đã có projData của bản nháp (usePdState).
+   Ở tab Bóc tách, băng mở rộng có chỗ trống .qs-pc-totals: SheetHeader đưa dải Chưa VAT / VAT / Tổng lên đây (pcSlot.js). */
 export default function PCard() {
   const { cur, lines, projects, projData, selectProject, status } = useQs()
+  const tab = useQsStore(s => s.tab)
+  const alignX = usePcAlignX()
   const pd = usePdState(cur, status)
   const folded = useFold('pcard')
   const p = cur || {}
@@ -23,9 +28,12 @@ export default function PCard() {
 
   const openInfo = () => { if (cur) projInfoModal(cur.maDA) }
   const stop = e => e.stopPropagation()
+  /* Ô chọn dự án đứng ở đầu băng, thay cho tên dự án (tên đang chọn hiện ngay trong ô) */
   const sel = (
     <select
-      className={folded ? 'qs-bd-bar-select' : 'qs-pc-sel'}
+      className={folded ? 'qs-bd-bar-select qs-pc-sel-title' : 'qs-pc-sel qs-pc-sel-title'}
+      title="Đổi dự án đang làm việc"
+      onClick={stop}
       value={cur ? cur.maDA : ''}
       onChange={e => selectProject(e.target.value)}
     >
@@ -33,9 +41,6 @@ export default function PCard() {
         ? projects.map(x => <option key={x.maDA} value={x.maDA}>{x.ten}</option>)
         : <option value="">— Chưa có dự án —</option>}
     </select>
-  )
-  const create = (
-    <button type="button" className={folded ? 'qs-bd-bar-create' : 'qs-pc-create'} onClick={() => openProjDlg('create')}>Tạo dự án +</button>
   )
   const fold = (
     <button type="button" className={folded ? 'qs-bd-bar-toggle' : 'qs-pc-fold'} title="Thu gọn / mở băng thông tin dự án"
@@ -47,61 +52,59 @@ export default function PCard() {
 
   if (folded) {
     return (
-      <div className="qs-bd-bar qs-pc-folded" onClick={openInfo} title="Bấm để sửa thông tin dự án">
-        <span className="qs-bd-bar-name" title={p.ten || ''}>{p.ten || 'Chưa chọn dự án'}</span>
+      <div className="qs-bd-bar qs-pc-folded">
+        <span className="qs-pc-proj-f" onClick={stop}>{sel}</span>
+        <button type="button" className="qs-pc-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án" onClick={openInfo}><Icon name="edit" size={13} /></button>
         <span className="qs-bd-bar-status">{p.trangThai || 'Bản nháp'}</span>
         {dz}
-        <span className="qs-bd-bar-code">Mã: {p.maDA || '—'}</span>
         <span style={{ flex: 1 }} />
         <span className="qs-bd-bar-pct">{pct}%</span>
-        <span className="qs-pc-proj-f" onClick={stop} title="Đổi dự án đang làm việc">{sel}{create}</span>
         {fold}
       </div>
     )
   }
 
   return (
-    <div className="qs-pc" onClick={openInfo} title="Bấm để sửa thông tin dự án">
-      <div className="qs-pc-main">
+    <div className="qs-pc">
+      {/* Bóc tách: khối tên dự án rộng tới mép trái của bảng bên dưới (trừ đệm trái 14 + khe 10 của .qs-pc) để các module
+          Hạng mục đã bóc · kiểu bảng · cột · tiền nằm gọn trong bề ngang của bảng, thẳng mép bảng */}
+      <div className={`qs-pc-main${tab === 'boc' ? ' has-node' : ''}`}
+        style={tab === 'boc' && alignX ? { width: Math.max(170, alignX - 24), flex: 'none' } : undefined}>
         <div className="qs-pc-top">
-          <h1>{p.ten || 'Chưa chọn dự án'}</h1>
+          <span className="qs-pc-proj" onClick={stop}>{sel}</span>
           <span className="qs-pc-status">{p.trangThai || 'Bản nháp'}</span>
-          {dz}
-          <span className="qs-pc-edit">Bấm để sửa ›</span>
+          <button type="button" className="qs-pc-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án" onClick={openInfo}><Icon name="edit" size={14} /></button>
         </div>
-        <div className="qs-pc-code">Mã: <span>{p.maDA || '—'}</span></div>
       </div>
-      <div className="qs-pc-info">
-        <div><span className="k">Khách hàng</span><span className="v">{p.khachHang || '—'}</span></div>
-        <div><span className="k">Điện thoại</span><span className="v">{p.sdt || '—'}</span></div>
-        <div><span className="k">Địa chỉ</span><span className="v">{p.diaChi || '—'}</span></div>
-        <div><span className="k">Ngày tạo</span><span className="v">{fmtDate(p.ngayTao)}</span></div>
+      {tab === 'boc' && <div className="qs-pc-node" ref={setPcNodeEl} onClick={stop} />}
+      {/* Module 4 (tiền): Chưa VAT · Tổng (VAT) (Bóc tách đưa vào .qs-pc-totals) · Lợi nhuận · % Lợi nhuận, chung 1 khung */}
+      <div className="qs-pc-mod qs-pc-money">
+        {tab === 'boc' && <div className="qs-pc-totals" ref={setPcTotalsEl} onClick={stop} />}
+        <div className="qs-pc-kpi">
+          {TT && (
+            <>
+              {pd.ready
+                ? (
+                  <>
+                    <div className="qs-pc-k"><span className="kv">{money(TT.net - TT.von)}đ</span><span className="kl">Lợi nhuận</span></div>
+                    <div className="qs-pc-k" title="Lợi nhuận / doanh thu chưa VAT (đã trừ chiết khấu báo giá)">
+                      <span className="kv">{(Math.round(TT.bien * 10) / 10).toLocaleString('vi-VN')}%</span><span className="kl">% Lợi nhuận</span>
+                    </div>
+                    {TT.ptErr && <div className="qs-pc-k qs-pc-err" title={TT.ptErr}><span className="kv">!</span><span className="kl">Phần thô lỗi, chưa tính</span></div>}
+                  </>
+                )
+                : (
+                  <div className={`qs-pc-k${pd.err ? ' qs-pc-err' : ''}`} title={pd.err || 'Đang tải dữ liệu dự án (Phần thô, chiết khấu báo giá)'}>
+                    <span className="kv">{pd.err ? 'Lỗi tải dữ liệu' : 'Đang tải…'}</span>
+                    {(pd.err || pd.slow)
+                      ? <button type="button" className="qs-pc-retry" onClick={e => { e.stopPropagation(); pdRetry_(cur.maDA) }}>Thử lại</button>
+                      : <span className="kl">Lợi nhuận</span>}
+                  </div>
+                )}
+            </>
+          )}
+        </div>
       </div>
-      <div className="qs-pc-kpi">
-        {TT && (
-          <>
-            <div className="qs-pc-k"><span className="kv">{(lines || []).length}</span><span className="kl">Hạng mục</span></div>
-            {pd.ready
-              ? (
-                <>
-                  <div className="qs-pc-k"><span className="kv">{money(TT.net)}đ</span><span className="kl">Tổng giá bán</span></div>
-                  <div className="qs-pc-k"><span className="kv">{money(TT.net - TT.von)}đ</span><span className="kl">Lợi nhuận</span></div>
-                  {TT.ptErr && <div className="qs-pc-k qs-pc-err" title={TT.ptErr}><span className="kv">!</span><span className="kl">Phần thô lỗi, chưa tính</span></div>}
-                </>
-              )
-              : (
-                <div className={`qs-pc-k${pd.err ? ' qs-pc-err' : ''}`} title={pd.err || 'Đang tải dữ liệu dự án (Phần thô, chiết khấu báo giá)'}>
-                  <span className="kv">{pd.err ? 'Lỗi tải dữ liệu' : 'Đang tải…'}</span>
-                  {(pd.err || pd.slow)
-                    ? <button type="button" className="qs-pc-retry" onClick={e => { e.stopPropagation(); pdRetry_(cur.maDA) }}>Thử lại</button>
-                    : <span className="kl">Tổng giá bán · Lợi nhuận</span>}
-                </div>
-              )}
-          </>
-        )}
-      </div>
-      <div className="qs-pc-prog"><div className="qs-pc-pct">{pct}%</div><div className="qs-pc-bar"><i style={{ width: pct + '%' }} /></div></div>
-      <div className="qs-pc-proj" onClick={stop} title="Đổi dự án đang làm việc">{sel}{create}</div>
       {fold}
     </div>
   )

@@ -1,3 +1,4 @@
+import Icon from '../../../../../components/ui/Icon'
 import ProductThumb from '../../common/ProductThumb'
 import { mediaUrl } from '../../../api/files'
 import { money } from '../../../lib/format.js'
@@ -19,13 +20,14 @@ export default function ChildBox({ title, n, cls, rows, foot }) {
             <div key={r.stt} className="qs-bdc-ccr" title={String(x.ten || '') + (r.phu ? ' — ' + r.phu : '') + (r.gc ? ' — Ghi chú: ' + r.gc : '')} onClick={r.onOpen}
               draggable={!!r.drag} onDragStart={r.drag ? r.drag.onStart : undefined} onDragEnd={r.drag ? r.drag.onEnd : undefined}>
               <span className="qs-bdc-ccr-no">{r.stt}</span>
-              <ProductThumb product={x} size={30} src={x.hinhAnh ? mediaUrl(String(x.hinhAnh).split('\n')[0].trim()) : ''} className="qs-bdc-ccr-th" />
+              <ProductThumb product={x} size={56} src={x.hinhAnh ? mediaUrl(String(x.hinhAnh).split('\n')[0].trim()) : ''} className="qs-bdc-ccr-th" />
               <span className="qs-bdc-ccr-m">
                 <b>{ten}</b>
-                <span className="qs-bdc-ccr-r"><i>{r.phu || ''}</i><em>{money(x.donGiaBan)} đ</em></span>
+                {r.phu ? <span className="qs-bdc-ccr-r"><i>{r.phu}</i></span> : null}
                 {r.gc ? <span className="qs-bdc-ccr-gc">Ghi chú: {r.gc}</span> : null}
               </span>
-              <button className="qs-bdc-ccr-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); r.onAdd() }}>+</button>
+              <span className="qs-bdc-ccr-p">{money(x.donGiaBan)} đ</span>
+              <button className="qs-bdc-ccr-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); r.onAdd() }}><Icon name="plus" size={13} stroke={2.8} /></button>
             </div>
           )
         })}

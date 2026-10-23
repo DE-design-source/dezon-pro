@@ -13,6 +13,8 @@
 
 /* ---------- Ô chọn hạng mục (#treePop, .tnode / .mm-step của bản gốc) ---------- */
 .qs-tk-tree{padding:6px;}
+/* Cây hạng mục dài xuống tới đáy màn hình: bỏ trần 440px chung của .qsc-pop, danh sách tự cao theo chỗ trống (TreePopover đo) */
+.qsc-pop.qs-tkp.qs-tk-tree{max-height:none; overflow:visible;}
 .qs-tk-tnlist{max-height:52vh; overflow:auto;}
 .qs-tk-tnode{display:flex; align-items:center; gap:9px; padding:6px 9px; border-radius:8px; cursor:pointer; font-size:12px;}
 .qs-tk-tnode:hover{background:var(--surface-alt);}
@@ -24,6 +26,9 @@
 .qs-tk-tnode.on .rd{border-color:var(--dash-accent); background:radial-gradient(var(--dash-accent) 40%, transparent 45%);}
 .qs-tk-tnode.lvl1{font-weight:600; margin-top:3px;}
 .qs-tk-tnode.lvl1 .nm{font-weight:650;}
+/* vạch ngăn giữa các đề mục lớn (cấp 1): vẽ bằng ::before để nền rê chuột / đang chọn vẫn bo góc gọn */
+.qs-tk-tnode.lvl1:not(:first-child){position:relative; margin-top:11px;}
+.qs-tk-tnode.lvl1:not(:first-child)::before{content:''; position:absolute; left:6px; right:6px; top:-6px; border-top:1px solid var(--border);}
 .qs-tk-tnode.lvl2{padding-left:20px; font-size:11.5px;}
 .qs-tk-tnode.lvl3{padding-left:34px; font-size:11.5px;}
 .qs-tk-tnode.lvl4{padding-left:48px; font-size:11px;}
@@ -42,6 +47,32 @@
 
 /* ---------- Chọn nhanh cột (.bgtree / .tkmine) ---------- */
 .qs-tk-bgtb{padding:6px;}
+/* Khung dọc "Chọn nhanh cột" bên trái vùng bảng Bóc tách (thay popup nhỏ), rộng bằng cột Hạng mục */
+.qs-tk-dock{flex:none; width:440px; margin-right:12px; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
+.qs-tk-dock .qs-tk-bgtb{flex:1; min-height:0; overflow-y:auto;}
+.qs-tk-dock .qs-tk-bgti{padding:10px 9px; border-radius:0;}
+.qs-tk-dock .qs-tk-bgti + .qs-tk-bgti{border-top:1px solid var(--border);}
+.qs-tk-dock .qs-tkp-h .qsc-x + .qsc-x{margin-left:0;}
+.qs-tk-dock .qs-tk-dockedit{display:inline-grid; place-items:center;}
+/* nút sửa / đặt mặc định / gán nút nhanh / xoá: chỉ hiện khi rê chuột vào dòng (nút nhanh đang gán thì luôn hiện) */
+.qs-tk-bgacts{display:inline-flex; gap:2px; visibility:hidden;}
+.qs-tk-bgti:hover .qs-tk-bgacts, .qs-tk-dock.editing .qs-tk-bgacts{visibility:visible;}
+.qs-tk-minef .qsc-btn.qs-tk-delsel{color:#d93025; border-color:#f3b8b3;}
+.qs-tk-bgact{display:grid; place-items:center; width:24px; height:24px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer;}
+.qs-tk-bgact:hover{background:var(--surface); color:var(--dash-accent); box-shadow:0 0 0 1px var(--border);}
+.qs-tk-bgact.on{color:var(--dash-accent);}
+.qs-tk-bgact.del:hover{color:#d93025; background:#fdecec; box-shadow:none;}
+.qs-tk-dock .qs-tk-bgti .nm{flex-wrap:wrap; row-gap:3px;}
+.qs-tk-quicktag.def{color:#1e8e3e; background:#e6f4ea;}
+.qs-tk-dock .qsc-x.qs-tk-dockedit.on{color:var(--dash-accent); background:var(--dash-accent-tint);}
+/* đang sửa: kéo dòng để sắp xếp, ô tích để xoá hàng loạt; vạch xanh báo chỗ thả */
+.qs-tk-dock.editing .qs-tk-bgti{cursor:grab;}
+.qs-tk-grip{flex:none; width:12px; color:var(--text-muted); font-size:12px; letter-spacing:-3px; line-height:1; user-select:none;}
+.qs-tk-bgchk{flex:none; margin:0; width:15px; height:15px; accent-color:var(--dash-accent); cursor:pointer;}
+.qs-tk-bgchk:disabled{cursor:not-allowed; opacity:.35;}
+.qs-tk-bgti.drop-before{box-shadow:inset 0 2px 0 var(--dash-accent);}
+.qs-tk-bgti.drop-after{box-shadow:inset 0 -2px 0 var(--dash-accent);}
+.qs-tk-quicktag{display:inline-flex; align-items:center; gap:3px; margin-left:6px; padding:1px 6px; border-radius:999px; font-size:10.5px; font-weight:600; color:var(--dash-accent); background:var(--dash-accent-tint); white-space:nowrap;}
 .qs-tk-bgti{display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; cursor:pointer; font-size:12.5px;}
 .qs-tk-bgti:hover{background:var(--surface-alt);}
 .qs-tk-bgti.on{background:var(--dash-accent-tint);}
@@ -50,6 +81,7 @@
 .qs-tk-bgti .rd{width:12px; height:12px; border:1.5px solid var(--border); border-radius:50%; flex:none;}
 .qs-tk-bgti .rd.on{border-color:var(--dash-accent); background:radial-gradient(var(--dash-accent) 40%, transparent 45%);}
 .qs-tk-bgti.tkmine .nm{color:var(--dash-accent);}
+.qs-tk-overnote{padding:8px 9px; font-size:11.5px; line-height:1.45; color:var(--text-muted);}
 .qs-tk-mineu{font-style:normal; font-weight:500; font-size:11px; color:var(--text-muted);}
 .qs-tk-minef{display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px 12px; border-top:1px solid var(--border);}
 .qs-tk-minef .qsc-btn{height:30px; font-size:12px;}
@@ -213,7 +245,9 @@
 .qs-tk-grid .qs-bd-row td.c-soLuong{color:var(--dash-accent);}
 .qs-tk-grid td.c-hinhAnh .qsc-thumb{margin:0 auto; display:flex;}
 .qs-tk-grid td.c-hinhAnh .qsc-thumb img{object-fit:contain;}
-.qs-tk-thmenu{position:absolute; right:3px; bottom:3px; width:16px; height:16px; border-radius:4px; font-size:10px; line-height:16px; text-align:center; color:inherit; opacity:.55; cursor:pointer;}
+.qs-tk-thmenu{position:absolute; right:8px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:4px; display:grid; place-items:center; color:inherit; opacity:.55; cursor:pointer;}
+/* chừa chỗ bên phải ô tiêu đề cho nút lọc (góc phải, canh giữa theo chiều cao): chữ tiêu đề không chạy dưới nút, hẹp thì tự xuống dòng */
+.qs-tk-grid .qs-bd-labels th:has(.qs-tk-thmenu){padding-right:28px;}
 .qs-tk-thmenu:hover{opacity:1; background:rgba(255,255,255,.18);}
 .qs-tk-grid th.qs-tk-thon{box-shadow:inset 0 -3px 0 #f59e0b;}
 .qs-tk-grid th.qs-tk-thon .qs-tk-thmenu{opacity:1; color:#f59e0b;}
@@ -273,12 +307,19 @@ html[data-theme="dark"] .qs-tk-lnupd{background:#3a2c0a;}
 .qs-tk-grip{color:var(--text-muted); opacity:.55; font-size:12px; cursor:grab;}
 .qs-tk-sttn{font-size:12px;}
 .qs-tk-grid.qs-tk-plain tr.qs-tk-rowsel td{background-color:var(--dash-accent-tint);}
-/* Bảng thường: nút xoá dòng ở mép phải, chỉ hiện ở dòng đang rê chuột (renderActGutter / bindActGutterHover_) */
-.qs-tk-grid th.qs-tk-actth, .qs-tk-grid td.qs-tk-actcell{position:sticky; right:0; z-index:2; padding:0; border-right:none; text-align:center;}
+/* Bảng thường: rãnh nút xoá / kéo dòng (renderActGutter), đứng đầu dòng, dính trái khi cuộn ngang */
+.qs-tk-grid th.qs-tk-actth, .qs-tk-grid td.qs-tk-actcell{position:sticky; z-index:2; padding:0; text-align:center;}
 .qs-tk-grid .qs-bd-labels th.qs-tk-actth{z-index:4;}
-.qs-tk-agx{width:22px; height:22px; padding:0; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0;}
-.qs-tk-grid tr:hover .qs-tk-agx{opacity:1;}
-.qs-tk-agx:hover{color:#dc2626; border-color:#dc2626;}
+/* Rãnh nút đầu dòng, trước STT (Bảng thường, tham khảo bản thiết kế): tách khỏi bảng — nền trắng, không tô màu tiêu đề / dòng nhóm,
+   mỗi dòng: nút xoá (x đỏ) trên, tay nắm kéo (⇕) dưới; luôn hiện */
+.qs-tk-grid th.qs-tk-actth, .qs-tk-grid .qs-bd-labels th.qs-tk-actth, .qs-tk-grid .qs-bd-letters th.qs-tk-actth{background:var(--surface); border:none; box-shadow:none;}
+.qs-tk-grid tr td.qs-tk-actcell, .qs-tk-grid tr.qs-bd-group td.qs-tk-actcell{background:var(--surface); border-top:none; border-bottom:1px solid var(--border); border-left:none; border-right:1px solid var(--border); vertical-align:middle;}
+.qs-tk-agcol{display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0;}
+.qs-tk-agx{width:20px; height:20px; padding:0; border:1px solid #f3b8b3; border-radius:5px; background:#fdecec; color:#d93025; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;}
+.qs-tk-agx:hover{background:#d93025; border-color:#d93025; color:#fff;}
+.qs-tk-agdrag{width:20px; height:20px; border:1px solid var(--border); border-radius:5px; background:var(--surface); color:var(--text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:grab;}
+.qs-tk-agdrag:hover{color:var(--dash-accent); border-color:var(--dash-accent);}
+.qs-tk-agdrag:active{cursor:grabbing;}
 /* Bảng thường: khối "Công cụ bảng" gọn thay cho thanh công cụ bảng tính */
 .qs-tk-toolbox{flex:none; height:43px; padding:0 8px 0 14px; display:flex; align-items:center; justify-content:flex-end; gap:4px; background:var(--dash-soft); border-bottom:1px solid var(--border);}
 .qs-tk-toolh{margin-right:auto; color:var(--text-muted); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;}
@@ -290,3 +331,73 @@ html[data-theme="dark"] .qs-tk-lnupd{background:#3a2c0a;}
 .qs-tk-shsep{align-self:center; margin:0 2px 0 6px; color:var(--text-muted); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap;}
 /* Chip tầng đã có vẫn bấm được (chuyển sang "đang thêm" như addFloorName) */
 .qs-bd-adder-chip.has{cursor:pointer;}
+/* Bảng thường: tay kéo đổi chiều cao hàng ở mép dưới ô đầu dòng (ô cố định đã là sticky nên giữ được vị trí tuyệt đối) */
+.qs-tk-grid td.qs-tk-rgcell:not(.pin){position:relative;}
+.qs-tk-grid td.qs-tk-rgcell .qs-tk-rgrip{left:0; right:0;}
+.qs-tk-rgrip:hover{background:rgba(26,86,219,.35);}
+/* Hộp Thay đổi kích thước hàng / cột (ResizeDialog) */
+.qsc-dlg.qs-rsz-dlg{width:400px; padding:20px 22px 18px;}
+.qs-rsz-h{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:14px;}
+.qs-rsz-h h3{margin:0; font-size:18px; font-weight:600; line-height:1.3;}
+.qs-rsz-opt{display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; cursor:pointer;}
+.qs-rsz-opt input{width:17px; height:17px; margin:0; accent-color:var(--dash-accent);}
+.qs-rsz-px{display:flex; align-items:center; gap:10px; padding:4px 0 10px 27px; font-size:13.5px; color:var(--text-muted);}
+.qs-rsz-px input{width:96px; height:38px; padding:0 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:15px; outline:none;}
+.qs-rsz-px input:focus{border-color:var(--dash-accent);}
+.qs-rsz-px input:disabled{opacity:.5;}
+.qs-rsz-f{display:flex; gap:10px; margin-top:18px;}
+.qs-rsz-f .qsc-btn{height:38px; min-width:90px; justify-content:center; font-size:14px;}
+/* Menu chuột phải: rộng hơn, cao tới gần hết màn hình (bỏ trần 440px chung của popup), mục gọn hơn để thấy đủ không phải cuộn */
+.qsc-pop.qs-tkp.qs-tk-ctx{max-height:92vh;}
+.qs-tk-ctx .qs-tk-cmi{padding:5px 14px;}
+.qs-tk-ctx .qs-tk-cmh{padding:6px 14px 2px;}
+/* Menu chuột phải 2 cột, vạch dọc ngăn giữa */
+.qs-tk-ctxcols{display:grid; grid-template-columns:1fr 1fr;}
+.qs-tk-ctxcols > .qs-tk-ctxcol + .qs-tk-ctxcol{border-left:1px solid var(--border);}
+.qs-tk-ctxcol > .qs-tk-cmsep:last-child{display:none;}
+/* Menu chuột phải 2 tầng: cột trái = đầu mục (rê / bấm để chọn), cột phải = tính năng con của đầu mục đang chọn */
+.qsc-pop.qs-tkp.qs-tk-ctx2{display:grid; grid-template-columns:200px 1fr; padding:0; overflow:hidden;}
+.qs-tk-ctxnav{padding:6px; background:var(--surface-alt); border-right:1px solid var(--border);}
+.qs-tk-ctxsec{display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:8px; font-size:12.5px; font-weight:600; color:var(--text); cursor:pointer;}
+.qs-tk-ctxsec > span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-tk-ctxsec > svg:last-child{opacity:.4;}
+.qs-tk-ctxsec.on{background:var(--surface); color:var(--dash-accent); box-shadow:0 1px 3px rgba(15,23,42,.08);}
+.qs-tk-ctxsec.on > svg:last-child{opacity:1;}
+.qs-tk-ctxbody{padding:6px 0; min-width:0;}
+.qs-tk-ctx2 .qs-tk-cmh{padding:6px 14px 6px; margin-bottom:2px; border-bottom:1px solid var(--border);}
+.qs-tk-ctx2 .qs-tk-cmi{padding:7px 14px;}
+.qs-rsz-scope{padding-bottom:10px; margin-bottom:10px; border-bottom:1px solid var(--border);}
+.qs-rsz-cap{font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin:2px 0 4px;}
+/* Menu chuột phải dạng bảng: mọi khối đầu mục hiện cùng lúc, xếp 3 cột (cột tự cân theo chiều cao), mỗi khối có tiêu đề + tính năng con */
+.qsc-pop.qs-tkp.qs-tk-ctx3{padding:8px; max-height:92vh;}
+.qs-tk-ctxgrid{column-count:3; column-gap:8px;}
+.qs-tk-ctxblk{break-inside:avoid; margin-bottom:8px; padding:4px 0 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
+.qs-tk-ctxblkh{display:flex; align-items:center; gap:7px; padding:6px 12px 7px; margin-bottom:2px; border-bottom:1px solid var(--border);
+  font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--dash-accent);}
+.qs-tk-ctxblkh > span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-tk-ctx3 .qs-tk-cmi{padding:6px 12px;}
+/* Hàng đã đặt chiều cao (hộp Thay đổi kích thước / kéo mép): nội dung cắt theo chiều cao, căn như ô bình thường */
+.qs-tk-clip{overflow:hidden;}
+.qs-bd-grid td.a-right .qs-tk-clip{text-align:right;}
+/* tay kéo chiều cao ở cột số dòng (như Excel): dày hơn, hiện vạch xanh khi rê; ô góc hàng tiêu đề cũng có */
+.qs-bd-grid td.qs-bd-rownum .qs-tk-rgrip, .qs-bd-grid .qs-bd-labels th.pin .qs-tk-rgrip{height:8px; bottom:-3px; z-index:5;}
+.qs-bd-grid .qs-bd-labels th.pin{position:sticky;}
+.qs-bd-grid .qs-bd-labels th.pin .qs-tk-rgrip{position:absolute; left:0; right:0;}
+/* số 1 ở ô cột số của hàng tiêu đề: cùng kiểu chữ với các số hàng bên dưới */
+.qs-bd-grid .qs-bd-labels th.qs-tk-headnum{text-align:center; font-size:12px; font-weight:700; color:var(--text-muted); text-transform:none;}
+/* Hộp Thay đổi kích thước hàng & cột: 2 phần cạnh nhau (Hàng | Cột), phần đang tắt mờ đi */
+.qsc-dlg.qs-rsz-dlg.two{width:720px;}
+.qs-rsz-parts{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px;}
+.qs-rsz-part{border:1px solid var(--border); border-radius:10px; padding:10px 12px;}
+.qs-rsz-part.off .qs-rsz-pb{opacity:.45;}
+.qs-rsz-ph{display:flex; align-items:center; gap:8px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700; cursor:pointer;}
+.qs-rsz-ph input{width:16px; height:16px; margin:0; accent-color:var(--dash-accent);}
+.qs-rsz-pb .qs-rsz-cap{margin-top:6px;}
+.qs-rsz-pb .qs-rsz-px{padding-left:27px;}
+/* Tắt xem tối ưu (bảng gọn): cả Bảng thường cũng 1 dòng / hàng, chữ dài cắt "…" để thấy được giá */
+.qs-tk-grid.qs-tk-plain.compact .qs-bd-row td{white-space:nowrap; text-overflow:ellipsis;}
+.qs-tk-grid.qs-tk-plain.compact .qs-tk-tentext{white-space:nowrap; overflow:hidden;}
+/* Ảnh ở cột Hình ảnh: xem tối ưu (bảng không gọn) = khung vuông tối thiểu 120px, ảnh nằm gọn trong khung;
+   bảng gọn = ảnh nhỏ 44px (1 dòng / hàng). Cột Hình ảnh tự rộng đủ khung (SheetGrid minW) */
+.qs-tk-grid td.c-hinhAnh .qs-tk-img{width:120px !important; height:120px !important;}
+.qs-tk-grid.compact td.c-hinhAnh .qs-tk-img{width:44px !important; height:44px !important;}
