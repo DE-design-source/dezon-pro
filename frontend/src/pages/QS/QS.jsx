@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './QS.css'
 import { useTheme } from '../../hooks/useTheme'
 import Icon from '../../components/ui/Icon'
@@ -27,15 +27,17 @@ import UserChip from './session/UserChip'
 import { API_BASE, apiConfigured, reportClientError } from './api/http'
 import { logoUrl } from './api/files'
 import DevSheetProbe from './state/DevSheetProbe'
+import { useFitLevel } from './components/common/useFitLevel'
 
-/* Tab chính, đúng thứ tự + mã tab của bản gốc (PUB/index.html:6580-6587); quyền theo canTab */
+/* Tab chính, đúng thứ tự + mã tab của bản gốc (PUB/index.html:6580-6587); quyền theo canTab.
+   icon: chỉ hiện khi thanh đầu trang thiếu chỗ (tab chỉ còn biểu tượng, data-fit 2 trong QS.css) */
 const TABS = [
-  { key: 'dash', label: 'Bảng điều khiển' },
-  { key: 'boc', label: 'Bóc tách' },
-  { key: 'chiphi', label: 'Chi phí' },
-  { key: 'export', label: 'Xuất báo giá' },
-  { key: 'muahang', label: 'Mua hàng' },
-  { key: 'duan', label: 'Dự án' },
+  { key: 'dash', label: 'Bảng điều khiển', icon: 'gauge' },
+  { key: 'boc', label: 'Bóc tách', icon: 'layers' },
+  { key: 'chiphi', label: 'Chi phí', icon: 'banknote' },
+  { key: 'export', label: 'Xuất báo giá', icon: 'fileText' },
+  { key: 'muahang', label: 'Mua hàng', icon: 'cart' },
+  { key: 'duan', label: 'Dự án', icon: 'folder' },
 ]
 /* Băng dự án ẩn ở trang không thuộc 1 dự án và ở Bảng điều khiển (PUB/app.js:350-353) */
 const NO_PCARD = { dash: 1, sanpham: 1, import: 1 }
@@ -81,6 +83,9 @@ function QsRoot() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [splashGone, setSplashGone] = useState(splashShown)
+  /* Thanh đầu trang thiếu chỗ (cửa sổ hẹp / phóng to) thì gọn dần: 1 = nút bên phải chỉ còn biểu tượng, 2 = tab chỉ còn biểu tượng */
+  const topRef = useRef(null)
+  useFitLevel(topRef, 2, '.qs-tabs-row')
 
   const configured = apiConfigured()
   const auth = configured ? session.auth : 'unconfigured'
@@ -132,7 +137,7 @@ function QsRoot() {
       className={`qs-page${aiOpen ? ' qs-ai-open' : ''}${aiResizing ? ' qs-ai-resizing' : ''}`}
       style={{ '--ai-panel-width': `${aiWidth}px`, ...brand }}
     >
-      <div className="qs-topbar">
+      <div className="qs-topbar" ref={topRef}>
         {/* đầu trang giống các trang khác (vd. Tài chính): ô biểu tượng + tên trang | vạch | các tab */}
         <div className="qs-hdr-icon" aria-hidden="true">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
@@ -140,8 +145,8 @@ function QsRoot() {
         <span className="qs-hdr-title">QS</span>
         <div className="qs-tabs-row">
           {me && TABS.filter(t => can(t.key)).map(t => (
-            <button key={t.key} className={`qs-tab${tab === t.key ? ' active' : ''}`} onClick={() => showTab(t.key)}>
-              {t.label}
+            <button key={t.key} className={`qs-tab${tab === t.key ? ' active' : ''}`} title={t.label} onClick={() => showTab(t.key)}>
+              <Icon name={t.icon} size={18} className="qs-tab-ic" /><span className="qs-tab-t">{t.label}</span>
             </button>
           ))}
         </div>
@@ -156,7 +161,7 @@ function QsRoot() {
         </div>
       </div>
 
-      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}${tab === 'dash' ? ' qs-scroll-home' : ''}`} style={tab === 'boc' || tab === 'export' ? { display: 'flex', flexDirection: 'column', gap: 12, padding: 12 } : undefined}>
+      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}${tab === 'dash' ? ' qs-scroll-home' : ''}`} style={tab === 'boc' || tab === 'export' ? { display: 'flex', flexDirection: 'column', gap: 12, padding: 12 } : (tab === 'sanpham' ? { padding: 12 } : undefined)}>
         {body}
       </div>
 

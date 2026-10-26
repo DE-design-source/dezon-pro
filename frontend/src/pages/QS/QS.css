@@ -75,6 +75,17 @@ html[data-theme="dark"][data-accent="teal"] .qs-page{--primary:#3FC2B6; --primar
 .qs-tab{border:none; cursor:pointer; white-space:nowrap; display:flex; align-items:center; padding:10.67px 21.33px; border-radius:10.67px; background:none; color:var(--text-muted); font-size:13px; font-weight:600; line-height:1.5;}
 .qs-tab:hover{color:var(--text);}
 .qs-tab.active{background:var(--dash-accent-tint); color:var(--dash-accent);}
+/* Thanh tab hẹp (màn hình nhỏ / thu phóng 100%): đệm ngang của tab co theo bề ngang thanh để đủ chữ mọi tab, không bị cuộn mất */
+.qs-tabs-row{container:qs-tabs / inline-size;}
+.qs-tab{padding-left:clamp(6px, calc((100cqi - 560px) / 12), 21.33px); padding-right:clamp(6px, calc((100cqi - 560px) / 12), 21.33px);}
+/* Vẫn thiếu chỗ thì gọn theo mức data-fit do QS.jsx đo (useFitLevel): 1 = nút bên phải chỉ còn biểu tượng, 2 = tab chỉ còn biểu tượng
+   (tên ở chú thích khi rê chuột) */
+.qs-tab-ic{display:none; flex:none;}
+.qs-topbar:is([data-fit="1"], [data-fit="2"]) .qs-top-btn:not(.icon){padding:0 11px;}
+.qs-topbar:is([data-fit="1"], [data-fit="2"]) .qs-top-btn:not(.icon) span{display:none;}
+.qs-topbar[data-fit="2"] .qs-tab-ic{display:block;}
+.qs-topbar[data-fit="2"] .qs-tab-t{display:none;}
+.qs-topbar[data-fit="2"] .qs-tab{padding:9px 12px;}
 .qs-top-actions{flex:none; display:flex; align-items:center; gap:6px;}
 .qs-top-btn{height:32px; padding:0 11px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:6px; cursor:pointer;}
 .qs-top-btn:hover{background:var(--surface-alt);}
@@ -90,6 +101,9 @@ html[data-theme="dark"][data-accent="teal"] .qs-page{--primary:#3FC2B6; --primar
    bằng đúng số px ghi trong CSS như các trang khác (14px = 14px), và vẫn đổi theo Cài đặt ▸ Giao diện ▸ Cỡ chữ (--fs-user).
    Đổi --qs-zoom thì đổi --qs-text = 1 / --qs-zoom. */
 .qs-page{--qs-text:1.3333;}
+/* Mặc định cả vùng QS (khung + chữ) nhỏ thêm 10%: trình duyệt 100% trông như 90% trước đây (.75 x 0,9).
+   Giữ --qs-text = 1,3333 (không bù) để chữ nhỏ theo cùng tỉ lệ; mọi chỗ dùng var(--qs-zoom) (hộp thoại .qs-mroot, vw/vh) tự theo */
+.qs-page{--qs-zoom:.675;}
 .qs-topbar, .qs-scroll{--fs:calc(var(--fs-user, 1) * var(--qs-text, 1.3333));}
 /* Cỡ chữ gốc đặt lại ngay trên vùng thu nhỏ: chữ không có cỡ riêng kế thừa 14px của .qs-page (ngoài vùng) sẽ bị thu còn 10,5px */
 .qs-topbar, .qs-scroll{font-size:14px;}
@@ -1261,6 +1275,12 @@ html[data-theme="dark"] .qs-po-status{background:#3A2E14; color:#F0B45A;}
 /* Bảng tính: nút Thêm tầng / phòng + Thêm hạng mục nằm trên thanh công cụ (trước cụm nút xem bên phải) thay cho chân bảng;
    thanh công cụ trong khung module không cắt phần tràn để hộp chọn tầng mở xuống được */
 .qs-bd-toolmod .qs-bd-tb-one{overflow:visible;}
+/* Thanh công cụ luôn 1 dòng: nút Tầng / phòng + Hạng mục gọn lại; thiếu chỗ thì theo mức data-fit do SheetToolbar đo (useFitLevel):
+   1 = 2 nút chỉ còn biểu tượng (chữ ở chú thích khi rê chuột), 2 = xuống hàng (cột Hạng mục cao theo, --qs-toolmod-h) */
+.qs-bd-tb .qs-tk-addgrp{gap:6px;}
+.qs-bd-tb .qs-tk-addgrp .qs-bd-add-row, .qs-bd-tb .qs-tk-addgrp .qs-bd-add-group{height:28px; padding:0 10px; font-size:12.5px; gap:5px;}
+.qs-bd-tb-one:is([data-fit="1"], [data-fit="2"]) .qs-tk-addgrp :is(.qs-bd-add-row, .qs-bd-add-group){font-size:0; gap:0; padding:0 8px;}
+.qs-bd-toolmod .qs-bd-tb-one[data-fit="2"]{flex-wrap:wrap; height:auto; min-height:43px; padding-top:6px; padding-bottom:6px; row-gap:4px;}
 .qs-bd-tb .qs-tk-addgrp{flex:none; margin:0 4px;}
 /* nút Vừa thêm + Lịch sử thao tác ở đầu cột Hạng mục (giữa ô đếm SKU và Bộ lọc) */
 .qs-bd-headtools{display:flex; align-items:center; gap:2px; margin-left:4px;}

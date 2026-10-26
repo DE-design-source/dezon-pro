@@ -270,6 +270,7 @@
 .qspl-mn button{width:100%; display:flex; align-items:center; gap:8px; height:34px; padding:0 10px; border:none; border-radius:8px; background:transparent; color:var(--text); font-size:13px; cursor:pointer; text-align:left;}
 .qspl-mn button:hover{background:var(--surface-alt);}
 .qspl-mn button.danger{color:var(--danger);}
+.qspl-mn button.on{color:var(--dash-accent); font-weight:600;}
 .qspl-mn button.danger:hover{background:var(--danger-tint);}
 .qspl-mn-sep{height:1px; margin:4px 2px; background:var(--border);}
 .qspl-ctx{width:300px; padding:6px;}
@@ -364,3 +365,328 @@
   .qspl-pdm-grid{grid-template-columns:1fr;}
   .qspl-pdm-right{columns:1;}
 }
+
+/* ---------- Tiêu đề bảng đồng bộ với bảng Bóc tách (.qs-bd-labels th, QS.css): nền navy, chữ IN HOA đậm căn giữa,
+   xuống tối đa nhiều dòng thay vì cắt "…", hàng cao hơn, vạch ngăn trắng mờ giữa các cột ---------- */
+.qspl-table th{height:56px; padding:6px 10px; background:var(--dash-navy-2); font-size:12.5px; font-weight:700; line-height:1.3; text-transform:uppercase;
+  text-align:center; white-space:normal; word-break:break-word; vertical-align:middle; box-shadow:inset -1px 0 0 rgba(255,255,255,.14);}
+.qspl-table th.num, .qspl-table th.ct{text-align:center;}
+.qspl-table th.sortOn{background:var(--dash-navy);}
+.qspl-table th.qspl-actcol{box-shadow:none;}
+.qspl-table th.dropL{box-shadow:inset 3px 0 0 #7FA8F5;} .qspl-table th.dropR{box-shadow:inset -3px 0 0 #7FA8F5;}
+.qspl-tblwrap.yscroll th{box-shadow:inset -1px 0 0 rgba(255,255,255,.14), 0 3px 6px -2px rgba(15,23,42,.25);}
+/* lớp qspl-th của ảnh thu nhỏ cũng gắn trên <th>: bỏ viền bo của nó để hàng tiêu đề liền một dải */
+.qspl-table th.qspl-th{border:0; border-radius:0;}
+
+/* ---------- Chọn chế độ xem (Bảng · Lưới · Danh sách), cạnh các tab trạng thái ---------- */
+.qspl-lay{display:inline-flex; align-items:center; gap:2px; height:34px; padding:2px; border:1px solid var(--border); border-radius:9px; background:var(--surface);}
+.qspl-lay button{height:100%; padding:0 10px; border:none; border-radius:7px; background:none; color:var(--text-muted); font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;}
+.qspl-lay button:hover:not(:disabled){color:var(--text); background:var(--surface-alt);}
+.qspl-lay button.on{background:var(--dash-navy); color:#fff;}
+.qspl-lay button:disabled{opacity:.4; cursor:not-allowed;}
+
+/* ---------- Dạng Lưới / Danh sách (SpCards) ---------- */
+/* khung thẻ là hộp cuộn (ProductList đặt chiều cao vừa màn hình cho [data-sp-wrap] như bảng) */
+.qspl-cards{padding:14px; min-height:220px; overflow:auto;}
+.qspl-cards.grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:14px; align-content:start;}
+.qspl-cards.list{display:flex; flex-direction:column; gap:10px;}
+.qspl-cards.list > .qspl-pc{flex-shrink:0;}
+.qspl-cards > .qspl-empty{grid-column:1 / -1;}
+.qspl-pc{position:relative; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; background:var(--surface); cursor:pointer; overflow:hidden; transition:border-color .14s, box-shadow .14s, transform .14s;}
+.qspl-pc:hover{border-color:var(--dash-accent-border); box-shadow:0 8px 22px rgba(15,40,80,.10);}
+.qspl-pc.sel{border-color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint);}
+.qspl-pc.kid{background:var(--dash-soft);}
+.qspl-pc-img{position:relative; display:flex; align-items:center; justify-content:center; background:var(--surface-alt); padding:12px;}
+.qspl-pc-img img, .qspl-pc-img > *:first-child{border-radius:8px;}
+.qspl-pc-ck{position:absolute; top:8px; left:8px; opacity:0; transition:opacity .12s;}
+.qspl-pc:hover .qspl-pc-ck, .qspl-pc.sel .qspl-pc-ck, .qspl-pc-ck:focus-visible{opacity:1;}
+@media (hover:none){ .qspl-pc-ck{opacity:1;} }
+.qspl-pc-fav{position:absolute; top:6px; right:6px; width:28px; height:28px; border:none; border-radius:50%; background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer; box-shadow:0 1px 4px rgba(15,23,42,.12);}
+.qspl-pc-fav:hover{color:#F59E0B;}
+.qspl-pc-fav.on{color:#F59E0B;}
+.qspl-pc-fav.on svg{fill:currentColor;}
+.qspl-pc-body{flex:1; display:flex; flex-direction:column; gap:3px; padding:10px 12px 6px; min-width:0;}
+.qspl-pc-top{display:flex; align-items:center; gap:6px; margin-bottom:2px;}
+.qspl-pc-name{font-size:13.5px; font-weight:600; line-height:1.4; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.qspl-pc-specs{margin:6px 0 0; display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:3px 14px;}
+.qspl-pc-specs div{display:flex; gap:6px; min-width:0; font-size:12px;}
+.qspl-pc-specs dt{flex:none; color:var(--text-muted);}
+.qspl-pc-specs dt::after{content:':';}
+.qspl-pc-specs dd{margin:0; min-width:0; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qspl-pc-foot{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px 12px;}
+.qspl-pc-price{display:flex; flex-direction:column; min-width:0;}
+.qspl-pc-price b{font-size:15px; font-weight:800; color:var(--dash-accent); white-space:nowrap;}
+.qspl-pc-price s{font-size:11.5px; color:var(--text-muted); white-space:nowrap;}
+.qspl-pc-price .unit{margin-left:2px; font-size:11px; color:var(--text-muted); font-weight:600;}
+.qspl-pc-acts{display:flex; align-items:center; gap:2px; flex:none;}
+.qspl-pc-add{height:30px; padding:0 10px; border:none; border-radius:8px; background:var(--dash-accent); color:#fff; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; cursor:pointer; white-space:nowrap;}
+.qspl-pc-add:hover{filter:brightness(1.08);}
+/* Danh sách: ảnh trái, thông tin giữa, giá + nút phải */
+.qspl-cards.list .qspl-pc{flex-direction:row; align-items:stretch;}
+.qspl-cards.list .qspl-pc-img{flex:none; width:128px; padding:10px;}
+.qspl-cards.list .qspl-pc-body{padding:12px 14px;}
+.qspl-cards.list .qspl-pc-name{-webkit-line-clamp:1;}
+.qspl-cards.list .qspl-pc-foot{flex:none; flex-direction:column; align-items:flex-end; justify-content:center; padding:12px 14px; border-left:1px solid var(--border); min-width:170px;}
+.qspl-cards.list .qspl-pc-price{align-items:flex-end;}
+/* Lưới: thẻ hẹp thì giá và nút xuống 2 hàng thay vì đè lên nhau */
+.qspl-cards.grid .qspl-pc-foot{flex-wrap:wrap;}
+.qspl-cards.grid .qspl-pc-price{flex:1 1 auto;}
+/* Danh sách trên màn hẹp: giá + nút xuống hàng dưới */
+@media (max-width:640px){
+  .qspl-cards.list .qspl-pc{flex-wrap:wrap;}
+  .qspl-cards.list .qspl-pc-img{width:96px;}
+  .qspl-cards.list .qspl-pc-body{flex:1 1 0;}
+  .qspl-cards.list .qspl-pc-foot{flex:1 1 100%; min-width:0; flex-direction:row; justify-content:space-between; border-left:0; border-top:1px solid var(--border);}
+}
+
+/* ---------- Tách module như tab Bóc tách: thanh công cụ · hàng chọn cột · bảng + phân trang là 3 khối riêng (bo 12px, cách 12px);
+   trong thanh công cụ mỗi cụm (tìm · tab trạng thái · chế độ xem · hạng mục / lọc · nút thao tác) có khung riêng như băng dự án.
+   Chế độ Phần thô (.ptmode) giữ khung cũ ---------- */
+.qspl-card:not(.ptmode){background:transparent; border:0; border-radius:0; overflow:visible; gap:12px;}
+.qspl-card:not(.ptmode) > .qspl-colbox, .qspl-tblcard{background:var(--surface); border:1px solid var(--border); border-radius:12px;}
+.qspl-tblcard{display:flex; flex-direction:column; min-width:0; overflow:hidden;}
+.qspl-tblcard > .qspl-note{padding:8px 14px 0;}
+.qspl-band > .qspl-toolbar{flex-wrap:nowrap; gap:10px; padding:8px 10px;}
+.qspl-card:not(.ptmode) > .qspl-colbox{padding:8px 14px;}
+.qspl-mod{display:flex; align-items:center; flex-wrap:nowrap; gap:4px; height:40px; padding:3px; border:1px solid var(--border); border-radius:10px; background:var(--surface); flex:none;}
+.qspl-band > .qspl-toolbar .qspl-search{flex:0 1 240px; min-width:150px; width:auto; height:40px; border-radius:10px;}
+.qspl-band > .qspl-toolbar .qspl-filtrow{flex-wrap:nowrap;}
+.qspl-band > .qspl-toolbar .qspl-lay{height:40px; border-radius:10px;}
+.qspl-acts .qsc-btn.qspl-sm{height:32px;}
+/* data-fit (ProductList đo tràn): 1 = nút thao tác chỉ còn biểu tượng (chữ ở chú thích), 2 = nút chế độ xem chỉ còn biểu tượng, 3 = xuống dòng */
+.qspl-toolbar:is([data-fit="1"], [data-fit="2"], [data-fit="3"]) .qspl-acts .t{display:none;}
+.qspl-toolbar:is([data-fit="1"], [data-fit="2"], [data-fit="3"]) .qspl-acts .qsc-btn.qspl-sm{padding:0 9px;}
+.qspl-toolbar:is([data-fit="2"], [data-fit="3"]) .qspl-lay span{display:none;}
+.qspl-band > .qspl-toolbar[data-fit="3"]{flex-wrap:wrap;}
+/* mức cuối: từng cụm cũng được co + xuống dòng bên trong, ô tìm chiếm trọn 1 hàng -> không cụm nào tràn khỏi khung */
+.qspl-band > .qspl-toolbar[data-fit="3"] > .qspl-mod{flex:0 1 auto; min-width:0; max-width:100%; flex-wrap:wrap; height:auto; min-height:40px;}
+.qspl-band > .qspl-toolbar[data-fit="3"] .qspl-filtrow{flex-wrap:wrap;}
+.qspl-band > .qspl-toolbar[data-fit="3"] > .qspl-search{flex:1 1 100%;}
+/* Yêu thích: cụm riêng, chỉ biểu tượng ★ + số */
+.qspl-favmod .qspl-vt.fav{padding:0 9px; color:#F59E0B;}
+.qspl-favmod .qspl-vt.fav svg{fill:currentColor;}
+.qspl-favmod .qspl-vt.fav.on{background:var(--dash-navy); color:#FBBF24;}
+/* ghi chú quyền (người không duyệt được): dòng nhỏ riêng giữa thanh công cụ và hàng chọn cột */
+.qspl-card:not(.ptmode) > .qspl-vt-note{margin:-4px 4px 0;}
+/* Nút phễu ở tiêu đề cột (như bảng Bóc tách .qs-tk-thmenu): góc phải, mờ, rê chuột thì rõ; cột đang sắp xếp thì vàng */
+.qspl-table th.qspl-th{padding-right:24px;}
+.qspl-thmenu{position:absolute; right:7px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:4px; display:grid; place-items:center; color:inherit; opacity:.55; cursor:pointer;}
+.qspl-thmenu:hover{opacity:1; background:rgba(255,255,255,.18);}
+.qspl-table th.sortOn .qspl-thmenu{opacity:1; color:#f59e0b;}
+.qspl-table th{position:sticky;}
+/* Nút Bộ lọc đầu thanh công cụ: ô vuông 40px chỉ biểu tượng phễu, số bộ lọc đang bật nổi ở góc trên phải */
+.qspl-fltbtn{position:relative; flex:none; width:40px; height:40px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); cursor:pointer;}
+.qspl-fltbtn:hover{border-color:var(--dash-accent-border); color:var(--dash-accent);}
+.qspl-fltbtn.on{background:var(--dash-accent-tint); border-color:var(--dash-accent-border); color:var(--dash-accent);}
+.qspl-fltbtn .qspl-fbadge{position:absolute; top:-6px; right:-6px; border:2px solid var(--surface);}
+/* Bảng Bộ lọc neo bên phải panel "Sản phẩm trong dự án" (đầu .qspl-main), dưới thanh công cụ, cao tới đáy — như .qs-bd-pop của Bóc tách */
+.qspl-main{position:relative;}
+.qspl-fdock{position:absolute; left:0; top:0; bottom:0; width:min(440px, 100%); z-index:30; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 18px 44px rgba(15,23,42,.2);}
+.qspl-fdock-head{flex:none; height:52px; padding:0 14px 0 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); font-size:16px; font-weight:600; color:var(--text);}
+.qspl-fdock-x{padding:4px; border:none; background:none; color:var(--text-muted); display:flex; cursor:pointer;}
+.qspl-fdock-x:hover{color:var(--text);}
+.qspl-fdock-body{flex:1; min-height:0; overflow-y:auto; padding:6px 14px 10px;}
+.qspl-fdock-body > .qspl-fgrp:first-child{border-top:0;}
+.qspl-fdock-foot{flex:none; display:flex; justify-content:space-between; gap:8px; padding:10px 14px; border-top:1px solid var(--border); background:var(--dash-soft); border-radius:0 0 12px 12px;}
+/* Cụm chế độ xem + Cột hiển thị + chọn nhanh bộ cột (như cụm kiểu bảng · Cột hiển thị · bộ cột trên băng Bóc tách) */
+.qspl-lay .qspl-colbtn{color:var(--text); border:1px solid var(--border); border-radius:16px; padding:0 10px 0 12px;}
+.qspl-lay .qspl-colbtn b{font-weight:600; color:var(--dash-accent);}
+.qspl-lay .qspl-colbtn .fold-ic{width:6px; height:6px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg); margin:-3px 2px 0 2px;}
+.qspl-lay .qspl-colbtn.on{background:var(--dash-accent-tint); border-color:var(--dash-accent-border); color:var(--dash-accent);}
+.qspl-lay .qspl-colbtn.on .fold-ic{transform:rotate(-135deg); margin-top:3px;}
+.qspl-lay .qspl-presetbtn{width:32px; padding:0; justify-content:center; border:1px dashed var(--dash-accent-border); border-radius:50%; color:var(--dash-accent);}
+.qspl-lay .qspl-presetbtn.on, .qspl-lay .qspl-presetbtn:hover{background:var(--dash-accent-tint); border-style:solid;}
+.qspl-toolbar:is([data-fit="2"], [data-fit="3"]) .qspl-lay .qspl-colbtn{padding:0 9px;}
+/* Dải chip cột: khối riêng, Hiện tất cả / Cột cơ bản cuối dải, nút đóng góc phải */
+.qspl-card:not(.ptmode) > .qspl-colbox{position:relative; padding:10px 40px 10px 14px;}
+.qspl-colbox .qspl-colchips{max-height:none; align-items:center;}
+.qspl-colbox-x{position:absolute; right:10px; bottom:10px; width:24px; height:24px; border:none; border-radius:6px; background:none; color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qspl-colbox-x:hover{background:var(--surface-alt); color:var(--text);}
+/* Chọn nhanh cột trong bảng neo */
+.qspl-fdock .qspl-bgt-b{padding:4px 0;}
+.qspl-fdock .qspl-mine-f{display:flex; flex-direction:column; gap:8px; width:100%;}
+
+/* ---------- Băng xanh (như băng dự án .qs-pc của Bóc tách): đầu panel + thanh công cụ trên 1 băng navy, các cụm khung mờ chữ trắng.
+   Panel trái rộng bằng cột Hạng mục của Bóc tách (440px, màn <= 1280px: 340px); đầu panel trên băng thẳng cột panel ---------- */
+.qspl-ws{--qspl-pp-w:440px;}
+@media (max-width:1280px){ .qspl-ws{--qspl-pp-w:340px;} }
+.qspl-pp{width:var(--qspl-pp-w);}
+.qspl-ws.banded{flex-wrap:wrap; row-gap:12px;}
+.qspl-band{flex:1 1 100%; min-width:0; display:flex; align-items:center; gap:16px; padding:8px 10px; border-radius:12px; background:linear-gradient(90deg, var(--dash-navy), var(--dash-navy-2)); color:#fff;}
+.qspl-band > .qspl-toolbar{flex:1 1 0; min-width:0; padding:0; border:0; background:none;}
+.qspl-band .qspl-mod{border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.04);}
+.qspl-band .qspl-fltbtn{border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); color:#fff;}
+.qspl-band .qspl-fltbtn:hover, .qspl-band .qspl-fltbtn.on{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff;}
+.qspl-band .qspl-fltbtn .qspl-fbadge{border-color:var(--dash-navy);}
+.qspl-band .qspl-search{border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#cfe0f3;}
+.qspl-band .qspl-search input{color:#fff;}
+.qspl-band .qspl-search input::placeholder{color:rgba(255,255,255,.6);}
+.qspl-band .qspl-search:focus-within{border-color:rgba(255,255,255,.6); box-shadow:none;}
+.qspl-band .qspl-vt{color:#cfe0f3;}
+.qspl-band .qspl-vt:hover{background:rgba(255,255,255,.1); color:#fff;}
+.qspl-band .qspl-vt .n{background:rgba(255,255,255,.15); color:#fff;}
+.qspl-band .qspl-vt.on{background:#fff; color:#0B2545;}
+.qspl-band .qspl-vt.on .n{background:#E8EEF5; color:#0B2545;}
+.qspl-band .qspl-favmod .qspl-vt.fav{color:#FBBF24;}
+.qspl-band .qspl-favmod .qspl-vt.fav.on{background:#fff; color:#F59E0B;}
+.qspl-band .qspl-lay button{color:#cfe0f3;}
+.qspl-band .qspl-lay button:hover:not(:disabled){background:rgba(255,255,255,.1); color:#fff;}
+.qspl-band .qspl-lay button.on{background:#fff; color:#0B2545;}
+.qspl-band .qspl-lay .qspl-colbtn{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff;}
+.qspl-band .qspl-lay .qspl-colbtn b{color:#9fc0e3;}
+.qspl-band .qspl-lay .qspl-colbtn.on, .qspl-band .qspl-lay .qspl-colbtn:hover{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff;}
+.qspl-band .qspl-lay .qspl-presetbtn{border-color:rgba(159,192,227,.7); color:#cfe0f3;}
+.qspl-band .qspl-lay .qspl-presetbtn.on, .qspl-band .qspl-lay .qspl-presetbtn:hover{border-style:solid; border-color:#fff; background:rgba(255,255,255,.14); color:#fff;}
+.qspl-band .qspl-catbtn{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff;}
+.qspl-band .qspl-catbtn:hover{border-color:rgba(255,255,255,.55);}
+.qspl-band .qspl-catbtn .cnt{background:rgba(255,255,255,.15); color:#fff;}
+.qspl-band .qspl-catbtn .caret{color:#cfe0f3;}
+.qspl-band .qspl-fltag{background:rgba(255,255,255,.12); color:#fff;}
+.qspl-band .qspl-fltag i{color:#cfe0f3;}
+.qspl-band .qsc-btn{border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#fff;}
+.qspl-band .qsc-btn:hover:not(:disabled){background:rgba(255,255,255,.16);}
+.qspl-band .qsc-btn.on{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.18); color:#fff;}
+.qspl-band .qsc-btn.blue, .qspl-band .qsc-btn.blue:hover:not(:disabled){border-color:transparent; background:#2E6BC6; color:#fff;}
+.qspl-band .qsc-btn:disabled{opacity:.45;}
+/* Panel (phần thân) dưới băng: ô chọn dự án + danh sách, không còn hàng tiêu đề */
+.qspl-pp.body{border-radius:12px;}
+@media (max-width:1000px){
+  .qspl-ws.banded{align-items:stretch;}
+  .qspl-band{flex-wrap:wrap;}
+  .qspl-band .qspl-catmod{width:100%;}
+  .qspl-pp{width:100%;}
+}
+/* Cụm hạng mục ở đầu băng: rộng bằng cột panel (thẳng mép panel như ô chọn dự án của Bóc tách), nút chọn hạng mục lấp cả cụm */
+.qspl-catmod{flex:0 1 calc(var(--qspl-pp-w) - 8px); min-width:160px; display:flex;}
+.qspl-catmod .qspl-scope{flex:1; min-width:0; display:flex;}
+.qspl-catmod .qspl-catbtn{flex:1; min-width:0; max-width:none; height:40px; border-radius:10px;}
+.qspl-catmod .qspl-catbtn .lbl{flex:1; text-align:left;}
+.qspl-band .qspl-catmod .qspl-catbtn{font-size:13.5px;}
+.qspl-ws.panel-hidden .qspl-catmod{flex-basis:260px;}
+/* Cụm Cột hiển thị + bộ cột (riêng, cạnh cụm chế độ xem) */
+.qspl-colmod .qspl-colbtn{margin-right:2px;}
+/* Nút Thêm sản phẩm: tròn, nổi bật, đứng riêng cuối băng */
+.qspl-addbtn{flex:none; width:40px; height:40px; border:none; border-radius:50%; background:#2E6BC6; color:#fff; display:grid; place-items:center; cursor:pointer;
+  box-shadow:0 0 0 3px rgba(255,255,255,.18), 0 6px 16px rgba(46,107,198,.45); transition:transform .12s, filter .12s;}
+.qspl-addbtn:hover{filter:brightness(1.12); transform:scale(1.06);}
+.qspl-addbtn:active{transform:scale(.96);}
+/* Chọn hạng mục dạng bảng lớn: phủ cả cột panel trái (bề ngang = panel), từ dưới băng tới đáy; dòng cao hơn, chữ to hơn popup cũ */
+.qspl-fdock.qspl-catdock{left:0; width:var(--qspl-pp-w); max-width:100%;}
+.qspl-catdock .qspl-fdock-body{padding:8px 10px;}
+.qspl-catdock .qspl-tn{padding:9px 12px; font-size:13.5px;}
+.qspl-catdock .qspl-tn.lvl2{padding-left:28px;}
+.qspl-catdock .qspl-tn .cn{font-size:12px;}
+/* Panel Sản phẩm trong dự án: tiêu đề gọn 1 hàng; mỗi dòng = Hình ảnh · Tên sản phẩm · Giá */
+.qspl-pp-head h3{font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qspl-pp-name{font-size:13px;}
+.qspl-pp-price{margin-top:2px; font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap;}
+/* Panel: gạch ngăn giữa 3 phần (tiêu đề · ô chọn dự án · danh sách sản phẩm) */
+.qspl-pp-head{padding-bottom:10px; border-bottom:1px solid var(--border);}
+.qspl-pp-sel + .qspl-pp-sub2, .qspl-pp-sel + .qspl-pp-empty{padding-top:10px; border-top:1px solid var(--border);}
+/* Dòng sản phẩm của panel dùng thẻ .qs-bd-product của Bóc tách: danh sách liền, vạch ngăn giữa các thẻ, không kéo được */
+.qspl-pp-list{gap:0;}
+.qspl-pp-list .qspl-pp-prod{cursor:default; padding:14px 6px 12px 2px;}
+.qspl-pp-list .qspl-pp-prod:hover{background:var(--dash-soft);}
+.qspl-pp-prod .qs-bd-product-name{display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.qspl-pp-prod .qs-bd-product-actions{gap:8px;}
+/* Panel: hàng tiêu đề danh sách + 3 nút chế độ xem (chỉ biểu tượng) */
+.qspl-pp-sub2{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.qspl-pp-sub2 > span:first-child{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qspl-pp-lay{flex:none; display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:8px; background:var(--surface);}
+.qspl-pp-lay button{width:26px; height:24px; border:none; border-radius:6px; background:none; color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qspl-pp-lay button:hover{background:var(--surface-alt); color:var(--text);}
+.qspl-pp-lay button.on{background:var(--dash-navy); color:#fff;}
+/* Danh sách gọn: mỗi SP 1 dòng (ảnh nhỏ · tên · giá · số lượng · bỏ) */
+.qspl-pp-list.list{gap:0;}
+.qspl-pp-row{display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid var(--border);}
+.qspl-pp-row:hover{background:var(--dash-soft);}
+.qspl-pp-rn{flex:1; min-width:0; font-size:12.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qspl-pp-rp{flex:none; font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap;}
+/* Lưới ảnh: ô vuông ảnh lớn + tên 2 dòng + giá; số lượng ở góc ảnh, nút bỏ hiện khi rê chuột */
+.qspl-pp-list.grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:10px; align-content:start;}
+.qspl-pp-tile{display:flex; flex-direction:column; gap:4px; padding:8px; border:1px solid var(--border); border-radius:10px; background:var(--surface); min-width:0;}
+.qspl-pp-tile:hover{border-color:var(--dash-accent-border);}
+.qspl-pp-timg{position:relative; display:flex; justify-content:center; padding:4px; border-radius:8px; background:var(--dash-soft);}
+.qspl-pp-tq{position:absolute; left:6px; top:6px; padding:0 6px; height:18px; border-radius:9px; background:var(--dash-navy); color:#fff; font-size:11px; font-weight:700; display:inline-flex; align-items:center;}
+.qspl-pp-timg .qspl-pp-del{position:absolute; right:4px; top:4px; background:var(--surface); opacity:0; transition:opacity .12s;}
+.qspl-pp-tile:hover .qspl-pp-del, .qspl-pp-del:focus-visible{opacity:1;}
+@media (hover:none){ .qspl-pp-timg .qspl-pp-del{opacity:1;} }
+.qspl-pp-tn{font-size:12px; line-height:1.35; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.qspl-pp-tp{font-size:12.5px; font-weight:700; color:var(--text);}
+/* Gạch ngắt nhịp dưới hàng tiêu đề danh sách (tách tiêu đề + nút chế độ xem khỏi danh sách) */
+.qspl-pp-sub2{padding-bottom:10px; border-bottom:1px solid var(--border);}
+/* Bộ lọc dạng module như Bóc tách: thân nền xám nhạt (module trắng nổi lên), ô chọn 3 cột phạm vi, ô thương hiệu / NCC rộng hơn */
+.qspl-fdock-flt .qspl-fdock-body{padding:12px; background:var(--dash-soft);}
+.qspl-fdock-flt .qs-bd-mod:last-child{margin-bottom:0;}
+.qspl-fsel3{display:flex; flex-direction:column; gap:8px;}
+.qspl-fcol2{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:var(--text-muted);}
+.qspl-fcol2 .qspl-fsel{width:100%;}
+.qspl-fdock-flt .qspl-fsearch{width:100%; margin:0 0 8px;}
+.qspl-fdock-flt .qspl-fclear{display:block; margin:0 0 8px auto;}
+.qspl-fdock-flt .qs-bd-pop-filters .qs-bd-fchips.qspl-fwide{grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));}
+.qspl-fdock-flt .qs-bd-fchip small{flex:none;}
+.qspl-fcl{min-width:0; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
+/* Nút bỏ khỏi dự án trong panel: nút tròn viền đỏ (cùng cỡ nút + tròn của thẻ Bóc tách) */
+.qspl-pp .qspl-pp-del{width:26px; height:26px; padding:0; flex:none; display:grid; place-items:center; border:1.5px solid var(--danger); border-radius:50%; background:var(--surface); color:var(--danger); font-size:12px; line-height:1;}
+.qspl-pp .qspl-pp-del:hover{background:var(--danger); color:#fff;}
+/* Hoàn tác · Edit · Tải Excel: luôn chỉ biểu tượng (tên ở chú thích khi rê chuột), nút vuông 32px */
+.qspl-acts .t{display:none;}
+.qspl-acts .qsc-btn.qspl-sm{width:32px; padding:0; justify-content:center;}
+/* Nút biểu tượng trên băng: nền mờ đều, rê chuột sáng lên; nút Edit đang bật nền trắng chữ navy như nút đang chọn của băng */
+.qspl-band .qspl-acts{gap:4px;}
+.qspl-band .qspl-acts .qsc-btn.qspl-sm{border-radius:8px; border-color:transparent; background:rgba(255,255,255,.08); color:#e6eef8;}
+.qspl-band .qspl-acts .qsc-btn.qspl-sm:hover:not(:disabled){background:rgba(255,255,255,.2); color:#fff;}
+.qspl-band .qspl-acts .qsc-btn.qspl-sm.on{background:#fff; color:#0B2545;}
+/* Nút ✕ tròn trong panel: biểu tượng X nét, căn giữa */
+.qspl-pp .qspl-pp-del svg{display:block;}
+/* Khoảng cách giữa các module như tab Bóc tách: panel ↔ bảng 12px, băng ↔ nội dung 10px; panel đệm 12px để danh sách rộng hơn.
+   Cụm hạng mục trên băng = bề ngang panel + khe 12 - (đệm trái băng 10 + khe cụm 10) -> nút lọc thẳng mép trái bảng */
+.qspl-ws{gap:12px;}
+.qspl-ws.banded{row-gap:10px;}
+.qspl-pp{padding:12px;}
+/* Bảng Bộ lọc / Chọn nhanh cột chiếm chỗ bên trái .qspl-main, bảng sản phẩm co lại phần còn lại (bảng tự tính lại bề rộng cột thao tác);
+   màn hẹp (<= 900px) thì bảng lọc vẫn nổi đè lên như cũ */
+.qspl-main.has-dock{padding-left:calc(min(440px, 100%) + 12px);}
+.qspl-main.has-dock .qspl-fdock{box-shadow:none;}
+@media (max-width:900px){ .qspl-main.has-dock{padding-left:0;} .qspl-main.has-dock .qspl-fdock{box-shadow:0 18px 44px rgba(15,23,42,.2);} }
+/* Dải chip cột kiểu Bóc tách: khung module, không giới hạn chiều cao, nút đóng cuối dải */
+.qspl-card:not(.ptmode) > .qspl-colbox.qs-bd-strip{flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:flex-start; padding:8px 8px 8px 14px; max-height:none; overflow:visible; gap:8px; border-bottom:1px solid var(--border);}
+.qspl-colbox .qs-bd-strip-close{flex:none; width:26px; height:26px; border:none; border-radius:6px; background:none; color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qspl-colbox .qs-bd-strip-close:hover{background:var(--surface-alt); color:var(--text);}
+/* Cột Ảnh: ảnh lớn theo bề rộng cột, căn giữa ô */
+.qspl-table td.thumbcol{text-align:center;}
+.qspl-table td.thumbcol .qsc-thumb{margin:0 auto;}
+/* Lưới thẻ: mỗi hàng cao đủ nội dung thẻ (thẻ overflow:hidden nên không có chiều cao tối thiểu; khung có chiều cao cố định
+   làm trình duyệt ép hàng còn mỗi phần ảnh) -> hàng max-content, khung cuộn dọc */
+.qspl-cards.grid{grid-auto-rows:max-content;}
+.qspl-cards.grid > .qspl-pc{min-height:max-content;}
+/* Khung Chọn nhanh cột như Bóc tách (.qs-tk-dock): dòng cao, ngăn bằng vạch, nút sửa (bút chì) tròn cạnh nút đóng */
+.qspl-coldock .qspl-fdock-head{height:48px;}
+.qspl-coldock .qspl-fdock-head > span{flex:1;}
+.qspl-coldock .qspl-fdock-body{padding:0 6px;}
+.qspl-coldock .qs-tk-bgtb{padding:0;}
+.qspl-coldock .qs-tk-bgti{padding:11px 9px; border-radius:0; font-size:13.5px;}
+.qspl-coldock .qs-tk-bgti .nm{flex:1; min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-weight:600;}
+.qspl-coldock .qs-tk-bgti + .qs-tk-bgti{border-top:1px solid var(--border);}
+.qspl-coldock .qs-tk-bgti.tkmine .nm{color:var(--dash-accent);}
+.qspl-coldock .qs-tk-bgacts{visibility:visible;}
+.qspl-dockedit{width:28px; height:28px; margin-right:4px; border-radius:50%; background:var(--surface-alt);}
+.qspl-dockedit.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+/* Menu "Lưu đè lên bộ" */
+.qspl-overpop{width:260px; padding:0;}
+.qspl-overpop-h{padding:10px 12px 8px; border-bottom:1px solid var(--border); font-size:13px; font-weight:700;}
+.qspl-overpop .qs-tk-bgtb{padding:6px;}
+.qspl-caret{font-style:normal; font-size:10px; margin-left:2px;}
+/* Nút nhanh (1)(2) trên băng: nút tròn số, bộ đang áp thì nền trắng chữ navy */
+.qspl-qbtns{flex:none; display:flex; align-items:center; gap:6px;}
+.qspl-qbtn{width:34px; height:34px; border-radius:50%; border:1.5px solid rgba(255,255,255,.45); background:rgba(255,255,255,.08); color:#fff; font-size:14px; font-weight:700; display:grid; place-items:center; cursor:pointer;}
+.qspl-qbtn:hover{background:rgba(255,255,255,.18); border-color:#fff;}
+.qspl-qbtn.on{background:#fff; color:#0B2545; border-color:#fff;}
+/* Ô gán nút nhanh 1 / 2 trên dòng ở chế độ sửa */
+.qspl-qslot{font-size:11.5px; font-weight:700; border:1px solid var(--border) !important;}
+.qspl-qslot.on{background:var(--dash-accent); color:#fff; border-color:var(--dash-accent) !important;}
+/* nút nhanh nằm trong khung Cột hiển thị: cỡ vừa khung 40px, đè kiểu nút chung .qspl-lay button */
+.qspl-lay .qspl-qbtns{gap:4px; margin-left:2px;}
+.qspl-band .qspl-lay button.qspl-qbtn{width:30px; height:30px; padding:0; border-radius:50%; border:1.5px solid rgba(255,255,255,.45); background:rgba(255,255,255,.08); color:#fff; font-size:13px; font-weight:700; justify-content:center;}
+.qspl-band .qspl-lay button.qspl-qbtn:hover{background:rgba(255,255,255,.18); border-color:#fff; color:#fff;}
+.qspl-band .qspl-lay button.qspl-qbtn.on{background:#fff; color:#0B2545; border-color:#fff;}

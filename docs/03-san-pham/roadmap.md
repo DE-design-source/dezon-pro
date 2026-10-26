@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-10-23 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-10-26 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -32,7 +32,7 @@
 | [M7](#xong-7) | Chi phí | ✅ | - |
 | [M8](#xong-8) | Xuất báo giá | ✅ | - |
 | [M9](#xong-9) | Mua hàng & đề xuất | ✅ | - |
-| [M10](#xong-10) | Danh sách sản phẩm | ✅ | - |
+| [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3) |
 | [M11](#xong-11) | Nhập dữ liệu | ✅ | - |
 | [M12](#xong-12) | Tệp & ảnh | ✅ | - |
 | [M13](#xong-13) | Thông báo | ✅ | - |
@@ -63,7 +63,7 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
-| - | Chưa có | - | - |
+| <a id="m10-3"></a>M10.3 | Danh sách sản phẩm: chọn chế độ xem Bảng · Lưới thẻ · Danh sách (nhớ trong máy, `qs_splayout`; dạng thẻ có ảnh, giá, duyệt, yêu thích, thêm vào dự án, chọn nhiều) + tiêu đề bảng đồng bộ kiểu Bóc tách (IN HOA, căn giữa, xuống dòng, nút phễu mở menu sắp xếp / ẩn cột) + thanh công cụ / hàng chọn cột / bảng tách thành module riêng, thanh công cụ 1 dòng tự gọn khi hẹp (Yêu thích chỉ biểu tượng, "Tất cả" không lặp tên hạng mục). Đã code + build (`SpCards.jsx`, `list.css`), còn thử trên app thật | User | 🟡 |
 
 ### 2.2 Tính năng mới
 

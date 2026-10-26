@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
 import { cpTong_ } from '../../lib/totals.js'
@@ -8,6 +8,7 @@ import { useFold, foldToggle_, projCtx_, usePdState, pdRetry_ } from './projectS
 import { projInfoModal, dezonSet_ } from './projectActions'
 import { useQsStore } from '../../state/store'
 import { setPcTotalsEl, setPcNodeEl, usePcAlignX } from './pcSlot'
+import { useFitLevel } from '../common/useFitLevel'
 import './project.css'
 
 /* Băng thông tin dự án #pcard (port PUB/index.html:6643-6661, renderCard app.js:424-447; shot tab-boc.png).
@@ -25,6 +26,9 @@ export default function PCard() {
   const pct = Math.max(0, Math.min(100, Number(p.tienDo) || 0))
   // đúng số tab Chi phí: gồm Phần thô, đã trừ CK báo giá (cpTong_ với hm = '')
   const TT = useMemo(() => (cur ? cpTong_(lines || [], '', projCtx_(cur, projData)) : null), [cur, lines, projData])
+  /* Băng thiếu chỗ thì gọn dần theo mức data-fit 0..4 (project.css): đo tràn chữ ở các cụm, nút, tên hạng mục */
+  const bandRef = useRef(null)
+  useFitLevel(bandRef, 4, '.qs-pc-mod, .qs-pc-main, .qs-pc-node, .qs-bd-node-lbl, .qs-bd-category b, .qs-bd-seg button, .qs-bd-cols-label', [folded, tab])
 
   const openInfo = () => { if (cur) projInfoModal(cur.maDA) }
   const stop = e => e.stopPropagation()
@@ -65,11 +69,11 @@ export default function PCard() {
   }
 
   return (
-    <div className="qs-pc">
-      {/* Bóc tách: khối tên dự án rộng tới mép trái của bảng bên dưới (trừ đệm trái 14 + khe 10 của .qs-pc) để các module
+    <div className="qs-pc" ref={bandRef}>
+      {/* Bóc tách: khối tên dự án rộng tới mép trái của bảng bên dưới (trừ đệm trái 14 + khe 23 của .qs-pc, project.css) để các module
           Hạng mục đã bóc · kiểu bảng · cột · tiền nằm gọn trong bề ngang của bảng, thẳng mép bảng */}
       <div className={`qs-pc-main${tab === 'boc' ? ' has-node' : ''}`}
-        style={tab === 'boc' && alignX ? { width: Math.max(170, alignX - 24), flex: 'none' } : undefined}>
+        style={tab === 'boc' && alignX ? { '--pc-align': Math.max(170, alignX - 37) + 'px' } : undefined}>
         <div className="qs-pc-top">
           <span className="qs-pc-proj" onClick={stop}>{sel}</span>
           <span className="qs-pc-status">{p.trangThai || 'Bản nháp'}</span>

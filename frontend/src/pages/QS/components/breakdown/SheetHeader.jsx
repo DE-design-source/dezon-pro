@@ -29,7 +29,7 @@ export default function SheetHeader({
   const preset = `${colsShown}/${colsTotal}`
   const colTools = (
     <>
-      {!hideCols && <button className={`qs-bd-cols-label${colsOpen ? ' on' : ''}`} title="Ẩn / hiện các chip cột" onClick={onOpenCols}>Cột hiển thị <span>{preset}</span><Icon name="chevronDown" size={16} /></button>}
+      {!hideCols && <button className={`qs-bd-cols-label${colsOpen ? ' on' : ''}`} title="Ẩn / hiện các chip cột" onClick={onOpenCols}><span className="qs-bd-cols-t">Cột hiển thị</span><span>{preset}</span><Icon name="chevronDown" size={16} /></button>}
       {/* trên băng dự án chỉ còn biểu tượng (tên bộ đang bật + số cột ở chú thích khi rê chuột) */}
       {!hideCols && (
         <button className={`qs-bd-preset${presetOpen ? ' on' : ''}${pcNode ? ' icon-only' : ''}`} onClick={onOpenPreset}
@@ -53,8 +53,8 @@ export default function SheetHeader({
   )
   const seg = (
     <div className="qs-bd-seg" title="Chọn kiểu bảng — máy sẽ nhớ">
-      <button className={view === 'sheet' ? 'on' : ''} onClick={() => onView('sheet')}><Icon name="table" size={15} />Bảng tính</button>
-      <button className={view === 'plain' ? 'on' : ''} onClick={() => onView('plain')}><Icon name="listLines" size={15} />Bảng thường</button>
+      <button className={view === 'sheet' ? 'on' : ''} title="Bảng tính" onClick={() => onView('sheet')}><Icon name="table" size={15} /><span className="qs-bd-seg-t">Bảng tính</span></button>
+      <button className={view === 'plain' ? 'on' : ''} title="Bảng thường" onClick={() => onView('plain')}><Icon name="listLines" size={15} /><span className="qs-bd-seg-t">Bảng thường</span></button>
     </div>
   )
   /* Nút ẩn/hiện cột hạng mục + "Hạng mục đã bóc" + nút chọn hạng mục: băng dự án đang mở rộng thì lên băng (.qs-pc-node),

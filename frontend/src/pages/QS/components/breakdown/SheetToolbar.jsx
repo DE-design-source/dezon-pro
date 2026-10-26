@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import Icon from '../../../../components/ui/Icon'
+import { useFitLevel } from '../common/useFitLevel'
 
 const ZOOMS = [50, 75, 90, 100, 110, 125, 150]
 const Sep = () => <span className="qs-bd-tb-sep" />
@@ -26,6 +27,9 @@ export default function SheetToolbar({ s, a, formula }) {
   const wrapOn = s.wrapOn !== undefined ? s.wrapOn : !s.fmt.nowrap
   const colorRef = useRef(null)
   const bgRef = useRef(null)
+  /* Thiếu chỗ: 1 = nút Tầng / phòng + Hạng mục chỉ còn biểu tượng, 2 = xuống hàng (QS.css, chỉ áp trong khung .qs-bd-toolmod) */
+  const barRef = useRef(null)
+  useFitLevel(barRef, s.addTools ? 2 : 0, '.qs-tk-addgrp', [!!s.addTools])
   /* Mở bảng màu của trình duyệt, neo ngay dưới nút */
   const pickColor = ref => { const el = ref.current; if (!el) return; if (el.showPicker) el.showPicker(); else el.click() }
 
@@ -126,7 +130,7 @@ export default function SheetToolbar({ s, a, formula }) {
   return (
     <>
       {/* 1 hàng: định dạng | thao tác bảng ... (dồn phải) cột / lọc / xem; không đủ chỗ thì cuộn ngang */}
-      <div className="qs-bd-tb qs-bd-tb-one">{s.leadTools && <>{s.leadTools}<Sep /></>}{on('quick') && <>{priceBtn}<Sep /></>}{gonBtn}<Sep />{frozenBtn}<Sep />{quickFltBtn}{on('fav') && favBtn}<Sep />{(s.extraTools || on('history')) && <>{historyTools}<Sep /></>}{formatTools}<Sep />{sheetTools}<span style={{ flex: 1 }} />{viewTools}{s.addTools && <><Sep /><span className="qs-tk-addgrp">{s.addTools}</span></>}</div>
+      <div className="qs-bd-tb qs-bd-tb-one" ref={barRef}>{s.leadTools && <>{s.leadTools}<Sep /></>}{on('quick') && <>{priceBtn}<Sep /></>}{gonBtn}<Sep />{frozenBtn}<Sep />{quickFltBtn}{on('fav') && favBtn}<Sep />{(s.extraTools || on('history')) && <>{historyTools}<Sep /></>}{formatTools}<Sep />{sheetTools}<span style={{ flex: 1 }} />{viewTools}{s.addTools && <><Sep /><span className="qs-tk-addgrp">{s.addTools}</span></>}</div>
       {/* formula = null (Bảng thường dùng chung thanh này): không có ô công thức */}
       {formula && <div className="qs-bd-formula">
         <span className="qs-bd-formula-ref">{formula.ref}</span>

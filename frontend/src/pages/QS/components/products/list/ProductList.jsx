@@ -11,14 +11,16 @@ import * as api from '../../../api/qsApi'
 import { mediaUrl } from '../../../api/files'
 import { money } from '../../../lib/format.js'
 import { nodeName } from '../../../lib/tree.js'
-import { csMyCols_, csMyOn_, csMyApply_, csMyKey_, csQuickLabel_, csPresetCols_, csWant_ } from '../../../lib/columns.js'
+import { csMyCols_, csMyOn_, csMyApply_, csMyKey_, csQuickLabel_, csPresetCols_, csWant_, csPresetList_, csPresetKeys_ } from '../../../lib/columns.js'
 import { ctSyncTemplate_, ptTemplateNew_ } from '../../../lib/phantho.js'
 import { useSpecs } from '../../breakdown/catalog/useSpecs'
 import { useComboCache, loadCombo } from '../../breakdown/catalog/comboCache'
 import ProjPanel from './ProjPanel'
 import SpTable from './SpTable'
+import SpCards from './SpCards'
+import { useFitLevel } from '../../common/useFitLevel'
 import SpModal from './SpModal'
-import { CatPop, FilterPop, PresetPop, BulkEditPop, MorePop, CopyMenu } from './SpPops'
+import { CatPop, FilterPop, PresetPop, BulkEditPop, MorePop, CopyMenu, ColMenu, OverPop } from './SpPops'
 import { useSpUi, getU, setU, setPer, clearSel } from './spStore'
 import {
   lsJson, lsSet, spKey_, spPanelHidden_, foldCols_, foldColsToggle_, spNganhCur_, spPTMode_, spAllCols_, spSkuMap_, spSkuCount_,
@@ -36,8 +38,19 @@ import './list.css'
    panel trái "Sản phẩm trong dự án", thanh công cụ (tìm, tab trạng thái duyệt, hạng mục, Hoàn tác, Edit, Bộ lọc, Tải Excel,
    Thêm sản phẩm), hàng chọn cột, bảng (cột theo ngành, biến thể, combo, sửa nhanh), phân trang, thanh chọn nhiều, modal chi tiết.
    Hạng mục của bảng = node trong spStore (S._spFilters.node), chọn ở đây thì đồng bộ hmNode (hmSet_ 'sp'); 3.1 Phần thô hiện products/pt (3B). */
-const UNDO_IC = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-4" /></svg>
+/* Biểu tượng nút thao tác trên băng: cùng bộ nét mảnh (kiểu Lucide), 16px, nét 2 */
+const UNDO_IC = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg>
+const EDIT_IC = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.38 3.62a2.12 2.12 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-3.51 1 1-3.51a2 2 0 0 1 .5-.86z" /></svg>
+const DONE_IC = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+const XLS_IC = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 15V3" /><path d="m7 10 5 5 5-5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
 const NEXT_IC = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+/* Chế độ xem: Bảng (mặc định) · Lưới thẻ · Danh sách — nhớ trong máy (qs_splayout) */
+const LAYOUTS = [
+  ['table', 'Bảng', <svg key="t" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 10v10" /></svg>],
+  ['grid', 'Lưới', <svg key="g" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>],
+  ['list', 'Danh sách', <QsIcon key="l" name="list" size={15} />],
+]
+const FILTER_IC = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z" /></svg>
 const SEARCH_IC = <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
 
 export default function ProductList() {
@@ -67,6 +80,15 @@ export default function ProductList() {
   const [xlsBusy, setXlsBusy] = useState(false)
   const [dragOn, setDragOn] = useState(false)
   const [wrapW, setWrapW] = useState(0)
+  const [layout, setLayoutSt] = useState(() => { const v = lsJson('qs_splayout', 'table'); return LAYOUTS.some(l => l[0] === v) ? v : 'table' })
+  const setLayout = v => { setLayoutSt(v); lsSet('qs_splayout', JSON.stringify(v)) }
+  /* Thanh công cụ luôn 1 dòng; thiếu chỗ thì gọn dần (data-fit, list.css): 1 = nút thao tác chỉ còn biểu tượng, 2 = nút chế độ xem
+     chỉ còn biểu tượng, 3 = cho xuống dòng */
+  const tbRef = useRef(null)
+  /* Nút bộ cột (như Bóc tách): mở cùng lúc bảng Chọn nhanh cột + dải chip cột; đóng một bên là đóng cả hai.
+     stripByPreset = dải chip do nút bộ cột mở (trước đó đang đóng) -> đóng bảng thì gập dải lại */
+  const stripByPreset = useRef(false)
+  useFitLevel(tbRef, 3, '.qspl-mod', [PT])
   const dragList = useRef(null)
   const ghost = useRef(null)
   const wsRef = useRef(null)
@@ -149,10 +171,67 @@ export default function ProductList() {
   const onMap = useMemo(() => { const m = {}; tab.keys().forEach(k => { m[k] = spColOn_(colOn, k) }); return m }, [tab, colOn])
   const mineOn = csMyOn_(tab, mine, onMap)
   const quick = csQuickLabel_(tab, onMap, mine)
-  async function mineSave() {
+  const cuKey = 'qs_spcols_custom_' + String(username || '').toLowerCase()
+  const [customs, setCustoms] = useState(() => lsJson(cuKey, []))
+  useEffect(() => { setCustoms(lsJson(cuKey, [])) }, [cuKey])
+  const saveCustoms = list => { setCustoms(list); lsSet(cuKey, JSON.stringify(list)) }
+  async function customNew() {
+    const r = await qs.ask({ title: 'Lưu bộ cột mới', ok: 'Lưu', fields: [{ key: 'ten', label: 'Tên bộ cột *', placeholder: 'VD: Báo giá nhanh' }] })
+    // hộp nhập 1 ô trả về chuỗi (nhiều ô mới trả {key: giá trị}, common/InputDialog)
+    const ten = String((r && typeof r === 'object' ? r.ten : r) || '').trim()
+    if (!ten) return false
     const keys = tab.keys().filter(k => onMap[k])
+    saveCustoms([...customs.filter(c => c.name !== ten), { name: ten, keys }])
+    toast('Đã lưu bộ cột "' + ten + '" (' + keys.length + ' cột)')
+    return true
+  }
+  /* Nút nhanh (1)(2) trên băng: gán 1 bộ cột vào mỗi ô ở chế độ sửa của khung Chọn nhanh cột; bấm nút = áp bộ đó.
+     id bộ: 'mine' | mã bộ dựng sẵn | 'u:' + tên bộ tự đặt. Lưu trong máy theo tài khoản (qs_spcols_quick_<user>) */
+  const qkKey = 'qs_spcols_quick_' + String(username || '').toLowerCase()
+  const [quickSlots, setQuickSlots] = useState(() => lsJson(qkKey, [null, null]))
+  useEffect(() => { setQuickSlots(lsJson(qkKey, [null, null])) }, [qkKey])
+  function setQuickSlot(i, id) {
+    const n = [0, 1].map(j => (j === i ? id : ((quickSlots || [])[j] === id && id ? null : (quickSlots || [])[j] || null)))
+    setQuickSlots(n); lsSet(qkKey, JSON.stringify(n))
+  }
+  function quickPreset(id) {
+    if (!id) return null
+    if (id === 'mine') return mine ? { name: 'Của tôi', map: csMyApply_(tab, mine) } : null
+    if (id.indexOf('u:') === 0) { const c = customs.find(x => x.name === id.slice(2)); return c ? { name: c.name, map: csWant_(tab, c.keys) } : null }
+    const ps = csPresetList_(tab).find(x => x[0] === id)
+    return ps ? { name: ps[1], map: csPresetCols_(tab, id) || csWant_(tab, csPresetKeys_(tab, ps)) } : null
+  }
+  const quickOn = m => tab.keys().every(k => !!onMap[k] === !!m[k])
+  /* Chế độ sửa của dải chip (như Bóc tách ColsStrip): bật / tắt chip (bảng đổi ngay) rồi Tạo mới / Lưu đè / Huỷ (trả cột cũ).
+     stripEdit = {from: tên bộ đang sửa | null, snap: cột lúc bắt đầu} */
+  const [stripEdit, setStripEdit] = useState(null)
+  const [overAt, setOverAt] = useState(null)
+  /* Mở khung Chọn nhanh cột bên trái (nếu đang đóng), neo vào nút bộ cột trên băng */
+  const showPresetDock = () => setPop(p => (p && p.kind === 'preset' ? p : { kind: 'preset', anchor: document.querySelector('.qspl-presetbtn') }))
+  function startStripEdit(from) {
+    if (foldCols_()) setFolded(foldColsToggle_())
+    showPresetDock()
+    setStripEdit(se => ({ from: from || null, snap: se ? se.snap : colOn }))
+  }
+  function cancelStripEdit() { if (stripEdit) saveCols({ colOn: stripEdit.snap }); setStripEdit(null) }
+  /* Tạo mới xong: bộ mới hiện ngay trong khung Chọn nhanh cột bên trái (mở khung nếu đang đóng) */
+  async function stripSaveNew() { if (await customNew()) { setStripEdit(null); showPresetDock() } }
+  async function stripSaveOver(name) {
+    if (!name) { await mineSave(null, true); setStripEdit(null); return }
+    const keys = tab.keys().filter(k => onMap[k])
+    saveCustoms(customs.map(c => (c.name === name ? { name, keys } : c)))
+    toast('Đã lưu đè bộ cột "' + name + '" (' + keys.length + ' cột)')
+    setStripEdit(null)
+  }
+  async function customDel(name) {
+    if (!await confirm('Xoá bộ cột "' + name + '"?')) return
+    saveCustoms(customs.filter(c => c.name !== name))
+  }
+  /* Lưu bộ "Của tôi" = cột đang hiện, hoặc keysIn (đặt 1 bộ làm mặc định); keep = giữ khung Chọn nhanh cột mở */
+  async function mineSave(keysIn, keep) {
+    const keys = Array.isArray(keysIn) ? keysIn : tab.keys().filter(k => onMap[k])
     lsSet(csMyKey_('sp', username), JSON.stringify(keys))
-    setPop(null)
+    if (!keep) setPop(null)
     try {
       const r = await api.setMyPref(tab.pref, keys)
       const m0 = getState().me
@@ -413,17 +492,18 @@ export default function ProductList() {
     copy: (e, p) => { e.stopPropagation(); setPop({ kind: 'copy', anchor: e.currentTarget, p }) },
     del: p => spDelete(p),
     cbToggle, cbIsOpen: p => !!U.cbOpen[spKey_(p)], btToggle,
+    colMenu: (c, a) => setPop(p => (p && p.kind === 'colmenu' && p.col.k === c.k ? null : { kind: 'colmenu', anchor: a, col: c })),
   }
 
   /* ---------- Vẽ ---------- */
   const fltN = spFltCount_(f)
   const chua = scope.filter(p => !p.daDuyet).length
   const viewTabs = [
-    ['all', node ? ('Tất cả · ' + (nodeName(node) || node)) : 'Tất cả', scope.length ? String(scope.length) : ''],
+    ['all', 'Tất cả', scope.length ? String(scope.length) : ''],
     ['chua', 'Chưa duyệt', chua ? String(chua) : ''],
     ['da', 'Đã duyệt', (scope.length - chua) ? String(scope.length - chua) : ''],
-    ['fav', '★ Yêu thích', (() => { const n = scope.filter(p => p.yeuThich).length; return n ? String(n) : '' })()],
   ]
+  const favN = scope.filter(p => p.yeuThich).length
   const catLabel = node ? (node + '.' + nodeName(node)) : 'Tất cả hạng mục'
   const catCnt = node ? nodeCount(node) : (products || []).length
   const catBtn = (
@@ -440,37 +520,88 @@ export default function ProductList() {
   const to = per ? Math.min(groups.length, pr.cur * per) : groups.length
   const info = (totalSP === groups.length) ? (groups.length + ' sản phẩm') : (groups.length + ' dòng · ' + totalSP + ' sản phẩm')
   const xlsLbl = xlsBusy ? 'Đang tạo file…' : (nSel ? ('Tải Excel (' + nSel + ')') : 'Tải Excel')
+  function openColTools(a) {
+    setPop({ kind: 'preset', anchor: a })
+    if (folded) { stripByPreset.current = true; setFolded(foldColsToggle_()) }
+  }
+  function closeColTools() {
+    setPop(p => (p && p.kind === 'preset' ? null : p))
+    if (stripByPreset.current && !foldCols_()) setFolded(foldColsToggle_())
+    stripByPreset.current = false
+  }
+  function closeStrip() {
+    if (stripEdit) cancelStripEdit()
+    if (pop && pop.kind === 'preset') { closeColTools(); if (!foldCols_()) setFolded(foldColsToggle_()); return }
+    setFolded(foldColsToggle_())
+  }
+  const showLayout = U.edit ? 'table' : layout   // sửa nhanh chỉ có ở dạng Bảng
   const live = dlg ? ((products || []).filter(x => spKey_(x) === spKey_(dlg.p))[0] || dlg.p) : null
 
   return (
-    <div className={`qspl-ws${panelHidden ? ' panel-hidden' : ''}`} ref={wsRef}>
-      <button type="button" className="qspl-pp-show" title="Hiện panel Sản phẩm trong dự án" onClick={panelToggle}>
-        <QsIcon name="layers" size={15} /><span className="n">{(cur ? lines : []).length}</span>
-      </button>
-      {!panelHidden && <ProjPanel qs={qs} dragOn={dragOn} onDrop={panelDrop} onHide={panelToggle} />}
-      <div className="qspl-main">
-        <div className={`qspl-card${PT ? ' ptmode' : ''}`}>
-          {PT ? (
-            <ProductsPtMode catBtn={catBtn} />
-          ) : (
-            <>
-              <div className="qspl-toolbar">
+    <div className={`qspl-ws${panelHidden ? ' panel-hidden' : ''}${PT ? '' : ' banded'}`} ref={wsRef}>
+      {/* Băng xanh như băng dự án của Bóc tách: nút chọn hạng mục ở đầu băng (thẳng cột panel, như ô chọn dự án của Bóc tách) + các cụm công cụ */}
+      {!PT && (
+        <div className="qspl-band">
+              <div className="qspl-toolbar" ref={tbRef}>
+                <div className="qspl-catmod">{catBtn}</div>
+                {/* Bộ lọc: vị trí đầu tiên, chỉ biểu tượng phễu (tên ở chú thích khi rê chuột), số bộ lọc đang bật ở góc */}
+                <button type="button" className={`qspl-fltbtn${fltN ? ' on' : ''}`} title={fltN ? 'Bộ lọc (' + fltN + ' đang bật)' : 'Bộ lọc'} aria-label="Bộ lọc"
+                  onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'flt' ? null : { kind: 'flt', anchor: a })) }}>
+                  {FILTER_IC}{fltN > 0 && <span className="qspl-fbadge">{fltN}</span>}
+                </button>
                 <div className="qspl-search">{SEARCH_IC}
                   <input placeholder="Tìm theo tên, mã hoặc thương hiệu…" value={U.q} onChange={e => setU({ q: e.target.value, page: 1 })} />
                 </div>
-                <div className="qspl-vtabs">
+                <div className="qspl-vtabs qspl-mod">
                   {viewTabs.map(t => (
                     <button type="button" key={t[0]} className={`qspl-vt${U.view === t[0] ? ' on' : ''}${t[0] === 'chua' ? ' warn' : (t[0] === 'fav' ? ' fav' : '')}`}
                       onClick={() => setU({ view: t[0], page: 1 })}>
                       {t[1]}{t[2] && <span className="n">{t[2]}</span>}
                     </button>
                   ))}
-                  {!canDuyet && <span className="qspl-vt-note">Bạn chỉ được sửa — sản phẩm sửa xong sẽ chờ người có quyền duyệt</span>}
+                </div>
+                <div className="qspl-favmod qspl-mod">
+                  <button type="button" className={`qspl-vt fav${U.view === 'fav' ? ' on' : ''}`} title="Sản phẩm yêu thích" aria-label="Sản phẩm yêu thích"
+                    onClick={() => setU({ view: 'fav', page: 1 })}>
+                    <QsIcon name="star" size={15} />{favN > 0 && <span className="n">{favN}</span>}
+                  </button>
+                </div>
+                <div className="qspl-lay qspl-mod" role="group" aria-label="Chế độ xem">
+                  {LAYOUTS.map(l => (
+                    <button type="button" key={l[0]} className={showLayout === l[0] ? 'on' : ''} disabled={U.edit && l[0] !== 'table'}
+                      title={U.edit && l[0] !== 'table' ? 'Đang sửa nhanh — chỉ xem được dạng Bảng' : 'Xem dạng ' + l[1]} onClick={() => setLayout(l[0])}>
+                      {l[2]}<span>{l[1]}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="qspl-lay qspl-colmod qspl-mod" role="group" aria-label="Cột hiển thị">
+                  <button type="button" className={`qspl-colbtn${folded ? '' : ' on'}`} title="Ẩn / hiện các chip cột" onClick={() => (folded ? setFolded(foldColsToggle_()) : closeStrip())}>
+                    <span>Cột hiển thị</span><b>{visCols.length}/{colList.length}</b><i className="fold-ic" />
+                  </button>
+                  <button type="button" className={`qspl-presetbtn${pop && pop.kind === 'preset' ? ' on' : ''}`} aria-label="Chọn nhanh bộ cột"
+                    title={'Chọn nhanh bộ cột — đang dùng: ' + quick.nhan + ' ' + quick.on + '/' + quick.total}
+                    onClick={e => { if (pop && pop.kind === 'preset') closeColTools(); else openColTools(e.currentTarget) }}>
+                    <QsIcon name="sliders" size={15} />
+                  </button>
+                {/* nút nhanh (1)(2) chung khung với Cột hiển thị + bộ cột */}
+                {(quickSlots || []).some(id => quickPreset(id)) && (
+                  <span className="qspl-qbtns" role="group" aria-label="Nút nhanh bộ cột">
+                    {(quickSlots || []).map((id, i) => {
+                      const q = quickPreset(id)
+                      if (!q) return null
+                      const on = quickOn(q.map)
+                      return (
+                        <button type="button" key={i} className={`qspl-qbtn${on ? ' on' : ''}`} title={'Nút nhanh ' + (i + 1) + ': ' + q.name + (on ? ' (đang dùng)' : '')}
+                          onClick={() => { colSet(q.map); toast('Đã bật bộ cột: ' + q.name) }}>{i + 1}</button>
+                      )
+                    })}
+                  </span>
+                )}
                 </div>
                 <span className="qspl-flex" />
-                <div className="qspl-bar">
+                {(tags.length > 0 || spAnyFilter_(f)) && (
+                <div className="qspl-bar qspl-mod">
                   <div className="qspl-filtrow">
-                    {catBtn}
                     {tags.length > 0 && (
                       <div className="qspl-fltags">
                         {tags.map(t => (
@@ -481,50 +612,97 @@ export default function ProductList() {
                     {spAnyFilter_(f) && <button type="button" className="qsc-btn qspl-xs" onClick={() => setU({ f: SP_FLT_EMPTY(), page: 1 })}>Xoá lọc</button>}
                   </div>
                 </div>
+                )}
+                <div className="qspl-acts qspl-mod">
                 <button type="button" className="qsc-btn qspl-sm" disabled={!undoSt.length} onClick={() => spUndo_()}
                   title={undoSt.length ? ('Hoàn tác: ' + undoSt[undoSt.length - 1].label + ' (Ctrl+Z) — còn ' + undoSt.length + ' bước') : 'Chưa có thao tác nào để hoàn tác'}>
-                  {UNDO_IC} Hoàn tác
+                  {UNDO_IC}<span className="t">Hoàn tác</span>
                 </button>
                 {canEdit && (
                   <button type="button" className={`qsc-btn qspl-sm${U.edit ? ' on' : ''}`} onClick={editToggle}
                     title={U.edit ? 'Tắt chế độ sửa nhanh' : 'Sửa nhanh ngay trên bảng — hiện tất cả cột nhập liệu'}>
-                    <QsIcon name={U.edit ? 'check' : 'edit'} size={14} /> {U.edit ? 'Xong' : 'Edit'}
+                    {U.edit ? DONE_IC : EDIT_IC}<span className="t">{U.edit ? 'Xong' : 'Edit'}</span>
                   </button>
                 )}
-                <button type="button" className={`qsc-btn qspl-sm${fltN ? ' on' : ''}`} onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'flt' ? null : { kind: 'flt', anchor: a })) }}>
-                  <QsIcon name="sliders" size={14} /> Bộ lọc{fltN > 0 && <span className="qspl-fbadge">{fltN}</span>}
-                </button>
                 <button type="button" className="qsc-btn qspl-sm" disabled={xlsBusy} onClick={() => exportXlsx()}
                   title={nSel ? ('Tải ' + nSel + ' sản phẩm đã chọn ra Excel') : 'Tải toàn bộ danh sách đang lọc ra Excel'}>
-                  <QsIcon name="download" size={14} /> <span>{xlsLbl}</span>
+                  {XLS_IC}<span className="t">{xlsLbl}</span>
                 </button>
-                <button type="button" className="qsc-btn blue qspl-sm" onClick={() => navigate('import')}><QsIcon name="plus" size={14} /> Thêm sản phẩm</button>
-              </div>
-
-              <div className="qspl-colbox">
-                <div className="qspl-colhr">
-                  <button type="button" className={`qspl-colh${folded ? ' folded' : ''}`} onClick={() => setFolded(foldColsToggle_())} title="Ẩn / hiện các chip cột">
-                    Cột hiển thị <b>{visCols.length}/{colList.length}</b><i className="fold-ic" />
-                  </button>
-                  <button type="button" className="qspl-quick" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'preset' ? null : { kind: 'preset', anchor: a })) }}
-                    title="Bật cả một bộ cột theo mục đích / bộ cột của tôi">
-                    <QsIcon name="sliders" size={13} /><span>{quick.nhan}</span><b>{quick.on}/{quick.total}</b><i>▾</i>
-                  </button>
-                  <button type="button" className="qspl-pgq" onClick={() => colAll(1)}>Hiện tất cả</button>
-                  <button type="button" className="qspl-pgq" onClick={colCoBan}>Cột cơ bản</button>
                 </div>
-                {!folded && (
-                  <div className="qspl-colchips">
-                    {colList.filter(c => c.k !== 'stt' && c.k !== 'ten').map(c => (
-                      <span key={c.k} className={`qspl-chip${spColOn_(colOn, c.k) ? ' on' : ''}`} onClick={() => colToggle(c.k)}>{c.label}</span>
-                    ))}
-                  </div>
-                )}
+                <button type="button" className="qspl-addbtn" title="Thêm sản phẩm" aria-label="Thêm sản phẩm" onClick={() => navigate('import')}><QsIcon name="plus" size={20} stroke={2.6} /></button>
               </div>
-
+        </div>
+      )}
+      <button type="button" className="qspl-pp-show" title="Hiện panel Sản phẩm trong dự án" onClick={panelToggle}>
+        <QsIcon name="layers" size={15} /><span className="n">{(cur ? lines : []).length}</span>
+      </button>
+      {!panelHidden && <ProjPanel qs={qs} node={node} dragOn={dragOn} onDrop={panelDrop} onHide={panelToggle} />}
+      {/* Bộ lọc / Chọn nhanh cột đang mở: bảng thu hẹp sang phải nhường chỗ (has-dock), không bị che */}
+      <div className={`qspl-main${pop && (pop.kind === 'flt' || pop.kind === 'preset') ? ' has-dock' : ''}`}>
+        {/* Chọn nhanh cột: bảng neo như Bộ lọc; chọn bộ thì giữ bảng mở để thấy dấu chọn (như Bóc tách) */}
+        {pop && pop.kind === 'preset' && (
+          <PresetPop anchor={pop.anchor} top={0} tab={tab} on={onMap} mine={mine} mineOn={mineOn} username={username}
+            onPreset={ps => { colSet(csPresetCols_(tab, ps[0]) || csWant_(tab, [])); toast('Đã bật bộ cột: ' + ps[1]) }}
+            onMine={() => { if (!mine) return; colSet(csMyApply_(tab, mine)); toast('Đã bật bộ cột của tôi') }}
+            customs={customs} onCustom={c => colSet(csWant_(tab, c.keys))} onNewCustom={customNew} onDelCustom={customDel}
+            onSetDefault={keys => mineSave(keys, true)}
+            onEditCols={startStripEdit} quick={quickSlots} onQuick={setQuickSlot}
+            onSaveMine={() => mineSave(null, true)} onClearMine={mineClear} onClose={closeColTools} />
+        )}
+        {pop && pop.kind === 'flt' && (
+          <FilterPop anchor={pop.anchor} top={0} scope={scope} f={f} fltQ={U.fltQ}
+            onSel={selFilter} onSpec={fltSpec} onNhieuXoa={k => setF({ [k]: {} })}
+            onTim={(k, v) => setU(s => ({ fltQ: { ...s.fltQ, [k]: v } }))}
+            onPrice={(k, v) => setF({ [k]: Number(v) || 0 })}
+            onReset={() => setU({ node: '', f: SP_FLT_EMPTY(), fltQ: {}, page: 1 })}
+            onClose={() => setPop(null)} />
+        )}
+        <div className={`qspl-card${PT ? ' ptmode' : ''}`}>
+          {PT ? (
+            <ProductsPtMode catBtn={catBtn} />
+          ) : (
+            <>
+              {!canDuyet && <div className="qspl-vt-note">Bạn chỉ được sửa — sản phẩm sửa xong sẽ chờ người có quyền duyệt</div>}
+              {/* dải chip cột (mở / đóng bằng nút Cột hiển thị trên thanh công cụ), cuối dải: Hiện tất cả · Cột cơ bản; nút đóng góc phải */}
+              {!folded && (
+                <div className="qs-bd-strip qs-bd-colmod qspl-colbox">
+                  {colList.filter(c => c.k !== 'stt' && c.k !== 'ten').map(c => {
+                    const on = !!spColOn_(colOn, c.k)
+                    return <button type="button" key={c.k} className={`qs-bd-strip-chip qs-colchip${on ? ' on' : ''}`} title={on ? 'Đang hiện — bấm để ẩn' : 'Đang ẩn — bấm để hiện'} onClick={() => colToggle(c.k)}>{c.label}</button>
+                  })}
+                  <span className="qs-colchip-sep" />
+                  {(() => {
+                    const allOn = tab.keys().every(k => onMap[k])
+                    return <button type="button" className={`qs-bd-strip-btn qs-colchip-act${allOn ? ' on' : ''}`} aria-pressed={allOn}
+                      title={allOn ? 'Đang hiện tất cả cột — bấm để về bộ mặc định' : 'Hiện tất cả cột'}
+                      onClick={() => (allOn ? colSet(csMyApply_(tab, mine)) : colAll(1))}>Hiện tất cả</button>
+                  })()}
+                  <button type="button" className="qs-bd-strip-btn qs-colchip-act" onClick={colCoBan}>Cột cơ bản</button>
+                  {stripEdit ? (
+                    <>
+                      <button type="button" className="qs-bd-strip-btn qs-colchip-save" title="Lưu các cột đang bật thành bộ mới (đặt tên)" onClick={stripSaveNew}><QsIcon name="plus" size={13} /> Tạo mới</button>
+                      {stripEdit.from
+                        ? <button type="button" className="qs-bd-strip-btn qs-colchip-save alt" title={'Ghi đè bộ "' + stripEdit.from + '" bằng các cột đang bật'} onClick={() => stripSaveOver(stripEdit.from)}><QsIcon name="check" size={13} /> Lưu đè "{stripEdit.from}"</button>
+                        : <button type="button" className="qs-bd-strip-btn qs-colchip-save alt" title="Ghi đè 1 bộ có sẵn bằng các cột đang bật" onClick={e => { const a = e.currentTarget; setOverAt(o => (o ? null : a)) }}><QsIcon name="check" size={13} /> Lưu đè… <i className="qspl-caret">▾</i></button>}
+                      <button type="button" className="qs-bd-strip-btn qs-colchip-act" onClick={cancelStripEdit}>Huỷ</button>
+                    </>
+                  ) : (
+                    <button type="button" className="qs-bd-strip-btn qs-colchip-act qs-colchip-edit" title="Sửa bộ cột: bật / tắt chip rồi lưu thành bộ chọn nhanh mới" onClick={() => startStripEdit(null)}><QsIcon name="edit" size={14} /></button>
+                  )}
+                  <span style={{ flex: 1 }} />
+                  <button type="button" className="qs-bd-strip-close" title="Đóng" onClick={closeStrip}><QsIcon name="close" size={15} /></button>
+                </div>
+              )}
+              {/* khối bảng (hoặc thẻ) + phân trang: module riêng, tách khỏi thanh công cụ / hàng chọn cột */}
+              <div className="qspl-tblcard">
               {specErr && <div className="qspl-note err">{specErr}: cột thông số của Thiết bị vệ sinh, Sơn nước, Công tắc - ổ cắm không hiện được.</div>}
-              <SpTable cols={visCols} rows={pr.rows} w={w} sel={U.sel} edit={U.edit} sort={U.sort} wrapW={wrapW}
-                skuCount={p => spSkuCount_(skuMap, p)} canEdit={canEdit} canDuyet={canDuyet} isAdmin={isAdmin} on={tableOn} />
+              {showLayout === 'table' ? (
+                <SpTable cols={visCols} rows={pr.rows} w={w} sel={U.sel} edit={U.edit} sort={U.sort} wrapW={wrapW}
+                  skuCount={p => spSkuCount_(skuMap, p)} canEdit={canEdit} canDuyet={canDuyet} isAdmin={isAdmin} on={tableOn} />
+              ) : (
+                <SpCards layout={showLayout} cols={visCols} rows={pr.rows} sel={U.sel}
+                  skuCount={p => spSkuCount_(skuMap, p)} canDuyet={canDuyet} on={tableOn} />
+              )}
 
               <div className="qspl-pgbar">
                 <span className="info">{groups.length ? <>Hiện <b>{from}–{to}</b> / {info}</> : 'Không có sản phẩm'}</span>
@@ -542,6 +720,7 @@ export default function ProductList() {
                 <select className="qspl-per" value={per} onChange={e => setPer(e.target.value)}>
                   {SP_PER.map(v => <option key={v} value={v}>{v ? v + ' SP/trang' : 'Tất cả'}</option>)}
                 </select>
+              </div>
               </div>
             </>
           )}
@@ -565,20 +744,14 @@ export default function ProductList() {
         </MrootPortal>
       )}
 
-      {pop && pop.kind === 'cat' && <CatPop anchor={pop.anchor} node={node} total={(products || []).length} count={nodeCount} onPick={catPick} onClose={() => setPop(null)} />}
-      {pop && pop.kind === 'flt' && (
-        <FilterPop anchor={pop.anchor} scope={scope} f={f} fltQ={U.fltQ}
-          onSel={selFilter} onSpec={fltSpec} onNhieuXoa={k => setF({ [k]: {} })}
-          onTim={(k, v) => setU(s => ({ fltQ: { ...s.fltQ, [k]: v } }))}
-          onPrice={(k, v) => setF({ [k]: Number(v) || 0 })}
-          onReset={() => setU({ node: '', f: SP_FLT_EMPTY(), fltQ: {}, page: 1 })}
-          onClose={() => setPop(null)} />
+      {overAt && <OverPop anchor={overAt} customs={customs} onPick={stripSaveOver} onClose={() => setOverAt(null)} />}
+      {pop && pop.kind === 'colmenu' && (
+        <ColMenu anchor={pop.anchor} col={pop.col} sort={U.sort} canHide={pop.col.k !== 'ten' && pop.col.k !== 'stt'}
+          onSort={so => setU({ sort: so, page: 1 })} onHide={() => colToggle(pop.col.k)} onClose={() => setPop(null)} />
       )}
-      {pop && pop.kind === 'preset' && (
-        <PresetPop anchor={pop.anchor} tab={tab} on={onMap} mine={mine} mineOn={mineOn} username={username}
-          onPreset={ps => { setPop(null); colSet(csPresetCols_(tab, ps[0]) || csWant_(tab, [])); toast('Đã bật bộ cột: ' + ps[1]) }}
-          onMine={() => { setPop(null); if (!mine) return; colSet(csMyApply_(tab, mine)); toast('Đã bật bộ cột của tôi') }}
-          onSaveMine={mineSave} onClearMine={mineClear} onClose={() => setPop(null)} />
+      {pop && pop.kind === 'cat' && (
+        <CatPop anchor={pop.anchor} node={node} total={(products || []).length} count={nodeCount} onPick={catPick} onClose={() => setPop(null)}
+          dock={!PT} top={!PT && tbRef.current && tbRef.current.parentElement ? tbRef.current.parentElement.offsetHeight + 12 : 0} />
       )}
       {pop && pop.kind === 'bbedit' && nSel > 0 && (
         <BulkEditPop anchor={pop.anchor} fields={spBulkFields_(ng, specs)} n={nSel} toast={toast} onClose={() => setPop(null)}

@@ -14,12 +14,13 @@ import { spInlineSave, spPrivateCopy } from './spActions'
      w          độ rộng đã lưu, sel (khoá đã tick), edit (chế độ sửa nhanh), sort {k, dir}
      skuCount(p), canEdit, canDuyet, isAdmin
      on: {sort(k), move(from, to, before), resize(k, w, done), selAll(on), selToggle(k, on), open(p), dragStart(e, p), dragEnd(),
-          fav(p), add(p), duyet(p), editP(p), copy(e, p), del(p), cbToggle(p), cbIsOpen(p), btToggle(key)} */
+          fav(p), add(p), duyet(p), editP(p), copy(e, p), del(p), cbToggle(p), cbIsOpen(p), btToggle(key), colMenu(c, anchorEl)?} */
 const SEL = 38
 const SP_FRZ = 3   // số cột dữ liệu đóng băng (STT · Ảnh · Sản phẩm), chưa kể cột chọn
 
 const img1 = v => (v ? mediaUrl(String(v).split('\n')[0].trim()) : '')
 const Dash = () => <span className="qspl-muted">—</span>
+const FUNNEL = <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z" /></svg>
 
 export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCount, canEdit, canDuyet, isAdmin, on }) {
   const [dragCol, setDragCol] = useState(null)
@@ -75,6 +76,8 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
     wr.scrollLeft = maxLeft ? pos * maxScroll / maxLeft : 0
   }
 
+  /* Ảnh sản phẩm to theo bề rộng cột Ảnh (trừ đệm 2 x 8px), 40-96px, luôn nằm gọn trong ô (ảnh object-fit: contain) */
+  const ts = Math.max(40, Math.min(cw('thumb') - 16, 96))
   let daCot = SEL; cols.forEach(c => { daCot += cw(c.k) })
   // cột thao tác nhận phần bề ngang còn dư để bảng vừa khít khung (tối thiểu đủ 7 nút)
   const ACT = Math.max(240, (wrapW || 0) - daCot - 2)
@@ -124,7 +127,7 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
                 <th key={c.k} className={`${thCls(c)} qspl-th${sOn ? ' sortOn' : ''}${dragCol === c.k ? ' dragging' : ''}${dcls}${frzCls(k)}`} style={frz(k)}
                   draggable title="Bấm để sắp xếp · kéo để đổi chỗ cột · kéo mép phải để giãn"
                   onDragStart={e => {
-                    if (e.target.closest && e.target.closest('.qspl-thrsz')) { e.preventDefault(); return }
+                    if (e.target.closest && e.target.closest('.qspl-thrsz, .qspl-thmenu')) { e.preventDefault(); return }
                     setDragCol(c.k); try { e.dataTransfer.setData('text/plain', c.k) } catch (x) { /* bỏ qua */ }
                   }}
                   onDragEnd={() => { setDragCol(null); setDrop(null) }}
@@ -143,6 +146,8 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
                     setDragCol(null); setDrop(null)
                   }}>
                   <span className="thl" onClick={() => on.sort(c.k)}>{c.label}{sOn ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : ''}</span>
+                  {on.colMenu && <span className="qspl-thmenu" title="Sắp xếp / ẩn cột" draggable={false}
+                    onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); on.colMenu(c, e.currentTarget) }}>{FUNNEL}</span>}
                   <span className="qspl-thrsz" onMouseDown={e => startResize(e, c.k)} />
                 </th>
               )
@@ -172,7 +177,7 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
                 </td>
                 {cols.map((c, k) => (
                   <td key={c.k} className={`${c.cls}${edit && editable(c, p) ? ' edt' : ''}${frzCls(k)}`} style={frz(k)}>
-                    {edit ? <EditCell c={c} p={p} r={r} on={on} skuCount={skuCount} /> : <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} />}
+                    {edit ? <EditCell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} /> : <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} />}
                   </td>
                 ))}
                 <td className="qspl-actcol" onClick={e => e.stopPropagation()}>
@@ -200,11 +205,11 @@ function thCls(c) { const cl = c.cls || ''; if (cl.indexOf('num') >= 0) return '
 function editable(c, p) { return !!c.e && !p.spChung }
 
 /* Ô hiển thị (cột ở chế độ xem) */
-function Cell({ c, p, r, on, skuCount }) {
+function Cell({ c, p, r, on, skuCount, ts }) {
   const m = r.m
   switch (c.kind) {
     case 'stt': return <span className={`qspl-stt${m.k ? ' sub' : ''}`}>{m.no}</span>
-    case 'thumb': return <ProductThumb product={p} size={40} src={img1(p.hinhAnh)} className="qspl-th" />
+    case 'thumb': return <ProductThumb product={p} size={ts || 40} src={img1(p.hinhAnh)} className="qspl-th" />
     case 'ten': return <NameCell p={p} r={r} on={on} />
     case 'duyet': return (
       <span className={`qspl-duyet${p.daDuyet ? ' on' : ''}`}
@@ -232,8 +237,8 @@ function Cell({ c, p, r, on, skuCount }) {
 }
 
 /* Ô ở chế độ Edit (spEditCell_): kho chung chỉ xem; Sản phẩm = 2 ô tên + mã; cột nhập được = ô nhập */
-function EditCell({ c, p, r, on, skuCount }) {
-  if (p.spChung) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} />
+function EditCell({ c, p, r, on, skuCount, ts }) {
+  if (p.spChung) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} />
   if (c.k === 'ten') {
     return (
       <span className="qspl-spin-name" onClick={e => e.stopPropagation()}>
@@ -242,7 +247,7 @@ function EditCell({ c, p, r, on, skuCount }) {
       </span>
     )
   }
-  if (!c.e) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} />
+  if (!c.e) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} />
   return <SpInp p={p} e={c.e} val={spEditRaw_(p, c.e.col)} />
 }
 

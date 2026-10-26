@@ -177,7 +177,7 @@ html[data-theme="dark"] .qs-pc-node .qs-bd-seg button.on{background:var(--dash-a
 
 /* Băng mở rộng gọn trên 1 hàng (Bóc tách nhiều cụm nhất: dự án · hạng mục đã bóc · kiểu bảng · cột · tổng tiền · lợi nhuận):
    chữ / nút nhỏ lại, khoảng cách hẹp, không xuống hàng; tên hạng mục / tên dự án dài thì cắt "…" */
-.qs-pc{flex-wrap:nowrap; gap:10px; padding:8px 42px 8px 14px; white-space:nowrap;}
+.qs-pc{flex-wrap:nowrap; gap:23px; padding:8px 42px 8px 14px; white-space:nowrap;}
 .qs-pc-main{min-width:0; gap:8px;}
 .qs-pc-top{gap:6px;}
 .qs-pc-sel.qs-pc-sel-title{height:30px; min-width:130px; max-width:220px; font-size:14px;}
@@ -203,9 +203,9 @@ html[data-theme="dark"] .qs-pc-node .qs-bd-seg button.on{background:var(--dash-a
 
 /* 4 module có khung trên băng: 1 hạng mục đã bóc · 2 kiểu bảng · 3 cột hiển thị (SheetHeader) · 4 tiền (Chưa VAT · Tổng (VAT) · Lợi nhuận · % Lợi nhuận).
    Khung thay cho các vạch ngăn dọc cũ: vạch chỉ còn giữa các ô số trong module 4 */
-.qs-pc-mod{display:flex; align-items:center; gap:6px; height:40px; padding:0 8px; border:1px solid rgba(255,255,255,.18); border-radius:10px; background:rgba(255,255,255,.04); flex:none;}
+.qs-pc-mod{display:flex; align-items:center; gap:6px; height:40px; padding:0 14px; border:1px solid rgba(255,255,255,.18); border-radius:10px; background:rgba(255,255,255,.04); flex:none;}
 .qs-pc-node .qs-bd-node{gap:8px; padding-left:0; border-left:0;}
-.qs-pc-node .qs-pc-mod.m-node{min-width:0; flex:0 1 auto;}
+.qs-pc-node .qs-pc-mod.m-node{min-width:0; flex:1 1 auto;}
 .qs-pc-node .qs-pc-mod .qs-bd-seg, .qs-pc-node .qs-pc-mod .qs-bd-head-cols{margin:0; padding-left:0; border-left:0;}
 .qs-pc-money{gap:10px; padding:0 12px;}
 .qs-pc-money .qs-pc-totals .qs-bd-tg:first-child,
@@ -214,38 +214,90 @@ html[data-theme="dark"] .qs-pc-node .qs-bd-seg button.on{background:var(--dash-a
 /* nút chọn nhanh bộ cột trên băng: chỉ biểu tượng, nút tròn */
 .qs-pc-node .qs-bd-preset.icon-only{width:28px; padding:0; justify-content:center;}
 
-/* Bóc tách: phần băng từ mép bảng tới mép phải chia 3 phần BẰNG NHAU (khe 10px):
-   [Hạng mục đã bóc] [Kiểu bảng + Cột hiển thị] [Tiền]. .qs-pc-node chứa 2 phần đầu (lưới 2 cột) nên co giãn 2 : 1 với phần tiền;
-   flex-basis 10px của .qs-pc-node bù đúng khe giữa 2 phần bên trong -> 3 khung rộng như nhau */
-.qs-pc-main.has-node ~ .qs-pc-node{flex:2 1 10px; margin-right:0; min-width:0;}
-.qs-pc-main.has-node ~ .qs-pc-money{flex:1 1 0; min-width:0; justify-content:space-between;}
-.qs-pc-node .qs-bd-node{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%;}
+/* Bóc tách: các khung rộng theo nội dung, phần dư tới mép phải chia 4 : 1 — phần [Tiền] nhận 4 phần (số căn giữa ô),
+   [Hạng mục đã bóc] + [Kiểu bảng + Cột hiển thị] nhận 1 phần thành khoảng cách đều bên trong (space-evenly); khe giữa các khung 23px */
+.qs-pc-main.has-node ~ .qs-pc-node{flex:1 1 auto; margin-right:0; min-width:0;}
+.qs-pc-main.has-node ~ .qs-pc-money{flex:4 1 auto; min-width:0;}
+.qs-pc-node .qs-bd-node{display:flex; gap:23px; width:100%;}
+.qs-pc-node .qs-pc-mod.m-view{flex:1 1 auto;}
 .qs-pc-node .qs-pc-mod{min-width:0; overflow:hidden;}
 .qs-pc-node .qs-pc-mod.m-view{justify-content:space-between;}
 .qs-pc-money .qs-pc-totals, .qs-pc-money .qs-pc-kpi{flex:none;}
 
-/* Các ô trong mỗi phần cũng rộng bằng nhau:
-   phần 1 = [nút cột trái + Hạng mục đã bóc] | [nút chọn hạng mục];
-   phần 2 = [Bảng tính / Bảng thường] | [Cột hiển thị] | nút bộ cột (chỉ biểu tượng, giữ cỡ nhỏ);
+/* Mỗi ô / nút rộng vừa nội dung (không kéo giãn), phần trống trong khung chia đều 2 đầu và giữa các ô (space-evenly):
+   phần 1 = [nút cột trái + Hạng mục đã bóc] · [nút chọn hạng mục];
+   phần 2 = [Bảng tính / Bảng thường] · [Cột hiển thị] · nút bộ cột (chỉ biểu tượng);
    phần 3 = Chưa VAT | Tổng (VAT) | Lợi nhuận | % Lợi nhuận (bỏ lớp bọc bằng display:contents để 4 ô vào chung 1 lưới) */
-.qs-pc-node .qs-pc-mod.m-node{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.qs-pc-node .qs-pc-mod.m-node{display:flex; justify-content:space-evenly; gap:14px;}
 .qs-pc-node .qs-bd-node-lbl{display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;}
-.qs-pc-node .m-node .qs-bd-category{width:100%; max-width:none; margin-left:0; overflow:hidden;}
+.qs-pc-node .m-node .qs-bd-category{width:auto; max-width:none; margin-left:0; overflow:hidden;}
 .qs-pc-node .m-node .qs-bd-category b{max-width:none; min-width:0;}
-.qs-pc-node .qs-pc-mod.m-view{display:grid; grid-template-columns:1fr 1fr auto; gap:8px;}
+.qs-pc-node .qs-pc-mod.m-view{display:flex; justify-content:space-evenly; gap:14px;}
 .qs-pc-node .m-view .qs-bd-head-cols{display:contents;}
-.qs-pc-node .m-view .qs-bd-seg{width:100%; min-width:0;}
-.qs-pc-node .m-view .qs-bd-seg button{flex:1; justify-content:center; min-width:0;}
-.qs-pc-node .m-view .qs-bd-cols-label{width:100%; min-width:0; justify-content:center;}
+.qs-pc-node .m-view .qs-bd-seg{width:auto; min-width:0;}
+.qs-pc-node .m-view .qs-bd-seg button{flex:none; justify-content:center; min-width:0;}
+.qs-pc-node .m-view .qs-bd-cols-label{width:auto; min-width:0; justify-content:center;}
+/* Bảng tính / Bảng thường / Cột hiển thị rộng thêm ~10% (đệm ngang lớn hơn); mức gọn data-fit >= 1 tự đặt lại đệm nhỏ */
+.qs-pc-node .m-view .qs-bd-seg button{padding:0 14px;}
+.qs-pc-node .m-view .qs-bd-cols-label{padding:0 17px;}
 .qs-pc-main.has-node ~ .qs-pc-money:has(.qs-pc-k, .qs-bd-tg){display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:0;}
 .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-totals,
 .qs-pc-main.has-node ~ .qs-pc-money .qs-bd-totals,
 .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-kpi{display:contents;}
 .qs-pc-main.has-node ~ .qs-pc-money .qs-bd-tg, .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-k{min-width:0; overflow:hidden;}
 
-/* Phần tiền không bao giờ cắt chữ: mỗi ô tối thiểu bằng nội dung (minmax(max-content, 1fr)), cả khung không co nhỏ hơn nội dung
-   (2 phần bên trái co lại thay, tên hạng mục cắt "…"); số nhỏ lại 1 chút, khe giữa ô hẹp hơn */
-.qs-pc-main.has-node ~ .qs-pc-money:has(.qs-pc-k, .qs-bd-tg){grid-auto-columns:minmax(max-content, 1fr); min-width:max-content; padding:0 10px;}
-.qs-pc-main.has-node ~ .qs-pc-money .qs-bd-tg, .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-k{overflow:visible; padding-left:8px; padding-right:4px;}
+/* Phần tiền: mỗi ô rộng theo số của nó + phần dư chia đều (cột auto), nhãn + số căn giữa ô (vạch ngăn giữa các ô); chữ số không đủ chỗ thì tràn -> PCard đo thấy và chuyển băng sang mức gọn (data-fit 1);
+   số nhỏ lại 1 chút, khe giữa ô hẹp hơn */
+.qs-pc-main.has-node ~ .qs-pc-money:has(.qs-pc-k, .qs-bd-tg){grid-auto-columns:auto; min-width:0; padding:0 14px;}
+.qs-pc-main.has-node ~ .qs-pc-money .qs-bd-tg, .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-k{overflow:visible; padding-left:10px; padding-right:10px; align-items:center; text-align:center;}
+.qs-pc.qs-pc .qs-pc-money .qs-pc-totals .qs-bd-tg:first-child{padding-left:0;}
+.qs-pc.qs-pc .qs-pc-money .qs-pc-kpi .qs-pc-k:last-child{padding-right:0;}
 .qs-pc-money .qs-pc-totals .qs-bd-totals b, .qs-pc .qs-pc-money .qs-pc-totals .qs-bd-totals b.qs-bd-total, .qs-pc-money .qs-pc-k .kv{font-size:12.5px; letter-spacing:-.1px;}
 .qs-pc-money .qs-pc-totals .qs-bd-muted, .qs-pc-money .qs-pc-totals .qs-bd-total-label, .qs-pc-money .qs-pc-k .kl{font-size:9px;}
+
+/* Chữ trên băng dự án (mở rộng + thu gọn) nhỏ hơn 10% so với phần còn lại của QS (mọi font-size đều nhân --fs lúc build) */
+.qs-pc, .qs-pc-folded{--fs:calc(var(--fs-user, 1) * var(--qs-text, 1.3333) * .9);}
+/* Khối tên dự án rộng tới mép trái bảng: PCard gán --pc-align (px) khi ở Bóc tách */
+.qs-pc-main.has-node{width:var(--pc-align, auto); flex:none;}
+.qs-bd-cols-label span.qs-bd-cols-t{font-weight:inherit; color:inherit;}
+.qs-pc-node .qs-bd-cols-label span.qs-bd-cols-t{color:inherit;}
+/* Co theo chỗ trống THẬT của băng: PCard đo tràn chữ (useFitLevel) rồi gán data-fit = 0..4 lên .qs-pc, mỗi mức gọn hơn mức trước:
+   0 = đủ chỗ: phần dư chia 4 : 1 cho phần tiền (số căn giữa ô) và 2 khung bên trái (khoảng cách bên trong giãn đều)
+   1 = bỏ gióng mép bảng của khối tên dự án, khe / đệm / chữ gọn hơn, nút sửa nổi đè lên nhãn trạng thái thay vì giữ chỗ
+   2 = nút kiểu bảng chỉ còn biểu tượng, bỏ chữ "Cột hiển thị" (rê chuột thấy tên)
+   3 = bỏ chữ "Hạng mục đã bóc" (còn nút + số dòng)
+   4 = băng xuống 2 hàng, phần tiền chiếm trọn hàng dưới */
+.qs-pc[data-fit]:not([data-fit="0"]){
+  gap:16px;
+  & .qs-pc-main.has-node{width:auto;}
+  & .qs-pc-main.has-node .qs-pc-top{position:relative;}
+  & .qs-pc-main.has-node .qs-pc-edit{position:absolute; right:0; top:50%; transform:translateY(-50%); background:var(--dash-navy-2);}
+  & .qs-pc-main.has-node ~ .qs-pc-money{flex:1 0 auto;}
+  & .qs-pc-main.has-node ~ .qs-pc-money:has(.qs-pc-k, .qs-bd-tg){padding:0 12px;}
+  & .qs-pc-main.has-node ~ .qs-pc-money .qs-bd-tg, & .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-k{padding-left:8px; padding-right:8px;}
+  & .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-totals .qs-bd-tg:first-child{padding-left:0;}
+  & .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-kpi .qs-pc-k:last-child{padding-right:0;}
+  & .qs-pc-money .qs-pc-totals .qs-bd-totals b, & .qs-pc-money .qs-pc-totals .qs-bd-totals b.qs-bd-total, & .qs-pc-money .qs-pc-k .kv{font-size:12px;}
+  & .qs-pc-node .qs-bd-node{gap:16px;}
+  & .qs-pc-node .qs-pc-mod{padding:0 10px;}
+  & .qs-pc-node .qs-pc-mod.m-node{gap:10px;}
+  & .qs-pc-node .m-node .qs-bd-category{flex:0 1 auto; min-width:96px;}
+  & .qs-pc-node .qs-bd-node-lbl{overflow:visible; min-width:max-content; gap:4px;}
+  & .qs-pc-node .qs-bd-h{font-size:12px;}
+  & .qs-pc-node .qs-bd-category{padding:0 6px 0 8px; gap:4px;}
+  & .qs-pc-node .qs-bd-category, & .qs-pc-node .qs-bd-seg button, & .qs-pc-node .qs-bd-cols-label{font-size:11.5px;}
+  & .qs-pc-node .qs-pc-mod.m-view{display:flex; justify-content:flex-start; gap:10px;}
+  & .qs-pc-node .m-view .qs-bd-seg, & .qs-pc-node .m-view .qs-bd-cols-label{width:auto;}
+  & .qs-pc-node .m-view .qs-bd-seg button{flex:none; padding:0 6px; gap:4px;}
+  & .qs-pc-node .m-view .qs-bd-cols-label{padding:0 7px; gap:4px;}
+}
+.qs-pc:is([data-fit="2"], [data-fit="3"], [data-fit="4"]){
+  & .qs-pc-node .qs-bd-seg-t, & .qs-pc-node .qs-bd-cols-t{display:none;}
+}
+.qs-pc:is([data-fit="3"], [data-fit="4"]){
+  & .qs-pc-node .qs-bd-node-lbl .qs-bd-h{display:none;}
+}
+.qs-pc.qs-pc[data-fit="4"]{
+  flex-wrap:wrap; row-gap:8px;
+  & .qs-pc-main.has-node ~ .qs-pc-money{flex:1 1 100%;}
+}
