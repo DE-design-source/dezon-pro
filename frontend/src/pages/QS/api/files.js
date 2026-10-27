@@ -81,6 +81,8 @@ export function mediaUrl(v) {
   if (!v) return ''
   if (/^(data:|blob:)/i.test(v)) return v
   if (v.indexOf('http') === 0) return v
+  // đường dẫn trên máy chủ (kho /files/...) -> nối API_BASE, không coi là mã ảnh Lark
+  if (v.charAt(0) === '/' && v.charAt(1) !== '/') return API_BASE + v
   return API_BASE + '/media?token=' + encodeURIComponent(v)
 }
 
