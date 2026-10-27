@@ -48,3 +48,9 @@ Yêu cầu ghi `docs/database/<TÊN>.md`; quy tắc của repo (`.claude/rules/d
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
 | [roadmap.md](03-san-pham/roadmap.md) | Tiến độ theo module (M) và tính năng mới (N), backlog, ưu tiên, danh sách đã xong; cập nhật theo `.claude/rules/docs/roadmap-sync.md` | **Hiện hành** |
+
+## 04-van-hanh
+
+| Tài liệu | Nội dung | Loại |
+|---|---|---|
+| [trien-khai-vps-cloudfly.md](04-van-hanh/trien-khai-vps-cloudfly.md) | Đưa backend Go + giao diện React + PostgreSQL lên VPS (Docker Compose + Caddy HTTPS): từng bước từ trỏ tên miền, chuyển dữ liệu, sao lưu / khôi phục, vận hành, xử lý sự cố | **Hiện hành** |

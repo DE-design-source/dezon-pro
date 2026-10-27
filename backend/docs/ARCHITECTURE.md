@@ -20,6 +20,7 @@ cmd/migrate/main.go              chạy migration (bản chuyển của infra/sc
 internal/config/                 biến môi trường, đọc file .env
 internal/server/server.go        gin engine, khớp route kiểu Express, tắt êm
 internal/server/static.go        phục vụ file tĩnh TUỲ CHỌN (STATIC_DIR, /vendor)
+internal/server/uploads.go       phục vụ kho file tải lên: GET / HEAD /files/<path>, công khai
 internal/server/assets.go        file nhúng go:embed ở gốc (AssetModule; logo.svg trong internal/server/assets/)
 internal/server/routes.go        NƠI DUY NHẤT nối các module (khối "MODULE WIRING")
 internal/server/rest.go          bảng RestRoutes (hàm rpc -> route REST) và RootRoutes (route lẻ)
@@ -28,7 +29,7 @@ internal/server/apidocs/         mô tả API nhúng (api-docs.json, meta.json; 
 internal/server/rpc/             cổng tương thích POST /api/:fn + Registry
 internal/middleware/             auth, tenant, rbac, cors, rate_limit, body (đọc thân JSON)
 internal/platform/database/      tầng dữ liệu = server/supa.js (Select / Insert / Update / Remove) + db-map.json
-internal/platform/storage/       Supabase Storage (uploadToStorage)
+internal/platform/storage/       kho file trên đĩa (UPLOAD_DIR), URL công khai /files/<path> (thay uploadToStorage)
 internal/platform/redis|logger/  Redis tuỳ chọn, log kiểu "[tag] nội dung"
 internal/platform/deps.go        import giữ chỗ để go.mod có sẵn thư viện cho các module
 internal/shared/omap/            object JSON có thứ tự khoá (JS value model)
@@ -304,10 +305,14 @@ Việc phụ (audit, lịch sử, thông báo, Lark, xoá cache) đặt SAU `s.t
 ### 3.6 `storage`, `logger`, `config`
 
 ```go
-// internal/platform/storage
-func New(url, key, bucket string) *Client             // rỗng -> mặc định như supa.js
-func (s *Client) Upload(ctx, buf []byte, path, contentType string) (string, error)
-func (s *Client) PublicURL(path string) string;  URL() string;  Bucket() string
+// internal/platform/storage   - kho file trên đĩa: <UPLOAD_DIR>/<path>, URL công khai /files/<path>
+const DefaultDir = "uploads";  const Prefix = "/files/"
+func New(dir string) *Client                          // rỗng -> DefaultDir (tương đối với thư mục chạy); thư mục tạo ở lần ghi đầu
+func (s *Client) Upload(ctx, buf []byte, path, contentType string) (string, error)   // ghi đè nếu trùng tên, trả /files/<path>
+func (s *Client) PublicURL(path string) string;  Dir() string
+func (s *Client) Open(path string) (*os.File, fs.FileInfo, error)   // sai đường dẫn / thư mục / không có -> fs.ErrNotExist
+func (s *Client) ReadURL(url string, max int64) ([]byte, error)     // đọc file theo URL /files/..., tối đa max byte
+func ValidPath(p string) bool;  func PathOf(url string) (path string, ok bool)
 
 // internal/platform/logger   - console.error('[api] x lỗi:', msg) -> logger.Error("api", "x lỗi:", msg)
 func Info(tag string, args ...any);  func Error(tag string, args ...any)
@@ -321,9 +326,9 @@ func New(url string) (*Client, error)
 // internal/config
 type Config struct { Port int; DatabaseURL string; DBPoolMax int; DBSortCollation, AuthSecret,
     LarkDomain, LarkAppID, LarkAppSecret, PurchaseWebhook, ReportWebhook,
-    SupabaseURL, SupabaseKey, SupabaseBucket, AppVer, SwaggerDocs, NodeEnv,
+    AppVer, SwaggerDocs, NodeEnv,
     StaticDir, VendorDir string; CORSOrigins []string; RateLimit float64; RedisURL string; Debug bool;
-    ReportJob bool; TrustedProxies []string }
+    ReportJob bool; UploadDir string; TrustedProxies []string }
 func LoadDotenv(files ...string)   // mặc định .env rồi ../.env; đọc như dotenv 16 của Node; không đè biến đã đặt; DOTENV=0 -> không đọc file nào
 func Load() *Config
 ```
@@ -331,6 +336,14 @@ func Load() *Config
 Module đọc cấu hình qua `Deps.Cfg`, KHÔNG gọi `os.Getenv` trực tiếp (`REPORT_JOB` = `Cfg.ReportJob`, `TRUSTED_PROXIES` = `Cfg.TrustedProxies`).
 Ngoại lệ: `DOTENV` được đọc trong `LoadDotenv` (trước khi có `Config`); `cmd/migrate` tự đọc `DATABASE_URL`.
 Biến `TEST_DATABASE_URL`, `*_OUT`... chỉ file test đọc.
+
+Kho file (`storage`): mọi đọc / ghi đi qua `os.Root` nên không leo ra ngoài `UPLOAD_DIR`, kể cả qua symlink. Đường dẫn hợp lệ (`ValidPath`):
+các đoạn cách nhau `/`, không rỗng, không bắt đầu bằng dấu chấm, không có `\` / `:` / NUL, không phải tên thiết bị của Windows.
+`Upload` ghi ra file tạm cùng thư mục rồi đổi tên (người đọc không thấy file ghi dở); `contentType` không được lưu.
+`internal/server/uploads.go` phục vụ GET / HEAD `/files/<path>` công khai (middleware đứng trước mọi route, không tra phiên):
+không có file, thư mục, đường dẫn sai -> 404; có Range, `Last-Modified` / 304; Content-Type theo đuôi file (bảng `uploadTypes`,
+ngoài bảng -> `application/octet-stream`), `X-Content-Type-Options: nosniff`, `Cache-Control: public, max-age=86400`; SVG kèm CSP `sandbox`.
+URL `/files/...` là tương đối nên quotations đọc ảnh thẳng từ đĩa (`FileReader`), không tải qua HTTP.
 
 ### 3.7 `response`, `errors`, `validator`
 
@@ -933,7 +946,7 @@ materials:
   - Migration 0012 (chú thích 2 cột nhắc gia hạn, bỏ `DEPRECATED`) và 0013 (chú thích `product_combos.note` - M10.2, `purchase_orders.send_result`
     - M9.1) chỉ đổi COMMENT; code không phụ thuộc hai migration này.
 - Biến `REPORT_JOB` (tắt job báo cáo và job nhắc gia hạn), `STATIC_DIR`, `VENDOR_DIR`, `CORS_ORIGINS`, `RATE_LIMIT_RPS`, `TRUSTED_PROXIES`, `REDIS_URL`, `DEBUG`,
-  `DB_POOL_MAX`, `DB_SORT_COLLATION`, `DOTENV`. CORS, giới hạn tần suất, Redis mặc định tắt.
+  `DB_POOL_MAX`, `DB_SORT_COLLATION`, `DOTENV`, `UPLOAD_DIR` (kho file trên đĩa, mục 3.6). CORS, giới hạn tần suất, Redis mặc định tắt.
 - `TRUSTED_PROXIES` mặc định không tin proxy nào: đứng sau reverse proxy mà không đặt thì mọi client chung một giới hạn tần suất.
   Ảnh hưởng: không có khi `RATE_LIMIT_RPS` tắt (mặc định).
 - Đọc `backend/.env` trước rồi mới tới `../.env` của bản Node; `DOTENV=0` trong môi trường thì không đọc file nào (mặc định: đọc cả hai).
@@ -1037,7 +1050,8 @@ Ngữ nghĩa chi tiết (nuốt lỗi, null, thứ tự khoá) nằm trong chú 
 | `LineReader` | `GetLines(ctx, maDA any) ([]any, error)` | takeoff | getLines S:331-334 | projects (bootstrap), quotations |
 | `ProjectReader` | `GetProject(ctx, maDA any) (*omap.Map, error)` | projects | getProject S:236-239 | quotations |
 | `MediaDownloader` | `MediaDownload(ctx, fileToken string) (buf []byte, contentType string, err error)` | files | lark.mediaDownload lark.js:25-32 | quotations (fetchImage X:333) |
-| `Uploader` | `Upload(ctx, buf []byte, path, contentType string) (url string, err error)` | platform/storage (`*storage.Client`) | uploadToStorage supa.js:461-469 | materials |
+| `Uploader` | `Upload(ctx, buf []byte, path, contentType string) (url string, err error)` | platform/storage (`*storage.Client`, ghi vào `UPLOAD_DIR`, trả `/files/<path>`) | uploadToStorage supa.js:461-469 | materials |
+| `FileReader` | `ReadURL(url string, max int64) ([]byte, error)` | platform/storage (`*storage.Client`) | không có (chỉ bản Go: đọc file `/files/...` từ đĩa) | quotations (fetchImage) |
 | `ReportRunner` | `BaoCaoNhapSP(ctx, a, opts *omap.Map) (*omap.Map, error)`, `DaGuiHomNay(ctx) bool` | reports | I:451-552, I:554-564 | jobs |
 | `ExpiryReminder` (file `expiry.go`) | `NhacGiaHan(ctx, dryRun bool) (*omap.Map, error)` | companies | không có (chỉ bản Go, M17.3) | jobs |
 
@@ -1090,7 +1104,7 @@ Hai trường tương ứng KHÔNG nằm trong `users.Deps`. Gọi cả hai tron
 | 7 | materials | users: `Auditor`, `UserReader`, `UserFormatter`; notifications: `Notifier`, `AdminLister`; `Uploader` = `d.Storage` |
 | 8 | takeoff | materials: `ProductPerms`, `ProductSaver` |
 | 9 | projects | materials: `CatalogReader`; takeoff: `LineReader` |
-| 10 | quotations | takeoff: `LineReader`; projects: `ProjectReader`; files: `MediaDownloader` |
+| 10 | quotations | takeoff: `LineReader`; projects: `ProjectReader`; files: `MediaDownloader`; `FileReader` = `d.Storage` |
 | 11 | estimates | materials: `ProductPerms`; users: `Auditor` |
 | 12 | purchasing | notifications: `PurchaseNotifier`, `Notifier`; users: `UserReader`, `Auditor` |
 | 13 | reports | không có (đọc database trực tiếp, import `categories`) |

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 QS Pro (Dezon Pro): web app bóc tách khối lượng / báo giá, nhiều công ty dùng chung (multi-tenant).
 Node.js + Express (CommonJS, không TypeScript, không bundler), dữ liệu trên PostgreSQL qua `DATABASE_URL`;
-file ảnh / tài liệu vẫn lưu trên Supabase Storage. Quy tắc chi tiết trong `.claude/rules/` (tự nạp).
+file ảnh / tài liệu lưu trên ổ đĩa máy chủ (thư mục `UPLOAD_DIR`, phục vụ ở `/files/...`). Quy tắc chi tiết trong `.claude/rules/` (tự nạp).
 Tên trong code, chú thích, chuỗi giao diện là tiếng Việt: giữ nguyên khi sửa. `export/` chứa dump dữ liệu thật, đã gitignore, không commit.
 Sửa thông số theo ngành (`backend/internal/shared/specs/js/*-spec.js`): dùng skill `thiet-bi-ve-sinh`; sửa xong chạy
 `node backend/scripts/gen-specs.js` rồi `go test ./internal/shared/specs ./internal/server` (từ `backend/`).
@@ -42,7 +42,7 @@ node infra/scripts/migrate.js --status
   Phiên: token `Authorization: Bearer`. Super không có công ty, thấy mọi công ty trừ khi gửi header `x-view-company`.
   Swagger UI ở `/api-docs` (bật khi chạy ở máy, `SWAGGER_DOCS=0/1` để tắt/bật).
 - `store_supa.js`: nghiệp vụ (sản phẩm, dự án, dòng bóc tách, tờ bìa, công tác, mua hàng). `auth.js`: đăng nhập, phiên, tài khoản, công ty, duyệt.
-- `supa.js`: tầng dữ liệu trên `pg` nhưng giữ giao diện kiểu Supabase (`select/insert/update/remove` + chuỗi lọc PostgREST như `ma_du_an=eq.X`).
+- `supa.js`: tầng dữ liệu trên `pg` nhưng giữ giao diện kiểu PostgREST (`select/insert/update/remove` + chuỗi lọc PostgREST như `ma_du_an=eq.X`).
   Nó dịch tên bảng/cột **tiếng Việt trong code -> tiếng Anh trong DB** theo `db-map.json`, và **tự lọc theo công ty**
   với bảng trong `TENANT_TABLES` (ngữ cảnh lấy từ `tenant.js` - AsyncLocalStorage). Bảng mới theo công ty PHẢI thêm vào
   `TENANT_TABLES`, nếu không dữ liệu lộ sang công ty khác. `noScope` bỏ lọc, chỉ dùng cho truy cập xuyên công ty thật sự (đăng nhập, phiên).
@@ -66,7 +66,7 @@ Code chạy ngay lúc nạp chỉ được gọi file nạp trước (`scripts/c
 ## Database / migration
 
 - Hạ tầng gom ở `infra/`: `infra/db/` (migration, `schema.sql`, `baseline.sql`), `infra/docker/` (Dockerfile bản Go),
-  `infra/scripts/` (migrate, sync-from-supabase). `render.yaml` giữ ở gốc vì Render đọc Blueprint ở gốc.
+  `infra/scripts/` (migrate, sao lưu / khôi phục database + kho file). `render.yaml` giữ ở gốc vì Render đọc Blueprint ở gốc.
 - Thêm cột / bảng: file mới `infra/db/migrations/NNNN_ten.sql` (không sửa file đã chạy, migrate kiểm checksum)
   -> `go run ./cmd/migrate` (từ `backend/`) -> sinh lại `infra/db/schema.sql` -> thêm cặp `"ten_trong_code": "name_in_db"` vào
   `backend/internal/platform/database/db-map.json` (bản duy nhất; bản Node `server/db-map.json` đã gỡ).
@@ -77,7 +77,7 @@ Code chạy ngay lúc nạp chỉ được gọi file nạp trước (`scripts/c
 
 - `backend/`: bản chuyển server sang Go + Gin, chạy độc lập, dùng lại `public/`. Có README và `backend/docs/ARCHITECTURE.md` riêng;
   chạy từ `backend/` (`go run ./cmd/api`, `go test -count=1 -p 1 ./...`). Nó kế thừa `../.env` - khi chạy thử phải đặt
-  `REPORT_JOB=0`, `PURCHASE_WEBHOOK`/`REPORT_WEBHOOK`/`SUPABASE_URL_OVERRIDE` về địa chỉ giả (xem backend/README.md).
+  `REPORT_JOB=0`, `PURCHASE_WEBHOOK`/`REPORT_WEBHOOK` về địa chỉ giả (xem backend/README.md).
 - `frontend/`: app React + Vite riêng (`siteflow-ui`), không được server Node phục vụ.
 - Deploy: Render (`render.yaml`, vẫn là bản Node), tự deploy khi push `main`.
 

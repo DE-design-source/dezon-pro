@@ -1,6 +1,6 @@
 // Package database: tầng truy cập dữ liệu PostgreSQL - bản chuyển 1:1 của server/supa.js.
 //
-// Giữ NGUYÊN giao diện của client Supabase REST cũ (Select / Insert / Update / Remove / Eq,
+// Giữ NGUYÊN giao diện kiểu REST cũ (Select / Insert / Update / Remove / Eq,
 // chuỗi lọc kiểu PostgREST "cot=eq.x&cot2=in.(1,2)"). Database dùng tên bảng / cột TIẾNG ANH,
 // code vẫn gọi tên tiếng Việt cũ; db-map.json là bảng đối chiếu: tầng này dịch tên khi gửi
 // truy vấn và dịch ngược khi trả kết quả.

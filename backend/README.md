@@ -45,7 +45,7 @@ Server đọc `backend/.env` rồi `../.env` - file cấu hình THẬT của b�
 3. `../.env` của bản Node;
 4. mặc định trong code.
 
-Hệ quả: chỉ truyền `PORT` và `DATABASE_URL` thì `AUTH_SECRET`, webhook Lark, khoá kho file, khoá Lark vẫn lấy từ `../.env`,
+Hệ quả: chỉ truyền `PORT` và `DATABASE_URL` thì `AUTH_SECRET`, webhook Lark, khoá Lark vẫn lấy từ `../.env`,
 và job báo cáo vẫn BẬT. Một lượt chạy thử trên database thử vẫn có thể gửi tin vào group Lark thật.
 
 Khi đích là database THỬ, LUÔN truyền đủ bộ biến an toàn sau (giá trị phải KHÁC RỖNG: `PURCHASE_WEBHOOK` rỗng nghĩa là
@@ -56,7 +56,6 @@ webhook Lark thật ghi sẵn trong code):
 | `REPORT_JOB` | `0` | job nền gửi báo cáo lên Lark |
 | `PURCHASE_WEBHOOK` | `http://127.0.0.1:9/x` | tin yêu cầu mua hàng / đề xuất |
 | `REPORT_WEBHOOK` | `http://127.0.0.1:9/x` | tin báo cáo (hàm `baoCaoNhapSP` gọi tay) |
-| `SUPABASE_URL_OVERRIDE` | `http://127.0.0.1:9` | tải file lên kho thật |
 
 ## Chạy song song / thay bản Node
 
@@ -76,7 +75,7 @@ Chuyển hẳn sang bản Go (`render.yaml` đã gỡ khỏi repo cùng app Node
 
 ## Chạy bằng Go cài trên máy (Go 1.25+)
 
-Dùng cấu hình thật của bản Node (database, webhook, kho file lấy từ `../.env`; chỉ dùng khi đã tắt bản Node hoặc đã đặt `REPORT_JOB=0`):
+Dùng cấu hình thật của bản Node (database, webhook lấy từ `../.env`; file tải lên ghi vào `UPLOAD_DIR`, mặc định `backend/uploads/`; chỉ dùng khi đã tắt bản Node hoặc đã đặt `REPORT_JOB=0`):
 
 ```
 cd backend
@@ -90,7 +89,6 @@ Chạy cạnh bản Node trên database thử (PowerShell):
 cd backend
 $env:PORT = '3998'; $env:DATABASE_URL = 'postgresql://qspro:<mật khẩu>@localhost:5434/qspro_gotest'
 $env:REPORT_JOB = '0'; $env:PURCHASE_WEBHOOK = 'http://127.0.0.1:9/x'; $env:REPORT_WEBHOOK = 'http://127.0.0.1:9/x'
-$env:SUPABASE_URL_OVERRIDE = 'http://127.0.0.1:9'
 go run ./cmd/api
 ```
 
@@ -110,7 +108,8 @@ docker run --rm -e DATABASE_URL=postgresql://user:pass@host:5432/db qspro-backen
 - Build context được thu gọn bằng `infra/docker/backend.Dockerfile.dockerignore` (BuildKit tự đọc; cần Docker 23+ hoặc `DOCKER_BUILDKIT=1`):
   `.env*`, `.git`, `node_modules`, kết quả test không được gửi vào build.
 - Biến cần cho triển khai thật: `DATABASE_URL`, `AUTH_SECRET`, `PURCHASE_WEBHOOK` / `REPORT_WEBHOOK` (trống = webhook thật trong code),
-  `SUPABASE_URL_OVERRIDE` / `SUPABASE_KEY_OVERRIDE` / `SUPABASE_BUCKET` (trống = project mặc định), `LARK_APP_ID` / `LARK_APP_SECRET` (ảnh cũ qua `/media`),
+  `UPLOAD_DIR` (kho ảnh / tài liệu trên đĩa, phục vụ công khai tại `/files/<path>`; image đặt `/app/uploads`, gắn volume để giữ file),
+  `LARK_APP_ID` / `LARK_APP_SECRET` (ảnh cũ qua `/media`),
   `REPORT_JOB=0` nếu còn một server khác gửi báo cáo. Danh sách đầy đủ: `.env.example`.
 - Chạy image trên database thử: thêm bộ biến an toàn ở mục Cấu hình (image không có `.env` nhưng webhook mặc định trong code vẫn là webhook thật).
 
@@ -120,7 +119,7 @@ Không cài Go trên máy: dùng container để phát triển.
 docker run -d --name qspro-go -v <gốc repo>:/repo -w /repo/backend -p 3998:3998 golang:1.25 sleep infinity
 docker exec qspro-go go build ./...
 docker exec qspro-go go vet ./...
-docker exec -e PORT=3998 -e DATABASE_URL=postgresql://qspro:<mật khẩu>@host.docker.internal:5434/qspro_gotest -e REPORT_JOB=0 -e PURCHASE_WEBHOOK=http://127.0.0.1:9/x -e REPORT_WEBHOOK=http://127.0.0.1:9/x -e SUPABASE_URL_OVERRIDE=http://127.0.0.1:9 qspro-go go run ./cmd/api
+docker exec -e PORT=3998 -e DATABASE_URL=postgresql://qspro:<mật khẩu>@host.docker.internal:5434/qspro_gotest -e REPORT_JOB=0 -e PURCHASE_WEBHOOK=http://127.0.0.1:9/x -e REPORT_WEBHOOK=http://127.0.0.1:9/x qspro-go go run ./cmd/api
 ```
 
 - Container `qspro-go` đã có thì bỏ dòng `docker run` (dùng `docker start qspro-go` nếu nó đang dừng).
@@ -199,7 +198,7 @@ cmd/api, cmd/migrate     điểm khởi chạy server và công cụ migration
 internal/config          biến môi trường, đọc file .env
 internal/server          gin engine, route, file tĩnh, bảng route REST (rest.go), Swagger, cổng /api/:fn (rpc)
 internal/middleware      auth, tenant, rbac, cors, rate limit, đọc thân JSON
-internal/platform        database (PostgreSQL), storage (Supabase Storage), redis, logger
+internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger
 internal/shared          omap, jsval, tenant, actor, response, errors, validator, contracts, qscore, specs, httpx
 internal/modules         nghiệp vụ theo module (14 gói)
 internal/jobs            job nền (báo cáo nhập sản phẩm)

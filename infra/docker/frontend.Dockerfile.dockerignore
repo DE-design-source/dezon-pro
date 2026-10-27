@@ -1,0 +1,12 @@
+# File ignore riêng của infra/docker/frontend.Dockerfile (BuildKit tự đọc <tên Dockerfile>.dockerignore).
+# Đường dẫn tính từ GỐC repo (build context). Bỏ hết, rồi mở lại đúng phần build cần.
+*
+!frontend
+
+# không gửi: thư viện đã cài, bản build cũ, file cấu hình máy phát triển
+# (.env.development có VITE_API_URL trỏ localhost; vite build còn đọc .env / .env.production nếu lọt vào)
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+**/*.log

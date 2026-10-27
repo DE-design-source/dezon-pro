@@ -1,95 +1,184 @@
-// Package storage: kho FILE trên Supabase Storage (ảnh / tài liệu) - bản chuyển của uploadToStorage()
-// trong server/supa.js. Publishable key là khoá công khai, chỉ dùng cho Storage.
+// Package storage: kho FILE (ảnh / tài liệu tải lên) trên ổ đĩa của máy chủ, thư mục UPLOAD_DIR.
+// File lưu ở <UPLOAD_DIR>/<path>, phục vụ công khai tại /files/<path> (internal/server/uploads.go).
+// Mọi truy cập đi qua os.Root nên không leo ra ngoài thư mục kho, kể cả qua symlink.
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
-	"net/http"
+	"io/fs"
+	"math/rand/v2"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
+	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/shared/jsval"
 )
 
-// Mặc định như server/supa.js; đổi project bằng SUPABASE_URL_OVERRIDE / SUPABASE_KEY_OVERRIDE / SUPABASE_BUCKET.
 const (
-	DefaultURL    = "https://xcjnpjpkmwhekkabpjzw.supabase.co"
-	DefaultKey    = "sb_publishable_Am7BKsK-MM3at1Gv34iY0g_bHJopSsV"
-	DefaultBucket = "products"
+	DefaultDir = "uploads" // UPLOAD_DIR mặc định, tương đối với thư mục chạy
+	Prefix     = "/files/" // tiền tố URL công khai của file trong kho
 )
 
-// Client tải file lên Storage.
+var (
+	errPath   = errors.New("Đường dẫn file không hợp lệ")
+	errGhi    = errors.New("Không lưu được file lên máy chủ")
+	errQuaLon = errors.New("File quá lớn")
+)
+
+// Client: kho file trên đĩa.
 type Client struct {
-	url, key, bucket string
-	http             *http.Client
+	dir string
 }
 
-// New: tham số rỗng thì lấy mặc định. URL bị cắt các dấu / ở cuối.
-func New(url, key, bucket string) *Client {
-	if url == "" {
-		url = DefaultURL
+// New: dir rỗng -> DefaultDir. Thư mục được tạo ở lần ghi đầu tiên.
+func New(dir string) *Client {
+	if dir == "" {
+		dir = DefaultDir
 	}
-	if key == "" {
-		key = DefaultKey
-	}
-	if bucket == "" {
-		bucket = DefaultBucket
-	}
-	return &Client{url: strings.TrimRight(url, "/"), key: key, bucket: bucket, http: &http.Client{Timeout: 5 * time.Minute, CheckRedirect: nhuFetch}}
+	return &Client{dir: dir}
 }
 
-// nhuFetch: theo chuyển hướng như fetch() của Node - tối đa 20 lần (lần thứ 21 là lỗi mạng "fetch failed"),
-// và khi phương thức bị đổi (POST -> GET ở 301 / 302 / 303) thì bỏ các header mô tả thân.
-func nhuFetch(req *http.Request, via []*http.Request) error {
-	if len(via) > 20 {
-		return errors.New("redirect count exceeded")
+// Dir: thư mục gốc của kho.
+func (s *Client) Dir() string { return s.dir }
+
+// PublicURL: đường dẫn công khai của 1 file - /files/ + từng đoạn qua encodeURIComponent.
+func (s *Client) PublicURL(p string) string {
+	segs := strings.Split(p, "/")
+	for i, sg := range segs {
+		segs[i] = jsval.EncodeURIComponent(sg)
 	}
-	if req.Method != via[0].Method {
-		for _, h := range []string{"Content-Type", "Content-Encoding", "Content-Language", "Content-Location"} {
-			req.Header.Del(h)
+	return Prefix + strings.Join(segs, "/")
+}
+
+// ValidPath: đường dẫn tương đối trong kho - các đoạn cách nhau "/", không rỗng, không bắt đầu bằng dấu chấm
+// (chặn "." / ".." và file tạm), không có "\", ":" hay NUL, không phải tên thiết bị của Windows (NUL, COM1...).
+func ValidPath(p string) bool {
+	if p == "" || strings.ContainsAny(p, "\\:\x00") || !fs.ValidPath(p) {
+		return false
+	}
+	for _, sg := range strings.Split(p, "/") {
+		if strings.HasPrefix(sg, ".") {
+			return false
 		}
 	}
-	return nil
+	return filepath.IsLocal(filepath.FromSlash(p))
 }
 
-// URL: địa chỉ gốc của Storage (supa._url).
-func (s *Client) URL() string { return s.url }
-
-// Bucket: tên bucket (supa._bucket).
-func (s *Client) Bucket() string { return s.bucket }
-
-// PublicURL: đường dẫn công khai của 1 file.
-func (s *Client) PublicURL(path string) string {
-	return s.url + "/storage/v1/object/public/" + s.bucket + "/" + jsval.EncodeURIComponent(path)
+// Upload ghi buf vào <dir>/<path> (ghi đè nếu trùng tên) và trả URL công khai. Ghi ra file tạm cùng thư mục rồi
+// đổi tên: người đọc không bao giờ thấy file ghi dở. contentType không được lưu: khi phục vụ, kiểu lấy theo đuôi file.
+func (s *Client) Upload(_ context.Context, buf []byte, p, _ string) (string, error) {
+	if !ValidPath(p) {
+		return "", errPath
+	}
+	if err := s.write(p, buf); err != nil {
+		logger.Error("storage", "ghi", p, "lỗi:", err.Error())
+		return "", errGhi
+	}
+	return s.PublicURL(p), nil
 }
 
-// Upload tải buf lên (ghi đè nếu trùng tên) và trả public URL. contentType rỗng -> image/jpeg.
-func (s *Client) Upload(ctx context.Context, buf []byte, path, contentType string) (string, error) {
-	if contentType == "" {
-		contentType = "image/jpeg"
+func (s *Client) write(p string, buf []byte) error {
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		s.url+"/storage/v1/object/"+s.bucket+"/"+jsval.EncodeURIComponent(path), bytes.NewReader(buf))
+	root, err := os.OpenRoot(s.dir)
 	if err != nil {
-		return "", errors.New("fetch failed")
+		return err
 	}
-	req.Header.Set("apikey", s.key)
-	req.Header.Set("Authorization", "Bearer "+s.key)
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("x-upsert", "true")
-	res, err := s.http.Do(req)
+	defer root.Close()
+	if d := path.Dir(p); d != "." {
+		if err := root.MkdirAll(filepath.FromSlash(d), 0o755); err != nil {
+			return err
+		}
+	}
+	tmp := filepath.FromSlash(path.Join(path.Dir(p), "."+path.Base(p)+"."+strconv.FormatUint(rand.Uint64(), 36)+".tmp"))
+	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
-		return "", errors.New("fetch failed") // thông báo của fetch() bên Node khi lỗi mạng
+		return err
 	}
-	defer res.Body.Close()
-	if res.StatusCode >= 400 {
-		body, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-		return "", errors.New("Storage upload -> " + strconv.Itoa(res.StatusCode) + " " + jsval.Slice(string(body), 0, 200))
+	_, err = f.Write(buf)
+	if err == nil {
+		err = f.Sync()
 	}
-	_, _ = io.Copy(io.Discard, res.Body)
-	return s.PublicURL(path), nil
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = root.Rename(tmp, filepath.FromSlash(p))
+	}
+	if err != nil {
+		_ = root.Remove(tmp)
+	}
+	return err
+}
+
+// Open mở 1 file của kho theo đường dẫn tương đối (đã giải mã). Đường dẫn sai, thư mục, không có file -> fs.ErrNotExist.
+// Nơi gọi đóng file.
+func (s *Client) Open(p string) (*os.File, fs.FileInfo, error) {
+	if !ValidPath(p) {
+		return nil, nil, fs.ErrNotExist
+	}
+	root, err := os.OpenRoot(s.dir)
+	if err != nil {
+		return nil, nil, fs.ErrNotExist
+	}
+	defer root.Close() // file đã mở vẫn dùng được sau khi đóng root
+	f, err := root.Open(filepath.FromSlash(p))
+	if err != nil {
+		return nil, nil, fs.ErrNotExist
+	}
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		f.Close()
+		return nil, nil, fs.ErrNotExist
+	}
+	return f, st, nil
+}
+
+// PathOf: đường dẫn trong kho của URL công khai "/files/<path>" (bỏ ?query / #..., giải mã %XX).
+// ok = false khi URL không thuộc kho hoặc đường dẫn không hợp lệ.
+func PathOf(u string) (string, bool) {
+	if !strings.HasPrefix(u, Prefix) {
+		return "", false
+	}
+	p := u[len(Prefix):]
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		p = p[:i]
+	}
+	p, err := url.PathUnescape(p)
+	if err != nil || !ValidPath(p) {
+		return "", false
+	}
+	return p, true
+}
+
+// ReadURL đọc nội dung file của kho theo URL công khai, tối đa max byte. URL không thuộc kho, không có file
+// hoặc lớn hơn max -> lỗi.
+func (s *Client) ReadURL(u string, max int64) ([]byte, error) {
+	p, ok := PathOf(u)
+	if !ok {
+		return nil, fs.ErrNotExist
+	}
+	f, st, err := s.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if st.Size() > max {
+		return nil, errQuaLon
+	}
+	buf, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(buf)) > max {
+		return nil, errQuaLon
+	}
+	return buf, nil
 }

@@ -197,12 +197,21 @@ type MediaDownloader interface {
 	MediaDownload(ctx context.Context, fileToken string) (buf []byte, contentType string, err error)
 }
 
-// Uploader - chủ: platform/storage (*storage.Client đã khớp sẵn). uploadToStorage (supa.js:461-469).
+// Uploader - chủ: platform/storage (*storage.Client đã khớp sẵn). Thay uploadToStorage (supa.js:461-469).
 //
-// POST lên Supabase Storage với x-upsert; contentType rỗng -> "image/jpeg". Trả URL công khai (path qua encodeURIComponent,
-// "/" thành "%2F"). HTTP >= 400 -> lỗi "Storage upload -> <status> <200 ký tự đầu của thân>".
+// Ghi buf vào kho trên đĩa (UPLOAD_DIR/<path>, ghi đè nếu trùng tên). Trả URL công khai tương đối "/files/<path>"
+// (từng đoạn của path qua encodeURIComponent). contentType không được lưu: khi phục vụ, kiểu lấy theo đuôi file.
+// Path không hợp lệ -> "Đường dẫn file không hợp lệ"; lỗi đĩa -> "Không lưu được file lên máy chủ" (chi tiết ghi log).
 type Uploader interface {
 	Upload(ctx context.Context, buf []byte, path, contentType string) (url string, err error)
+}
+
+// FileReader - chủ: platform/storage (*storage.Client). Đọc file của kho theo URL công khai "/files/<path>"
+// (URL tương đối nên máy chủ không tải qua HTTP được).
+//
+// ReadURL: URL không thuộc kho, đường dẫn sai / leo khỏi kho, không có file hoặc lớn hơn max byte -> lỗi.
+type FileReader interface {
+	ReadURL(url string, max int64) ([]byte, error)
 }
 
 // ReportRunner - chủ: reports. baoCaoNhapSP (I:451-552), daGuiBaoCaoHomNay_ (I:554-564).

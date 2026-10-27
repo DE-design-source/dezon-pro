@@ -1,0 +1,135 @@
+# QS Pro production: PostgreSQL 17 + backend Go (kho file ở volume uploads) + Caddy (HTTPS, giao diện React).
+# Chạy từ thư mục infra/deploy/ (đọc biến trong infra/deploy/.env - chép từ .env.example):
+#   bash deploy.sh                 # build + backup + migration + khởi động (dùng hằng ngày)
+#   docker compose ps              # trạng thái
+#   docker compose logs -f api     # log backend
+# Hướng dẫn đầy đủ: docs/04-van-hanh/trien-khai-vps-cloudfly.md
+name: qspro
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-qspro}:${POSTGRES_PASSWORD:?Thiếu POSTGRES_PASSWORD trong .env}@db:5432/${POSTGRES_DB:-qspro}?sslmode=disable
+  # image không có file .env; DOTENV=0 để chắc chắn không đọc file nào
+  DOTENV: "0"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qspro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Thiếu POSTGRES_PASSWORD trong .env}
+      POSTGRES_DB: ${POSTGRES_DB:-qspro}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Chỉ chạy LẦN ĐẦU khi volume pgdata còn trống: dựng toàn bộ bảng + đánh dấu migration 0001..hiện tại đã chạy.
+      - ../db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # Chỉ mở cho chính máy chủ (127.0.0.1): pgAdmin trên máy tính nối vào qua SSH tunnel, KHÔNG mở ra Internet.
+    ports:
+      - "127.0.0.1:${DB_LOCAL_PORT:-5432}:5432"
+    shm_size: 256mb
+    healthcheck:
+      # qua TCP (-h 127.0.0.1): lần đầu nạp schema.sql, Postgres tạm chỉ nghe socket nội bộ - kiểm qua socket sẽ báo sẵn sàng quá sớm
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    logging: *logging
+
+  # Chạy migration chưa áp dụng (infra/db/migrations) rồi thoát. api chỉ khởi động khi bước này thành công.
+  migrate:
+    image: qspro-backend:latest
+    pull_policy: never
+    command: ["/app/qspro-migrate"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+    logging: *logging
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    image: qspro-backend:latest
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      AUTH_SECRET: ${AUTH_SECRET:?Thiếu AUTH_SECRET trong .env}
+      PURCHASE_WEBHOOK: ${PURCHASE_WEBHOOK:-}
+      REPORT_WEBHOOK: ${REPORT_WEBHOOK:-}
+      REPORT_JOB: ${REPORT_JOB:-}
+      # Kho ảnh / tài liệu: thư mục trong volume uploads (phục vụ qua /files/...)
+      UPLOAD_DIR: /app/uploads
+      LARK_DOMAIN: ${LARK_DOMAIN:-}
+      LARK_APP_ID: ${LARK_APP_ID:-}
+      LARK_APP_SECRET: ${LARK_APP_SECRET:-}
+      DB_POOL_MAX: ${DB_POOL_MAX:-}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-}
+      # IP người dùng lấy từ X-Forwarded-For do Caddy gửi (chỉ tin mạng nội bộ của compose, xem networks bên dưới)
+      TRUSTED_PROXIES: 172.30.0.0/24
+    volumes:
+      # ảnh / tài liệu người dùng tải lên - không xoá volume này (docker compose down -v là MẤT file).
+      - uploads:/app/uploads
+    # RENDER_GIT_COMMIT (header x-app-ver) = mã commit đang chạy, deploy.sh ghi vào file này
+    env_file:
+      - path: ./.env.version
+        required: false
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    # backend tự tắt êm trong tối đa 15 giây (chờ request đang chạy, job báo cáo đang gửi)
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    logging: *logging
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend.Dockerfile
+      args:
+        # Nhúng vào JS lúc build. PUBLIC_URL chỉ đặt khi thử trên máy (vd https://localhost:8443).
+        VITE_API_URL: ${PUBLIC_URL:-https://${DOMAIN:?Thiếu DOMAIN trong .env}}
+    image: qspro-web:latest
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Thiếu DOMAIN trong .env}
+      WWW_DOMAIN: ${WWW_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:?Thiếu ACME_EMAIL trong .env}
+    # CADDYFILE_SHA: deploy.sh ghi mã băm Caddyfile vào đây -> Caddyfile đổi thì web được tạo lại và đọc file mới
+    env_file:
+      - path: ./.env.caddy
+        required: false
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # chứng chỉ HTTPS - không xoá volume này
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_started }
+    logging: *logging
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

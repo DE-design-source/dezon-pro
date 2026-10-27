@@ -2,78 +2,127 @@ package storage
 
 import (
 	"context"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestUpload(t *testing.T) {
-	var got *http.Request
-	var body string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r
-		b, _ := io.ReadAll(r.Body)
-		body = string(b)
-		if strings.Contains(r.URL.Path, "loi") {
-			w.WriteHeader(400)
-			_, _ = w.Write([]byte(strings.Repeat("x", 300)))
-		}
-	}))
-	defer srv.Close()
-
-	s := New(srv.URL+"///", "khoa", "kho")
+	dir := filepath.Join(t.TempDir(), "kho") // chưa có: lần ghi đầu tự tạo
+	s := New(dir)
 	url, err := s.Upload(context.Background(), []byte("abc"), "sp/ảnh 1.png", "image/png")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := srv.URL + "/storage/v1/object/public/kho/sp%2F%E1%BA%A3nh%201.png"
-	if url != want {
+	if want := "/files/sp/%E1%BA%A3nh%201.png"; url != want {
 		t.Errorf("url:\n got %s\nwant %s", url, want)
 	}
-	if got.Method != "POST" || got.URL.EscapedPath() != "/storage/v1/object/kho/sp%2F%E1%BA%A3nh%201.png" || body != "abc" {
-		t.Errorf("request: %s %s %q", got.Method, got.URL.EscapedPath(), body)
+	if b, err := os.ReadFile(filepath.Join(dir, "sp", "ảnh 1.png")); err != nil || string(b) != "abc" {
+		t.Errorf("file trên đĩa: %q %v", b, err)
 	}
-	if got.Header.Get("apikey") != "khoa" || got.Header.Get("Authorization") != "Bearer khoa" || got.Header.Get("Content-Type") != "image/png" || got.Header.Get("x-upsert") != "true" {
-		t.Errorf("header: %v", got.Header)
+	// ghi đè, không để lại file tạm
+	if _, err := s.Upload(context.Background(), []byte("xyz"), "sp/ảnh 1.png", ""); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := s.Upload(context.Background(), []byte("a"), "a.jpg", ""); err != nil || got.Header.Get("Content-Type") != "image/jpeg" {
-		t.Errorf("content type mặc định: %v %s", err, got.Header.Get("Content-Type"))
+	if b, _ := os.ReadFile(filepath.Join(dir, "sp", "ảnh 1.png")); string(b) != "xyz" {
+		t.Errorf("ghi đè: %q", b)
 	}
-	_, err = s.Upload(context.Background(), []byte("a"), "loi.jpg", "")
-	if err == nil || err.Error() != "Storage upload -> 400 "+strings.Repeat("x", 200) {
-		t.Errorf("lỗi: %v", err)
+	if es, _ := os.ReadDir(filepath.Join(dir, "sp")); len(es) != 1 {
+		t.Errorf("thư mục sp có %d mục, muốn 1", len(es))
 	}
-	down := New("http://127.0.0.1:9", "", "")
-	if _, err := down.Upload(context.Background(), []byte("a"), "a.jpg", ""); err == nil || err.Error() != "fetch failed" {
-		t.Errorf("lỗi mạng: %v", err)
+	if got := s.PublicURL("docs/a+b#c?.pdf"); got != "/files/docs/a%2Bb%23c%3F.pdf" {
+		t.Errorf("PublicURL: %s", got)
 	}
-	def := New("", "", "")
-	if def.URL() != DefaultURL || def.Bucket() != DefaultBucket {
-		t.Error("mặc định sai")
+	if New("").Dir() != DefaultDir || DefaultDir != "uploads" {
+		t.Error("thư mục mặc định sai")
 	}
 }
 
-// Kho trả chuyển hướng: fetch() của Node theo tối đa 20 lần rồi báo "fetch failed" (21 request), và từ lần chuyển hướng
-// đầu (POST -> GET) không còn gửi Content-Type. Số liệu lấy từ server Node thật qua bộ so sánh vi sai.
-func TestUploadRedirectNhuFetch(t *testing.T) {
-	n, ct := 0, []string{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n++
-		ct = append(ct, r.Method+" "+r.Header.Get("Content-Type"))
-		w.Header().Set("Location", "/storage/v1/object/kho/khac")
-		w.WriteHeader(302)
-	}))
-	defer srv.Close()
-	_, err := New(srv.URL, "khoa", "kho").Upload(context.Background(), []byte("abc"), "a.png", "image/png")
-	if err == nil || err.Error() != "fetch failed" {
+// Đường dẫn sai không được ghi ra đĩa, kể cả ra ngoài thư mục kho.
+func TestUploadPathSai(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "kho")
+	s := New(dir)
+	for _, p := range []string{"", ".", "..", "../x.png", "sp/../../x.png", "/x.png", "sp//x.png", "sp/", `sp\x.png`,
+		`..\x.png`, "C:/x.png", "a:b.png", "sp/.an.png", ".tmp", "x\x00.png"} {
+		if _, err := s.Upload(context.Background(), []byte("a"), p, ""); err == nil || err.Error() != "Đường dẫn file không hợp lệ" {
+			t.Errorf("%q: %v", p, err)
+		}
+	}
+	if es, _ := os.ReadDir(base); len(es) != 0 {
+		t.Errorf("đường dẫn sai mà vẫn ghi: %v", es)
+	}
+}
+
+// Lỗi đĩa: thông báo chung, không lộ đường dẫn của máy chủ.
+func TestUploadLoiDia(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(f, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := New(f).Upload(context.Background(), []byte("a"), "sp/a.png", "")
+	if err == nil || err.Error() != "Không lưu được file lên máy chủ" {
 		t.Errorf("lỗi: %v", err)
 	}
-	if n != 21 {
-		t.Errorf("số request = %d, muốn 21", n)
+}
+
+func TestReadURL(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "kho")
+	s := New(dir)
+	if err := os.WriteFile(filepath.Join(base, "bi-mat.png"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if len(ct) < 2 || ct[0] != "POST image/png" || ct[1] != "GET " {
-		t.Errorf("header qua chuyển hướng: %v", ct)
+	url, err := s.Upload(context.Background(), []byte("12345"), "sp/ảnh 1.png", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []string{url, url + "?v=2", url + "#x", "/files/sp/ảnh 1.png", "/files/sp%2F%E1%BA%A3nh%201.png"} {
+		if b, err := s.ReadURL(u, 5); err != nil || string(b) != "12345" {
+			t.Errorf("%s: %q %v", u, b, err)
+		}
+	}
+	if _, err := s.ReadURL(url, 4); err == nil {
+		t.Error("lớn hơn max phải lỗi")
+	}
+	for _, u := range []string{"/files/sp/khong-co.png", "/files/sp", "/files/", "/files/../bi-mat.png", "/files/%2e%2e/bi-mat.png",
+		"/files/sp/..%2F..%2Fbi-mat.png", "/files/sp/%ZZ.png", "/media?token=x", "https://x.vn/files/sp/a.png", "files/sp/a.png"} {
+		if b, err := s.ReadURL(u, 100); err == nil {
+			t.Errorf("%s: phải lỗi, được %q", u, b)
+		}
+	}
+	if _, _, err := s.Open("sp"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("mở thư mục: %v", err)
+	}
+}
+
+// Symlink trỏ ra ngoài kho không đọc được (os.Root).
+func TestOpenSymlinkRaNgoai(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "kho")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ngoai := filepath.Join(base, "bi-mat.png")
+	if err := os.WriteFile(ngoai, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(ngoai, filepath.Join(dir, "link.png")); err != nil {
+		t.Skip("không tạo được symlink:", err)
+	}
+	if _, _, err := New(dir).Open("link.png"); err == nil {
+		t.Error("symlink ra ngoài kho mà vẫn mở được")
+	}
+}
+
+func TestValidPath(t *testing.T) {
+	for p, want := range map[string]bool{"sp/1-2.jpg": true, "docs/123-tai-lieu.pdf": true, "sp/1.svg+xml": true, "a": true,
+		"": false, "sp/../a": false, "sp/./a": false, "/a": false, "a/": false, "a//b": false, `a\b`: false, "a:b": false,
+		".a": false, "sp/.a": false, "a\x00": false} {
+		if got := ValidPath(p); got != want {
+			t.Errorf("ValidPath(%q) = %v", p, got)
+		}
 	}
 }

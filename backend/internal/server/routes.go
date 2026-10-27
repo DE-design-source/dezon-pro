@@ -116,7 +116,8 @@ func (s *Server) modules() []Module {
 		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage})
 	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc})
 	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc})
-	quoteSvc := quotations.New(quotations.Deps{DB: d.DB, Cfg: d.Cfg, Lines: takeoffSvc, Projects: projSvc, Media: filesSvc})
+	quoteSvc := quotations.New(quotations.Deps{DB: d.DB, Cfg: d.Cfg, Lines: takeoffSvc, Projects: projSvc, Media: filesSvc,
+		Files: d.Storage})
 	estSvc := estimates.New(estimates.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Auditor: usersSvc})
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
 		Users: usersSvc, Auditor: usersSvc})

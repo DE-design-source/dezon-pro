@@ -20,13 +20,13 @@ Trình duyệt  --->  Frontend (React + Vite)  --->  Backend (Go + Gin)  --->  D
 | `infra/export/qspro_dev.sql` | **Bản dữ liệu dùng để phát triển** (cấu trúc + dữ liệu: sản phẩm, dự án, công ty, tài khoản) |
 | `infra/export/qspro_seed.sql` | Bản dữ liệu cũ hơn (13/10), chỉ dùng để đặt lại database thử `qspro_gotest` cho test Go (xem `backend/README.md` mục Kiểm thử). Phát triển thì dùng `qspro_dev.sql` |
 | `infra/docker/` | Dockerfile của backend |
-| `infra/scripts/` | Script Node chép dữ liệu Supabase sang Postgres trống (`sync-from-supabase.js`, gọi `migrate.js`), dùng khi chuyển production. Không cần để chạy dự án |
+| `infra/scripts/` | Script vận hành: `migrate.js` (chạy migration bằng Node), `backup-db.sh` / `restore-db.sh` (sao lưu / khôi phục database + kho file trên máy chủ), `create-super.sh` (tạo tài khoản super). Không cần để chạy dự án |
 | `docs/` | Tài liệu: `03-san-pham/roadmap.md` (lộ trình, trạng thái tính năng), `03-san-pham/flows/` (quy trình nghiệp vụ), `02-ky-thuat/` (kỹ thuật, database) |
 
 Bản Node.js cũ (`server/`, `public/`) đã gỡ khỏi repo; backend Go thay thế hoàn toàn.
 
 > **Dữ liệu thật:** các file trong `infra/export/` chứa thông tin khách hàng và mật khẩu đã băm. Chỉ dùng trong repo private,
-> không gửi ra ngoài, và luôn chạy máy phát triển với webhook / kho file giả như bước 4.
+> không gửi ra ngoài, và luôn chạy máy phát triển với webhook giả như bước 4.
 
 ## 1. Cài công cụ
 
@@ -160,7 +160,6 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:5174
 REPORT_JOB=0
 PURCHASE_WEBHOOK=http://127.0.0.1:9/x
 REPORT_WEBHOOK=http://127.0.0.1:9/x
-SUPABASE_URL_OVERRIDE=http://127.0.0.1:9
 ```
 
 Ý nghĩa:
@@ -172,7 +171,7 @@ SUPABASE_URL_OVERRIDE=http://127.0.0.1:9
 | `CORS_ORIGINS` | địa chỉ trang frontend được phép gọi API; phải trùng ĐÚNG giao thức + host + cổng của Vite |
 | `REPORT_JOB=0` | tắt job tự gửi báo cáo lên group Lark |
 | `PURCHASE_WEBHOOK`, `REPORT_WEBHOOK` | địa chỉ giả. Để trống thì backend dùng webhook Lark THẬT ghi sẵn trong code, tin sẽ vào group thật |
-| `SUPABASE_URL_OVERRIDE` | địa chỉ giả để không tải file lên kho thật. Hệ quả: chức năng tải ảnh / tài liệu sẽ báo lỗi trên máy phát triển. Cần thử upload thật thì xin trưởng nhóm cấu hình kho dùng cho phát triển |
+| `UPLOAD_DIR` (để trống) | thư mục lưu ảnh / tài liệu tải lên, phục vụ ở `/files/...`. Trống = `uploads` tính từ thư mục chạy, tức `backend/uploads` (đã có trong `.gitignore`, không commit) |
 
 Danh sách đầy đủ các biến: `backend/.env.example`. File `.env` không được commit (đã có trong `.gitignore`).
 

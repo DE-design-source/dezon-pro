@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 
+	"qspro-backend/internal/platform/storage"
 	"qspro-backend/internal/shared/httpx"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
@@ -257,5 +258,50 @@ func TestFetchNode(t *testing.T) {
 		} else if res != nil && res.ext != jsval.AsString(m.Val("ext")) {
 			t.Errorf("enc %s: ext node %v, go %s", n, m.Val("ext"), res.ext)
 		}
+	}
+}
+
+// khongGoiMang: http.Client của ảnh /files/... không được dùng tới.
+type khongGoiMang struct{ t *testing.T }
+
+func (k khongGoiMang) RoundTrip(r *http.Request) (*http.Response, error) {
+	k.t.Errorf("không được tải qua HTTP: %s", r.URL)
+	return nil, http.ErrNotSupported
+}
+
+// /files/... (kho UPLOAD_DIR): đọc thẳng từ đĩa, không gọi HTTP; vẫn chỉ nhận PNG / JPEG, tối đa 5 MB, không ra ngoài kho.
+func TestFetchImageKhoFile(t *testing.T) {
+	ctx := context.Background()
+	base := t.TempDir()
+	kho := storage.New(filepath.Join(base, "kho"))
+	png := append([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, "du-lieu"...)
+	up := func(p string, b []byte) string {
+		u, err := kho.Upload(ctx, b, p, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	uPng := up("sp/ảnh 1.png", png)
+	uJpg := up("logo/a.jpg", []byte{0xFF, 0xD8, 0xFF, 0xE0, 1})
+	uTxt := up("sp/a.png", []byte("khong-phai-anh"))
+	uLon := up("sp/lon.png", append(append([]byte{}, png...), make([]byte, imgMax)...))
+	if err := os.WriteFile(filepath.Join(base, "ngoai.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := New(Deps{Repo: &fakeRepo{}, Files: kho, HTTP: &http.Client{Transport: khongGoiMang{t}}})
+	if res := svc.fetchImage(ctx, uPng); res == nil || res.ext != "png" || !bytes.Equal(res.buf, png) {
+		t.Errorf("png: %+v", res)
+	}
+	if res := svc.fetchImage(ctx, uJpg+"?v=1"); res == nil || res.ext != "jpeg" {
+		t.Errorf("jpg: %+v", res)
+	}
+	for _, u := range []string{uTxt, uLon, "/files/sp/khong-co.png", "/files/sp", "/files/../ngoai.png", "/files/%2e%2e/ngoai.png"} {
+		if res := svc.fetchImage(ctx, u); res != nil {
+			t.Errorf("%s: phải bỏ ảnh", u)
+		}
+	}
+	if res := New(Deps{Repo: &fakeRepo{}}).fetchImage(ctx, uPng); res != nil {
+		t.Error("không có kho: phải bỏ ảnh")
 	}
 }

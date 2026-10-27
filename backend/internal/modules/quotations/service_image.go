@@ -366,12 +366,21 @@ func (s *Service) download(ctx context.Context, target *url.URL) []byte {
 	return buf
 }
 
-// fetchImage = fetchImage (X:328-354): /media?token=... tải qua Lark, URL http tải trực tiếp (không tải địa chỉ nội bộ,
-// tối đa 8 giây và 5 MB). Chỉ nhận PNG / JPEG theo CHỮ KÝ FILE. Mọi lỗi -> nil (bỏ ảnh).
+// fetchImage = fetchImage (X:328-354): /files/... đọc thẳng từ kho trên đĩa, /media?token=... tải qua Lark, URL http
+// tải trực tiếp (không tải địa chỉ nội bộ, tối đa 8 giây và 5 MB). Chỉ nhận PNG / JPEG theo CHỮ KÝ FILE. Mọi lỗi -> nil (bỏ ảnh).
 func (s *Service) fetchImage(ctx context.Context, url string) *imageData {
 	var buf []byte
 	m := reToken.FindStringSubmatch(url)
 	switch {
+	case strings.HasPrefix(url, "/files/"):
+		// URL tương đối của kho UPLOAD_DIR: không tải qua HTTP được
+		if s.files == nil {
+			return nil
+		}
+		var err error
+		if buf, err = s.files.ReadURL(url, imgMax); err != nil {
+			return nil
+		}
 	case strings.HasPrefix(url, "/media") && m != nil:
 		token, err := jsval.DecodeURIComponent(m[1])
 		if err != nil || s.media == nil {

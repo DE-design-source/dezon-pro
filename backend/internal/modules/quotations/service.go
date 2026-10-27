@@ -17,14 +17,15 @@ import (
 	"qspro-backend/internal/shared/qscore"
 )
 
-// Deps: phụ thuộc của module. Lines (takeoff), Projects (projects), Media (files) là interface của contracts.
-// Repo và HTTP để trống thì dùng bản mặc định (Postgres qua DB, http.Client chuẩn).
+// Deps: phụ thuộc của module. Lines (takeoff), Projects (projects), Media (files), Files (platform/storage) là interface
+// của contracts. Repo và HTTP để trống thì dùng bản mặc định (Postgres qua DB, http.Client chuẩn).
 type Deps struct {
 	DB       *database.DB
 	Cfg      *config.Config
 	Lines    contracts.LineReader
 	Projects contracts.ProjectReader
 	Media    contracts.MediaDownloader
+	Files    contracts.FileReader
 	Repo     Repository
 	HTTP     *http.Client
 }
@@ -35,11 +36,12 @@ type Service struct {
 	lines    contracts.LineReader
 	projects contracts.ProjectReader
 	media    contracts.MediaDownloader
+	files    contracts.FileReader
 	http     *http.Client
 }
 
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, repo: d.Repo, lines: d.Lines, projects: d.Projects, media: d.Media, http: d.HTTP}
+	s := &Service{db: d.DB, repo: d.Repo, lines: d.Lines, projects: d.Projects, media: d.Media, files: d.Files, http: d.HTTP}
 	if s.repo == nil {
 		s.repo = newPgRepo(d.DB)
 	}

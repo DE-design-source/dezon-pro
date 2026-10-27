@@ -21,5 +21,8 @@ coverage.*
 **/.out/
 tests/tmp-*/
 
+# kho ảnh / tài liệu tải lên khi chạy ở máy (UPLOAD_DIR mặc định)
+/uploads/
+
 .idea/
 .vscode/

@@ -138,7 +138,7 @@ func (d *DB) loadCatalog(ctx context.Context) (map[string]*table, string, error)
 	if err := rows.Err(); err != nil {
 		return nil, "", err
 	}
-	// Sắp xếp chữ có dấu theo ngôn ngữ (như Supabase), không phụ thuộc locale lúc tạo database.
+	// Sắp xếp chữ có dấu theo ngôn ngữ, không phụ thuộc locale lúc tạo database.
 	// Database không có collation ICU này thì sắp theo mặc định của database.
 	collate := ""
 	var one int

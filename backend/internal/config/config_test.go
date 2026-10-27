@@ -10,9 +10,9 @@ import (
 )
 
 var bienCauHinh = []string{"PORT", "DATABASE_URL", "DB_POOL_MAX", "DB_SORT_COLLATION", "AUTH_SECRET", "LARK_DOMAIN",
-	"LARK_APP_ID", "LARK_APP_SECRET", "PURCHASE_WEBHOOK", "REPORT_WEBHOOK", "SUPABASE_URL_OVERRIDE",
-	"SUPABASE_KEY_OVERRIDE", "SUPABASE_BUCKET", "RENDER_GIT_COMMIT", "SWAGGER_DOCS", "NODE_ENV", "STATIC_DIR",
-	"VENDOR_DIR", "CORS_ORIGINS", "RATE_LIMIT_RPS", "REDIS_URL", "DEBUG", "REPORT_JOB", "TRUSTED_PROXIES"}
+	"LARK_APP_ID", "LARK_APP_SECRET", "PURCHASE_WEBHOOK", "REPORT_WEBHOOK", "RENDER_GIT_COMMIT", "SWAGGER_DOCS",
+	"NODE_ENV", "STATIC_DIR", "VENDOR_DIR", "CORS_ORIGINS", "RATE_LIMIT_RPS", "REDIS_URL", "DEBUG", "REPORT_JOB",
+	"TRUSTED_PROXIES", "UPLOAD_DIR"}
 
 // xoaEnv bỏ mọi biến cấu hình trong lúc test (t.Setenv trước để hết test được trả lại giá trị cũ).
 func xoaEnv(t *testing.T) {
@@ -45,6 +45,7 @@ func TestLoadDefaults(t *testing.T) {
 		ReportWebhook:   "https://open.larksuite.com/open-apis/bot/v2/hook/865751f9-d3e8-4e8e-9b4e-e0fa53ef4698",
 		VendorDir:       filepath.Join("..", "node_modules"), // STATIC_DIR mặc định rỗng: không phục vụ giao diện cũ
 		ReportJob:       true,
+		UploadDir:       "uploads",
 	}
 	if !reflect.DeepEqual(c, want) {
 		t.Errorf("mặc định:\n got %+v\nwant %+v", c, want)
@@ -99,8 +100,7 @@ func TestLoadValues(t *testing.T) {
 	for k, v := range map[string]string{
 		"DATABASE_URL": "postgresql://u:p@h/d", "DB_SORT_COLLATION": "vi-x-icu", "AUTH_SECRET": "bi-mat",
 		"LARK_APP_ID": "cli_1", "LARK_APP_SECRET": "s1", "PURCHASE_WEBHOOK": "http://h/mua",
-		"SUPABASE_URL_OVERRIDE": "http://s/", "SUPABASE_KEY_OVERRIDE": "k", "SUPABASE_BUCKET": "b",
-		"RENDER_GIT_COMMIT": "abc123", "SWAGGER_DOCS": "1", "NODE_ENV": "production", "STATIC_DIR": "/srv/public",
+		"UPLOAD_DIR": "/srv/uploads", "RENDER_GIT_COMMIT": "abc123", "SWAGGER_DOCS": "1", "NODE_ENV": "production", "STATIC_DIR": "/srv/public",
 		"VENDOR_DIR": "/srv/nm", "CORS_ORIGINS": " https://a.vn , ,https://b.vn", "RATE_LIMIT_RPS": "2.5",
 		"REDIS_URL": "redis://r:6379/0", "DEBUG": "1", "REPORT_JOB": "0", "TRUSTED_PROXIES": "10.0.0.0/8, 127.0.0.1",
 	} {
@@ -111,8 +111,7 @@ func TestLoadValues(t *testing.T) {
 		Port: 3000, DatabaseURL: "postgresql://u:p@h/d", DBPoolMax: 10, DBSortCollation: "vi-x-icu", AuthSecret: "bi-mat",
 		LarkDomain: "https://open.larksuite.com", LarkAppID: "cli_1", LarkAppSecret: "s1",
 		PurchaseWebhook: "http://h/mua", ReportWebhook: "http://h/mua", // REPORT_WEBHOOK chưa đặt -> dùng chung
-		SupabaseURL: "http://s/", SupabaseKey: "k", SupabaseBucket: "b",
-		AppVer: "abc123", SwaggerDocs: "1", NodeEnv: "production", StaticDir: "/srv/public", VendorDir: "/srv/nm",
+		UploadDir: "/srv/uploads", AppVer: "abc123", SwaggerDocs: "1", NodeEnv: "production", StaticDir: "/srv/public", VendorDir: "/srv/nm",
 		CORSOrigins: []string{"https://a.vn", "https://b.vn"}, RateLimit: 2.5, RedisURL: "redis://r:6379/0", Debug: true,
 		ReportJob: false, TrustedProxies: []string{"10.0.0.0/8", "127.0.0.1"},
 	}

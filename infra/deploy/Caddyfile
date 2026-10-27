@@ -1,0 +1,48 @@
+# Caddy: cổng vào duy nhất của máy chủ (80/443).
+# - Tự xin và gia hạn chứng chỉ HTTPS Let's Encrypt cho {$DOMAIN} (DNS phải trỏ về IP máy chủ trước khi chạy).
+# - Đường dẫn của backend Go -> api:3000; còn lại là app React (BrowserRouter: mọi đường dẫn lạ trả index.html).
+# Sửa file này xong: docker compose restart web   (không cần build lại)
+{
+	email {$ACME_EMAIL}
+}
+
+# WWW_DOMAIN (tuỳ chọn, vd www.dezon.tech): cùng xin chứng chỉ, mọi request chuyển hẳn về {$DOMAIN}. Trống = không có địa chỉ phụ.
+{$DOMAIN} {$WWW_DOMAIN} {
+	encode zstd gzip
+
+	@www expression `{host} == "{$WWW_DOMAIN}"`
+	redir @www https://{$DOMAIN}{uri} permanent
+
+	header {
+		# Trình duyệt chỉ dùng HTTPS cho tên miền này trong 1 năm (chặn bị hạ xuống HTTP trên Wi-Fi lạ)
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Mọi đường dẫn backend Go phục vụ (backend/internal/server/routes.go + file nhúng go:embed).
+	# Thêm route gốc mới ở backend (ngoài /api) thì phải thêm vào đây, nếu không nó trả index.html.
+	@backend path /api /api/* /export/* /upload/* /files/* /media /healthz /logo.svg /vs-spec.js /son-spec.js /ct-spec.js /mau-nhap-*
+	handle @backend {
+		# Không giới hạn kích thước body / thời gian chờ ở Caddy: backend tự giới hạn (JSON 30 MB, file 50 MB).
+		reverse_proxy api:3000
+	}
+
+	# File build của Vite có mã băm trong tên: cache lâu; thiếu file thì 404 (không trả index.html).
+	handle /assets/* {
+		root * /srv
+		@found file
+		header @found Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Còn lại là app React: đường dẫn lạ (/qs, /du-an...) trả index.html; luôn hỏi lại để nhận bản mới sau mỗi lần deploy.
+	handle {
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

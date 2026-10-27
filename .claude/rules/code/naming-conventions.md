@@ -10,7 +10,7 @@
 - Tên bảng / cột TRONG DATABASE PostgreSQL là **tiếng Anh** (từ 2026-10-07); `server/db-map.json` ánh xạ hai chiều,
   `server/supa.js` tự dịch khi đọc/ghi. Quy tắc database: `docs/02-ky-thuat/database/database-rules.md`.
 
-## Cơ sở dữ liệu (Supabase / Postgres)
+## Cơ sở dữ liệu (PostgreSQL)
 
 Cột "Code" là tên dùng trong code (khoá của `db-map.json`); cột "Database" là tên thật trong PostgreSQL.
 
@@ -40,7 +40,7 @@ giữa các spec phải trỏ cùng một cột.
 | Cửa ngõ kiểm quyền (`server/auth.js`) | hậu tố `Gated`; `REGISTRY` trỏ tên API tới hàm này | `ctSave: auth.ctSaveGated`, `updateDbProductTracked: auth.updateProductGated` |
 | Hàm nội bộ / helper | hậu tố `_` | `calc_`, `tblErr_`, `spPerms_`, `toNumber_` |
 | Object trả về client | khoá `camelCase` (đổi từ cột `snake_case` trong `server/store_supa.js`) | `donGiaVon`, `maDA`, `thanhTienBan` |
-| Biến môi trường | `UPPER_SNAKE_CASE` | `AUTH_SECRET`, `REPORT_WEBHOOK`, `SUPABASE_URL_OVERRIDE` |
+| Biến môi trường | `UPPER_SNAKE_CASE` | `AUTH_SECRET`, `REPORT_WEBHOOK`, `UPLOAD_DIR` |
 
 ## Client (`public/`)
 

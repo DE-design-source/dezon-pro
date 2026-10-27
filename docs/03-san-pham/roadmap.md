@@ -52,8 +52,9 @@
 | Mã | Tính năng | Trạng thái | Còn lại |
 |---|---|---|---|
 | [N1](#xong-n1) | Database PostgreSQL trực tiếp, tên bảng / cột tiếng Anh | 🟡 | [N1](#n1): thử tay trên trình duyệt, chuyển production |
-| [N2](#xong-n2) | Server Go + Gin (`backend/`) | 🟡 | [N2](#n2): chuyển deploy sang bản Go, so vi sai phần còn mở |
+| [N2](#xong-n2) | Server Go + Gin (`backend/`) | 🟡 | [N2](#n2): bật Lark, so vi sai phần còn mở |
 | [N3](#xong-n3) | Tích hợp QS vào frontend React SiteFlow (`frontend/`) với API Go | ✅ | - |
+| [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 
 ---
 
@@ -70,7 +71,6 @@
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
 | - | Chưa có | - | - |
-
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
@@ -81,8 +81,8 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
-| <a id="n1"></a>N1 | Refactor database sang PostgreSQL trực tiếp (`DATABASE_URL`; bản Node dùng `pg`, bản Go dùng `pgx`): đã triển khai trên database local `qspro_en2`; mọi tab QS đã chạy thử tự động trên trình duyệt (React + Go, database thử `qspro_gotest`, xem [N3](#xong-n3)); còn người dùng thử tay trên dữ liệu thật, chuyển production (cần máy chủ PostgreSQL mà Render truy cập được), xoá 8 cột `DEPRECATED` (D-09; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date` / `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15 vì M15.2 / M10.2 / M17.3 dùng lại; migration 0010 / 0012 / 0013 đổi chú thích cột) - xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md` mục 8 | Toàn hệ thống | 🟡 |
-| <a id="n2"></a>N2 | Chuyển server Node + Express sang Go + Gin (`backend/`, đã commit ở `5fa5d52` / `033c421`; app Node và `render.yaml` đã gỡ khỏi repo): đã chuyển mã; còn dựng deploy cho bản Go (chưa có cấu hình deploy nào trong repo, chỉ có `infra/docker/backend.Dockerfile`; server Go không phục vụ app React, React build và deploy riêng với `VITE_API_URL` trỏ tới Go + `CORS_ORIGINS` của Go), so vi sai job báo cáo và các nhánh chỉ chạy khi database thiếu cột - xem `backend/docs/ARCHITECTURE.md` mục "Việc còn mở" | Toàn hệ thống | 🟡 |
+| <a id="n1"></a>N1 | Refactor database sang PostgreSQL trực tiếp (`DATABASE_URL`; bản Node dùng `pg`, bản Go dùng `pgx`): đã triển khai trên database local `qspro_en2`; mọi tab QS đã chạy thử tự động trên trình duyệt (React + Go, database thử `qspro_gotest`, xem [N3](#xong-n3)); 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (xem [N2](#n2)); còn người dùng thử tay trên dữ liệu thật, xoá 8 cột `DEPRECATED` (D-09; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date` / `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15 vì M15.2 / M10.2 / M17.3 dùng lại; migration 0010 / 0012 / 0013 đổi chú thích cột) - xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md` mục 8 | Toàn hệ thống | 🟡 |
+| <a id="n2"></a>N2 | Chuyển server Node + Express sang Go + Gin (`backend/`, đã commit ở `5fa5d52` / `033c421`; app Node và `render.yaml` đã gỡ khỏi repo): đã chuyển mã; cấu hình deploy VPS đã có (`infra/deploy/`: Docker Compose + Caddy HTTPS phục vụ React và chuyển tiếp route Go cùng tên miền, PostgreSQL 17, script sao lưu / khôi phục / tạo super; hướng dẫn `docs/04-van-hanh/trien-khai-vps-cloudfly.md`), đã chạy thử trọn bộ trên máy 2026-10-22; 2026-10-24 đã chạy trên VPS CloudFly bằng IP (`http://222.255.184.134/qs`, mã chép thẳng từ máy phát triển, chưa qua GitHub) và nạp dữ liệu `qspro_en2` + 1430 file, mở cổng 80/443 ở Cloud Firewall của CloudFly, vào được từ Internet; tối 2026-10-24 chuyển sang `https://dezon.tech` (chứng chỉ Let's Encrypt, `www` và `http` chuyển về); còn bật Lark (`REPORT_JOB` và webhook đang tắt / giả), so vi sai job báo cáo và các nhánh chỉ chạy khi database thiếu cột - xem `backend/docs/ARCHITECTURE.md` mục "Việc còn mở" | Toàn hệ thống | 🟡 |
 
 ---
 
@@ -90,16 +90,15 @@
 
 > Thứ tự dưới đây là **gợi ý của Claude, chưa được duyệt** — xếp theo "chỉ còn thiếu nối giao diện" trước, "cần quyết định nghiệp vụ" sau.
 
-1. Hai hạng mục lớn ở mục 2.4: [N2](#n2) (dựng deploy cho bản Go) và [N1](#n1) (chuyển production, xoá cột D-09)
-2. Chạy migration 0014 (`user_sessions`, M1.2) trên `qspro_en2` / production TRƯỚC khi chạy server Go bản mới (thiếu bảng thì mọi lời gọi đã đăng nhập trả 500)
-3. Chủ sản phẩm xác nhận các GIẢ ĐỊNH đã ghi trong mục 5 (gần nhất: M1.2, M6.1, M10.1, M17.3)
+1. Hai hạng mục lớn ở mục 2.4: [N2](#n2) (bật Lark trên VPS CloudFly theo `docs/04-van-hanh/trien-khai-vps-cloudfly.md`) và [N1](#n1) (người dùng thử trên dữ liệu thật, xoá cột D-09)
+2. Chủ sản phẩm xác nhận các GIẢ ĐỊNH đã ghi trong mục 5 (gần nhất: M1.2, M6.1, M10.1, M17.3)
 
 ---
 
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N4`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N6`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -169,8 +168,6 @@
 - Chọn sản phẩm cho dòng hoặc tạo sản phẩm mới vào danh mục
 - Sửa ô trực tiếp, tự tính giá đại lý, đơn giá, thành tiền
 - Gõ Markup, Margin hoặc Lợi nhuận (VND) để tính ngược giá bán
-- Nút sửa ở dải chip cột: bật / tắt chip rồi Lưu, đặt tên thành bộ chọn nhanh mới (tối đa 20, lưu theo tài khoản `ui_prefs.tkPresets`, xoá trong "Chọn nhanh cột") - 🟡 chưa chạy thử trên giao diện
-- Nút bộ cột trên băng dự án mở cùng lúc "Chọn nhanh cột" + dải chip cột; cột đang hiện tự lưu theo tài khoản (`ui_prefs.tkLastCols`), mở lại đúng cột lần trước - 🟡 chưa chạy thử trên giao diện
 - Sửa hàng loạt: chuyển tầng, đặt lợi nhuận, sửa cột
 - Sao chép, nhân bản, xoá nhiều dòng
 - Kéo thả đổi vị trí dòng và thứ tự tầng, đổi tên tầng
@@ -246,8 +243,6 @@
 - Chỉnh trình bày: mỗi phần 1 trang, số dòng mỗi trang, mức phóng, kéo đổi thứ tự / độ rộng cột
 - Tổng kết & điều khoản: chiết khấu tổng, ngày báo giá, hiệu lực, tiến độ thanh toán, ghi chú
 - Thông tin công ty (tên, logo, địa chỉ, liên hệ) trên bản xem trước và bản in
-- Mẫu tờ bìa: chọn nhanh bằng số ①②… (2 mẫu dựng sẵn + tối đa 6 mẫu tự lưu theo tài khoản `ui_prefs.bgBiaMau`), ⊕ lưu cài đặt đang dùng thành mẫu mới, Lưu ghi đè / Xoá mẫu tự lưu - 🟡 chưa chạy thử trên giao diện
-- Logo tờ bìa: chế độ Công ty chọn 1 trong 3 logo gần nhất, tab "Tạo logo" chọn 1 trong 2: Logo ảnh (tải ảnh) hoặc Logo chữ (gõ chữ, chỉnh font / màu / đậm / nghiêng / giãn chữ), bấm "Lưu logo" thì logo vào danh sách của mục Công ty; thông tin công ty dưới logo theo mẫu chung hoặc tự nhập riêng cho báo giá; thanh Cỡ logo đổi cả cỡ chữ khi không có ảnh - 🟡 chưa chạy thử trên giao diện
 - Xuất Excel nhiều trang tính: Tờ bìa, Tổng cộng, 3.2 Phần hoàn thiện, 3.1 Phần thô, chi tiết theo nhóm
 - Nhúng ảnh sản phẩm vào file Excel (bỏ qua ảnh webp / gif / svg và ảnh trên 5 MB)
 - Cảnh báo dòng đang dùng giá cũ trước khi xuất Excel
@@ -453,7 +448,7 @@
 <a id="xong-n1"></a>
 #### N1 - Database PostgreSQL trực tiếp
 
-- Server đọc / ghi PostgreSQL qua `pg` và `DATABASE_URL`; Supabase chỉ còn làm kho file
+- Server đọc / ghi PostgreSQL qua `pg` và `DATABASE_URL`; ảnh / tài liệu nằm trên ổ đĩa máy chủ (xem [N4](#xong-n4))
 - Tên bảng / cột trong database sang tiếng Anh, `db-map.json` ánh xạ hai chiều với tên trong code (nay là `backend/internal/platform/database/db-map.json`; bản `server/db-map.json` đã gỡ cùng app Node)
 - Tách bảng sản phẩm thành bảng lõi + 4 bảng thông số theo ngành; cấu hình cấp công ty sang bảng `company_settings`; phiếu đề xuất tách 2 bảng dòng
 - Bảng con bỏ cột công ty, lấy công ty qua bảng cha; thêm khoá ngoại và CHECK công thức
@@ -469,6 +464,8 @@
 - Bản chuyển `server/` sang Go + Gin trong `backend/`, chạy độc lập; app Node (`server/`, `public/`) đã gỡ khỏi repo, file tĩnh cần cho React (thông số ngành, logo, file mẫu) nhúng trong binary Go
 - Giữ `POST /api/<tênHàm>`, thêm REST dưới `/api/v1`
 - Migration (`go run ./cmd/migrate`) và chạy bằng Docker
+- Cấu hình triển khai VPS `infra/deploy/` (Docker Compose + Caddy + PostgreSQL 17, sao lưu hằng ngày), chạy thử trọn bộ trên máy 2026-10-22
+- Chạy trên VPS CloudFly (2026-10-24): Ubuntu 24.04, `setup-server.sh` + `deploy.sh --no-pull` (mã chép từ máy phát triển), chạy bằng IP `http://222.255.184.134` (`DOMAIN=http://<IP>`, `PUBLIC_URL`), nạp `qspro_en2` + kho file bằng `restore-db.sh`; kiểm từ Internet sau khi mở cổng 80/443 ở Cloud Firewall: `/healthz`, `/qs`, ảnh `/files` trả 200, trang đăng nhập QS hiện, giao diện gọi được API. Tối cùng ngày chuyển sang tên miền `https://dezon.tech/qs`: `DOMAIN=dezon.tech`, `WWW_DOMAIN=www.dezon.tech` (Caddy trả 301 về tên miền chính), chứng chỉ Let's Encrypt; kiểm từ Internet: `/healthz`, `/qs`, ảnh `/files` trả 200, `http://` trả 308 sang `https://`. `setup-server.sh` giữ file cấu hình nhà cung cấp khi nâng cấp gói (trước đó dừng ở câu hỏi `cloud.cfg` của cloud-init)
 - 🟡 phần còn lại ở 2.4
 
 <a id="xong-n3"></a>
@@ -480,3 +477,21 @@
 - Chạy React với server Go: đặt `CORS_ORIGINS` của server Go đúng origin của frontend (cấu hình chạy, không phải phần mã còn thiếu; deploy production thuộc [N2](#n2))
 - Backlog mục 2.1 (2026-10-15, 3 đợt) làm trên server Go + module QS React, mục 2.1 nay trống; mỗi việc ghi ở module của nó trong mục 5 (mã M). Kiểm tích hợp sau đợt 3: Go build / vet / gofmt / test toàn bộ đạt trên `qspro_gotest` (migration tới 0013), mọi tab QS chạy với admin / staff / super không lỗi trang
 - Kiểm thử 2026-10-15: build OK, 62.658 golden test công thức đạt (chạy lại sau backlog: 62.658 đạt / 0 khác; 2 ca thư viện công tác "giả", "mẫu+giả" nay đưa danh sách theo thứ tự máy chủ trả vì M5.3 sắp lại công tác ở máy), so từng tab với bản gốc không thiếu số tiền nào (admin, staff, super), file Excel báo giá trùng bản gốc, 20 trang SiteFlow khác không đổi pixel nào, chạy được không có `public/` (cả bản Docker)
+
+<a id="xong-n4"></a>
+#### N4 - Kho file trên ổ đĩa máy chủ
+
+- Ảnh / tài liệu tải lên ghi vào thư mục `UPLOAD_DIR` trên máy chạy backend (mặc định `uploads`; Docker: `/app/uploads`, volume `uploads`), đường dẫn lưu trong database là `/files/<đường dẫn>`; backend Go phục vụ `GET/HEAD /files/...` không cần đăng nhập; Caddy chuyển `/files/*` sang backend; đường dẫn Lark cũ vẫn qua `/media`
+- Mã backend Go (2026-10-24): `platform/storage` ghi file qua `os.Root` (chặn đường dẫn thoát khỏi thư mục), `/files` trả 404 khi thiếu file, không liệt kê thư mục, file SVG kèm CSP sandbox; xuất Excel đọc ảnh / logo `/files/...` thẳng từ đĩa; giao diện React thêm `VITE_API_URL` trước `/files/...`; bỏ hết biến và mã kho file cũ. Kiểm: Go build / vet / gofmt / test đạt; chạy thử bộ Docker trên máy: 170 ảnh `/files` trên trang Bóc tách hiện đủ, 0 ảnh lỗi
+- File cũ chuyển một lần (2026-10-24, ngoài repo, không có lệnh `migrate-files`): tải 1430 file về, đổi đường dẫn trong bản sao `qspro_en2` thành `/files/...`, nạp lên VPS bằng `restore-db.sh <dump> <kho-file.tar.gz>`
+- Sao lưu hằng ngày gồm cả kho file (`qspro-files-<thời điểm>.tar.gz`), `restore-db.sh` khôi phục được database và/hoặc kho file; gỡ script đồng bộ dữ liệu từ hệ thống cũ (`infra/scripts/`)
+
+<a id="xong-n5"></a>
+#### N5 - Bố cục mới trang QS
+
+- Thanh xanh trên cùng (`components/project/QsBar.jsx`) thay thanh tab + băng dự án: dự án ▾ (thông tin khách hàng, sửa, tìm / đổi dự án, tạo dự án), trạng thái bản nháp ▾, Chưa VAT / VAT (sửa được) / Tổng của hạng mục đang bóc (tab Bóc tách) + Bán / LN của dự án (các tab của dự án; thanh hẹp thì ẩn dần), ô tìm sản phẩm (lọc danh mục Bóc tách; ở Danh sách SP lọc bảng sản phẩm), Chế độ xem ▾ (mọi tab theo quyền), vòng tròn tài khoản (thông báo, sáng / tối, đổi mật khẩu, đăng xuất) (2026-10-22)
+- Bóc tách: cột trái 3 thẻ (tiêu đề + Bộ lọc · Hạng mục sản phẩm / Đèn trong dự án · danh sách SP; Phần thô 3.1 thêm thẻ bộ lọc riêng), đầu bảng 1 thanh mỏng (hạng mục, nút Tầng / phòng + Hạng mục - bỏ dòng đáy của bảng, kiểu bảng, bộ cột; tổng tiền chuyển lên thanh xanh), bảng tính chiếm phần còn lại
+- Bảng "Bộ lọc" cạnh cột trái (cùng chỗ panel Thông tin sản phẩm, thay hộp Bộ lọc + ô xổ): mỗi nút mở đúng phần của nó (nút Bộ lọc -> các khối lọc Công suất … Khoảng giá, các khối này không còn ở cột trái; ô Hạng mục sản phẩm -> danh sách hạng mục; ô Đèn / Thiết bị trong dự án -> danh sách dự án); Xoá lọc / Bỏ chọn, Esc để đóng (2026-10-22)
+- Mở Dezbot: trang co lại và các bố cục hẹp bật theo bề rộng thật của trang (`@container qs`), khung chat không đổ bóng; bấm nút tròn sidebar mở hẳn sidebar
+- Kiểm 2026-10-22 trên trình duyệt với API giả (Playwright, không đụng database): bố cục khớp bản phác ở 1536px, mở Dezbot không tràn, giao diện tối, Phần thô 3.1, các menu thả xuống; `vite build` đạt
+- Phần còn lại (sắp lại các tab khác theo cột thẻ trái, thử trên dữ liệu thật) bỏ khỏi backlog theo yêu cầu người dùng (2026-10-24)

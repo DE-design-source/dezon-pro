@@ -23,7 +23,9 @@ COPY --from=build /out/qspro-api /out/qspro-migrate /app/
 # migration: nguồn duy nhất infra/db/migrations; qspro-migrate đọc qua MIGRATIONS_DIR
 COPY infra/db/migrations /app/migrations
 # NODE_ENV=production: /api-docs và /api-docs.json TẮT mặc định (như bản Node trên production); bật bằng SWAGGER_DOCS=1
-ENV PORT=3000 MIGRATIONS_DIR=/app/migrations NODE_ENV=production
+ENV PORT=3000 MIGRATIONS_DIR=/app/migrations NODE_ENV=production UPLOAD_DIR=/app/uploads
+# Kho ảnh / tài liệu (UPLOAD_DIR). Tạo sẵn và giao cho user app: volume có tên gắn vào lần đầu sẽ nhận đúng chủ sở hữu này.
+RUN mkdir -p /app/uploads && chown app:app /app/uploads
 USER app
 EXPOSE 3000
 CMD ["/app/qspro-api"]

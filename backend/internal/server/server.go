@@ -1,6 +1,7 @@
 // Package server: dựng HTTP server (Gin) thay cho server/index.js.
 //   - Phục vụ file tĩnh nhúng trong binary mà giao diện React tải thẳng (/vs-spec.js, /son-spec.js, /ct-spec.js,
 //     /logo.svg, /mau-nhap-hang-loat.xlsx - xem assets.go)
+//   - Kho ảnh / tài liệu tải lên (UPLOAD_DIR) tại /files/<path> - xem uploads.go
 //   - Tuỳ chọn: giao diện cũ trong STATIC_DIR và thư viện bảng tính dưới /vendor (chỉ khi đặt STATIC_DIR)
 //   - POST /api/:fn    -> cổng tương thích với giao diện hiện tại (xem package rpc)
 //   - /api/v1/...      -> REST, dùng chung service với cổng trên
@@ -73,7 +74,7 @@ func New(d *Deps) *Server {
 		d.DB = database.New(database.Config{URL: cfg.DatabaseURL, PoolMax: cfg.DBPoolMax, SortCollation: cfg.DBSortCollation})
 	}
 	if d.Storage == nil {
-		d.Storage = storage.New(cfg.SupabaseURL, cfg.SupabaseKey, cfg.SupabaseBucket)
+		d.Storage = storage.New(cfg.UploadDir)
 	}
 	if d.Reg == nil {
 		d.Reg = rpc.NewRegistry()
@@ -109,6 +110,8 @@ func New(d *Deps) *Server {
 	// DrainBody: đọc bỏ thân chưa đọc sau khi trả lời (Node tự làm) để client gửi thân quá lớn vẫn nhận được 413
 	e.Use(middleware.DrainBody())
 	e.Use(middleware.JSONBody(middleware.JSONBodyLimit))
+	// Kho file tải lên (UPLOAD_DIR) tại /files/...: công khai, không tra phiên
+	e.Use(uploads(d.Storage))
 	// File nhúng trong binary (spec ngành, logo, file mẫu): đứng TRƯỚC STATIC_DIR nên luôn là bản nhúng
 	assets := map[string]*asset{}
 	e.Use(embeddedAssets(assets))

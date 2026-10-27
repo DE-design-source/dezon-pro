@@ -6,7 +6,7 @@
 
 Stack: Node.js + Express (CommonJS, không TypeScript, không bundler) · giao diện là script thuần
 dùng chung biến toàn cục · dữ liệu trên **PostgreSQL** (thư viện `pg`, nối qua `DATABASE_URL`); file ảnh /
-tài liệu vẫn trên Supabase Storage. Sơ đồ file chi tiết: [README.md](../../../README.md) mục Kiến trúc.
+tài liệu lưu trên ổ đĩa máy chủ (`UPLOAD_DIR`, phục vụ ở `/files/...`). Sơ đồ file chi tiết: [README.md](../../../README.md) mục Kiến trúc.
 
 ---
 
@@ -20,7 +20,7 @@ server/                      # file PHẲNG, không có thư mục con
 ├── auth.js                  # đăng nhập, phiên, tài khoản, công ty, duyệt đơn / đề xuất / yêu cầu xoá (hàm ...Gated)
 ├── store_supa.js            # nghiệp vụ: sản phẩm, dự án, dòng bóc tách, tờ bìa, công tác, mua hàng; COL_SQL
 ├── supa.js                  # tầng dữ liệu pg DUY NHẤT: dịch tên VN (code) <-> EN (DB) theo db-map.json,
-│                            #   tự lọc công ty theo TENANT_TABLES; upload Supabase Storage
+│                            #   tự lọc công ty theo TENANT_TABLES
 ├── db-map.json              # đối chiếu tên bảng / cột tiếng Việt -> tiếng Anh
 ├── tenant.js                # ngữ cảnh công ty theo request (AsyncLocalStorage)
 ├── shared.js                # hàm thuần: mẫu tờ bìa, NCC 3.2, đọc số VN, đọc file nhập hàng loạt
@@ -42,9 +42,9 @@ infra/                       # hạ tầng: database, Docker, script vận hành
 │   ├── migrations/NNNN_ten.sql  # migration đánh số, chạy bằng `npm run migrate` (có checksum, không sửa file đã chạy);
 │   │                            #   bản Go đọc thẳng thư mục này, KHÔNG có bản sao
 │   ├── schema.sql               # schema hiện hành (bản chụp, tên tiếng Anh) — sinh lại sau mỗi migration
-│   └── baseline.sql, baseline-map.json   # schema gốc trước migration (dùng cho sync-from-supabase.js)
+│   └── baseline.sql, baseline-map.json   # schema gốc trước migration (bản lưu tham khảo, không script nào dùng)
 ├── docker/                  # backend.Dockerfile + .dockerignore cạnh nó
-└── scripts/                 # script vận hành: migrate.js (`npm run migrate`), sync-from-supabase.js
+└── scripts/                 # script vận hành: migrate.js (`npm run migrate`), backup-db.sh / restore-db.sh, create-super.sh
 render.yaml                  # ở GỐC vì Render đọc Blueprint ở gốc repo
 db/                          # chỉ còn bao-gia-phan-tho.xlsx (file mẫu, không phải migration)
 scripts/                     # test-core.js, check-load.js, test-vs.js (`npm test`); test-db.js, test-api.js
@@ -87,7 +87,7 @@ hàm của `store_supa.js` / `auth.js` vào `REGISTRY`. Không có thư mục `t
 - Thêm hàm API mà quên `REGISTRY` hoặc tập quyền → client không gọi được hoặc hở quyền.
 - Tạo `server/components/`, `server/libraries/`, `server/app.js`, `src/`, `controllers/`, `models/`, `utils/`
   khi user chưa yêu cầu refactor — repo đang dùng file phẳng trong `server/`.
-- Viết file `db/<ten>.sql` chạy tay trên Supabase SQL Editor, hoặc sửa migration đã chạy (checksum sẽ báo lệch).
+- Viết file `db/<ten>.sql` chạy tay trên database, hoặc sửa migration đã chạy (checksum sẽ báo lệch).
 - Đặt file hạ tầng (Dockerfile, cấu hình CI/triển khai, script vận hành DB, migration) ngoài `infra/` — trừ `render.yaml` ở gốc.
 - Chép migration sang chỗ khác (vd `backend/migrations/`) — `infra/db/migrations/` là nguồn DUY NHẤT cho cả Node lẫn Go.
 - Thêm bundler / module ES / framework giao diện vào `public/` khi user không yêu cầu.

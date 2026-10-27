@@ -1,5 +1,5 @@
 // Package files: tải ảnh cũ lưu trên Lark Drive (file_token) - bản chuyển của server/lark.js và route GET /media
-// (server/index.js dòng 635-646). Ảnh mới nằm trên Supabase Storage, không đi qua đây.
+// (server/index.js dòng 635-646). Ảnh mới nằm trong kho trên đĩa (platform/storage, /files/...), không đi qua đây.
 package files
 
 import (
