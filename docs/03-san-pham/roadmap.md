@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-10-26 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-10-27 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -32,7 +32,7 @@
 | [M7](#xong-7) | Chi phí | ✅ | - |
 | [M8](#xong-8) | Xuất báo giá | ✅ | - |
 | [M9](#xong-9) | Mua hàng & đề xuất | ✅ | - |
-| [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3) |
+| [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3), [M10.4](#m10-4) |
 | [M11](#xong-11) | Nhập dữ liệu | ✅ | - |
 | [M12](#xong-12) | Tệp & ảnh | ✅ | - |
 | [M13](#xong-13) | Thông báo | ✅ | - |
@@ -65,6 +65,7 @@
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
 | <a id="m10-3"></a>M10.3 | Danh sách sản phẩm: chọn chế độ xem Bảng · Lưới thẻ · Danh sách (nhớ trong máy, `qs_splayout`; dạng thẻ có ảnh, giá, duyệt, yêu thích, thêm vào dự án, chọn nhiều) + tiêu đề bảng đồng bộ kiểu Bóc tách (IN HOA, căn giữa, xuống dòng, nút phễu mở menu sắp xếp / ẩn cột) + thanh công cụ / hàng chọn cột / bảng tách thành module riêng, thanh công cụ 1 dòng tự gọn khi hẹp (Yêu thích chỉ biểu tượng, "Tất cả" không lặp tên hạng mục). Đã code + build (`SpCards.jsx`, `list.css`), còn thử trên app thật | User | 🟡 |
+| <a id="m10-4"></a>M10.4 | Danh sách sản phẩm: bộ cột theo hạng mục - dải chip / "Hiện tất cả cột" chỉ có cột của ngành trong hạng mục (Thiết bị điện = đèn + công tắc; hạng mục chưa có bộ thông số như Thạch cao, Cửa chỉ còn 25 cột chung thay vì 135; lọc "Hạng mục SP" = 1 loại có bộ thông số riêng như Bồn cầu, Lavabo, Ổ cắm thì chỉ còn thông số của loại đó); mỗi hạng mục nhớ cột đang hiện riêng (`qs_spcolcfg.byNode`, hạng mục chưa lưu thì dùng bộ theo ngành như cũ); bộ cột tự đặt tên và nút nhanh (1)(2) chỉ hiện ở hạng mục lúc tạo (bộ / nút cũ chưa gắn hạng mục chuyển về "Tất cả hạng mục"); bộ "Của tôi" vẫn theo tài khoản, dùng chung; khung "Chọn nhanh cột" bỏ bộ "Hiện tất cả cột" (trùng nút Hiện tất cả ở dải chip). Đã code + build (`ProductList.jsx`, `spModel.js`), còn thử trên app thật | User | 🟡 |
 
 ### 2.2 Tính năng mới
 
