@@ -16,7 +16,7 @@ function init() {
     btOpen: {}, cbOpen: {},
     perm: null,          // S._spPerm: null = chưa tải (coi như được cả hai, như spCanEdit_)
     colUser: '',         // tài khoản đã áp bộ cột "Của tôi" (csMyApplyAll_ lúc đăng nhập)
-    colNg: null,         // S._spColsNganh: ngành của bộ cột đang dùng (den | vs | son | ct)
+    colSc: null,         // khoá hạng mục của bộ cột đang dùng (spColScope_: mã hạng mục | '*')
     colOn: null,         // S._spCols
     colBak: null,        // S._spColsBak: bộ cột thật khi đang bật Edit (Edit bật hết cột nhập được)
     order: null, w: null,  // S._spOrder, S._spW

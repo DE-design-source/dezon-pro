@@ -52,9 +52,44 @@ export function spColFlat_(ng, specs) {
   if (ng === 'den') return DB_FLAT
   return DB_FLAT.concat(F.vs).concat(F.son).concat(F.ct)
 }
+/* Ngành nằm trong 1 hạng mục: hạng mục ngành -> ngành đó; Thiết bị điện (3.2.6) -> đèn + công tắc; Tất cả / 3 / 3.2 -> mọi ngành;
+   hạng mục chưa có bộ thông số (Thạch cao, Cửa…) -> rỗng */
+const SP_NG_NODE = [['3.2.6.1', 'den'], ['3.2.5', 'vs'], ['3.2.2', 'son'], ['3.2.6.2', 'ct']]
+export function spHmNgs_(node) {
+  const nd = String(node || '')
+  return SP_NG_NODE.filter(x => !nd || x[0] === nd || x[0].indexOf(nd + '.') === 0).map(x => x[1])
+}
+/* Lọc "Hạng mục SP" (hm) trùng 1 loại của ngành trong hạng mục: ngành đó + thông số của loại (HM[loại].chinh + tk; null = mọi thông số,
+   như loại đèn) */
+const SPEC_OF = { vs: 'VS_SPEC', son: 'SON_SPEC', ct: 'CT_SPEC' }
+function spLoai_(ngs, specs, hm) {
+  const n = spNorm_(hm)
+  if (!n) return null
+  for (const g of ngs) {
+    if (g === 'den') {
+      const hmDen = (DB_FLAT.find(f => f[0] === 'HẠNG MỤC') || [])[4] || []
+      if (hmDen.some(x => spNorm_(x) === n)) return { g, keep: null }
+      continue
+    }
+    const S = specs && specs[SPEC_OF[g]]
+    const h = S && (S.HANG_MUC || []).find(x => spNorm_(x) === n)
+    if (h && S.HM && S.HM[h]) return { g, keep: [].concat(S.HM[h].chinh || [], S.HM[h].tk || []) }
+  }
+  return null
+}
+/* Trường của hạng mục: gộp các ngành bên trong; không có ngành thì chỉ trường chung (có ở mọi ngành đã tải thông số).
+   Đang lọc 1 loại sản phẩm (hm) có bộ thông số riêng: trường chung + thông số của loại đó (trường thông số mang dấu 'vs' ở f[6]) */
+export function spColFlatHm_(node, specs, hm) {
+  const ngs = spHmNgs_(node)
+  const loai = spLoai_(ngs, specs, hm)
+  if (loai) return spColFlat_(loai.g, specs).filter(f => !loai.keep || f[6] !== 'vs' || loai.keep.indexOf(f[0]) >= 0)
+  if (ngs.length) return [].concat(...ngs.map(g => spColFlat_(g, specs)))
+  const F = flats_(specs), ds = [F.vs, F.son, F.ct].filter(l => l.length)
+  return DB_FLAT.filter(f => ds.every(l => l.some(x => x[0] === f[0])))
+}
 /* Cột = {k, label, cls, kind, e}. kind: stt|thumb|ten|duyet|sku|gen|giaDaiLy|nguoiTao|ngayTao|nguoiSua.
-   e (cột nhập được) = {lark, col, sfx, num, money} */
-export function spAllCols_(ng, specs) {
+   e (cột nhập được) = {lark, col, sfx, num, money}. node = hạng mục ('' = mọi cột), hm = lọc "Hạng mục SP" (loại sản phẩm) */
+export function spAllCols_(node, specs, hm) {
   const L2C = dbLabelMaps_(specs).DB_LABEL2COL_
   const head = [
     { k: 'stt', label: 'STT', cls: 'ct', kind: 'stt' },
@@ -70,7 +105,7 @@ export function spAllCols_(ng, specs) {
     { k: 'nguoiSua', label: 'Người sửa cuối', cls: '', kind: 'nguoiSua' },
   ]
   const gen = [], daCo = {}
-  spColFlat_(ng, specs).forEach(f => {
+  spColFlatHm_(node, specs, hm).forEach(f => {
     if (daCo[f[0]]) return; daCo[f[0]] = 1
     const lark = f[0]; if (SP_SKIP[lark]) return
     const col = L2C[lark]; if (!col) return
@@ -149,18 +184,29 @@ export function spColsDefault_(ng) {
 /* Ngành của BỘ CỘT: '' (chưa lọc) và ngành lạ dùng bộ cột đèn (spColsSync_) */
 export const spColsNg_ = ng => (coSpec_(ng) ? ng : 'den')
 const ON_KEY = { vs: 'onVs', son: 'onSon', ct: 'onCt' }
-export function spColsLoad_(ngCols) {
+/* Khoá hạng mục của bộ cột: mã hạng mục, '*' = Tất cả hạng mục. Cột đang hiện, bộ tự đặt tên, nút nhanh đều tách theo khoá này */
+export const spColScope_ = node => String(node || '') || '*'
+/* sc: cột đã lưu của hạng mục (byNode); hạng mục chưa lưu lần nào thì dùng bộ theo ngành như trước */
+export function spColsLoad_(ngCols, sc) {
   const j = lsJson('qs_spcolcfg', {}) || {}
+  const theoHm = sc && j.byNode && j.byNode[sc]
+  if (theoHm && Object.keys(theoHm).length) return theoHm
   const luu = j[ON_KEY[ngCols] || 'on']
   return (luu && Object.keys(luu).length) ? luu : spColsDefault_(ngCols)
 }
 export function spCfgLoad_() { const j = lsJson('qs_spcolcfg', {}) || {}; return { order: j.order || null, w: j.w || {} } }
-/* spSaveCols_: on = bộ cột THẬT của người dùng (đang Edit thì là bản lưu trước khi bật hết) */
-export function spCfgSave_(order, w, ngCols, on) {
+/* spSaveCols_: on = bộ cột THẬT của người dùng (đang Edit thì là bản lưu trước khi bật hết); có sc thì lưu riêng cho hạng mục đó */
+export function spCfgSave_(order, w, ngCols, on, sc) {
   const j = lsJson('qs_spcolcfg', {}) || {}
   j.order = order; j.w = w || {}
-  j[ON_KEY[ngCols] || 'on'] = on || {}
+  if (sc) j.byNode = { ...(j.byNode || {}), [sc]: on || {} }
+  else j[ON_KEY[ngCols] || 'on'] = on || {}
   lsSet('qs_spcolcfg', JSON.stringify(j))
+}
+/* Nút nhanh (1)(2) theo hạng mục: {[khoá hạng mục]: [id, id]}; bản cũ lưu 1 mảng chung -> coi như của "Tất cả hạng mục" */
+export function spQuickLoad_(key) {
+  const v = lsJson(key, null)
+  return Array.isArray(v) ? { '*': v } : (v && typeof v === 'object' ? v : {})
 }
 /* spOrder_: thứ tự đã lưu + cột mới (stt lên đầu, cột khác nối cuối), bỏ cột không còn */
 export function spOrder_(saved, cols) {

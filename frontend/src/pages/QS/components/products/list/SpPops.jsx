@@ -259,9 +259,15 @@ export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuX
    bộ của tôi. Bấm 1 bộ để áp, khung không đóng. Nút bút chì = chế độ sửa: lưu cột đang hiện thành bộ mới / làm mặc định,
    mỗi dòng có nút đặt mặc định · xoá (bộ tự đặt tên, bộ của tôi). */
 const sameKeys = (a, b) => a.length === b.length && a.every(k => b.includes(k))
-export function PresetPop({ anchor, top, tab, on, mine, mineOn, username, customs, onPreset, onMine, onCustom, onSaveMine, onSetDefault, onClearMine, onNewCustom, onDelCustom, onEditCols, quick, onQuick, onClose }) {
+export function PresetPop({ anchor, top, tab, on, mine, mineOn, username, customs, cur, onPreset, onMine, onCustom, onSaveMine, onSetDefault, onClearMine, onNewCustom, onDelCustom, onEditCols, quick, onQuick, onClose }) {
   const [editing, setEditing] = useState(false)
   const dem = tab.keys().filter(k => !!on[k]).length
+  // bỏ bộ "Hiện tất cả cột": đã có nút Hiện tất cả ở dải chip
+  const presets = csPresetList_(tab).filter(ps => ps[0] !== 'all')
+  const customOn = c => tab.keys().every(k => !!on[k] === (c.keys.includes(k) || k === tab.luon))
+  /* Nhiều bộ có thể trùng cột (vd. Của tôi = Mặc định): chỉ đánh dấu 1 bộ - bộ vừa bấm (cur) nếu còn khớp, không thì bộ khớp đầu tiên */
+  const khop = [...(mine ? [['mine', mineOn]] : []), ...presets.map(ps => [ps[0], csPresetOn_(tab, ps, on)]), ...(customs || []).map(c => ['u:' + c.name, customOn(c)])]
+  const onId = (khop.find(x => x[0] === cur && x[1]) || khop.find(x => x[1]) || [])[0]
   const act = (icon, title, fn, cls = '') => (
     <button type="button" className={`qs-tk-bgact${cls}`} title={title} onClick={e => { e.stopPropagation(); fn() }}><QsIcon name={icon} size={13} /></button>
   )
@@ -299,19 +305,18 @@ export function PresetPop({ anchor, top, tab, on, mine, mineOn, username, custom
           <button type="button" className="qsc-btn blue" onClick={onNewCustom}><QsIcon name="plus" size={13} /> Lưu {dem} cột đang hiện thành bộ mới…</button>
           <button type="button" className="qsc-btn" disabled={mineOn} title={mineOn ? 'Bộ cột đang hiện đã là bộ của bạn' : undefined} onClick={onSaveMine}><QsIcon name="check" size={13} /> Làm mặc định của tôi</button>
           <button type="button" className="qsc-btn" onClick={() => setEditing(false)}>Xong</button>
-          <div className="qspl-mine-n">Bộ "Của tôi" lưu theo tài khoản (đăng nhập máy khác vẫn có); bộ tự đặt tên lưu trên máy này.</div>
+          <div className="qspl-mine-n">Bộ "Của tôi" lưu theo tài khoản (đăng nhập máy khác vẫn có); bộ tự đặt tên và nút nhanh lưu trên máy này, riêng cho từng hạng mục.</div>
         </div>
       ) : null}>
       <div className="qs-tk-bgtb">
-        {mine && row('mine', ' tkmine', mineOn, <><QsIcon name="check" size={13} /> Của tôi <i className="qs-tk-mineu">{username}</i></>, mine.length, onMine, mine, editing ? onClearMine : null)}
-        {csPresetList_(tab).map(ps => {
+        {mine && row('mine', ' tkmine', onId === 'mine', <><QsIcon name="check" size={13} /> Của tôi <i className="qs-tk-mineu">{username}</i></>, mine.length, onMine, mine, editing ? onClearMine : null)}
+        {presets.map(ps => {
           const keys = csPresetKeys_(tab, ps)
-          return row(ps[0], '', csPresetOn_(tab, ps, on), ps[1], keys.length, () => onPreset(ps), keys, null)
+          return row(ps[0], '', onId === ps[0], ps[1], keys.length, () => onPreset(ps), keys, null)
         })}
-        {(customs || []).map(c => {
-          const isOn = tab.keys().every(k => !!on[k] === (c.keys.includes(k) || k === tab.luon))
-          return row('u:' + c.name, ' tkuser', isOn, c.name, c.keys.length, () => onCustom(c), c.keys, editing ? () => onDelCustom(c.name) : null, () => { onCustom(c); onEditCols(c.name) })
-        })}
+        {(customs || []).map(c => (
+          row('u:' + c.name, ' tkuser', onId === 'u:' + c.name, c.name, c.keys.length, () => onCustom(c), c.keys, editing ? () => onDelCustom(c.name) : null, () => { onCustom(c); onEditCols(c.name) })
+        ))}
       </div>
     </DockPanel>
   )

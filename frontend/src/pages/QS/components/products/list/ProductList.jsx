@@ -24,7 +24,7 @@ import { CatPop, FilterPop, PresetPop, BulkEditPop, MorePop, CopyMenu, ColMenu, 
 import { useSpUi, getU, setU, setPer, clearSel } from './spStore'
 import {
   lsJson, lsSet, spKey_, spPanelHidden_, foldCols_, foldColsToggle_, spNganhCur_, spPTMode_, spAllCols_, spSkuMap_, spSkuCount_,
-  spColsNg_, spColsLoad_, spCfgLoad_, spCfgSave_, spOrder_, spColOn_, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
+  spColsNg_, spColScope_, spColsLoad_, spCfgLoad_, spCfgSave_, spQuickLoad_, spOrder_, spColOn_, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
   SP_PER, spPageNums_, spNodeCount_, spScopeProducts_, SP_FLT_EMPTY, spFltCount_, spAnyFilter_, spSortNext_,
   spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_,
 } from './spModel'
@@ -69,6 +69,7 @@ export default function ProductList() {
   const PT = spPTMode_(node)
   const ng = spNganhCur_(node)
   const ngCols = spColsNg_(ng)
+  const sc = spColScope_(node)
   const isAdmin = isAdminRole_(me)
   const canEdit = U.perm ? !!U.perm.edit : true
   const canDuyet = U.perm ? !!U.perm.duyet : true
@@ -103,8 +104,9 @@ export default function ProductList() {
   }, [visible, seq])
 
   /* ---------- Cột ---------- */
-  const cols = useMemo(() => spAllCols_(ng, specs), [ng, specs])
-  const colOn = (U.colNg === ngCols && U.colOn) ? U.colOn : spColsLoad_(ngCols)
+  const hmLoai = U.f.hangMuc || ''   // lọc "Hạng mục SP": dải chip chỉ còn thông số của loại đó
+  const cols = useMemo(() => spAllCols_(node, specs, hmLoai), [node, specs, hmLoai])
+  const colOn = (U.colSc === sc && U.colOn) ? U.colOn : spColsLoad_(ngCols, sc)
   const savedOrder = U.order != null ? U.order : spCfgLoad_().order
   const w = U.w != null ? U.w : spCfgLoad_().w
   const order = useMemo(() => spOrder_(savedOrder, cols), [savedOrder, cols])
@@ -112,14 +114,14 @@ export default function ProductList() {
   const visCols = useMemo(() => spVisCols_(cols, order, colOn), [cols, order, colOn])
   const tab = useMemo(() => spColset_(colList, ngCols), [colList, ngCols])
 
-  /* đổi ngành của bộ cột (spColsSync_): nạp bộ cột đã lưu của ngành đó; đang Edit thì vẫn bật hết cột nhập được */
+  /* đổi hạng mục (spColsSync_): nạp bộ cột đã lưu của hạng mục đó; đang Edit thì vẫn bật hết cột nhập được */
   useEffect(() => {
     const u = getU()
-    if (u.colNg === ngCols && u.colOn) return
-    let on = spColsLoad_(ngCols), bak = null
+    if (u.colSc === sc && u.colOn) return
+    let on = spColsLoad_(ngCols, sc), bak = null
     if (u.edit) { bak = on; on = { ...on, thumb: 1 }; cols.forEach(c => { if (c.e) on[c.k] = 1 }) }
-    setU({ colNg: ngCols, colOn: on, colBak: bak, order: null, w: null })
-  }, [ngCols, cols])
+    setU({ colSc: sc, colOn: on, colBak: bak, order: null, w: null })
+  }, [sc, ngCols, cols])
 
   /* Đăng nhập: bật bộ cột "Của tôi" của tài khoản, chưa lưu thì Mặc định (csMyApplyAll_ trong onAuthed_, app.js:2476).
      Lúc đó chưa lọc hạng mục nên bộ cột là của mọi ngành, lưu vào khoá đèn ('on'). */
@@ -137,7 +139,9 @@ export default function ProductList() {
     // COLSET.sp.set -> spSaveCols_ lưu S._spOrder = thứ tự gộp mọi ngành (spOrder_ lúc chưa lọc), không phải bản đã lưu (có thể null).
     // Tải thông số ngành lỗi thì thứ tự gộp thiếu cột ngành: giữ bản đã lưu, không ghi đè bằng bản thiếu
     spCfgSave_(specs ? ordAll : spCfgLoad_().order, spCfgLoad_().w, 'den', on)
-    setU(getU().colNg === 'den' ? { colUser: username, colNg: 'den', colOn: on, colBak: null } : { colUser: username })
+    // bộ trên chỉ là dự phòng của hạng mục chưa lưu cột riêng (spColsLoad_): nạp lại cột của hạng mục đang xem
+    const u = getU(), sc0 = spColScope_(u.node)
+    setU(u.colSc === sc0 ? { colUser: username, colOn: spColsLoad_(spColsNg_(spNganhCur_(u.node)), sc0), colBak: null } : { colUser: username })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, specs, specErr])
 
@@ -146,9 +150,9 @@ export default function ProductList() {
     const next = {
       colOn: patch.colOn || colOn, order: patch.order || order, w: patch.w || w,
     }
-    setU({ colNg: ngCols, ...patch })
+    setU({ colSc: sc, ...patch })
     // đang Edit (bật hết cột) -> lưu bộ cột thật của người dùng
-    spCfgSave_(next.order, next.w, ngCols, (u.edit && u.colBak) || next.colOn)
+    spCfgSave_(next.order, next.w, ngCols, (u.edit && u.colBak) || next.colOn, sc)
   }
   function colSet(m) {
     const on = { ...colOn }
@@ -171,10 +175,15 @@ export default function ProductList() {
   const onMap = useMemo(() => { const m = {}; tab.keys().forEach(k => { m[k] = spColOn_(colOn, k) }); return m }, [tab, colOn])
   const mineOn = csMyOn_(tab, mine, onMap)
   const quick = csQuickLabel_(tab, onMap, mine)
+  /* Bộ tự đặt tên chỉ thuộc hạng mục lúc tạo (c.node = khoá hạng mục); bộ cũ chưa có node coi như của "Tất cả hạng mục" */
   const cuKey = 'qs_spcols_custom_' + String(username || '').toLowerCase()
-  const [customs, setCustoms] = useState(() => lsJson(cuKey, []))
-  useEffect(() => { setCustoms(lsJson(cuKey, [])) }, [cuKey])
-  const saveCustoms = list => { setCustoms(list); lsSet(cuKey, JSON.stringify(list)) }
+  const [customsAll, setCustomsAll] = useState(() => lsJson(cuKey, []))
+  useEffect(() => { setCustomsAll(lsJson(cuKey, [])) }, [cuKey])
+  const customs = useMemo(() => (customsAll || []).filter(c => (c.node || '*') === sc), [customsAll, sc])
+  const saveCustoms = list => {
+    const all = (customsAll || []).filter(c => (c.node || '*') !== sc).concat(list.map(c => ({ ...c, node: sc })))
+    setCustomsAll(all); lsSet(cuKey, JSON.stringify(all))
+  }
   async function customNew() {
     const r = await qs.ask({ title: 'Lưu bộ cột mới', ok: 'Lưu', fields: [{ key: 'ten', label: 'Tên bộ cột *', placeholder: 'VD: Báo giá nhanh' }] })
     // hộp nhập 1 ô trả về chuỗi (nhiều ô mới trả {key: giá trị}, common/InputDialog)
@@ -182,26 +191,29 @@ export default function ProductList() {
     if (!ten) return false
     const keys = tab.keys().filter(k => onMap[k])
     saveCustoms([...customs.filter(c => c.name !== ten), { name: ten, keys }])
-    toast('Đã lưu bộ cột "' + ten + '" (' + keys.length + ' cột)')
+    toast('Đã lưu bộ cột "' + ten + '" (' + keys.length + ' cột) cho ' + catLabel)
     return true
   }
   /* Nút nhanh (1)(2) trên băng: gán 1 bộ cột vào mỗi ô ở chế độ sửa của khung Chọn nhanh cột; bấm nút = áp bộ đó.
-     id bộ: 'mine' | mã bộ dựng sẵn | 'u:' + tên bộ tự đặt. Lưu trong máy theo tài khoản (qs_spcols_quick_<user>) */
+     id bộ: 'mine' | mã bộ dựng sẵn | 'u:' + tên bộ tự đặt. Lưu trong máy theo tài khoản và hạng mục (qs_spcols_quick_<user>) */
   const qkKey = 'qs_spcols_quick_' + String(username || '').toLowerCase()
-  const [quickSlots, setQuickSlots] = useState(() => lsJson(qkKey, [null, null]))
-  useEffect(() => { setQuickSlots(lsJson(qkKey, [null, null])) }, [qkKey])
+  const [quickAll, setQuickAll] = useState(() => spQuickLoad_(qkKey))
+  useEffect(() => { setQuickAll(spQuickLoad_(qkKey)) }, [qkKey])
+  const quickSlots = quickAll[sc] || [null, null]
   function setQuickSlot(i, id) {
-    const n = [0, 1].map(j => (j === i ? id : ((quickSlots || [])[j] === id && id ? null : (quickSlots || [])[j] || null)))
-    setQuickSlots(n); lsSet(qkKey, JSON.stringify(n))
+    const n = [0, 1].map(j => (j === i ? id : (quickSlots[j] === id && id ? null : quickSlots[j] || null)))
+    const all = { ...quickAll, [sc]: n }
+    setQuickAll(all); lsSet(qkKey, JSON.stringify(all))
   }
   function quickPreset(id) {
     if (!id) return null
     if (id === 'mine') return mine ? { name: 'Của tôi', map: csMyApply_(tab, mine) } : null
     if (id.indexOf('u:') === 0) { const c = customs.find(x => x.name === id.slice(2)); return c ? { name: c.name, map: csWant_(tab, c.keys) } : null }
-    const ps = csPresetList_(tab).find(x => x[0] === id)
+    const ps = csPresetList_(tab).find(x => x[0] === id && id !== 'all')
     return ps ? { name: ps[1], map: csPresetCols_(tab, id) || csWant_(tab, csPresetKeys_(tab, ps)) } : null
   }
   const quickOn = m => tab.keys().every(k => !!onMap[k] === !!m[k])
+  const [presetCur, setPresetCur] = useState(null)   // id bộ vừa bấm: khung Chọn nhanh cột chỉ đánh dấu 1 bộ khi nhiều bộ trùng cột
   /* Chế độ sửa của dải chip (như Bóc tách ColsStrip): bật / tắt chip (bảng đổi ngay) rồi Tạo mới / Lưu đè / Huỷ (trả cột cũ).
      stripEdit = {from: tên bộ đang sửa | null, snap: cột lúc bắt đầu} */
   const [stripEdit, setStripEdit] = useState(null)
@@ -432,8 +444,8 @@ export default function ProductList() {
     if (on) {
       const n = { ...colOn, thumb: 1 }
       cols.forEach(c => { if (c.e) n[c.k] = 1 })   // hiện TẤT CẢ cột nhập được
-      setU({ edit: true, colBak: { ...colOn }, colOn: n, colNg: ngCols })
-    } else setU({ edit: false, colOn: U.colBak || colOn, colBak: null, colNg: ngCols })
+      setU({ edit: true, colBak: { ...colOn }, colOn: n, colSc: sc })
+    } else setU({ edit: false, colOn: U.colBak || colOn, colBak: null, colSc: sc })
     toast(on ? 'Sửa nhanh: gõ thẳng vào ô, rời ô là tự lưu' : 'Đã tắt chế độ sửa nhanh')
   }
   async function exportXlsx(keysIn) {
@@ -592,7 +604,7 @@ export default function ProductList() {
                       const on = quickOn(q.map)
                       return (
                         <button type="button" key={i} className={`qspl-qbtn${on ? ' on' : ''}`} title={'Nút nhanh ' + (i + 1) + ': ' + q.name + (on ? ' (đang dùng)' : '')}
-                          onClick={() => { colSet(q.map); toast('Đã bật bộ cột: ' + q.name) }}>{i + 1}</button>
+                          onClick={() => { setPresetCur(id); colSet(q.map); toast('Đã bật bộ cột: ' + q.name) }}>{i + 1}</button>
                       )
                     })}
                   </span>
@@ -641,10 +653,10 @@ export default function ProductList() {
       <div className={`qspl-main${pop && (pop.kind === 'flt' || pop.kind === 'preset') ? ' has-dock' : ''}`}>
         {/* Chọn nhanh cột: bảng neo như Bộ lọc; chọn bộ thì giữ bảng mở để thấy dấu chọn (như Bóc tách) */}
         {pop && pop.kind === 'preset' && (
-          <PresetPop anchor={pop.anchor} top={0} tab={tab} on={onMap} mine={mine} mineOn={mineOn} username={username}
-            onPreset={ps => { colSet(csPresetCols_(tab, ps[0]) || csWant_(tab, [])); toast('Đã bật bộ cột: ' + ps[1]) }}
-            onMine={() => { if (!mine) return; colSet(csMyApply_(tab, mine)); toast('Đã bật bộ cột của tôi') }}
-            customs={customs} onCustom={c => colSet(csWant_(tab, c.keys))} onNewCustom={customNew} onDelCustom={customDel}
+          <PresetPop anchor={pop.anchor} top={0} tab={tab} on={onMap} mine={mine} mineOn={mineOn} username={username} cur={presetCur}
+            onPreset={ps => { setPresetCur(ps[0]); colSet(csPresetCols_(tab, ps[0]) || csWant_(tab, [])); toast('Đã bật bộ cột: ' + ps[1]) }}
+            onMine={() => { if (!mine) return; setPresetCur('mine'); colSet(csMyApply_(tab, mine)); toast('Đã bật bộ cột của tôi') }}
+            customs={customs} onCustom={c => { setPresetCur('u:' + c.name); colSet(csWant_(tab, c.keys)) }} onNewCustom={customNew} onDelCustom={customDel}
             onSetDefault={keys => mineSave(keys, true)}
             onEditCols={startStripEdit} quick={quickSlots} onQuick={setQuickSlot}
             onSaveMine={() => mineSave(null, true)} onClearMine={mineClear} onClose={closeColTools} />
