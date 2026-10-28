@@ -658,3 +658,13 @@ func TestPhienChiTruyCapQuaAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TOKEN_TTL_DAYS (chỉ bản Go): đặt thì đổi hạn token + phiên; bỏ trống giữ 7 ngày của Node.
+func TestTokenTTLDays(t *testing.T) {
+	if got := New(Deps{Cfg: &config.Config{TokenTTLDays: 30}}).ttlMs; got != 30*24*3600*1000 {
+		t.Errorf("TOKEN_TTL_DAYS=30: ttlMs = %v", got)
+	}
+	if got := New(Deps{Cfg: &config.Config{}}).ttlMs; got != tokenTTLMs {
+		t.Errorf("không đặt: ttlMs = %v, mong %v", got, float64(tokenTTLMs))
+	}
+}

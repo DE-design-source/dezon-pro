@@ -27,7 +27,7 @@ func (s *Service) makeToken(u *omap.Map) string { return s.makeTokenSid(u, "") }
 // makeTokenSid: như makeToken, thêm khoá "sid" (id phiên user_sessions, M1.2) ở cuối khi sid khác rỗng.
 func (s *Service) makeTokenSid(u *omap.Map, sid string) string {
 	payload := omap.Of("uid", u.Val("id"), "u", u.Val("username"), "r", u.Val("role"),
-		"ct", jsval.Or(u.Val("cong_ty_id"), nil), "exp", s.now()+tokenTTLMs)
+		"ct", jsval.Or(u.Val("cong_ty_id"), nil), "exp", s.now()+s.ttlMs)
 	if sid != "" {
 		payload.Set("sid", sid)
 	}
