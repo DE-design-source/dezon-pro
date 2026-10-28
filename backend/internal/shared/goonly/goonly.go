@@ -38,6 +38,16 @@ func StripNull(v any, keys ...string) any {
 	return strip(v, func(k string, e any) bool { return ks[k] && (e == nil || omap.IsUndefined(e)) })
 }
 
+// StripEmpty như StripNull nhưng bỏ cả khi giá trị là chuỗi rỗng: dùng cho cột chỉ bản Go mà dòng của golden
+// không có nên bản Go đọc ra "" (vd cột thông số ngành Điện lạnh trong khối raw của sản phẩm).
+func StripEmpty(v any, keys ...string) any {
+	if len(keys) == 0 {
+		return v
+	}
+	ks := set(keys)
+	return strip(v, func(k string, e any) bool { return ks[k] && (e == nil || omap.IsUndefined(e) || e == "") })
+}
+
 // StripWrites bỏ khoá keys khỏi payload của từng lệnh ghi trong log (mảng các lệnh, mỗi lệnh là một object
 // như {m, table, a} hay {op, table, rows}). Payload = object con trực tiếp của lệnh, hoặc object là phần tử
 // trực tiếp của một mảng con của lệnh (vd từng phần tử của a / rows). Lệnh có một payload chỉ gồm khoá chỉ bản Go

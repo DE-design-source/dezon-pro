@@ -707,7 +707,7 @@ export default function ProductList() {
               )}
               {/* khối bảng (hoặc thẻ) + phân trang: module riêng, tách khỏi thanh công cụ / hàng chọn cột */}
               <div className="qspl-tblcard">
-              {specErr && <div className="qspl-note err">{specErr}: cột thông số của Thiết bị vệ sinh, Sơn nước, Công tắc - ổ cắm không hiện được.</div>}
+              {specErr && <div className="qspl-note err">{specErr}: cột thông số của Thiết bị vệ sinh, Sơn nước, Công tắc - ổ cắm, Điện lạnh không hiện được.</div>}
               {showLayout === 'table' ? (
                 <SpTable cols={visCols} rows={pr.rows} w={w} sel={U.sel} edit={U.edit} sort={U.sort} wrapW={wrapW}
                   skuCount={p => spSkuCount_(skuMap, p)} canEdit={canEdit} canDuyet={canDuyet} isAdmin={isAdmin} on={tableOn} />

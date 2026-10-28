@@ -158,6 +158,7 @@ func decodeBase64(s string) []byte {
 }
 
 // specOf: bộ thông số theo hạng mục của ngành - 'vs' (thiết bị vệ sinh) · 'son' (sơn nước) · 'ct' (công tắc - ổ cắm)
+// · 'dl' (điện lạnh, chỉ bản Go)
 func specOf(nganh any) *specs.Spec {
 	switch nganh {
 	case "vs":
@@ -166,6 +167,8 @@ func specOf(nganh any) *specs.Spec {
 		return specs.SON
 	case "ct":
 		return specs.CT
+	case "dl":
+		return specs.DL
 	}
 	return nil
 }
@@ -176,7 +179,7 @@ const maxImportRows = 2000
 ImportParse = importParse(base64, ext, nganh): đọc file nhập hàng loạt, trả
 
 	{count, products, mapped, headers}.
-	Thiết bị đèn: chỉ đọc sheet đầu. Ngành có bộ thông số (vs / son / ct): đọc MỌI sheet (trừ "Hướng dẫn"),
+	Thiết bị đèn: chỉ đọc sheet đầu. Ngành có bộ thông số (vs / son / ct / dl): đọc MỌI sheet (trừ "Hướng dẫn"),
 	ô HẠNG MỤC trống thì lấy theo tên sheet.
 */
 func ImportParse(base64Data, ext, nganh any) (*omap.Map, error) {

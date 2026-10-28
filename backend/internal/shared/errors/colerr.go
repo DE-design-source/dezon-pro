@@ -24,7 +24,7 @@ func buildColSQL() []string {
 	for _, c := range out {
 		seen[c] = true
 	}
-	for _, sp := range []*specs.Spec{specs.VS, specs.SON, specs.CT} {
+	for _, sp := range []*specs.Spec{specs.VS, specs.SON, specs.CT, specs.DL} { // DL chỉ bản Go, nối cuối
 		for _, lb := range sp.Metric.Keys() {
 			// gán lại khoá đã có không đổi vị trí của nó trong object JS
 			if c := sp.MetricCol(lb); !seen[c] {

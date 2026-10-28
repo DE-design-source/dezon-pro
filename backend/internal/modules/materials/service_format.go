@@ -239,13 +239,13 @@ func prodToObj(r *omap.Map) *omap.Map {
 		}
 		moTa = themGhiChu(strings.Join(a, "\n"))
 		thongSoTK = strings.Join(lines(tk), "\n")
-		if nganh == "ct" && h != nil {
-			// Công tắc - ổ cắm: hai cột theo nhóm ttc / tsk của hạng mục (S:86-94)
+		if (nganh == "ct" || nganh == "dl") && h != nil {
+			// Công tắc - ổ cắm (S:86-94) / Điện lạnh (chỉ bản Go): hai cột theo nhóm ttc / tsk của hạng mục
 			get := func(c string) any { return v(c) }
 			ghep := func(ds []string) string {
 				out := []string{}
 				for _, lb := range ds {
-					if d := specs.Dong(lb, get); d != nil {
+					if d := spec.Dong(lb, get); d != nil {
 						out = append(out, d[0]+": "+d[1])
 					}
 				}

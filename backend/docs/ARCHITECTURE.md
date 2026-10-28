@@ -843,6 +843,7 @@ materials:
   | `resolver`, `resolvedAt` | từng đơn của `listPurchaseRequests` (`GET /api/v1/purchase-orders`), nối CUỐI | `resolver_name`, `resolved_at` | giá trị cột nguyên dạng, null khi chưa duyệt - M15.1 |
   | `ket_qua_gui` | dòng `don_mua_hang` | `purchase_orders.send_result` | Go ghi `ok` / `loi` sau khi gửi thẻ Lark (lệnh riêng, M9.1); test khẳng định rồi đặt lại giá trị lúc lưu như Node |
   | `resolution_note` | dòng `delete_requests` | `delete_requests.resolution_note` | lý do từ chối yêu cầu xoá |
+  | 38 cột Điện lạnh (`loai_may` ... `quy_cach_vt`, mọi nhãn của `specs.DL`) | khối `raw` của mọi sản phẩm (`prodToObj`, `getProducts`, catalog) | `db_san_pham` -> `product_hvac_specs` (migration 0017) | thông số ngành Điện lạnh; golden Node không có nên test bỏ khi rỗng: `goonly.StripEmpty` (`materials` `stripDL`) |
   | `lyDo`, `lyDoTuChoi` | từng dòng của `listDeleteRequests` (`GET /api/v1/product-delete-requests`), nối CUỐI | `note`, `resolution_note` | lý do gửi / lý do từ chối, giá trị cột nguyên dạng - M15.2 |
   | `hien_trang` | dòng `du_an` | `projects.current_condition` | hiện trạng dự án |
   | `sid` | payload token (`login.token`, `$verifyToken`, `$makeToken` trong `auth/service_test.go`) | `user_sessions.id` | id phiên (M1.2); `userstest.Norm` bỏ khoá này khi giải token, `auth/service_test.go` bỏ ở `$verifyToken`; `$makeToken` mở phiên thật (uid không mở được -> sid giả) |

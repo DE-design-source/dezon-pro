@@ -46,7 +46,7 @@ node infra/scripts/migrate.js --status
   Nó dịch tên bảng/cột **tiếng Việt trong code -> tiếng Anh trong DB** theo `db-map.json`, và **tự lọc theo công ty**
   với bảng trong `TENANT_TABLES` (ngữ cảnh lấy từ `tenant.js` - AsyncLocalStorage). Bảng mới theo công ty PHẢI thêm vào
   `TENANT_TABLES`, nếu không dữ liệu lộ sang công ty khác. `noScope` bỏ lọc, chỉ dùng cho truy cập xuyên công ty thật sự (đăng nhập, phiên).
-- Sản phẩm (`db_san_pham` trong code) = bảng lõi `products` + 4 bảng thông số theo ngành, đọc qua view `product_catalog`.
+- Sản phẩm (`db_san_pham` trong code) = bảng lõi `products` + 5 bảng thông số theo ngành (đèn, vệ sinh, sơn, công tắc, điện lạnh), đọc qua view `product_catalog`.
   Thêm cột thông số phải tạo lại view (docs/02-ky-thuat/database/ket-qua-trien-khai.md mục 7).
 - `shared.js`: hàm thuần dùng chung (mẫu tờ bìa, đọc số VN, đọc file nhập). `export.js`: xuất Excel (ExcelJS).
   `*-template.js`: sinh file mẫu nhập hàng loạt theo ngành.
@@ -54,7 +54,7 @@ node infra/scripts/migrate.js --status
 **Giao diện (`public/`):** script thuần dùng chung biến toàn cục, nạp theo thứ tự thẻ `<script>` trong `index.html`:
 `app.js` (lõi: object trạng thái `S`, `api()`, quyền, công thức giá, cây hạng mục `TREE`) -> mỗi tab 1 file -> `main.js` cuối cùng.
 Code chạy ngay lúc nạp chỉ được gọi file nạp trước (`scripts/check-load.js` kiểm). Hàm dùng từ 2 tab trở lên đặt ở `app.js`.
-`*-spec.js` (vs, son, ct) là UMD, dùng cả client lẫn server.
+`*-spec.js` (vs, son, ct, dl) là UMD, dùng cả client lẫn server.
 
 **Bất biến dễ vỡ:**
 - Công thức giá 1 dòng có 2 bản: server `calc_()` (store_supa.js) và client `recalcLine_()` / `giaDaiLy_()` / `donGiaCK_()`. Sửa bên này phải sửa bên kia.

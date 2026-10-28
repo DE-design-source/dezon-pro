@@ -19,8 +19,10 @@ import (
 	"qspro-backend/internal/platform/database"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	"qspro-backend/internal/shared/goonly"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
+	"qspro-backend/internal/shared/specs"
 	"qspro-backend/internal/shared/tenant"
 )
 
@@ -38,6 +40,18 @@ func loadJSON(t *testing.T, name string) *omap.Map {
 	}
 	return jsval.AsMap(v)
 }
+
+// dlRawCols: cột thông số Điện lạnh (ngành chỉ bản Go). Khối raw của mọi sản phẩm có các cột này (rỗng) mà golden
+// Node không có: bỏ khi rỗng trước khi so, nên ghi giá trị thật vào các cột này vẫn làm test báo khác.
+var dlRawCols = func() []string {
+	out := []string{}
+	for _, lb := range specs.DL.All {
+		out = append(out, specs.DL.MetricCol(lb))
+	}
+	return out
+}()
+
+func stripDL(v any) any { return goonly.StripEmpty(v, dlRawCols...) }
 
 func js(v any) string {
 	s, err := omap.MarshalString(v)
@@ -68,7 +82,7 @@ func eachCase(t *testing.T, pure *omap.Map, key string, fn func(c []any) (got, w
 
 func TestPureGolden(t *testing.T) {
 	pure := jsval.AsMap(loadJSON(t, "unit.json").Val("pure"))
-	eachCase(t, pure, "prodToObj", func(c []any) (string, string) { return js(prodToObj(jsval.AsMap(c[0]))), js(c[1]) })
+	eachCase(t, pure, "prodToObj", func(c []any) (string, string) { return js(stripDL(prodToObj(jsval.AsMap(c[0])))), js(c[1]) })
 	eachCase(t, pure, "dataToRow", func(c []any) (string, string) { return js(dataToRow(jsval.AsMap(c[0]))), js(c[1]) })
 	eachCase(t, pure, "laCo", func(c []any) (string, string) {
 		return js(dataToRow(omap.Of(nhanLapRoi, c[0])).Val("lap_nguon_roi")), js(c[1])
@@ -361,7 +375,7 @@ func replayFlows(t *testing.T, flows []any) {
 			t.Errorf("%s: Go báo lỗi %q, Node trả %s", repo.name, err.Error(), js(m.Val("result")))
 			continue
 		}
-		if got, want := tsNorm(js(res)), js(m.Val("result")); got != want {
+		if got, want := tsNorm(js(stripDL(res))), js(m.Val("result")); got != want {
 			t.Errorf("%s: kết quả\n  go:   %s\n  node: %s", repo.name, got, want)
 		}
 	}

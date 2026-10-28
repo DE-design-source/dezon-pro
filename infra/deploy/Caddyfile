@@ -24,7 +24,7 @@
 
 	# Mọi đường dẫn backend Go phục vụ (backend/internal/server/routes.go + file nhúng go:embed).
 	# Thêm route gốc mới ở backend (ngoài /api) thì phải thêm vào đây, nếu không nó trả index.html.
-	@backend path /api /api/* /export/* /upload/* /files/* /media /healthz /logo.svg /vs-spec.js /son-spec.js /ct-spec.js /mau-nhap-*
+	@backend path /api /api/* /export/* /upload/* /files/* /media /healthz /logo.svg /vs-spec.js /son-spec.js /ct-spec.js /dl-spec.js /mau-nhap-*
 	handle @backend {
 		# Không giới hạn kích thước body / thời gian chờ ở Caddy: backend tự giới hạn (JSON 30 MB, file 50 MB).
 		reverse_proxy api:3000

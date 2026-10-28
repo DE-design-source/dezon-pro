@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
 
+	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
 	"qspro-backend/internal/shared/specs"
@@ -68,7 +69,7 @@ func TestNganhCuaGolden(t *testing.T) {
 }
 
 func TestSpecNganhVaMuc(t *testing.T) {
-	for ng, want := range map[string]*specs.Spec{"vs": specs.VS, "son": specs.SON, "ct": specs.CT, "den": nil, "": nil, "VS": nil, " vs": nil} {
+	for ng, want := range map[string]*specs.Spec{"vs": specs.VS, "son": specs.SON, "ct": specs.CT, "dl": specs.DL, "den": nil, "": nil, "VS": nil, " vs": nil} {
 		if got := SpecNganh(ng); got != want {
 			t.Errorf("SpecNganh(%q) sai", ng)
 		}
@@ -76,6 +77,11 @@ func TestSpecNganhVaMuc(t *testing.T) {
 	got := []any{}
 	MucNganh.Each(func(k string, v any) { got = append(got, []any{k, v}) })
 	g := loadGolden(t)
+	// golden của Node chưa có dl (ngành chỉ bản Go, nối cuối): so phần Node + kiểm riêng dl
+	if js(t, got[len(got)-1]) != js(t, []any{"dl", "Điện lạnh"}) || Muc("dl") != "Điện lạnh" {
+		t.Errorf("MUC_NGANH thiếu dl ở cuối: %s", js(t, got))
+	}
+	got = got[:len(got)-1]
 	if a, b := js(t, got), js(t, g.Val("mucNganh")); a != b {
 		t.Errorf("MUC_NGANH\n go:   %s\n node: %s", a, b)
 	}
@@ -90,6 +96,21 @@ func TestSpecNganhVaMuc(t *testing.T) {
 	}
 }
 
+// nodePart: bảng nhãn <-> cột của Go = bảng của Node + nhãn Điện lạnh nối cuối (ngành chỉ bản Go).
+// Trả phần đầu dài n để so với golden; mọi phần thêm phải là nhãn của dl-spec.js (lbAt = vị trí nhãn trong cặp).
+func nodePart(t *testing.T, ds []any, n, lbAt int) []any {
+	t.Helper()
+	if len(ds) < n {
+		t.Fatalf("bảng ngắn hơn bản Node: %d < %d", len(ds), n)
+	}
+	for _, x := range ds[n:] {
+		if lb := jsval.AsString(jsval.AsArray(x)[lbAt]); specs.DL.Metric.Val(lb) == nil {
+			t.Errorf("thêm ngoài bản Node mà không phải nhãn Điện lạnh: %s", js(t, x))
+		}
+	}
+	return ds[:n]
+}
+
 func TestLabelColGolden(t *testing.T) {
 	g := loadGolden(t)
 	l2c := []any{}
@@ -99,6 +120,7 @@ func TestLabelColGolden(t *testing.T) {
 			t.Errorf("ColOf(%q) = %q, bảng = %q", lc.Label, ColOf(lc.Label), lc.Col)
 		}
 	}
+	l2c = nodePart(t, l2c, len(jsval.AsArray(g.Val("dbLabel2Col"))), 0)
 	if a, b := js(t, l2c), js(t, g.Val("dbLabel2Col")); a != b {
 		t.Errorf("DB_LABEL2COL khác Node (thứ tự / nội dung)\n go:   %s\n node: %s", a, b)
 	}
@@ -109,6 +131,7 @@ func TestLabelColGolden(t *testing.T) {
 			t.Errorf("LabelOf(%q) = %q", lc.Col, LabelOf(lc.Col))
 		}
 	}
+	c2l = nodePart(t, c2l, len(jsval.AsArray(g.Val("col2Label"))), 1)
 	if a, b := js(t, c2l), js(t, g.Val("col2Label")); a != b {
 		t.Errorf("COL2LABEL khác Node\n go:   %s\n node: %s", a, b)
 	}
@@ -445,8 +468,8 @@ func TestTemplateRoutesGolden(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	svc := New(Deps{})
-	svc.RegisterRPC(nil)
-	svc.RegisterRoutes(nil)
+	svc.RegisterRPC(rpc.NewRegistry())
+	svc.RegisterRoutes(gin.New().Group("/api/v1")) // route Điện lạnh: TestDlTemplateRoute
 	svc.RegisterRoot(&engine.RouterGroup)
 	if n := len(engine.Routes()); n != 3 {
 		t.Fatalf("RegisterRoot phải gắn 3 route, có %d", n)
@@ -530,5 +553,52 @@ func TestDumpTemplates(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, jsval.AsString(v.Val("name"))+".xlsx"), buf, 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// File mẫu Điện lạnh (chỉ bản Go): route /api/v1, cột theo hạng mục, dòng ví dụ tự bỏ qua, sheet Hướng dẫn.
+func TestDlTemplateRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	New(Deps{}).RegisterRoutes(engine.Group("/api/v1"))
+	get := func(q string) (*httptest.ResponseRecorder, *excelize.File) {
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/product-templates/dien-lanh"+q, nil))
+		if w.Code != 200 || w.Header().Get("Content-Type") != xlsxMime ||
+			w.Header().Get("Content-Disposition") != `attachment; filename="Mau-nhap-dien-lanh-DezonQS.xlsx"` {
+			t.Fatalf("%s: %d %v", q, w.Code, w.Header())
+		}
+		f, err := excelize.OpenReader(bytes.NewReader(w.Body.Bytes()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return w, f
+	}
+	header := func(f *excelize.File) []string {
+		rows, err := f.GetRows("San pham")
+		if err != nil || len(rows) < 2 {
+			t.Fatalf("sheet San pham: %v", err)
+		}
+		return rows[0]
+	}
+	_, f := get("?hm=" + "%C4%90i%E1%BB%81u%20ho%C3%A0%20kh%C3%B4ng%20kh%C3%AD") // Điều hoà không khí
+	h := strings.Join(header(f), "|")
+	if !strings.Contains(h, "LOẠI MÁY") || !strings.Contains(h, "KHỐI LƯỢNG DÀN NÓNG (kg)") || strings.Contains(h, "QUY CÁCH") {
+		t.Errorf("cột của Điều hoà không khí sai: %s", h)
+	}
+	rows, _ := f.GetRows("San pham")
+	if len(rows) != 3 || !strings.HasPrefix(rows[1][4], specs.DL.VD) {
+		t.Errorf("phải có 2 dòng ví dụ bắt đầu %q: %v", specs.DL.VD, rows)
+	}
+	_, f = get("?hm=ong%20dong%20dan%20gas")
+	if h := strings.Join(header(f), "|"); strings.Contains(h, "LOẠI MÁY") || !strings.Contains(h, "QUY CÁCH") {
+		t.Errorf("cột của Ống đồng dẫn gas sai: %s", h)
+	}
+	_, f = get("")
+	if h := strings.Join(header(f), "|"); !strings.Contains(h, "LOẠI MÁY") || !strings.Contains(h, "QUY CÁCH") {
+		t.Errorf("không chọn hạng mục phải có cột của mọi hạng mục: %s", h)
+	}
+	if i, _ := f.GetSheetIndex("Hướng dẫn"); i < 0 {
+		t.Error("thiếu sheet Hướng dẫn")
 	}
 }

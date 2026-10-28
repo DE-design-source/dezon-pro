@@ -2,6 +2,7 @@
    Port nguyên văn bản gốc; S.* và spec toàn cục thành tham số. Nguồn:
    catCbKey_ boc.js:1656 · ccSpecTxt_ boc.js:1679-1682 · spSpecs_ sanpham.js:1130-1139 · SP_MAU_CSS / spMauCss_ / spMauNhom_ sanpham.js:2182-2193
    specRows_ / pdSection_ / pdMedia_ (phần dữ liệu) / pdSpecs_ / pdSpecsVS_ / pdSpecsSon_ / pdSpecsCT_ / pdBullets_ app.js:1076-1228
+   (+ pdSpecsDL_ của ngành Điện lạnh, QS Pro ea787b6)
    CT_DEMUC_RULES / ctDeMucOf_ / ctSecDeMuc_ / ctSecsOfNode_ / ctAddToBoc_ (phần dựng SP) / renderCtLib_ (dấu "đã thêm") phantho.js:524-610
    PT_LOAI_NGAN / ptLoaiLabel_ / ptLoaiNgan_ sanpham.js:1326-1328 */
 import { parseWatt, parseKelvin } from '../../../lib/catalogFilters.js'
@@ -67,10 +68,10 @@ function sec_(title, rows){
 function bullets_(en, vn, text){ return String(text||'').trim() ? {type:'bullets', en:en, vn:vn, items:pdBullets_(text)} : null; }
 // Ảnh của SP (gallery): giá trị gốc, người gọi đổi sang URL bằng mediaUrl
 export function pdImgs_(p){ return String(p.anhTatCa||p.hinhAnh||'').split('\n').map(function(s){return s.trim();}).filter(Boolean); }
-/* Key Product Info (pdMedia_): [[icon, chữ]]; sơn / công tắc không có khối này (do pdSpecsSon_ / pdSpecsCT_ vẽ) */
+/* Key Product Info (pdMedia_): [[icon, chữ]]; sơn / công tắc / điện lạnh không có khối này (do pdSpecsSon_ / pdSpecsCT_ / pdSpecsDL_ vẽ) */
 export function pdKeyItems_(p, specs){
   var ng=nganhCuaSP_(p, specs);
-  if(ng==='son'||ng==='ct') return [];
+  if(ng==='son'||ng==='ct'||ng==='dl') return [];
   if(ng==='vs') return vsChip_(p, specs).map(function(x){ return [x[0], x[1]]; });
   var cong=p.congSuat||parseWatt(p.ten), nd=p.nhietDo||parseKelvin(p.ten);
   return [
@@ -87,6 +88,7 @@ export function pdSpecBlocks_(p, specs){
   if(ng==='vs') out=pdSpecsVS_(p, specs);
   else if(ng==='son') out=pdSpecsSon_(p, specs);
   else if(ng==='ct') out=pdSpecsCT_(p, specs);
+  else if(ng==='dl') out=pdSpecsDL_(p, specs);
   else {
     out=[sec_('Design Specifications|Thông số thiết kế',[
         ['Chất liệu',p.chatLieu],['Chiều cao',p.chieuCao],['Đường kính',p.duongKinh],
@@ -124,6 +126,16 @@ function pdSpecsSon_(p, specs){
       rows(g.chinh).concat([['Dòng sản phẩm',p.dongSanPham||SON.chuanHM(p.hangMuc)||p.hangMuc],['Hạng mục',SON.MUC]])),
     bullets_('Tính năng sản phẩm','',p.tinhNang),
     sec_(SON.TEN_TK, rows(g.tk))];
+}
+/* Điện lạnh: 4 khối theo DL_SPEC.KHOI (Thông tin chính · Hiệu suất · Kết nối · Lắp đặt); vật tư / phụ kiện chỉ có khối đầu
+   (Quy cách · Xuất xứ) - sec_ tự bỏ khối rỗng */
+function pdSpecsDL_(p, specs){
+  var DL=specNganh_('dl', specs); if(!DL) return [];
+  var h=DL.hmOf(p.hangMuc), raw=p.raw||{}, M=h?h.nhom:{chinh:DL.CHINH_ALL,hs:[],ket:[],lap:DL.TK_ALL};
+  function rows(ds){ return ds.map(function(lb){ return DL.dong(lb, function(c){ return raw[c]; })||['','']; }); }
+  var chung=[['Dòng sản phẩm',p.dongSanPham||p.nhom],['Hạng mục',DL.chuanHM(p.hangMuc)||p.hangMuc],['Thời gian bảo hành',p.baoHanh]];
+  return DL.KHOI.map(function(k,i){ return sec_(k[1], rows(M[k[0]]).concat(i===0?chung:[])); })
+    .concat([bullets_('Features','Tính năng',p.tinhNang)]);
 }
 function pdSpecsCT_(p, specs){
   var CT=specNganh_('ct', specs); if(!CT) return [];

@@ -235,6 +235,54 @@ Bình luận công việc - migration 0016. **Bảng con** (tenant qua `project_
 | `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote it; set null if deleted. |  |
 | `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
 
+## `product_hvac_specs` (phần của `db_san_pham`)
+
+Thông số ngành Điện lạnh (đề mục 3.2.7, nguồn `backend/internal/shared/specs/js/dl-spec.js`, chép từ QS Pro ea787b6) - migration 0017 (2026-10-28).
+Bảng 1-1 với `products`, chỉ có dòng khi SP có ít nhất 1 thông số; đọc qua view `product_catalog` (cột s4), ghi tách theo `parts` của `db_san_pham` trong `db-map.json`.
+**Xếp loại (quy tắc 25):** bảng con của `products` (công ty lấy qua sản phẩm, như các bảng thông số khác). 2 cột đổi tên so với QS Pro vì trùng cột ngành vệ sinh trong view: `hvac_power_supply` (nhãn ĐIỆN NGUỒN), `hvac_control_type` (nhãn ĐIỀU KHIỂN (REMOTE / WIFI)).
+
+| Cột | Tên trong code | Kiểu | NULL | Ràng buộc | Ý nghĩa |
+|---|---|---|---|---|---|
+| `product_id` | `—` | bigint | không | PK, FK CASCADE | Product (products.id); row deleted with the product. |
+| `unit_type` | `loai_may` | text | có |  | HVAC spec (code: loai_may) |
+| `cooling_capacity_kw` | `cs_lanh_kw` | text | có |  | HVAC spec (code: cs_lanh_kw) |
+| `capacity_hp` | `cs_hp` | text | có |  | HVAC spec (code: cs_hp) |
+| `capacity_btu` | `cs_btu` | text | có |  | HVAC spec (code: cs_btu) |
+| `operation_mode` | `che_do_van_hanh` | text | có |  | HVAC spec (code: che_do_van_hanh) |
+| `compressor_type` | `may_nen` | text | có |  | HVAC spec (code: may_nen) |
+| `refrigerant` | `moi_chat_lanh` | text | có |  | HVAC spec (code: moi_chat_lanh) |
+| `hvac_power_supply` | `dien_nguon_dl` | text | có |  | HVAC spec (code: dien_nguon_dl) |
+| `origin_country` | `xuat_xu` | text | có |  | HVAC spec (code: xuat_xu) |
+| `power_input_kw` | `cs_dien_kw` | text | có |  | HVAC spec (code: cs_dien_kw) |
+| `energy_efficiency` | `hieu_suat_nl` | text | có |  | HVAC spec (code: hieu_suat_nl) |
+| `energy_label` | `nhan_nang_luong` | text | có |  | HVAC spec (code: nhan_nang_luong) |
+| `airflow_m3h` | `luu_luong_gio` | text | có |  | HVAC spec (code: luu_luong_gio) |
+| `indoor_noise_db` | `do_on_dan_lanh` | text | có |  | HVAC spec (code: do_on_dan_lanh) |
+| `outdoor_noise_db` | `do_on_dan_nong` | text | có |  | HVAC spec (code: do_on_dan_nong) |
+| `cooling_area` | `pham_vi_lam_lanh` | text | có |  | HVAC spec (code: pham_vi_lam_lanh) |
+| `air_filtration` | `loc_khi` | text | có |  | HVAC spec (code: loc_khi) |
+| `hvac_control_type` | `dk_dieu_hoa` | text | có |  | HVAC spec (code: dk_dieu_hoa) |
+| `liquid_pipe` | `ong_long` | text | có |  | HVAC spec (code: ong_long) |
+| `gas_pipe` | `ong_hoi` | text | có |  | HVAC spec (code: ong_hoi) |
+| `max_pipe_length_m` | `ong_dai_max` | text | có |  | HVAC spec (code: ong_dai_max) |
+| `max_height_diff_m` | `chenh_cao_max` | text | có |  | HVAC spec (code: chenh_cao_max) |
+| `drain_pipe` | `ong_thoat_nuoc` | text | có |  | HVAC spec (code: ong_thoat_nuoc) |
+| `power_cable` | `day_nguon` | text | có |  | HVAC spec (code: day_nguon) |
+| `control_cable` | `day_dieu_khien` | text | có |  | HVAC spec (code: day_dieu_khien) |
+| `panel_model` | `mat_na` | text | có |  | HVAC spec (code: mat_na) |
+| `max_indoor_units` | `so_dan_lanh_max` | text | có |  | HVAC spec (code: so_dan_lanh_max) |
+| `refrigerant_charge` | `gas_nap` | text | có |  | HVAC spec (code: gas_nap) |
+| `indoor_unit_dimensions` | `kt_dan_lanh` | text | có |  | HVAC spec (code: kt_dan_lanh) |
+| `indoor_unit_weight_kg` | `kl_dan_lanh` | text | có |  | HVAC spec (code: kl_dan_lanh) |
+| `outdoor_unit_dimensions` | `kt_dan_nong` | text | có |  | HVAC spec (code: kt_dan_nong) |
+| `outdoor_unit_weight_kg` | `kl_dan_nong` | text | có |  | HVAC spec (code: kl_dan_nong) |
+| `panel_cutout_size` | `kt_mat_na` | text | có |  | HVAC spec (code: kt_mat_na) |
+| `installation_location` | `vi_tri_lap_dat` | text | có |  | HVAC spec (code: vi_tri_lap_dat) |
+| `outdoor_bracket` | `gia_do_dan_nong` | text | có |  | HVAC spec (code: gia_do_dan_nong) |
+| `min_clearance` | `kc_lap_min` | text | có |  | HVAC spec (code: kc_lap_min) |
+| `installation_note` | `gc_lap_dat` | text | có |  | HVAC spec (code: gc_lap_dat) |
+| `material_spec` | `quy_cach_vt` | text | có |  | HVAC spec (code: quy_cach_vt) |
+
 ## `audit_logs` (`audit_log`)
 
 Nhật ký thao tác (chỉ thêm). 2933 dòng.

@@ -260,6 +260,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/work-items/import/parse` | `ctImportParse` | `rpc.Login` | estimates | Đọc file nhập công tác -> `{rows, loi}` (M5.1) |
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
+| `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); route gốc `/mau-nhap-*.xlsx` đóng băng theo bản Node nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
 | `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
