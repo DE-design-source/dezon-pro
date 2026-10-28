@@ -4,6 +4,7 @@ import * as QLTK_DATA from '../../../data/quanLyThietKeData'
 import TaskDrawer from './TaskDrawer'
 import GanttItemModal from './GanttItemModal'
 import PurchaseBoard from './PurchaseBoard'
+import { useDelivery } from '../delivery'
 
 const STATS_EXPANDED_H = 200
 const TASKLIST_MIN_W = 420
@@ -69,16 +70,31 @@ function PhaseMemberPopover({ phase, onAdd, onRemove, onClose }) {
   )
 }
 
+/* Tiến độ của dự án đang chọn (DeliveryProvider): đề mục, công việc, mốc thu/chi, bình luận lưu trên máy chủ.
+   Bảng mua hàng (PurchaseBoard) vẫn là dữ liệu mẫu: chỉ mở với đề mục mẫu PURCHASE_PHASE_ID nên dữ liệu thật không vào. */
 export default function GanttTab({ active, data = QLTK_DATA }) {
   const {
-    TODAY, INITIAL_PHASES, INITIAL_COMMENTS, ME_NAME, CASHFLOW_DATA, PROJECT_SHORTLIST,
-    RANGE_START, RANGE_END, TOTAL_DAYS, STATUS_LABEL,
+    TODAY, INITIAL_PHASES, STATUS_LABEL,
     parseD, dayDiff, fmt, fmtFull, toISO, statusOf, fmtTyQ, avatarColor, initials,
     PURCHASE_PHASE_ID = null, INITIAL_PURCHASE_ITEMS = {},
   } = data
-  const [phases, setPhases] = useState(INITIAL_PHASES)
+  const dv = useDelivery()
+  const phases = useMemo(() => (dv.detail && String(dv.detail.project.id) === String(dv.currentId) ? dv.detail.phases : []), [dv.detail, dv.currentId])
+  const comments = (dv.detail && dv.detail.comments) || {}
+  const currentProject = dv.current || { name: 'Chưa có dự án' }
+  /* Khung timeline theo dữ liệu thật (luôn gồm hôm nay), lùi 6 ngày / thêm 8 ngày như bản cũ */
+  const { RANGE_START, RANGE_END, TOTAL_DAYS } = useMemo(() => {
+    const ds = [TODAY, ...phases.flatMap(p => p.tasks.flatMap(t => [parseD(t.start), parseD(t.end)]))]
+    const s = new Date(Math.min(...ds)); s.setDate(s.getDate() - 6)
+    const e = new Date(Math.max(...ds)); e.setDate(e.getDate() + Math.max(8, 60 - dayDiff(s, e)))
+    return { RANGE_START: s, RANGE_END: e, TOTAL_DAYS: dayDiff(s, e) }
+  }, [phases]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Dòng tiền: các mốc thu / chi đã xác nhận (tỷ) */
+  const CASHFLOW_DATA = useMemo(() => {
+    const sum = k => phases.flatMap(p => p.tasks).filter(t => t.finType === k && t.confirmed).reduce((s, t) => s + (t.amountValue || 0) / 1000, 0)
+    return { income: sum('thu'), expense: sum('chi') }
+  }, [phases])
   const [itemModal, setItemModal] = useState(null) // { kind: 'task'|'phase', mode: 'create'|'edit', phaseId?, task?, phase? }
-  const [comments, setComments] = useState(INITIAL_COMMENTS)
   const [dayW, setDayW] = useState(16)
   const [phaseFilter, setPhaseFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -86,12 +102,10 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [drawer, setDrawer] = useState({ taskId: null, open: false })
   const [board, setBoard] = useState({ taskId: null, open: false })
-  const [purchaseItems, setPurchaseItems] = useState(INITIAL_PURCHASE_ITEMS)
   const [openPhasePop, setOpenPhasePop] = useState(null)
   const [cashflowOpen, setCashflowOpen] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [projectMenuQuery, setProjectMenuQuery] = useState('')
-  const [currentProject, setCurrentProject] = useState(PROJECT_SHORTLIST[0])
   const [statsH, setStatsH] = useState(STATS_EXPANDED_H)
   const [statsAnimate, setStatsAnimate] = useState(true)
   const [tasklistW, setTasklistW] = useState(loadTasklistWidth)
@@ -140,7 +154,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
       done: flat.filter(t => statusOf(t) === 'done').length,
       progress: flat.filter(t => statusOf(t) === 'progress').length,
       overdue: flat.filter(t => statusOf(t) === 'overdue').length,
-      avg: Math.round(flat.reduce((s, t) => s + t.progress, 0) / total),
+      avg: total ? Math.round(flat.reduce((s, t) => s + t.progress, 0) / total) : 0,
     }
   }, [phases])
   const net = CASHFLOW_DATA.income - CASHFLOW_DATA.expense
@@ -154,7 +168,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   }, [phases, phaseFilter, searchTerm])
 
   const rowCount = visiblePhases.reduce((n, p) => n + 1 + (collapsed.has(p.id) ? 0 : p.tasks.length + 1), 0) + 1
-  const gridLines = useMemo(() => <GridLines dayW={dayW} TOTAL_DAYS={TOTAL_DAYS} RANGE_START={RANGE_START} />, [dayW])
+  const gridLines = useMemo(() => <GridLines dayW={dayW} TOTAL_DAYS={TOTAL_DAYS} RANGE_START={RANGE_START} />, [dayW, TOTAL_DAYS, RANGE_START])
 
   const drawerTask = drawer.taskId ? phases.flatMap(p => p.tasks).find(t => t.id === drawer.taskId) : null
   const boardTask = board.taskId ? phases.flatMap(p => p.tasks).find(t => t.id === board.taskId) : null
@@ -163,58 +177,72 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
     [phases],
   )
 
-  /* ---------- Cập nhật dữ liệu ---------- */
+  /* ---------- Cập nhật dữ liệu (gửi máy chủ; DeliveryProvider nạp lại tiến độ sau mỗi lệnh) ---------- */
   function updateTask(taskId, patch) {
-    setPhases(prev => prev.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t) })))
+    return dv.updateTask(taskId, patch)
   }
   /* ---------- Tạo / sửa / xoá đề mục & công việc ---------- */
   const knownAssignees = useMemo(() => [...new Set(phases.flatMap(p => [...p.tasks.map(t => t.assignee), ...(p.members || []).map(m => m.name)]).filter(Boolean))], [phases])
   const openNewTask = phaseId => setItemModal({ kind: 'task', mode: 'create', phaseId })
   const openEditTask = (phaseId, task) => setItemModal({ kind: 'task', mode: 'edit', phaseId, task })
-  function saveTask(data) {
-    const { phaseId, ...fields } = data
+  async function saveTask(data) {
+    if (!dv.currentId) { alert('Chọn hoặc tạo dự án trước.'); return }
     const editing = itemModal?.mode === 'edit'
-    const id = editing ? itemModal.task.id : 't' + Date.now().toString(36)
-    const task = { ...(editing ? itemModal.task : {}), ...fields, id, critical: !fields.milestone && !!fields.critical }
-    setPhases(prev => prev.map(p => {
-      const without = p.tasks.filter(t => t.id !== id)
-      if (p.id !== phaseId) return without.length === p.tasks.length ? p : { ...p, tasks: without }
-      const idx = p.tasks.findIndex(t => t.id === id)
-      if (idx >= 0) return { ...p, tasks: p.tasks.map(t => (t.id === id ? task : t)) }
-      return { ...p, tasks: [...without, task] }
-    }))
-    setCollapsed(c => { const n = new Set(c); n.delete(phaseId); return n })
+    const fields = { ...data, critical: !data.milestone && !!data.critical }
+    delete fields.assignee
+    const ok = editing ? await dv.updateTask(itemModal.task.id, fields) : await dv.addTask({ ...fields, sortOrder: (phases.find(p => p.id === data.phaseId)?.tasks.length || 0) })
+    if (!ok) return
+    setCollapsed(c => { const n = new Set(c); n.delete(data.phaseId); return n })
     setItemModal(null)
   }
-  function deleteTask(id) {
+  async function deleteTask(id) {
     if (!window.confirm('Xoá công việc này khỏi tiến độ?')) return
-    setPhases(prev => prev.map(p => ({ ...p, tasks: p.tasks.filter(t => t.id !== id) })))
-    setItemModal(null)
+    if (await dv.deleteTask(id)) setItemModal(null)
   }
-  function savePhase(name) {
-    if (itemModal?.mode === 'edit') setPhases(prev => prev.map(p => (p.id === itemModal.phase.id ? { ...p, name } : p)))
-    else setPhases(prev => [...prev, { id: 'p' + Date.now().toString(36), name, members: [], tasks: [] }])
-    setItemModal(null)
+  async function savePhase(name) {
+    if (!dv.currentId) { alert('Chọn hoặc tạo dự án trước.'); return }
+    const ok = itemModal?.mode === 'edit' ? await dv.updatePhase(itemModal.phase.id, { name }) : await dv.addPhase({ name, sortOrder: phases.length })
+    if (ok) setItemModal(null)
   }
-  function deletePhase(id) {
+  async function deletePhase(id) {
     const ph = phases.find(p => p.id === id)
     if (!window.confirm(`Xoá đề mục "${ph?.name}"${ph?.tasks.length ? ` cùng ${ph.tasks.length} công việc` : ''}?`)) return
-    setPhases(prev => prev.filter(p => p.id !== id))
+    if (!(await dv.deletePhase(id))) return
     if (phaseFilter === id) setPhaseFilter('all')
     setItemModal(null)
   }
-  function applyTemplate(v) {
+  /* Mẫu: xoá hết (trống) hoặc dựng lại khung mẫu, dời ngày để công việc đầu tiên bắt đầu từ hôm nay */
+  async function applyTemplate(v) {
+    if (!dv.currentId) { alert('Chọn hoặc tạo dự án trước.'); return }
     if (v === 'blank') {
       if (phases.length && !window.confirm('Bắt đầu từ trống sẽ xoá toàn bộ đề mục & công việc hiện tại. Tiếp tục?')) return
-      setPhases([]); setPhaseFilter('all')
     } else if (v === 'sample') {
-      if (!window.confirm('Dùng lại tiến độ mẫu (chung cư) — thay toàn bộ đề mục hiện tại?')) return
-      setPhases(INITIAL_PHASES); setPhaseFilter('all')
-    }
+      if (!window.confirm('Dựng tiến độ theo khung mẫu (dời ngày bắt đầu về hôm nay) — thay toàn bộ đề mục hiện tại?')) return
+    } else return
+    await dv.batch(async call => {
+      for (const p of phases) await call('DELETE', '/phases/' + p.id)
+      if (v !== 'sample') return
+      const first = Math.min(...INITIAL_PHASES.flatMap(p => p.tasks.map(t => parseD(t.start))))
+      const shift = s => { const d = parseD(s); d.setDate(d.getDate() + dayDiff(new Date(first), TODAY)); return toISO(d) }
+      for (let i = 0; i < INITIAL_PHASES.length; i++) {
+        const src = INITIAL_PHASES[i]
+        const ph = await call('POST', '/phases', { name: src.name, sortOrder: i, members: src.members || [] })
+        for (let k = 0; k < src.tasks.length; k++) {
+          const s = src.tasks[k]
+          await call('POST', '/tasks', {
+            phaseId: ph.id, name: s.name, start: shift(s.start), end: shift(s.end), progress: 0, critical: !!s.critical, milestone: !!s.milestone,
+            desc: s.desc || '', depts: s.depts || [], owners: s.owners || (s.assignee ? [s.assignee] : []), sortOrder: k,
+            finType: s.finType || '', planStart: s.planStart ? shift(s.planStart) : '', amountVnd: s.amountValue != null ? Math.round(s.amountValue * 1e6) : null,
+          })
+        }
+      }
+    })
+    setPhaseFilter('all')
   }
 
   function updatePhaseMembers(phaseId, fn) {
-    setPhases(prev => prev.map(p => p.id === phaseId ? { ...p, members: fn(p.members || []) } : p))
+    const ph = phases.find(p => p.id === phaseId)
+    if (ph) dv.updatePhase(phaseId, { members: fn(ph.members || []) })
   }
   function toggleCollapsed(phaseId) {
     setCollapsed(prev => {
@@ -237,11 +265,12 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
     setBoard(b => ({ ...b, open: false }))
     setSelectedTaskId(null)
   }
+  const [purchaseItems, setPurchaseItems] = useState(INITIAL_PURCHASE_ITEMS)
   function movePurchaseItem(taskId, itemId, stage) {
     setPurchaseItems(prev => ({ ...prev, [taskId]: (prev[taskId] || []).map(it => it.id === itemId ? { ...it, stage } : it) }))
   }
   function addComment(taskId, text) {
-    setComments(prev => ({ ...prev, [taskId]: [...(prev[taskId] || []), { who: ME_NAME, time: 'Vừa xong', text }] }))
+    dv.addComment(taskId, text)
   }
   function confirmFinance(task) {
     const input = prompt(`Nhập ngày ${task.finType === 'thu' ? 'thực thu' : 'thực chi'} thực tế (YYYY-MM-DD):`, task.planStart)
@@ -357,7 +386,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   }
 
   const menuQuery = projectMenuQuery.toLowerCase()
-  const menuProjects = PROJECT_SHORTLIST.filter(p => !menuQuery || p.name.toLowerCase().includes(menuQuery))
+  const menuProjects = dv.projects.filter(p => !menuQuery || p.name.toLowerCase().includes(menuQuery))
 
   /* ---------- Một hàng trên timeline ---------- */
   function renderTimelineItem(t, st, isSel) {
@@ -446,7 +475,6 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6,9 12,15 18,9" /></svg>
           </span>
           <h1>Tiến độ</h1>
-          {!currentProject.hasData && <span className="tk-demo-badge" style={{ display: 'inline-block' }}>Dữ liệu minh hoạ</span>}
 
           {projectMenuOpen && (
             <div className="tk-project-menu" onClick={e => e.stopPropagation()}>
@@ -457,11 +485,11 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
               <div className="tk-project-menu-list">
                 {menuProjects.length ? menuProjects.map(p => (
                   <div
-                    key={p.name}
-                    className={`tk-pm-item${p.name === currentProject.name ? ' active' : ''}`}
-                    onClick={() => { setCurrentProject(p); setProjectMenuOpen(false) }}
+                    key={p.id}
+                    className={`tk-pm-item${String(p.id) === String(dv.currentId) ? ' active' : ''}`}
+                    onClick={() => { dv.select(p.id); setProjectMenuOpen(false) }}
                   >
-                    <span>{p.name}</span><span className="tk-pm-sub">{p.sub}</span>
+                    <span>{p.name}</span><span className="tk-pm-sub">{[p.client, p.progress + '%'].filter(Boolean).join(' · ')}</span>
                   </div>
                 )) : <div className="tk-pm-empty">Không tìm thấy dự án.</div>}
               </div>

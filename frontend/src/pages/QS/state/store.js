@@ -18,6 +18,9 @@ import { qbRecentPush_ } from './useRecentNodes'
 export const DEFAULT_NODE = '3.2.6.1'
 export const PERM_TABS = [['dash', 'Bảng điều khiển'], ['boc', 'Bóc tách'], ['chiphi', 'Chi phí'], ['export', 'Xuất báo giá'],
   ['muahang', 'Mua hàng'], ['duan', 'Dự án'], ['sanpham', 'Danh sách sản phẩm'], ['import', 'Nhập dữ liệu']]
+/* Quyền các trang nghiệp vụ ngoài QS (services/workSession.js canTab). Không nằm trong PERM_TABS vì firstAllowedTab_ chọn tab QS từ đó */
+export const WORK_TABS = [['kinhdoanh', 'Kinh doanh'], ['thietke', 'Quản lý thiết kế'], ['thicong', 'Quản lý dự án (thi công)']]
+export const GRANT_TABS = PERM_TABS.concat(WORK_TABS)
 const HIST_LIMIT = 100
 
 function readLs(k) { try { return localStorage.getItem(k) || '' } catch (e) { return '' } }

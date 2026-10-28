@@ -1,20 +1,6 @@
 /* Tiện ích đọc/ghi localStorage cho trang Quản lý thiết kế — giữ nguyên các key của bản React cũ */
-export const SETUP_STORAGE_KEY = 'siteflow-project-setup'
-export const SUBCONTRACTOR_STORAGE_KEY = 'siteflow-project-subcontractors'
 export const ORG_CHILDREN_STORAGE_KEY = 'siteflow-project-org-children'
 export const ORG_PARALLEL_STORAGE_KEY = 'siteflow-project-org-parallel'
-export const PROJECT_MEMBERS_STORAGE_KEY = 'siteflow-project-members'
-export const SYNCED_PROJECTS_KEY = 'siteflow-synced-projects'
-
-/* Đọc object đã lưu; lỗi / sai kiểu → {} */
-export function readStoredObject(key) {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || '{}')
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
-  } catch {
-    return {}
-  }
-}
 
 /* Đọc mảng đã lưu; lỗi / sai kiểu → fallback (mặc định theo bản HTML) */
 export function readStoredArray(key, fallback) {

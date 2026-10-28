@@ -7,6 +7,7 @@ import (
 	"qspro-backend/internal/modules/auth"
 	"qspro-backend/internal/modules/categories"
 	"qspro-backend/internal/modules/companies"
+	"qspro-backend/internal/modules/delivery"
 	"qspro-backend/internal/modules/estimates"
 	"qspro-backend/internal/modules/files"
 	"qspro-backend/internal/modules/materials"
@@ -15,6 +16,7 @@ import (
 	"qspro-backend/internal/modules/purchasing"
 	"qspro-backend/internal/modules/quotations"
 	"qspro-backend/internal/modules/reports"
+	"qspro-backend/internal/modules/sales"
 	"qspro-backend/internal/modules/system"
 	"qspro-backend/internal/modules/takeoff"
 	"qspro-backend/internal/modules/users"
@@ -122,13 +124,17 @@ func (s *Server) modules() []Module {
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
 		Users: usersSvc, Auditor: usersSvc})
 	reportsSvc := reports.New(reports.Deps{DB: d.DB, Cfg: d.Cfg})
+	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: kéo khách sang thiet-ke / thi-cong tự tạo dự án triển khai (DeliveryFromLead)
+	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
+	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
+		Delivery: delivSvc})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
 	s.expiry = compSvc
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc,
 	}
 }
 

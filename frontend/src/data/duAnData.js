@@ -1,6 +1,6 @@
 /* Dữ liệu mẫu & tiện ích cho trang Quản lý dự án (du-an.html) */
 
-export const TODAY = new Date(2026, 8, 21) // 21/09/2026
+export const TODAY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })() // hôm nay (00:00), trước là mốc cố định 21/09/2026
 
 export const INITIAL_PHASES = [
   { id: 'p1', name: 'Chuẩn bị & xin phép', members: [

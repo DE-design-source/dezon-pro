@@ -78,28 +78,3 @@ export function mulberry32(seed) {
     return ((t ^ t >>> 14) >>> 0) / 4294967296
   }
 }
-
-/* ---------- Đồng bộ sang tab Dự án (localStorage) ---------- */
-const SYNC_KEY = 'siteflow-synced-projects'
-
-export function pushSyncedProject(lead) {
-  let arr = []
-  try { arr = JSON.parse(localStorage.getItem(SYNC_KEY) || '[]') } catch { arr = [] }
-  arr = arr.filter(p => p.id !== lead.id)
-  arr.push({
-    id: lead.id,
-    name: lead.type.indexOf('—') !== -1 ? lead.type : (lead.name + ' — ' + lead.type),
-    client: lead.name,
-    stage: lead.stage,
-    value: lead.value,
-    updated: new Date().toLocaleDateString('vi-VN'),
-  })
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify(arr)) } catch { /* bỏ qua */ }
-}
-
-export function removeSyncedProject(id) {
-  let arr = []
-  try { arr = JSON.parse(localStorage.getItem(SYNC_KEY) || '[]') } catch { arr = [] }
-  arr = arr.filter(p => p.id !== id)
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify(arr)) } catch { /* bỏ qua */ }
-}

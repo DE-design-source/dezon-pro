@@ -33,7 +33,7 @@ export function imgSrc1_(v) { return mediaUrl(String(v || '').split('\n')[0].tri
 
 export const CT_FEATURES = [['dash', 'Bảng điều khiển'], ['boc', 'Bóc tách'], ['chiphi', 'Chi phí'],
   ['export', 'Xuất báo giá'], ['muahang', 'Mua hàng'], ['duan', 'Dự án'],
-  ['sanpham', 'Danh sách sản phẩm'], ['import', 'Nhập dữ liệu']]
+  ['sanpham', 'Danh sách sản phẩm'], ['import', 'Nhập dữ liệu'], ['kinhdoanh', 'Kinh doanh'], ['thietke', 'Quản lý thiết kế'], ['thicong', 'Quản lý dự án (thi công)']]
 
 /* Số ngày còn lại tới hạn dùng (âm = đã hết hạn), null = không giới hạn */
 export function ngayConLai(h) {

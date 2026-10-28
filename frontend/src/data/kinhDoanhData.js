@@ -11,8 +11,6 @@ export const STAGE_LABEL = {
   'chot-hd': 'Chốt hợp đồng', 'bao-gia-thi-cong': 'Báo giá (Thi công)', 'thiet-ke': 'Dự án (Thiết kế)', 'thi-cong': 'Dự án (Thi công)',
   'truot-thau': 'Đã trượt thầu',
 }
-/* Các giai đoạn được đồng bộ sang tab Dự án (localStorage siteflow-synced-projects) */
-export const SYNC_STAGES = ['thiet-ke', 'thi-cong', 'tu-van', 'dam-phan']
 
 export const DEPTS = ['du-an', 'dan-dung']
 export const DEPT_LABEL = { 'du-an': 'Phòng KD Dự Án', 'dan-dung': 'Phòng KD Dân dụng' }

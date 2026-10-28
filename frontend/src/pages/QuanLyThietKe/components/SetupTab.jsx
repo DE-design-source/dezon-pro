@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  PROJECT_SHORTLIST, DETAIL_PROJECT_DATA, DETAIL_STATUS_COLORS,
-  ORG_ICON, ORG_HUB, INITIAL_ORG_PARALLEL, INITIAL_ORG_CHILDREN, ORG_EXTRA_COLORS,
-  INITIAL_SUBCONTRACTORS, SUB_STATUS_LABEL,
+  ORG_ICON, ORG_HUB, INITIAL_ORG_PARALLEL, INITIAL_ORG_CHILDREN, ORG_EXTRA_COLORS, SUB_STATUS_LABEL,
 } from '../../../data/quanLyThietKeData'
 import { useMembers, MemberCell, FlowNodeMembers, FlowNodePopover } from './ProjectMembers'
-import {
-  SETUP_STORAGE_KEY, SUBCONTRACTOR_STORAGE_KEY, ORG_CHILDREN_STORAGE_KEY, ORG_PARALLEL_STORAGE_KEY, SYNCED_PROJECTS_KEY,
-  readStoredObject, readStoredArray, readStoredOrgRow, writeStored,
-} from './storage'
+import { ORG_CHILDREN_STORAGE_KEY, ORG_PARALLEL_STORAGE_KEY, readStoredOrgRow, writeStored } from './storage'
+import { useDelivery, STATUS_OPTIONS, STATUS_STYLE, fmtTy } from '../delivery'
 
 /* Ghi state xuống localStorage mỗi khi thay đổi (bỏ qua lần render đầu) */
 function usePersist(key, value) {
@@ -63,127 +59,115 @@ const DEPT_FLOW = [
 ]
 
 /* ---------------- Thiết lập chung ---------------- */
-const DEFAULT_SETUP_PROJECT = 'Chung cư Riverside — Giai đoạn 2'
-const DEFAULT_SETUP_INFO = {
-  client: 'Công ty CP Đầu tư Riverside',
-  contact: 'Ông Nguyễn Văn Bình',
-  email: 'contact@riverside-invest.vn',
-  phone: '0909 123 456',
-  address: '123 Nguyễn Hữu Cảnh, P.22, Bình Thạnh, TP.HCM',
+const FORM_KEYS = ['name', 'status', 'client', 'contact', 'email', 'phone', 'address', 'projectType', 'startDate', 'handoverDate', 'note']
+function formOf(p) {
+  const f = {}
+  FORM_KEYS.forEach(k => { f[k] = (p && p[k]) || '' })
+  f.contractValue = p && p.contractValueVnd ? String(p.contractValueVnd) : ''
+  f.approvedBudget = p && p.approvedBudgetVnd ? String(p.approvedBudgetVnd) : ''
+  return f
 }
-const EMPTY_SETUP = { startDate: '', handoverDate: '', contractValue: '', approvedBudget: '', note: '' }
+const toVnd = s => Number(String(s || '').replace(/[^\d]/g, '')) || 0
+const groupVnd = s => { const n = toVnd(s); return n ? n.toLocaleString('vi-VN') : '' }
 
-/* Lấy phần "Thông tin quan trọng" đã lưu của một dự án (key 'siteflow-project-setup') */
-function storedSetupOf(setups, project) {
-  const s = setups[project]
-  const out = { ...EMPTY_SETUP }
-  if (s && typeof s === 'object') Object.keys(EMPTY_SETUP).forEach(k => { if (typeof s[k] === 'string') out[k] = s[k] })
-  return out
+/* Dự án đang chọn (dùng chung cho cả trang): ô chọn dự án đặt ở đầu mỗi tab con */
+export function ProjectPicker({ style }) {
+  const dv = useDelivery()
+  return (
+    <select value={dv.currentId} onChange={e => dv.select(e.target.value)} style={style}>
+      {!dv.projects.length && <option value="">— Chưa có dự án —</option>}
+      {dv.projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+    </select>
+  )
 }
 
 function SetupGeneral({ onGoto }) {
-  const [project, setProject] = useState(DEFAULT_SETUP_PROJECT)
-  const [form, setForm] = useState(() => storedSetupOf(readStoredObject(SETUP_STORAGE_KEY), DEFAULT_SETUP_PROJECT))
+  const dv = useDelivery()
+  const p = dv.current
+  const [form, setForm] = useState(() => formOf(p))
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setForm(formOf(p)) }, [p && p.id, p && p.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
   const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
 
-  /* Đổi dự án → nạp lại thiết lập đã lưu của dự án đó */
-  function selectProject(e) {
-    const next = e.target.value
-    setProject(next)
-    setForm(storedSetupOf(readStoredObject(SETUP_STORAGE_KEY), next))
+  async function handleSave() {
+    if (!p) return
+    if (!form.name.trim()) { alert('Nhập tên dự án.'); return }
+    setBusy(true)
+    const { contractValue, approvedBudget, ...rest } = form
+    const ok = await dv.updateProject({ ...rest, contractValueVnd: toVnd(contractValue), approvedBudgetVnd: toVnd(approvedBudget) })
+    setBusy(false)
+    if (ok) onGoto('tiendo')
+  }
+  async function handleDelete() {
+    if (!p || !window.confirm(`Xoá dự án "${p.name}" cùng toàn bộ tiến độ, thành viên, thầu phụ? Không hoàn tác được.`)) return
+    if (await dv.deleteProject(p.id)) onGoto('list')
   }
 
-  /* Lưu thiết lập theo dự án; nếu là dự án đồng bộ từ Kinh doanh thì cập nhật luôn 'siteflow-synced-projects' (giữ logic cũ) */
-  function handleSave() {
-    const setups = readStoredObject(SETUP_STORAGE_KEY)
-    const prev = setups[project] && typeof setups[project] === 'object' ? setups[project] : {}
-    const saved = {
-      ...(project === DEFAULT_SETUP_PROJECT ? DEFAULT_SETUP_INFO : {}),
-      ...prev,
-      name: prev.name || project,
-      ...form,
-    }
-    writeStored(SETUP_STORAGE_KEY, { ...setups, [project]: saved })
-    const synced = readStoredArray(SYNCED_PROJECTS_KEY, [])
-    if (synced.some(p => p && p.id === project)) {
-      writeStored(SYNCED_PROJECTS_KEY, synced.map(p => p && p.id === project
-        ? { ...p, name: saved.name, client: saved.client, type: saved.type, setup: saved }
-        : p))
-    }
-    onGoto('list')
-  }
-
-  /* Huỷ → bỏ thay đổi chưa lưu, quay về danh sách */
-  function handleCancel() {
-    setForm(storedSetupOf(readStoredObject(SETUP_STORAGE_KEY), project))
-    onGoto('list')
-  }
-
-  const readonlyField = (label, value) => (
-    <div className="tk-field"><label>{label}</label><input type="text" defaultValue={value} readOnly /></div>
+  const field = (label, key, extra) => (
+    <div className="tk-field"><label>{label}</label><input type="text" value={form[key]} onChange={setField(key)} {...extra} /></div>
   )
   return (
     <>
       <div className="tk-card tk-setup-card">
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Thiết lập chung cho dự án</h3>
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 18px' }}>
-          Việc tạo hồ sơ khách hàng mới nay thuộc mục <Link to="/kinh-doanh" style={{ color: 'var(--sales)', fontWeight: 600 }}>Kinh doanh</Link>. Khi một cơ hội được chuyển vào cột "Dự án (Thiết kế)" hoặc "Dự án (Thi công)" ở đó, dự án sẽ tự xuất hiện bên dưới.
+          Hồ sơ khách hàng tạo ở mục <Link to="/kinh-doanh" style={{ color: 'var(--sales)', fontWeight: 600 }}>Kinh doanh</Link>. Khi một khách hàng được kéo vào cột "Dự án (Thiết kế)" hoặc "Dự án (Thi công)" ở đó, dự án tự xuất hiện ở trang tương ứng, mang theo thông tin khách hàng và giá trị.
         </p>
 
         <div className="tk-field" style={{ marginBottom: 16 }}>
           <label>Chọn dự án cần thiết lập *</label>
-          <select value={project} onChange={selectProject}>
-            <option>Chung cư Riverside — Giai đoạn 2</option>
-            <option>Nhà phố Lô B12 — KDC Bình Chánh</option>
-            <option>Văn phòng cho thuê — Q3</option>
-          </select>
+          <ProjectPicker />
         </div>
-
-        <div className="tk-divider" style={{ margin: '4px 0 18px' }} />
-        <h4 className="tk-section-title" style={{ marginBottom: 14 }}>
-          Thông tin cơ bản <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-faint)' }}>— lấy từ Kinh doanh</span>
-        </h4>
-        <div className="tk-field-grid">
-          {readonlyField('Tên chủ đầu tư', 'Công ty CP Đầu tư Riverside')}
-          {readonlyField('Người liên hệ', 'Ông Nguyễn Văn Bình')}
-        </div>
-        <div className="tk-field-grid">
-          {readonlyField('Email', 'contact@riverside-invest.vn')}
-          {readonlyField('Số điện thoại', '0909 123 456')}
-        </div>
-        <div className="tk-field" style={{ marginBottom: 16 }}>
-          <label>Địa chỉ</label><input type="text" defaultValue="123 Nguyễn Hữu Cảnh, P.22, Bình Thạnh, TP.HCM" readOnly />
-        </div>
-
-        <div className="tk-divider" style={{ margin: '4px 0 18px' }} />
-        <h4 className="tk-section-title" style={{ marginBottom: 14 }}>Thông tin quan trọng</h4>
-        <div className="tk-field-grid">
-          <div className="tk-field"><label>Ngày khởi công</label><input type="text" placeholder="dd/mm/yyyy" value={form.startDate} onChange={setField('startDate')} /></div>
-          <div className="tk-field"><label>Ngày hoàn công (dự kiến)</label><input type="text" placeholder="dd/mm/yyyy" value={form.handoverDate} onChange={setField('handoverDate')} /></div>
-        </div>
-        <div className="tk-field-grid">
-          <div className="tk-field"><label>Giá trị hợp đồng</label><input type="text" placeholder="VD: 8.500.000.000" value={form.contractValue} onChange={setField('contractValue')} /></div>
-          <div className="tk-field"><label>Ngân sách được duyệt</label><input type="text" placeholder="VD: 2.500.000.000" value={form.approvedBudget} onChange={setField('approvedBudget')} /></div>
-        </div>
-        <div className="tk-field"><label>Ghi chú</label><textarea rows={3} placeholder="Yêu cầu đặc biệt từ khách hàng, lưu ý về mặt bằng..." value={form.note} onChange={setField('note')} /></div>
-
-        <div className="tk-divider" style={{ margin: '20px 0 18px' }} />
-        <h4 className="tk-section-title" style={{ marginBottom: 4 }}>Sau khi lưu, dữ liệu vận hành sẽ được khởi tạo tới</h4>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>Không cần nhập lại thông tin khách hàng hay địa điểm ở từng module.</p>
-        <div className="tk-init-grid">
-          {INIT_CARDS.map(c => (
-            <div key={c.title} className="tk-init-card">
-              <div className="tk-init-icon" style={{ background: `var(--${c.color}-tint)`, color: `var(--${c.color})` }}><Svg size={17} html={c.icon} /></div>
-              <div><div className="tk-init-title">{c.title}</div><div className="tk-init-desc">{c.desc}</div></div>
+        {!p ? <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Chưa có dự án để thiết lập.</p> : <>
+          <div className="tk-field-grid">
+            {field('Tên dự án *', 'name')}
+            <div className="tk-field"><label>Trạng thái</label>
+              <select value={form.status} onChange={setField('status')}>{STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
             </div>
-          ))}
-        </div>
+          </div>
+
+          <div className="tk-divider" style={{ margin: '4px 0 18px' }} />
+          <h4 className="tk-section-title" style={{ marginBottom: 14 }}>
+            Thông tin khách hàng {p.leadId ? <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-faint)' }}>— lấy từ Kinh doanh, sửa được</span> : null}
+          </h4>
+          <div className="tk-field-grid">{field('Tên chủ đầu tư', 'client')}{field('Người liên hệ', 'contact')}</div>
+          <div className="tk-field-grid">{field('Email', 'email')}{field('Số điện thoại', 'phone')}</div>
+          <div className="tk-field-grid">{field('Địa chỉ', 'address')}{field('Loại công trình', 'projectType')}</div>
+
+          <div className="tk-divider" style={{ margin: '4px 0 18px' }} />
+          <h4 className="tk-section-title" style={{ marginBottom: 14 }}>Thông tin quan trọng</h4>
+          <div className="tk-field-grid">
+            {field('Ngày khởi công', 'startDate', { type: 'date' })}
+            {field('Ngày hoàn công (dự kiến)', 'handoverDate', { type: 'date' })}
+          </div>
+          <div className="tk-field-grid">
+            {field('Giá trị hợp đồng (đồng)', 'contractValue', { placeholder: 'VD: 8.500.000.000', inputMode: 'numeric', onBlur: () => setForm(f => ({ ...f, contractValue: groupVnd(f.contractValue) })) })}
+            {field('Ngân sách được duyệt (đồng)', 'approvedBudget', { placeholder: 'VD: 2.500.000.000', inputMode: 'numeric', onBlur: () => setForm(f => ({ ...f, approvedBudget: groupVnd(f.approvedBudget) })) })}
+          </div>
+          <div className="tk-field"><label>Ghi chú</label><textarea rows={3} placeholder="Yêu cầu đặc biệt từ khách hàng, lưu ý về mặt bằng..." value={form.note} onChange={setField('note')} /></div>
+          {p.maDA && <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>Dự án QS đã gắn: <Link to="/qs" style={{ color: 'var(--qs)', fontWeight: 600 }}>{p.maDA}</Link></p>}
+
+          <div className="tk-divider" style={{ margin: '20px 0 18px' }} />
+          <h4 className="tk-section-title" style={{ marginBottom: 4 }}>Sau khi lưu, dữ liệu vận hành sẽ được khởi tạo tới</h4>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>Không cần nhập lại thông tin khách hàng hay địa điểm ở từng module.</p>
+          <div className="tk-init-grid">
+            {INIT_CARDS.map(c => (
+              <div key={c.title} className="tk-init-card">
+                <div className="tk-init-icon" style={{ background: `var(--${c.color}-tint)`, color: `var(--${c.color})` }}><Svg size={17} html={c.icon} /></div>
+                <div><div className="tk-init-title">{c.title}</div><div className="tk-init-desc">{c.desc}</div></div>
+              </div>
+            ))}
+          </div>
+        </>}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button className="tk-btn-ghost" onClick={handleCancel}>Huỷ</button>
-        <button className="tk-btn-project" style={{ padding: '10px 20px', fontWeight: 700 }} onClick={handleSave}>Lưu thiết lập &amp; bắt đầu thi công</button>
-      </div>
+      {p && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="tk-btn-ghost" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={handleDelete}>Xoá dự án</button>
+          <button className="tk-btn-ghost" onClick={() => { setForm(formOf(p)); onGoto('list') }}>Huỷ</button>
+          <button className="tk-btn-project" style={{ padding: '10px 20px', fontWeight: 700 }} disabled={busy} onClick={handleSave}>{busy ? 'Đang lưu…' : 'Lưu thiết lập & mở tiến độ'}</button>
+        </div>
+      )}
     </>
   )
 }
@@ -192,27 +176,21 @@ function SetupGeneral({ onGoto }) {
 const EMPTY_SUB = { name: '', scope: '', contact: '', phone: '', value: '' }
 
 function Subcontractors() {
-  const [subs, setSubs] = useState(() =>
-    readStoredArray(SUBCONTRACTOR_STORAGE_KEY, INITIAL_SUBCONTRACTORS)
-      .filter(s => s && typeof s === 'object')
-      /* trạng thái lạ trong dữ liệu cũ → 'pending' để không vỡ giao diện */
-      .map(s => (SUB_STATUS_LABEL[s.status] ? s : { ...s, status: 'pending' })))
-  usePersist(SUBCONTRACTOR_STORAGE_KEY, subs)
+  const dv = useDelivery()
+  const subs = (dv.detail && dv.detail.subcontractors) || []
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_SUB)
   const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
 
-  function submit() {
+  async function submit() {
     const name = form.name.trim()
     if (!name) { alert('Vui lòng nhập tên nhà thầu phụ.'); return }
-    setSubs(prev => [{
-      name,
-      scope: form.scope.trim() || 'Chưa xác định',
-      contact: form.contact.trim() || '—',
-      phone: form.phone.trim() || '—',
-      value: form.value.trim() || '—',
-      status: 'pending',
-    }, ...prev])
+    if (!dv.currentId) { alert('Chọn dự án trước.'); return }
+    const ok = await dv.addSubcontractor({
+      name, scope: form.scope.trim(), contact: form.contact.trim(), phone: form.phone.trim(),
+      valueVnd: Number(form.value.replace(/[^\d]/g, '')) || 0, status: 'pending',
+    })
+    if (!ok) return
     setForm(EMPTY_SUB)
     setModalOpen(false)
   }
@@ -222,8 +200,9 @@ function Subcontractors() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h3 style={{ fontSize: 14.5, fontWeight: 700 }}>Thầu phụ</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý các nhà thầu phụ tham gia thi công dự án.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý các nhà thầu phụ tham gia dự án.</p>
         </div>
+        <ProjectPicker style={{ marginLeft: 'auto', marginRight: 10, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', padding: '7px 10px', borderRadius: 7, fontSize: 12, fontFamily: 'inherit' }} />
         <button className="tk-btn-project" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontWeight: 600 }} onClick={() => setModalOpen(true)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Thêm thầu phụ
@@ -234,20 +213,27 @@ function Subcontractors() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Nhà thầu phụ', 'Hạng mục phụ trách', 'Người liên hệ', 'SĐT', 'Giá trị hợp đồng', 'Trạng thái'].map(h => <th key={h} className="tk-th">{h}</th>)}
+              {['Nhà thầu phụ', 'Hạng mục phụ trách', 'Người liên hệ', 'SĐT', 'Giá trị hợp đồng', 'Trạng thái', ''].map(h => <th key={h} className="tk-th">{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {subs.map((s, i) => {
-              const st = SUB_STATUS_LABEL[s.status]
+            {!subs.length && <tr><td className="tk-td" colSpan={7} style={{ color: 'var(--text-muted)' }}>{dv.currentId ? 'Chưa có thầu phụ.' : 'Chưa chọn dự án.'}</td></tr>}
+            {subs.map(s => {
+              const st = SUB_STATUS_LABEL[s.status] || SUB_STATUS_LABEL.pending
               return (
-                <tr key={i}>
+                <tr key={s.id}>
                   <td className="tk-td" style={{ fontWeight: 700 }}>{s.name}</td>
-                  <td className="tk-td" style={{ color: 'var(--text-dim)' }}>{s.scope}</td>
-                  <td className="tk-td">{s.contact}</td>
-                  <td className="tk-td mono">{s.phone}</td>
-                  <td className="tk-td mono">{s.value}</td>
-                  <td className="tk-td"><span className="tk-pill" style={{ background: st[2], color: st[1] }}>{st[0]}</span></td>
+                  <td className="tk-td" style={{ color: 'var(--text-dim)' }}>{s.scope || 'Chưa xác định'}</td>
+                  <td className="tk-td">{s.contact || '—'}</td>
+                  <td className="tk-td mono">{s.phone || '—'}</td>
+                  <td className="tk-td mono">{s.valueVnd ? s.valueVnd.toLocaleString('vi-VN') : '—'}</td>
+                  <td className="tk-td">
+                    <select value={s.status} onChange={e => dv.updateSubcontractor(s.id, { status: e.target.value })}
+                      style={{ border: 'none', borderRadius: 999, padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', background: st[2], color: st[1], cursor: 'pointer' }}>
+                      {Object.entries(SUB_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v[0]}</option>)}
+                    </select>
+                  </td>
+                  <td className="tk-td"><button className="tk-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }} onClick={() => { if (window.confirm('Xoá thầu phụ "' + s.name + '"?')) dv.removeSubcontractor(s.id) }}>Xoá</button></td>
                 </tr>
               )
             })}
@@ -440,9 +426,13 @@ function OrgChart({ project, onGoto }) {
 }
 
 function ProjectDetail({ onGoto }) {
-  const [project, setProject] = useState('Chung cư Riverside — Giai đoạn 2')
-  const d = DETAIL_PROJECT_DATA[project]
-  const statusColors = DETAIL_STATUS_COLORS[d.statusColor] || DETAIL_STATUS_COLORS.primary
+  const dv = useDelivery()
+  const p = dv.current
+  if (!p) return <div className="tk-card" style={{ padding: 24, fontSize: 13, color: 'var(--text-muted)' }}>Chưa có dự án. Tạo ở tab "Danh sách dự án".</div>
+  const project = p.id
+  const statusColors = STATUS_STYLE[p.status] || STATUS_STYLE.nhap
+  const d = { status: (STATUS_OPTIONS.find(o => o[0] === p.status) || STATUS_OPTIONS[0])[1], client: p.client || '—', contact: p.contact || '—', phone: p.phone || '—', email: p.email || '—',
+    budget: fmtTy(p.approvedBudgetVnd || p.contractValueVnd) }
 
   return (
     <>
@@ -453,17 +443,9 @@ function ProjectDetail({ onGoto }) {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="tk-display" style={{ fontWeight: 800, fontSize: 16 }}>{project}</div>
+              <div className="tk-display" style={{ fontWeight: 800, fontSize: 16 }}>{p.name}</div>
               <span className="tk-pill" style={{ background: statusColors[0], color: statusColors[1] }}>{d.status}</span>
-              {!d.hasData && <span className="tk-pill" style={{ background: 'var(--overdue-soft)', color: 'var(--overdue)', display: 'inline-block' }}>Dữ liệu minh hoạ</span>}
-              <select
-                title="Chuyển qua dự án khác"
-                value={project}
-                onChange={e => setProject(e.target.value)}
-                style={{ marginLeft: 'auto', flex: 'none', position: 'relative', zIndex: 2, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', padding: '6px 10px', borderRadius: 7, fontSize: 11.5, fontFamily: 'inherit', cursor: 'pointer' }}
-              >
-                {PROJECT_SHORTLIST.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-              </select>
+              <ProjectPicker style={{ marginLeft: 'auto', flex: 'none', position: 'relative', zIndex: 2, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', padding: '6px 10px', borderRadius: 7, fontSize: 11.5, fontFamily: 'inherit', cursor: 'pointer' }} />
             </div>
             <div style={{ display: 'flex', gap: 18, marginTop: 4, fontSize: 12.5 }}>
               <span><span style={{ color: 'var(--text-muted)' }}>Khách hàng: </span><strong>{d.client}</strong></span>
@@ -479,7 +461,7 @@ function ProjectDetail({ onGoto }) {
         </div>
         <div style={{ textAlign: 'right', flex: 'none' }}>
           <div className="mono tk-display" style={{ fontWeight: 800, fontSize: 20 }}>{d.budget}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Ngân sách · PM: Trần Anh</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{p.approvedBudgetVnd ? 'Ngân sách duyệt' : 'Giá trị hợp đồng'}</div>
         </div>
       </div>
 
@@ -489,7 +471,7 @@ function ProjectDetail({ onGoto }) {
           <div className="tk-flow-circle" style={{ background: 'var(--project)', color: '#fff', width: 60, height: 60, borderRadius: 16 }}>
             <Svg size={28} stroke="#fff" html={ICONS.folder} />
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>Dự án Riverside GĐ2</div>
+          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>{p.name}</div>
           <div className="tk-flow-vline" style={{ height: 22, marginTop: 6 }} />
           <div style={{ width: '100%', maxWidth: 1140, height: 2, background: 'var(--border)' }} />
 

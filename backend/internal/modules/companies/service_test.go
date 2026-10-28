@@ -317,9 +317,10 @@ func TestDeleteCongTyOrder(t *testing.T) {
 	if got := js(t, res); got != `{"ok":true,"ten":"Cty giả"}` {
 		t.Errorf("kết quả %s", got)
 	}
-	// thứ tự Object.keys(TENANT_TABLES) của supa.js:34-40, users sau cùng, rồi mới tới cong_ty
+	// thứ tự Object.keys(TENANT_TABLES) của supa.js:34-40 + 2 bảng Kinh doanh (chỉ bản Go, con trước cha), users sau cùng, rồi mới tới cong_ty
 	want := "du_an,db_bao_gia,khai_toan,db_san_pham,db_san_pham_history,don_mua_hang,chi_tiet_mua_hang,notifications,delete_requests," +
-		"audit_log,sp_combo,sp_yeu_thich,cong_tac,de_xuat,chi_tiet_de_xuat_ck,chi_tiet_de_xuat_tt,cong_tac_history,du_an_data,cai_dat_cong_ty,users,cong_ty"
+		"audit_log,sp_combo,sp_yeu_thich,cong_tac,de_xuat,chi_tiet_de_xuat_ck,chi_tiet_de_xuat_tt,cong_tac_history,du_an_data,cai_dat_cong_ty,kd_cham_soc,kd_khach_hang," +
+		"tk_binh_luan,tk_cong_viec,tk_giai_doan,tk_thau_phu,tk_thanh_vien,tk_du_an,users,cong_ty"
 	var got []string
 	for i, r := range repo.removed {
 		tb, f, _ := strings.Cut(r, "?")

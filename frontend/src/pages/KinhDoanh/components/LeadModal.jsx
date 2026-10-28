@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   LEAD_STEPS, LEAD_STEP_TITLE, LEAD_STEP_TAB_LABEL, LEAD_SOURCES, LEAD_PROJECT_TYPES, LEAD_DEPT_OPTIONS,
-  LEAD_STAGE_OPTIONS, LEAD_CATEGORY_GROUPS, LEAD_CATEGORIES, BOQ_DEFAULT_LABEL, KD_CURRENT_USER, KD_MANAGER,
+  LEAD_STAGE_OPTIONS, LEAD_CATEGORY_GROUPS, LEAD_CATEGORIES, BOQ_DEFAULT_LABEL,
 } from '../../../data/kinhDoanhData'
 import { FONT_STACK, lmInitials } from '../utils'
+import { listQsProjects } from '../api'
 
 /* ===================== Modal thêm / chỉnh sửa khách hàng tiềm năng (3 cấp độ) =====================
    Component được mount sẵn (ẩn bằng display) như bản HTML; trang cha đổi `key` mỗi lần mở
@@ -13,29 +14,31 @@ const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }
 const stepStyle = active => ({ display: active ? 'flex' : 'none', flexDirection: 'column', gap: 14 })
 const closeIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
 
-function initForm(lead) {
+function initForm(lead, me) {
   return {
     name: lead ? lead.name : '',
     phone: lead ? (lead.phone || '') : '',
     email: lead ? (lead.email || '') : '',
     address: lead ? (lead.address || '') : '',
     scale: lead ? (lead.scale || '') : '',
-    value: lead ? String(lead.value || '') : '',
+    value: lead && lead.valueVnd ? String(lead.valueVnd / 1e9) : '',
     concept: lead ? (lead.concept || '') : '',
     notes: lead ? (lead.notes || '') : '',
     partner: lead ? !!lead.partner : false,
     source: lead && lead.source ? lead.source : 'Giới thiệu',
     dept: lead ? (lead.dept || 'dan-dung') : 'dan-dung',
-    creator: lead ? (lead.creator || '') : KD_CURRENT_USER,
-    manager: lead ? (lead.manager || '') : KD_MANAGER,
+    creator: lead ? (lead.creator || '') : (me || ''),
+    manager: lead ? (lead.manager || '') : (me || ''),
+    maDA: lead ? (lead.maDA || '') : '',
     type: lead && lead.projectType ? lead.projectType : 'Nhà phố',
     stage: lead ? lead.stage : 'tiep-can',
     categories: lead && lead.categories ? LEAD_CATEGORIES.filter(c => lead.categories.indexOf(c) !== -1) : [],
   }
 }
 
-export default function LeadModal({ open, lead, onClose, onSave }) {
-  const [form, setForm] = useState(() => initForm(lead))
+export default function LeadModal({ open, lead, me, onClose, onSave }) {
+  const [form, setForm] = useState(() => initForm(lead, me))
+  const [qsProjects, setQsProjects] = useState(null) // null = đang tải
   const [step, setStep] = useState(0)
   const [boqFile, setBoqFile] = useState(lead ? (lead.boqFile || '') : '')
   const [assignees, setAssignees] = useState(lead && lead.assignees ? lead.assignees.slice() : [])
@@ -53,6 +56,10 @@ export default function LeadModal({ open, lead, onClose, onSave }) {
   const stepId = LEAD_STEPS[step]
   const isLast = step === LEAD_STEPS.length - 1
 
+  useEffect(() => {
+    if (!open) return
+    listQsProjects().then(ps => setQsProjects(ps || []), () => setQsProjects([]))
+  }, [open])
   useEffect(() => { if (nameFocusTick && nameRef.current) nameRef.current.focus() }, [nameFocusTick])
   useEffect(() => { if (assigneeFocusTick && assigneeNameRef.current) assigneeNameRef.current.focus() }, [assigneeFocusTick])
 
@@ -138,6 +145,7 @@ export default function LeadModal({ open, lead, onClose, onSave }) {
       notes: form.notes.trim(),
       partner: form.partner,
       assignees: finalAssignees,
+      maDA: form.maDA,
     })
   }
 
@@ -241,7 +249,7 @@ export default function LeadModal({ open, lead, onClose, onSave }) {
                 </button>
               </div>
               <div style={grid2}>
-                <div className="kd-field"><label>Giá trị ước tính (tỷ)</label><input type="text" placeholder="VD: 2.5" value={form.value} onChange={e => set('value', e.target.value)} /></div>
+                <div className="kd-field"><label>Giá trị ước tính (tỷ){form.maDA ? ' · đang lấy theo báo giá QS' : ''}</label><input type="text" placeholder="VD: 2.5" value={form.value} onChange={e => set('value', e.target.value)} /></div>
                 <div className="kd-field"><label>Giai đoạn hiện tại</label>
                   <select value={form.stage} onChange={e => set('stage', e.target.value)}>
                     {/* Lead đang ở giai đoạn ngoài 5 lựa chọn (VD: Dự án thiết kế): ô chọn để trống như bản HTML, nhưng giữ nguyên giai đoạn khi lưu */}
@@ -249,6 +257,13 @@ export default function LeadModal({ open, lead, onClose, onSave }) {
                     {LEAD_STAGE_OPTIONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="kd-field"><label>Gắn dự án QS (giá trị lấy theo tổng báo giá)</label>
+                <select value={form.maDA} onChange={e => set('maDA', e.target.value)}>
+                  <option value="">{qsProjects === null ? 'Đang tải dự án QS…' : '— Chưa gắn —'}</option>
+                  {form.maDA && qsProjects && !qsProjects.some(p => p.maDA === form.maDA) && <option value={form.maDA}>{form.maDA}</option>}
+                  {(qsProjects || []).map(p => <option key={p.maDA} value={p.maDA}>{(p.ten || p.maDA) + (p.tenBanNhap ? ' › ' + p.tenBanNhap : '') + ' · ' + p.maDA}</option>)}
+                </select>
               </div>
             </div>
 
