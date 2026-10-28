@@ -294,7 +294,7 @@ func (s *Server) OnShutdown(fn func(context.Context)) { s.stop = append(s.stop, 
 func (s *Server) Run(ctx context.Context) error {
 	errc := make(chan error, 1)
 	go func() {
-		fmt.Println("QS Pro chạy tại http://localhost:" + strconv.Itoa(s.deps.Cfg.Port))
+		//fmt.Println("QS Pro chạy tại http://localhost:" + strconv.Itoa(s.deps.Cfg.Port))
 		if s.swaggerOn {
 			fmt.Println("Swagger UI: http://localhost:" + strconv.Itoa(s.deps.Cfg.Port) + "/api-docs")
 		}
