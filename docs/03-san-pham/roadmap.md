@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-10-27 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-10-28 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -55,6 +55,8 @@
 | [N2](#xong-n2) | Server Go + Gin (`backend/`) | 🟡 | [N2](#n2): bật Lark, so vi sai phần còn mở |
 | [N3](#xong-n3) | Tích hợp QS vào frontend React SiteFlow (`frontend/`) với API Go | ✅ | - |
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
+| [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
+| [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 
 ---
 
@@ -71,7 +73,8 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
-| - | Chưa có | - | - |
+| <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
+| <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; sơ đồ tổ chức, bảng mua hàng PO, nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot vẫn là dữ liệu mẫu | User | 🟡 |
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
@@ -99,7 +102,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N6`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N8`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -496,3 +499,26 @@
 - Mở Dezbot: trang co lại và các bố cục hẹp bật theo bề rộng thật của trang (`@container qs`), khung chat không đổ bóng; bấm nút tròn sidebar mở hẳn sidebar
 - Kiểm 2026-10-22 trên trình duyệt với API giả (Playwright, không đụng database): bố cục khớp bản phác ở 1536px, mở Dezbot không tràn, giao diện tối, Phần thô 3.1, các menu thả xuống; `vite build` đạt
 - Phần còn lại (sắp lại các tab khác theo cột thẻ trái, thử trên dữ liệu thật) bỏ khỏi backlog theo yêu cầu người dùng (2026-10-24)
+
+<a id="xong-n6"></a>
+#### N6 - Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật
+
+- Migration 0015 (`sales_leads`, `sales_lead_activities`) và 0016 (`delivery_projects` + thành viên, thầu phụ, đề mục, công việc, bình luận); module Go `sales`, `delivery` (REST chỉ bản Go `/api/v1/sales/...`, `/api/v1/delivery/...`)
+- Kinh doanh: khách hàng, kéo-thả giai đoạn, bảng con Thiết kế / Thi công, người phụ trách, lịch sử chăm sóc lưu trên máy chủ; gắn dự án QS (giá trị lấy theo tổng báo giá); Tổng quan tính từ dữ liệu thật (doanh số theo ngày chốt)
+- Kéo khách sang "Dự án (Thiết kế)" / "Dự án (Thi công)" tự tạo dự án ở Quản lý thiết kế / Quản lý dự án (1 lần / khách / loại, cùng transaction)
+- Quản lý thiết kế / Quản lý dự án dùng chung component: danh sách dự án, thiết lập chung, nhân sự, thầu phụ, tiến độ Gantt (đề mục, công việc, mốc thu chi, kéo giãn, khung mẫu dời về hôm nay), bình luận; "hôm nay" là ngày thật
+- Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
+- Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
+- Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)
+- 🟡 phần còn lại ở 2.2
+
+<a id="xong-n7"></a>
+#### N7 - Ngành Điện lạnh (đề mục 3.2.7)
+
+- Chuyển từ QS Pro (commit ea787b6, app Node) sang bản Go + React: `dl-spec.js` (9 hạng mục: Điều hoà không khí 4 khối thông số; vật tư / phụ kiện / thông gió: Quy cách · Xuất xứ), golden `gen-specs.js` gồm cả `laChung` / `doanHM` / `dong`
+- Tự nhận ngành theo hạng mục (cả hạng mục ghi chung "Điện lạnh", "Máy lạnh"...) và đoán hạng mục con theo tên SP khi lưu / nhập file (`specs.DLDoanHM`)
+- Bảng `product_hvac_specs` + view `product_catalog` 179 cột (migration 0017); file mẫu `GET /api/v1/product-templates/dien-lanh`
+- Giao diện: ngành "Điện lạnh · sản phẩm" ở Nhập dữ liệu (form 4 khối, nút tải file mẫu), bộ lọc Bóc tách 3.2.7, bộ cột Danh sách SP, panel thông tin SP, modal Mua hàng
+- Thử trên máy phát triển 2026-10-28: lưu SP qua API (hạng mục "Điện lạnh" + tên "Ống đồng dẫn gas" tự thành hạng mục Ống đồng dẫn gas), đề mục 3.2.7 hiện SP, panel chi tiết, form nhập
+- 🟡 phần còn lại ở 2.2
+

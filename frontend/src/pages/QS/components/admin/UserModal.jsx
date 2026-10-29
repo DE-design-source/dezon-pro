@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as api from '../../api/qsApi'
-import { PERM_TABS } from '../../state/store'
+import { GRANT_TABS as PERM_TABS } from '../../state/store'
 import { qsToast } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
 import { MrootPortal } from '../common/Mroot'

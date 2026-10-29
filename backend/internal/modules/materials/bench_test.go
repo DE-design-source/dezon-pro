@@ -197,7 +197,7 @@ func TestCatalogResponseBytes(t *testing.T) {
 		for i, c := range cases {
 			row := jsval.AsMap(arr(c)[0])
 			yt, combo := i%3 == 0, float64(i%4)
-			p := prodToObj(row)
+			p := stripDL(prodToObj(row)).(*omap.Map)
 			p.Set("yeuThich", yt)
 			p.Set("comboN", combo)
 			prods = append(prods, p)

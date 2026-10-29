@@ -3,7 +3,7 @@
 import { money, tkNum_, spNorm_ } from '../../../lib/format.js'
 import { TREE, spNodeCodeOf_ } from '../../../lib/tree.js'
 import {
-  DB_FLAT, flat_, dbGroupsVs, dbGroupsSon, dbGroupsCt, coSpec_, dbLabelMaps_,
+  DB_FLAT, flat_, dbGroupsVs, dbGroupsSon, dbGroupsCt, dbGroupsDl, coSpec_, dbLabelMaps_,
   COL2PROP, SP_NUMCOL, SP_CTCOL, SP_SFX, SP_MONEY, SP_SKIP, SP_COLLBL,
 } from '../../../lib/productFields.js'
 import { splitVals, spVarKey_, spGroupVariants_ } from '../../../lib/catalogFilters.js'
@@ -32,6 +32,7 @@ export function spNganhCur_(node) {
   if (nd === '3.2.5') return 'vs'
   if (nd === '3.2.2') return 'son'
   if (nd === '3.2.6.2') return 'ct'
+  if (nd === '3.2.7') return 'dl'
   if (nd === '3.2.6' || nd === '3.2.6.1') return 'den'
   return ''
 }
@@ -42,6 +43,7 @@ function flats_(specs) {
     vs: s.VS_SPEC ? flat_(dbGroupsVs(s.VS_SPEC)) : [],
     son: s.SON_SPEC ? flat_(dbGroupsSon(s.SON_SPEC)) : [],
     ct: s.CT_SPEC ? flat_(dbGroupsCt(s.CT_SPEC)) : [],
+    dl: s.DL_SPEC ? flat_(dbGroupsDl(s.DL_SPEC)) : [],
   }
 }
 export function spColFlat_(ng, specs) {
@@ -49,19 +51,20 @@ export function spColFlat_(ng, specs) {
   if (ng === 'vs') return F.vs
   if (ng === 'son') return F.son
   if (ng === 'ct') return F.ct
+  if (ng === 'dl') return F.dl
   if (ng === 'den') return DB_FLAT
-  return DB_FLAT.concat(F.vs).concat(F.son).concat(F.ct)
+  return DB_FLAT.concat(F.vs).concat(F.son).concat(F.ct).concat(F.dl)
 }
 /* Ngành nằm trong 1 hạng mục: hạng mục ngành -> ngành đó; Thiết bị điện (3.2.6) -> đèn + công tắc; Tất cả / 3 / 3.2 -> mọi ngành;
    hạng mục chưa có bộ thông số (Thạch cao, Cửa…) -> rỗng */
-const SP_NG_NODE = [['3.2.6.1', 'den'], ['3.2.5', 'vs'], ['3.2.2', 'son'], ['3.2.6.2', 'ct']]
+const SP_NG_NODE = [['3.2.6.1', 'den'], ['3.2.5', 'vs'], ['3.2.2', 'son'], ['3.2.6.2', 'ct'], ['3.2.7', 'dl']]
 export function spHmNgs_(node) {
   const nd = String(node || '')
   return SP_NG_NODE.filter(x => !nd || x[0] === nd || x[0].indexOf(nd + '.') === 0).map(x => x[1])
 }
 /* Lọc "Hạng mục SP" (hm) trùng 1 loại của ngành trong hạng mục: ngành đó + thông số của loại (HM[loại].chinh + tk; null = mọi thông số,
    như loại đèn) */
-const SPEC_OF = { vs: 'VS_SPEC', son: 'SON_SPEC', ct: 'CT_SPEC' }
+const SPEC_OF = { vs: 'VS_SPEC', son: 'SON_SPEC', ct: 'CT_SPEC', dl: 'DL_SPEC' }
 function spLoai_(ngs, specs, hm) {
   const n = spNorm_(hm)
   if (!n) return null
@@ -179,11 +182,12 @@ export function spColsDefault_(ng) {
   if (ng === 'vs') { b.kich_thuoc = 1; b.mau_sac = 1; b.kieu_lap_dat = 1; b.he_thong_xa = 1; return b }
   if (ng === 'ct') { b.thanh_phan = 1; b.mau_sac = 1; b.dong_dm_a = 1; b.kieu_lap_dat = 1; return b }
   if (ng === 'son') { b.mau_sac = 1; b.be_mat = 1; b.do_phu = 1; b.kich_thuoc = 1; return b }
+  if (ng === 'dl') { b.loai_may = 1; b.cs_hp = 1; b.cs_lanh_kw = 1; b.quy_cach_vt = 1; return b }
   b.cong_suat_w = 1; b.nhiet_do_mau_k = 1; b.cri = 1; b.goc_chieu_deg = 1; return b
 }
 /* Ngành của BỘ CỘT: '' (chưa lọc) và ngành lạ dùng bộ cột đèn (spColsSync_) */
 export const spColsNg_ = ng => (coSpec_(ng) ? ng : 'den')
-const ON_KEY = { vs: 'onVs', son: 'onSon', ct: 'onCt' }
+const ON_KEY = { vs: 'onVs', son: 'onSon', ct: 'onCt', dl: 'onDl' }
 /* Khoá hạng mục của bộ cột: mã hạng mục, '*' = Tất cả hạng mục. Cột đang hiện, bộ tự đặt tên, nút nhanh đều tách theo khoá này */
 export const spColScope_ = node => String(node || '') || '*'
 /* sc: cột đã lưu của hạng mục (byNode); hạng mục chưa lưu lần nào thì dùng bộ theo ngành như trước */

@@ -36,6 +36,8 @@ func byName(t *testing.T, name string) *Spec {
 		return SON
 	case "ct":
 		return CT
+	case "dl":
+		return DL
 	}
 	t.Fatalf("spec lạ: %q", name)
 	return nil
@@ -43,7 +45,7 @@ func byName(t *testing.T, name string) *Spec {
 
 // Ghi lại Data phải ra đúng từng byte của JSON.stringify bên Node: thứ tự khoá không đổi qua nhúng + giải mã.
 func TestDataRoundTrip(t *testing.T) {
-	for name, raw := range map[string][]byte{"vs": vsJSON, "son": sonJSON, "ct": ctJSON} {
+	for name, raw := range map[string][]byte{"vs": vsJSON, "son": sonJSON, "ct": ctJSON, "dl": dlJSON} {
 		got, err := omap.Marshal(byName(t, name).Data)
 		if err != nil {
 			t.Fatal(err)
@@ -55,7 +57,7 @@ func TestDataRoundTrip(t *testing.T) {
 }
 
 func TestDerivedLists(t *testing.T) {
-	for _, s := range []*Spec{VS, SON, CT} {
+	for _, s := range []*Spec{VS, SON, CT, DL} {
 		if !reflect.DeepEqual(s.HangMuc, s.HM.Keys()) {
 			t.Errorf("%s: HANG_MUC khác Object.keys(HM)", s.Name)
 		}
@@ -69,7 +71,7 @@ func TestDerivedLists(t *testing.T) {
 			t.Errorf("%s: thiếu dữ liệu", s.Name)
 		}
 	}
-	if VS.Muc != "" || SON.Muc == "" || CT.Muc == "" || SON.TenTk == "" || CT.Opt == nil || VS.Opt != nil {
+	if VS.Muc != "" || SON.Muc == "" || CT.Muc == "" || SON.TenTk == "" || CT.Opt == nil || VS.Opt != nil || DL.Muc != "Điện lạnh" || DL.Opt == nil {
 		t.Error("MUC / TEN_TK / OPT không đúng spec")
 	}
 }
@@ -144,7 +146,11 @@ func TestGolden(t *testing.T) {
 			got = NganhOf(arg(0), arg(1))
 		case "dong":
 			rec := jsval.AsMap(arg(1))
-			got = strsOrNull(Dong(jsval.AsString(arg(0)), func(col string) any { return rec.Val(col) }))
+			got = strsOrNull(byName(t, spec).Dong(jsval.AsString(arg(0)), func(col string) any { return rec.Val(col) }))
+		case "laChung":
+			got = DLLaChung(arg(0))
+		case "doanHM":
+			got = DLDoanHM(arg(0), arg(1))
 		default:
 			t.Fatalf("ca %d: hàm lạ %q", i, fn)
 		}

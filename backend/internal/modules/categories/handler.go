@@ -9,11 +9,25 @@ import (
 
 const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-// RegisterRPC: module không có hàm /api/:fn nào.
-func (s *Service) RegisterRPC(reg *rpc.Registry) {}
+// RegisterRPC: module không có hàm /api/:fn nào; chỉ khai route "chỉ bản Go" file mẫu Điện lạnh
+// (bảng route gốc /mau-nhap-*.xlsx đóng băng theo bản Node nên ngành mới đi dưới /api/v1).
+func (s *Service) RegisterRPC(reg *rpc.Registry) {
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "mauNhapDienLanh", Method: "GET", Path: "/product-templates/dien-lanh", Perm: rpc.Public,
+		Tag: "Sản phẩm", Summary: "File mẫu nhập hàng loạt Điện lạnh (.xlsx), tạo động từ dl-spec.js",
+		Fields: []rpc.GoField{{Name: "hm", In: "query", Desc: "Hạng mục (vd Điều hoà không khí); trống = mọi hạng mục"}}})
+}
 
-// RegisterRoutes: module không có route REST nào dưới /api/v1.
-func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {}
+// RegisterRoutes: GET /api/v1/product-templates/dien-lanh, công khai như các file mẫu ở gốc.
+func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
+	v1.GET("/product-templates/dien-lanh", func(c *gin.Context) {
+		hm, err := queryHM(c)
+		var buf []byte
+		if err == nil {
+			buf, err = BuildDlTemplate(hm)
+		}
+		sendTemplate(c, "Mau-nhap-dien-lanh", buf, err)
+	})
+}
 
 // RegisterRoot gắn 3 route tải file mẫu nhập hàng loạt (server/index.js dòng 797-829). Không cần đăng nhập.
 func (s *Service) RegisterRoot(root *gin.RouterGroup) {

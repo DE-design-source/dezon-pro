@@ -40,6 +40,7 @@ type Service struct {
 	auditor   contracts.Auditor
 	companies contracts.CompanyReader
 	now       func() float64 // Date.now() - thay được trong test
+	ttlMs     float64        // hạn token + phiên: tokenTTLMs, hoặc TOKEN_TTL_DAYS khi có
 
 	mu      sync.Mutex
 	sess    map[string]sessEntry // _sess (A:37), khoá = sid
@@ -58,8 +59,12 @@ func New(d Deps) *Service {
 	if d.Cfg != nil && d.Cfg.AuthSecret != "" {
 		secret = d.Cfg.AuthSecret
 	}
+	ttl := float64(tokenTTLMs)
+	if d.Cfg != nil && d.Cfg.TokenTTLDays > 0 {
+		ttl = d.Cfg.TokenTTLDays * 24 * 3600 * 1000
+	}
 	return &Service{repo: NewRepository(d.DB), secret: secret, users: d.Users, fmt: d.UserFormatter,
-		auditor: d.Auditor, companies: d.Companies, now: jsval.NowMs, sess: map[string]sessEntry{}, revoked: map[string]float64{}}
+		auditor: d.Auditor, companies: d.Companies, now: jsval.NowMs, ttlMs: ttl, sess: map[string]sessEntry{}, revoked: map[string]float64{}}
 }
 
 // getUsersByName = getUsersByName_ (A:78-91): đăng nhập bằng TÊN ĐĂNG NHẬP hoặc EMAIL, trả mọi dòng trùng.

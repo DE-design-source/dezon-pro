@@ -1,24 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import {
-  INITIAL_PROJECT_MEMBERS, PROJ_DEPTS, AUTO_INCLUDE_DEPTS, avatarColor, initials,
-} from '../../../data/quanLyThietKeData'
-import {
-  PROJECT_MEMBERS_STORAGE_KEY, ORG_CHILDREN_STORAGE_KEY, ORG_PARALLEL_STORAGE_KEY,
-  readStoredObject, readStoredArray, writeStored,
-} from './storage'
-
-/* Nhân sự đã lưu (key 'siteflow-project-members'); không có / hỏng → dữ liệu mặc định của bản HTML */
-function loadProjectMembers() {
-  const stored = readStoredObject(PROJECT_MEMBERS_STORAGE_KEY)
-  if (!Object.keys(stored).length) return INITIAL_PROJECT_MEMBERS
-  const clean = {}
-  Object.entries(stored).forEach(([project, list]) => {
-    clean[project] = Array.isArray(list)
-      ? list.filter(m => m && typeof m.name === 'string').map(m => ({ ...m, role: m.role || '', dept: m.dept || 'general' }))
-      : []
-  })
-  return clean
-}
+import { createContext, useContext, useEffect, useState } from 'react'
+import { PROJ_DEPTS, AUTO_INCLUDE_DEPTS, avatarColor, initials } from '../../../data/quanLyThietKeData'
+import { ORG_CHILDREN_STORAGE_KEY, ORG_PARALLEL_STORAGE_KEY, readStoredArray } from './storage'
+import { useDelivery } from '../delivery'
 
 /* Bộ phận tuỳ biến đã lưu trong sơ đồ tổ chức → bổ sung vào danh sách phòng ban của popover nhân sự */
 function loadExtraDepts() {
@@ -29,11 +12,11 @@ function loadExtraDepts() {
 }
 
 /* Nhân sự tham gia dự án — dùng chung cho danh sách dự án, header "Sơ đồ tổ chức"
-   và các node phòng ban. Chỉ một popover được mở tại một thời điểm. */
+   và các node phòng ban. Lưu trên máy chủ theo dự án (khoá `project` = id dự án). Chỉ một popover được mở tại một thời điểm. */
 const MembersContext = createContext(null)
 
 export function MembersProvider({ children }) {
-  const [projectMembers, setProjectMembers] = useState(loadProjectMembers)
+  const dv = useDelivery()
   const [extraDepts, setExtraDepts] = useState(loadExtraDepts)
   const [openPop, setOpenPop] = useState(null) // { project, anchor }
 
@@ -44,24 +27,21 @@ export function MembersProvider({ children }) {
     return () => document.removeEventListener('click', close)
   }, [openPop])
 
-  /* Ghi lại mỗi khi danh sách nhân sự thay đổi (bỏ qua lần render đầu) */
-  const firstRun = useRef(true)
-  useEffect(() => {
-    if (firstRun.current) { firstRun.current = false; return }
-    writeStored(PROJECT_MEMBERS_STORAGE_KEY, projectMembers)
-  }, [projectMembers])
-
+  function membersOf(project) {
+    if (!project) return []
+    if (dv.detail && String(dv.detail.project.id) === String(project)) return dv.detail.members
+    return (dv.projects.find(p => String(p.id) === String(project)) || {}).members || []
+  }
   const depts = [...PROJ_DEPTS, ...extraDepts]
   const deptLabel = Object.fromEntries(depts.map(d => [d.value, d.label]))
 
   const value = {
     depts,
     deptLabel,
-    membersOf: project => projectMembers[project] || [],
-    addMember: (project, member) =>
-      setProjectMembers(prev => ({ ...prev, [project]: [...(prev[project] || []), member] })),
-    removeMember: (project, idx) =>
-      setProjectMembers(prev => ({ ...prev, [project]: (prev[project] || []).filter((_, i) => i !== idx) })),
+    membersOf,
+    nameOf: project => (dv.projects.find(p => String(p.id) === String(project)) || {}).name || '',
+    addMember: (project, member) => dv.addMember(project, member),
+    removeMember: (project, idx) => { const m = membersOf(project)[idx]; if (m) dv.removeMember(project, m.id) },
     addDept: dept => setExtraDepts(prev => [...prev, dept]),
     openPop,
     togglePop: (project, anchor) =>
@@ -93,7 +73,7 @@ function AvatarStack({ members, max }) {
 }
 
 export function ProjectMemberPopover({ project, presetDept }) {
-  const { depts, deptLabel, membersOf, addMember, removeMember, closePop } = useMembers()
+  const { depts, deptLabel, membersOf, nameOf, addMember, removeMember, closePop } = useMembers()
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [dept, setDept] = useState(presetDept || depts[0].value)
@@ -108,7 +88,7 @@ export function ProjectMemberPopover({ project, presetDept }) {
 
   return (
     <div className="tk-pjm-popover" draggable="false" onClick={e => e.stopPropagation()}>
-      <div className="tk-pjm-title">Nhân sự tham gia — {project}</div>
+      <div className="tk-pjm-title">Nhân sự tham gia — {nameOf(project)}</div>
       <div className="tk-pjm-list">
         {members.length ? members.map((m, i) => (
           <span key={i} className="tk-pjm-chip">

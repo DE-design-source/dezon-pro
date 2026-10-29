@@ -133,24 +133,56 @@ export function dbGroupsCt(CT_SPEC){
   ];
 }
 
-/* Ngành có BỘ THÔNG SỐ THEO HẠNG MỤC (khác đèn): vệ sinh · sơn nước · công tắc - ổ cắm */
-export function coSpec_(n){ return n==='vs'||n==='son'||n==='ct'; }
+/* Điện lạnh (đề mục 3.2.7, QS Pro ea787b6): sinh từ DL_SPEC. Điều hoà: 4 khối theo DL_SPEC.KHOI; vật tư / phụ kiện / thông gió: Quy cách · Xuất xứ */
+export function dbGroupsDl(DL_SPEC){
+  function dlField_(lb){ var m=DL_SPEC.METRIC[lb]; return [lb, m[1], m[2], 0, [], m[3]||'', 'vs']; }
+  function dlKhoi_(k){ var out=[]; DL_SPEC.HANG_MUC.forEach(function(h){ DL_SPEC.HM[h].nhom[k].forEach(function(lb){ if(out.indexOf(lb)<0) out.push(lb); }); }); return out; }
+  return [
+    {g:'Thông tin cơ bản', f:[
+      ['THƯƠNG HIỆU','Thương hiệu','text',1],['NHÀ CUNG CẤP','Nhà cung cấp','text',1],
+      ['HẠNG MỤC','Hạng mục','hm',1,DL_SPEC.HANG_MUC],
+      ['DÒNG SẢN PHẨM','Dòng sản phẩm','text',1,null,'VD: Máy lạnh treo tường · Dàn nóng Multi · Ống đồng dẫn gas'],
+      ['NHÓM SẢN PHẨM','Nhóm sản phẩm (series)','text',0,null,'Tên series của NCC — để trống = lấy theo Dòng sản phẩm'],
+      ['TÊN SẢN PHẨM','Tên sản phẩm','text',1],['MÃ SẢN PHẨM','Mã sản phẩm','text',1,null,'Mỗi model 1 mã'] ]},
+    {g:'Thông tin giá bán', note:'Giá đại lý tự tính = Giá bán lẻ × (1 − %Chiết khấu).', f:[
+      ['GIÁ BÁN LẺ','Giá bán lẻ','num',1],['CHIẾT KHẤU ĐẠI LÝ (%)','%Chiết khấu','num',1],['GIÁ ĐẠI LÝ','Giá đại lý','calc',0] ]},
+  ].concat(DL_SPEC.KHOI.map(function(k,i){ var t=k[1].split('|');
+    return {g:t[0]+' ('+t[1]+')', vs:1, note:i===0?'Thông số theo hạng mục đã chọn — lên cột "Thông tin chính" của bảng bóc tách. Vật tư / phụ kiện chỉ có Quy cách · Xuất xứ.':undefined, f:dlKhoi_(k[0]).map(dlField_)}; })
+  ).concat([
+    {g:'Tính năng', note:'Mỗi dòng một tính năng — hiện ở phần Thông tin sản phẩm (mở rộng).', f:[
+      ['TÍNH NĂNG','Tính năng','area',0,null,'• Inverter tiết kiệm điện\n• Lọc bụi mịn PM2.5'] ]},
+    {g:'Thương mại', f:[
+      ['BẢO HÀNH (năm)','Bảo hành (năm)','num',0],
+      ['ĐƠN VỊ TÍNH','Đơn vị tính','sel',1,['Bộ','Cái','m','Lô','Gói']],
+      ['TRẠNG THÁI','Trạng thái','sel',0,['Đang kinh doanh','Ngưng kinh doanh','Đặt hàng']],
+      ['GHI CHÚ','Ghi chú','area',0] ]},
+    {g:'Tài liệu', note:'Tải file lên (PDF, ảnh, ZIP…) hoặc dán link — hiện thành nút mở trong Thông tin sản phẩm.', f:[
+      ['LINK DATASHEET','Tài liệu kỹ thuật / Catalogue','doc',0],['THÔNG SỐ KỸ THUẬT','Thông số kỹ thuật','doc',0],
+      ['HƯỚNG DẪN CÀI ĐẶT','Hướng dẫn lắp đặt','doc',0],['FILE BẢN VẼ','File bản vẽ','doc',0] ]},
+  ]);
+}
+
+/* Ngành có BỘ THÔNG SỐ THEO HẠNG MỤC (khác đèn): vệ sinh · sơn nước · công tắc - ổ cắm · điện lạnh */
+export function coSpec_(n){ return n==='vs'||n==='son'||n==='ct'||n==='dl'; }
 /* Spec tải bất đồng bộ (api/specs.js loadSpecs, PLAN D6): khi CHƯA có / tải lỗi, các hàm dưới KHÔNG ném lỗi mà coi như
    chưa biết ngành: specNganh_ -> null, nganhCuaSP_ -> '' (trừ SP ghi sẵn ngành vs/son/ct), groups*_ -> [], bản đồ nhãn chỉ còn cột chung.
    Người gọi kiểm specsOk_ để hiện "Không tải được thông số ngành" (PLAN 1.6). Có đủ spec thì kết quả đúng như bản gốc. */
-export function specsOk_(specs){ return !!(specs && specs.VS_SPEC && specs.SON_SPEC && specs.CT_SPEC); }
+export function specsOk_(specs){ return !!(specs && specs.VS_SPEC && specs.SON_SPEC && specs.CT_SPEC && specs.DL_SPEC); }
 // Bộ thông số theo ngành
-export function specNganh_(ng, specs){ specs=specs||{}; return (ng==='son'?specs.SON_SPEC:(ng==='ct'?specs.CT_SPEC:specs.VS_SPEC))||null; }
+export function specNganh_(ng, specs){ specs=specs||{}; return (ng==='son'?specs.SON_SPEC:(ng==='ct'?specs.CT_SPEC:(ng==='dl'?specs.DL_SPEC:specs.VS_SPEC)))||null; }
 export function nganhCuaSP_(p, specs){
   if(!p) return 'den';
   var n=String(p.nganh||'').trim(); if(coSpec_(n)) return n;
   if(!specsOk_(specs)) return '';
   if(!n && specs.SON_SPEC.chuanHM(p.hangMuc)) return 'son';
   if(!n && specs.CT_SPEC.chuanHM(p.hangMuc)) return 'ct';
-  return specs.VS_SPEC.nganhOf(p.nganh,p.hangMuc)==='vs'?'vs':'den';
+  if(specs.VS_SPEC.nganhOf(p.nganh,p.hangMuc)==='vs') return 'vs';
+  // Điện lạnh: xét sau vệ sinh như máy chủ (categories.NganhCua) - hạng mục chuẩn hoặc ghi chung ("Điện lạnh", "Máy lạnh"...)
+  if(!n && (specs.DL_SPEC.chuanHM(p.hangMuc)||specs.DL_SPEC.laChung(p.hangMuc))) return 'dl';
+  return 'den';
 }
 // Bộ nhóm trường theo ngành (impGroups_ / groupsCuaSP_): 'son' | 'ct' | 'vs' | còn lại = đèn
-export function groupsOfNganh_(ng, specs){ if(coSpec_(ng) && !specNganh_(ng, specs)) return []; return ng==='son'?dbGroupsSon(specs.SON_SPEC):(ng==='ct'?dbGroupsCt(specs.CT_SPEC):(ng==='vs'?dbGroupsVs(specs.VS_SPEC):DB_GROUPS)); }
+export function groupsOfNganh_(ng, specs){ if(coSpec_(ng) && !specNganh_(ng, specs)) return []; return ng==='son'?dbGroupsSon(specs.SON_SPEC):(ng==='ct'?dbGroupsCt(specs.CT_SPEC):(ng==='dl'?dbGroupsDl(specs.DL_SPEC):(ng==='vs'?dbGroupsVs(specs.VS_SPEC):DB_GROUPS))); }
 export function groupsCuaSP_(p, specs){ var ng=nganhCuaSP_(p, specs); return ng?groupsOfNganh_(ng, specs):[]; }
 
 /* ═══ TÀI LIỆU SẢN PHẨM - mỗi trường chứa NHIỀU file (mỗi dòng 1 link) ═══ */
@@ -175,7 +207,7 @@ export const IMP_TRUC=[['MÀU SẮC','mauSac','mau_sac'],['NHIỆT ĐỘ MÀU (K
 export function impGon_(v){ return String(v==null?'':v).toLowerCase().replace(/[^0-9a-z.À-ỹ]/g,''); }
 // Ngành hàng ở trang Nhập dữ liệu
 export const IMP_LOAI=[['sp','Thiết bị đèn · sản phẩm'],['vs','Thiết bị vệ sinh · sản phẩm'],
-  ['son','Sơn nước · sản phẩm'],['ct','Công tắc - ổ cắm · sản phẩm'],['pt','Xây dựng · công tác phần thô']];
+  ['son','Sơn nước · sản phẩm'],['ct','Công tắc - ổ cắm · sản phẩm'],['dl','Điện lạnh · sản phẩm'],['pt','Xây dựng · công tác phần thô']];
 
 // cột DB -> thuộc tính đã format sẵn trong object sản phẩm
 export const COL2PROP={ thuong_hieu:'thuongHieu', nha_cung_cap:'ncc', hang_muc:'hangMuc', dong_sp:'dongSanPham',
@@ -215,7 +247,7 @@ export function dbLabelMaps_(specs){
     'ÁP LỰC NƯỚC':'ap_luc_nuoc','LƯU Ý':'luu_y','TÍNH NĂNG':'tinh_nang',
     'GIÁ ĐẠI LÝ':'gia_dai_ly'   // chỉ HIỂN THỊ: cột tự tính, server bỏ qua khi lưu
   };
-  ['VS_SPEC','SON_SPEC','CT_SPEC'].forEach(function(k){ var SP=specs&&specs[k]; if(!SP) return;
+  ['VS_SPEC','SON_SPEC','CT_SPEC','DL_SPEC'].forEach(function(k){ var SP=specs&&specs[k]; if(!SP) return;
     Object.keys(SP.METRIC).forEach(function(lb){ if(!DB_LABEL2COL_[lb]) DB_LABEL2COL_[lb]=SP.METRIC[lb][0]; }); });
   Object.assign(DB_LABEL2COL_,{'THÔNG SỐ KỸ THUẬT':'thong_so_file','HƯỚNG DẪN CÀI ĐẶT':'huong_dan_lap_dat','FILE BẢN VẼ':'file_ban_ve'});
   var SP_COL2LABEL_={}; Object.keys(DB_LABEL2COL_).forEach(function(k){ SP_COL2LABEL_[DB_LABEL2COL_[k]]=k; });

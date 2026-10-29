@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import './DuAn.css'
 import { useTheme } from '../../hooks/useTheme'
-import { MembersProvider } from './components/ProjectMembers'
-import ProjectListTab from './components/ProjectListTab'
-import SetupTab from './components/SetupTab'
+/* Danh sách, thiết lập, nhân sự, tiến độ dùng chung component với Quản lý thiết kế; dữ liệu theo dự án loại "construction" */
+import { MembersProvider } from '../QuanLyThietKe/components/ProjectMembers'
+import ProjectListTab from '../QuanLyThietKe/components/ProjectListTab'
+import SetupTab from '../QuanLyThietKe/components/SetupTab'
+import WorkGate from '../../components/ui/WorkGate'
+import { DeliveryProvider } from '../QuanLyThietKe/delivery'
 import GanttTab from '../QuanLyThietKe/components/GanttTab'
 import '../QuanLyThietKe/QuanLyThietKe.css'
-import * as DU_AN_DATA from '../../data/duAnData'
 import NhiemVuTab from './components/NhiemVuTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
@@ -33,6 +35,10 @@ function initialRoute() {
 }
 
 export default function DuAn() {
+  return <WorkGate tab="thicong" title="Quản lý dự án"><DeliveryProvider kind="construction"><DuAnPage /></DeliveryProvider></WorkGate>
+}
+
+function DuAnPage() {
   const { theme, toggleTheme } = useTheme()
   const [route] = useState(initialRoute)
   const [tab, setTab] = useState(route.tab)
@@ -80,13 +86,13 @@ export default function DuAn() {
         {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái khi chuyển tab, giống bản HTML */}
         <div className="da-content">
           <div className="da-panel" style={panelStyle('tiendo')}>
-            <div className="tk-page tk-embed"><GanttTab active={tab === 'tiendo'} data={DU_AN_DATA} /></div>
+            <div className="tk-page tk-embed"><GanttTab active={tab === 'tiendo'} /></div>
           </div>
           <div className="da-panel-scroll" style={panelStyle('list')}>
-            <ProjectListTab onGoto={goToTab} />
+            <div className="tk-page tk-embed"><ProjectListTab onGoto={goToTab} /></div>
           </div>
           <div className="da-panel-scroll" style={panelStyle('create')}>
-            <SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} />
+            <div className="tk-page tk-embed"><SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} /></div>
           </div>
           <div className="da-panel-scroll" style={panelStyle('nhiemvu')}>
             <NhiemVuTab gtab={gtab} onGtabChange={setGtab} />

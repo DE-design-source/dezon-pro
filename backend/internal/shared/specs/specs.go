@@ -69,9 +69,12 @@ var sonJSON []byte
 //go:embed data/ct.json
 var ctJSON []byte
 
+//go:embed data/dl.json
+var dlJSON []byte
+
 // Spec: toàn bộ export của một file *-spec.js.
 type Spec struct {
-	Name string    // "vs" | "son" | "ct"
+	Name string    // "vs" | "son" | "ct" | "dl"
 	Data *omap.Map // mọi export không phải hàm, đúng thứ tự khoá của object api
 
 	Metric   *omap.Map
@@ -93,6 +96,7 @@ var (
 	VS  = load("vs", vsJSON)
 	SON = load("son", sonJSON)
 	CT  = load("ct", ctJSON)
+	DL  = load("dl", dlJSON)
 )
 
 func load(name string, raw []byte) *Spec {
@@ -298,7 +302,13 @@ func NganhOf(nganh, hangMuc any) string {
 
 // Dong = CT.dong(lb, get): 1 dòng [nhãn, giá trị] cho bảng / panel; không có giá trị -> nil.
 // get(col) trả giá trị thô của cột DB. "@BH" = bảo hành, "@KT" = kích thước mặt R x C x D.
-func Dong(lb string, get func(col string) any) []string {
+func Dong(lb string, get func(col string) any) []string { return CT.Dong(lb, get) }
+
+// Dong = <spec>.dong(lb, get) của CT / DL. "@KT" chỉ CT có (DL tra METRIC nên trả nil).
+func (s *Spec) Dong(lb string, get func(col string) any) []string {
+	if lb == "@KT" && s != CT {
+		lb = "\x00" // không phải nhãn METRIC -> nil như DL.dong
+	}
 	switch lb {
 	case "@BH":
 		bh := jsval.Trim(jsval.StrOr(get("bao_hanh_nam"), ""))
@@ -322,7 +332,7 @@ func Dong(lb string, get func(col string) any) []string {
 		}
 		return []string{"Kích thước mặt (R x C x D)", strings.Join(kt, " x ") + " mm"}
 	}
-	m := jsval.AsArray(CT.Metric.Val(lb))
+	m := jsval.AsArray(s.Metric.Val(lb))
 	if len(m) < 2 {
 		return nil
 	}

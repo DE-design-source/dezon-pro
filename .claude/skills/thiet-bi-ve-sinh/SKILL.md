@@ -41,11 +41,14 @@ Lưu ý: bảng dưới ghi vị trí trong app Node cũ (`public/`, `server/`),
 ## Ngành SƠN NƯỚC — cùng khuôn, khác spec
 `backend/internal/shared/specs/js/son-spec.js` (`SON_SPEC`) là bản song song của vs-spec cho đề mục **3.2.2 Sơn nước**: cùng API (`METRIC`/`HM`/`HANG_MUC`/`CHUNG`/`chuanHM`/`labelsOf`/`optsOf`/`isReq`/`CHINH_ALL`/`TK_ALL`/`VD`), hạng mục = dòng sơn (Sơn nội thất · ngoại thất · lót · chống thấm · Bả matit · hiệu ứng · sàn epoxy · Dung môi), `chinh` = Key Product Info, `tk` = mục IX tính chất lý hoá. File mẫu `server/son-template.js` → `GET /mau-nhap-son-nuoc.xlsx`; bảng `product_paint_specs` (migration `infra/db/migrations/0006_product_spec_tables.sql`).
 
-Chỗ chọn spec theo ngành (thêm ngành mới thì sửa đúng mấy chỗ này):
-| Nơi | Hàm |
+Chỗ chọn spec theo ngành (thêm ngành mới thì sửa đúng mấy chỗ này; ngành Điện lạnh `dl` thêm ngày 2026-10-28 theo đúng danh sách này):
+| Nơi | Chỗ |
 |---|---|
-| Client | `nhap.js`: `specNganh_(ng)`, `nganhCuaSP_(p)`, `impGroups_`/`impFlat_`, `DB_GROUPS_SON`, `vsApplyHM_(box,hm,hienHet,ng)`, `impSpec_` · `app.js`: `spSpec_(p)` |
-| Server | `nganhCua_`, `specNganh_`, `MUC_NGANH` (`san-pham.mapper.js`) và tham số `nganh` của `importParse` (`san-pham.import.js`) |
+| Spec + golden | `specs/js/<ngành>-spec.js`, `specs/source.go` (go:embed + `SourceFiles`), `specs/specs.go` (`load`), `specs/specs_test.go` (`byName`, các danh sách), `backend/scripts/gen-specs.js` (`SPECS`, `NAMES`, `LABELS_ALL`, `NGANH`); hàm riêng của spec (vd `dl` có `laChung` / `doanHM`) viết bản Go (`specs/dl.go`) + ca golden |
+| Server Go | `modules/categories/service.go`: `NganhCua`, `SpecNganh`, `MucNganh`, bảng nhãn↔cột · `shared/errors/colerr.go` · `shared/qscore/importparse.go` `specOf` · `modules/materials`: `service_import.go` (`_nganh`), `service_write.go`, `service_format.go` (`prodToObj`) · file mẫu `categories/template_<ngành>.go` (route gốc `/mau-nhap-*.xlsx` đóng băng: ngành mới đi `/api/v1/product-templates/...`) · `server/assets_test.go` |
+| Database | migration bảng `product_<ngành>_specs` + tạo lại view `product_catalog` · `db-map.json` `db_san_pham.columns` + `parts` · `infra/deploy/Caddyfile` (đường dẫn `/<ngành>-spec.js`) |
+| Client React | `api/specs.js`, `api/files.js` (`TEMPLATES`), `lib/productFields.js` (`dbGroups*`, `coSpec_`, `specNganh_`, `nganhCuaSP_`, `groupsOfNganh_`, `IMP_LOAI`, `dbLabelMaps_`), `lib/catalogFilters.js`, `components/importer/*`, `components/products/list/spModel.js`, `components/products/edit/editModel.js`, `components/breakdown/catalog/catalogModel.js`, `components/purchase/ProductModal.jsx` |
+| Test golden Node | golden Node không sinh lại được: chỉ sửa mã test (`categories` `nodePart`, `colerr_test`, `materials` `stripDL` / `goonly.StripEmpty`) |
 
 Nhãn TRÙNG giữa 2 spec phải trỏ **cùng một cột DB** (MÀU SẮC · KÍCH THƯỚC · BỀ MẶT HOÀN THIỆN · LƯU Ý).
 

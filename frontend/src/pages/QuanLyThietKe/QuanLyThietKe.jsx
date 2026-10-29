@@ -8,6 +8,8 @@ import GanttTab from './components/GanttTab'
 import NhanSuTab from './components/NhanSuTab'
 import TaskGameTab from './components/TaskGameTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
+import WorkGate from '../../components/ui/WorkGate'
+import { DeliveryProvider } from './delivery'
 
 const MAIN_TABS = [
   { key: 'list', label: 'Danh sách dự án' },
@@ -31,6 +33,10 @@ function initialRoute() {
 }
 
 export default function QuanLyThietKe() {
+  return <WorkGate tab="thietke" title="Quản lý thiết kế"><DeliveryProvider kind="design"><QuanLyThietKePage /></DeliveryProvider></WorkGate>
+}
+
+function QuanLyThietKePage() {
   const { theme, toggleTheme } = useTheme()
   const [route] = useState(initialRoute)
   const [tab, setTab] = useState(route.tab)

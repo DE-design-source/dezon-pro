@@ -28,7 +28,7 @@ export default function NganhSel({ loai, onPick, specs }) {
   const btnRef = useRef(null)
   const popRef = useRef(null)
   const dem = useMemo(() => {
-    const c = { den: 0, vs: 0, son: 0, ct: 0 }
+    const c = { den: 0, vs: 0, son: 0, ct: 0, dl: 0 }
     ;(products || []).forEach(p => { const ng = nganhCuaSP_(p, specs); if (c[ng] != null) c[ng]++ })
     return c
   }, [products, specs])

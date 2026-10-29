@@ -13,6 +13,7 @@ import (
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
 	"qspro-backend/internal/shared/qscore"
+	"qspro-backend/internal/shared/specs"
 )
 
 var (
@@ -99,6 +100,10 @@ func (s *Service) SaveDbProduct(ctx context.Context, a *actor.Actor, data *omap.
 		if ng0 := categories.NganhCua("", row.Val("hang_muc")); ng0 != "den" {
 			row.Set("nganh", ng0)
 		}
+	}
+	// Điện lạnh (chỉ bản Go, theo QS Pro): hạng mục ghi chung -> hạng mục con đoán theo tên SP
+	if row.Val("nganh") == "dl" && jsval.Truthy(row.Val("hang_muc")) {
+		row.Set("hang_muc", specs.DLDoanHM(row.Val("hang_muc"), ten))
 	}
 	ma := jsval.Trim(jsval.S(data.Val(nhanMa)))
 	// Khoá trùng = MÃ SP + các trục BIẾN THỂ: cùng mã nhưng khác nhiệt độ màu là 2 sản phẩm riêng.

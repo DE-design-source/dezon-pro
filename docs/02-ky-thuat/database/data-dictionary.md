@@ -72,6 +72,217 @@ thật là `RemoveSession` (đăng xuất) / `RemoveUserSessions` (thu hồi the
 | `created_at` | `tao_luc` | timestamp with time zone | không | now() |  | Login time |  |
 | `expires_at` | `het_han` | timestamp with time zone | không |  | CHECK > `created_at` | Same as the token expiry (login time + 7 days) | **C (dẫn xuất)**: = `exp` của token; nguồn chuẩn là lúc server ký token. |
 
+## `sales_leads` (`kd_khach_hang`)
+
+Khách hàng tiềm năng / cơ hội của trang Kinh doanh - migration 0015 (2026-10-28), module `backend/internal/modules/sales`. **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`). Kéo khách sang `thiet-ke` / `thi-cong` tự tạo dòng `delivery_projects` trong cùng transaction (`contracts.DeliveryFromLead`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `customer_name` | `ten_khach` | text | không |  | CHECK | Customer (person or company) name shown on the card. |  |
+| `phone` | `sdt` | text | không | '' |  | Customer phone, free text. |  |
+| `email` | `email` | text | không | '' |  | Customer email, free text. |  |
+| `address` | `dia_chi` | text | không | '' |  | Project / customer address. |  |
+| `lead_source` | `nguon` | text | không | '' |  | Where the lead came from (Giới thiệu, Website, ...). Open list, no CHECK. |  |
+| `sales_unit` | `phong_kd` | text | không | 'dan-dung' | CHECK | Sales department: dan-dung (residential) / du-an (projects). |  |
+| `stage` | `giai_doan` | text | không | 'tiep-can' | CHECK | Pipeline stage key (frontend STAGES in kinhDoanhData.js). |  |
+| `board_stage` | `giai_doan_con` | text | có |  | CHECK | Sub-stage on the Thiết kế / Thi công boards; null = not placed on a board yet. |  |
+| `project_type` | `loai_cong_trinh` | text | không | '' |  | Building type (Nhà phố, Biệt thự, ...). |  |
+| `scale_note` | `quy_mo` | text | không | '' |  | Free-text scale, e.g. "200m2 x 3 tầng". |  |
+| `estimated_value_vnd` | `gia_tri_vnd` | numeric(18,0) | không | 0 | CHECK | Value typed by sales, VND. Ignored for display when project_code is set (quote total wins). | Giao diện hiển thị tổng báo giá QS (thanhTienBan, chưa VAT) thay cho cột này khi `project_code` có giá trị. |
+| `categories` | `hang_muc` | text[] | không | '{}' |  | Work categories requested (display only, never filtered on). | Danh sách chỉ để hiển thị (quy tắc 6); mảng `text[]`, không lọc theo phần tử. |
+| `concept_note` | `concept` | text | không | '' |  | Design concept / style wishes. |  |
+| `note` | `ghi_chu` | text | không | '' |  | General note. |  |
+| `is_partner_handover` | `doi_tac` | boolean | không | false |  | True when the signed job is handed to a partner company. |  |
+| `creator_name` | `nguoi_tao_ten` | text | không | '' |  | Display name of the salesperson who created the lead (free text, may differ from created_by). | Tên hiển thị tự do (danh bạ nhân sự chưa có trong database). |
+| `manager_name` | `quan_ly` | text | không | '' |  | Display name of the managing salesperson (free text). |  |
+| `assignees` | `phu_trach` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "role": text}] - people on the card. | jsonb tài liệu nguyên khối (quy tắc 19): `[{"name": text, "role": text}]`, tối đa 50 phần tử. |
+| `handoff` | `ban_giao` | jsonb | có |  | CHECK | Document read/written whole: last handoff slip {"status","dept","requestedAt","assignee"}; null = none. | jsonb tài liệu nguyên khối: `{"status","dept","requestedAt","assignee"}` (giá trị chuỗi hoặc null). |
+| `boq_file_name` | `file_boq` | text | không | '' |  | Name of the BOQ file the customer sent (name only, no upload yet). |  |
+| `project_code` | `ma_da` | text | có |  | FK SET NULL | Linked QS project (projects.project_code); its quote total is shown as the lead value. |  |
+| `won_at` | `ngay_chot` | timestamp with time zone | có |  |  | Set by the service when the lead first enters a won stage (chot-hd, thiet-ke, thi-cong, bao-gia-thi-cong); cleared when moved back. | **C (dẫn xuất)**: nguồn chuẩn là `stage`; service đặt khi lần đầu vào nhóm đã chốt, xoá khi quay lại. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `sales_lead_activities` (`kd_cham_soc`)
+
+Lịch sử chăm sóc khách hàng - migration 0015. **Bảng con** của `sales_leads` (không có `company_id`; db-map `tenant` qua `lead_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `lead_id` | `khach_hang_id` | bigint | không |  | FK CASCADE | Owning lead; rows are deleted with it. |  |
+| `activity_date` | `ngay` | date | không |  |  | Business date of the contact. |  |
+| `activity_kind` | `loai` | text | không |  | CHECK | call / meeting / site / zalo / email / quote / note. |  |
+| `title` | `tieu_de` | text | không |  | CHECK | Short title. |  |
+| `content` | `noi_dung` | text | không | '' |  | What happened. |  |
+| `outcome` | `ket_qua` | text | không | '' | CHECK | Customer reaction: good / neutral / bad, empty for plain notes. |  |
+| `next_follow_up_date` | `hen_tiep` | date | có |  |  | Planned next contact date; null = none. |  |
+| `next_note` | `ghi_chu_hen` | text | không | '' |  | What to do at the next contact. |  |
+| `author_name` | `nguoi_viet` | text | không | '' |  | Display name of the writer at the time (snapshot). | **B (snapshot)**: tên người viết tại thời điểm ghi. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote the row; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `delivery_projects` (`tk_du_an`)
+
+Dự án triển khai sau Kinh doanh: `kind = design` (trang Quản lý thiết kế, quyền tab `thietke`) / `construction` (Quản lý dự án, quyền `thicong`) - migration 0016, module `backend/internal/modules/delivery`. **Tenant-owned, bảng gốc**.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session. |  |
+| `kind` | `loai` | text | không |  | CHECK | design = Quản lý thiết kế page, construction = Quản lý dự án page. |  |
+| `lead_id` | `khach_hang_id` | bigint | có |  | FK SET NULL | Sales lead it came from; null when created by hand. Unique per kind. | Unique cùng `kind` (`uq_delivery_projects_lead_id_kind`, chỉ khi khác NULL): 1 dự án thiết kế + 1 thi công / khách. |
+| `project_code` | `ma_da` | text | có |  | FK SET NULL | Linked QS project (copied from the lead when created, editable). |  |
+| `name` | `ten` | text | không |  | CHECK | Project display name. |  |
+| `client_name` | `khach` | text | không | '' |  | Customer name (copied from the lead at creation, then independent). | **B (snapshot)** lúc tạo từ khách hàng Kinh doanh, sau đó sửa độc lập. |
+| `contact_name` | `lien_he` | text | không | '' |  | Customer contact person. |  |
+| `phone` | `sdt` | text | không | '' |  | Customer phone. |  |
+| `email` | `email` | text | không | '' |  | Customer email. |  |
+| `address` | `dia_chi` | text | không | '' |  | Site address. |  |
+| `project_type` | `loai_cong_trinh` | text | không | '' |  | Building type (Nhà phố, Biệt thự, ...). |  |
+| `status` | `trang_thai` | text | không | 'nhap' | CHECK | nhap (draft) / dang-lam (in progress) / tam-dung (paused) / hoan-tat (done). |  |
+| `start_date` | `ngay_bat_dau` | date | có |  | CHECK | Planned start date. |  |
+| `handover_date` | `ngay_ban_giao` | date | có |  | CHECK | Planned handover date. |  |
+| `contract_value_vnd` | `gia_tri_hd` | numeric(18,0) | không | 0 | CHECK | Contract value, VND. Snapshot of the lead value at creation, then edited here. | **B (snapshot)** giá trị khách hàng lúc tạo (tổng báo giá QS nếu đã gắn), sau đó sửa độc lập. |
+| `approved_budget_vnd` | `ngan_sach` | numeric(18,0) | không | 0 | CHECK | Approved cost budget, VND. |  |
+| `note` | `ghi_chu` | text | không | '' |  | General note. |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row (or moved the lead); set null if deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change of the project header (set by the service). |  |
+
+## `delivery_project_members` (`tk_thanh_vien`)
+
+Thành viên dự án triển khai - migration 0016. **Bảng con** (tenant qua `project_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `project_id` | `du_an_id` | bigint | không |  | FK CASCADE | Owning project. |  |
+| `member_name` | `ten` | text | không |  | CHECK | Display name (free text; staff directory is not in the database yet). |  |
+| `role` | `vai_tro` | text | không | '' |  | Role on the project. |  |
+| `dept_key` | `bo_phan` | text | không | 'general' |  | Department / org-chart node key the person sits in (open list). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `delivery_subcontractors` (`tk_thau_phu`)
+
+Thầu phụ của dự án triển khai - migration 0016. **Bảng con** (tenant qua `project_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `project_id` | `du_an_id` | bigint | không |  | FK CASCADE | Owning project. |  |
+| `name` | `ten` | text | không |  | CHECK | Subcontractor company name. |  |
+| `scope` | `pham_vi` | text | không | '' |  | Work scope. |  |
+| `contact_name` | `lien_he` | text | không | '' |  | Contact person. |  |
+| `phone` | `sdt` | text | không | '' |  | Contact phone. |  |
+| `contract_value_vnd` | `gia_tri` | numeric(18,0) | không | 0 | CHECK | Subcontract value, VND. |  |
+| `status` | `trang_thai` | text | không | 'pending' | CHECK | active / pending / done. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `delivery_phases` (`tk_giai_doan`)
+
+Đề mục (giai đoạn) tiến độ Gantt - migration 0016. **Bảng con** (tenant qua `project_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK, UNIQUE | Primary key. |  |
+| `project_id` | `du_an_id` | bigint | không |  | FK CASCADE, UNIQUE | Owning project. |  |
+| `name` | `ten` | text | không |  | CHECK | Phase name. |  |
+| `sort_order` | `thu_tu` | integer | không | 0 |  | Display order (ascending). |  |
+| `members` | `thanh_vien` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "role": text}] in charge of the phase. | jsonb tài liệu nguyên khối: `[{"name": text, "role": text}]`. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `delivery_tasks` (`tk_cong_viec`)
+
+Công việc / cột mốc / mốc thu chi trên tiến độ - migration 0016. **Bảng con** (tenant qua `project_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK, UNIQUE | Primary key. |  |
+| `project_id` | `du_an_id` | bigint | không |  | FK CASCADE, FK CASCADE, UNIQUE | Owning project (tenant path; must equal the phase project, enforced by fk_delivery_tasks_phase). | Đường tenant (db-map `tenant` qua `delivery_projects`); khoá ngoại ghép `(phase_id, project_id)` bảo đảm cùng dự án với giai đoạn. |
+| `phase_id` | `giai_doan_id` | bigint | không |  | FK CASCADE | Phase the task sits in. |  |
+| `name` | `ten` | text | không |  | CHECK | Task name. |  |
+| `start_date` | `bat_dau` | date | không |  | CHECK | Start date (actual date once a payment milestone is confirmed). |  |
+| `end_date` | `ket_thuc` | date | không |  | CHECK | End date. |  |
+| `progress_pct` | `tien_do` | numeric(5,2) | không | 0 | CHECK | Progress 0-100 entered by the team. |  |
+| `is_critical` | `quan_trong` | boolean | không | false |  | On the critical path (drawn red). |  |
+| `is_milestone` | `cot_moc` | boolean | không | false |  | Milestone (drawn as a diamond). |  |
+| `description` | `mo_ta` | text | không | '' |  | Task description. |  |
+| `depts` | `bo_phan` | text[] | không | '{}' |  | Departments in charge (display only, never filtered on). | Danh sách chỉ để hiển thị (quy tắc 6). |
+| `owners` | `phu_trach` | text[] | không | '{}' |  | People in charge (display only; first one shown as assignee). | Danh sách chỉ để hiển thị (quy tắc 6); phần tử đầu hiện ở cột "Phụ trách". |
+| `finance_kind` | `loai_tien` | text | có |  | CHECK | Payment milestone: thu (money in) / chi (money out); null = normal task. |  |
+| `planned_date` | `ngay_ke_hoach` | date | có |  |  | Planned date of a payment milestone (start_date holds the actual date once confirmed). |  |
+| `amount_vnd` | `so_tien` | numeric(18,0) | có |  | CHECK | Amount of a payment milestone, VND. |  |
+| `is_confirmed` | `da_xac_nhan` | boolean | không | false |  | Payment milestone confirmed as paid / received. |  |
+| `sort_order` | `thu_tu` | integer | không | 0 |  | Order inside the phase (ascending). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change (set by the service). |  |
+
+## `delivery_task_comments` (`tk_binh_luan`)
+
+Bình luận công việc - migration 0016. **Bảng con** (tenant qua `project_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `project_id` | `du_an_id` | bigint | không |  | FK CASCADE, FK CASCADE | Owning project (tenant path; must equal the task project, enforced by fk_delivery_task_comments_task). | Đường tenant; khoá ngoại ghép `(task_id, project_id)` bảo đảm cùng dự án với công việc. |
+| `task_id` | `cong_viec_id` | bigint | không |  | FK CASCADE | Task commented on. |  |
+| `author_name` | `nguoi_viet` | text | không | '' |  | Display name of the writer at the time (snapshot). | **B (snapshot)**: tên người viết tại thời điểm ghi. |
+| `body` | `noi_dung` | text | không |  | CHECK | Comment text (may contain @mentions). |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote it; set null if deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `product_hvac_specs` (phần của `db_san_pham`)
+
+Thông số ngành Điện lạnh (đề mục 3.2.7, nguồn `backend/internal/shared/specs/js/dl-spec.js`, chép từ QS Pro ea787b6) - migration 0017 (2026-10-28).
+Bảng 1-1 với `products`, chỉ có dòng khi SP có ít nhất 1 thông số; đọc qua view `product_catalog` (cột s4), ghi tách theo `parts` của `db_san_pham` trong `db-map.json`.
+**Xếp loại (quy tắc 25):** bảng con của `products` (công ty lấy qua sản phẩm, như các bảng thông số khác). 2 cột đổi tên so với QS Pro vì trùng cột ngành vệ sinh trong view: `hvac_power_supply` (nhãn ĐIỆN NGUỒN), `hvac_control_type` (nhãn ĐIỀU KHIỂN (REMOTE / WIFI)).
+
+| Cột | Tên trong code | Kiểu | NULL | Ràng buộc | Ý nghĩa |
+|---|---|---|---|---|---|
+| `product_id` | `—` | bigint | không | PK, FK CASCADE | Product (products.id); row deleted with the product. |
+| `unit_type` | `loai_may` | text | có |  | HVAC spec (code: loai_may) |
+| `cooling_capacity_kw` | `cs_lanh_kw` | text | có |  | HVAC spec (code: cs_lanh_kw) |
+| `capacity_hp` | `cs_hp` | text | có |  | HVAC spec (code: cs_hp) |
+| `capacity_btu` | `cs_btu` | text | có |  | HVAC spec (code: cs_btu) |
+| `operation_mode` | `che_do_van_hanh` | text | có |  | HVAC spec (code: che_do_van_hanh) |
+| `compressor_type` | `may_nen` | text | có |  | HVAC spec (code: may_nen) |
+| `refrigerant` | `moi_chat_lanh` | text | có |  | HVAC spec (code: moi_chat_lanh) |
+| `hvac_power_supply` | `dien_nguon_dl` | text | có |  | HVAC spec (code: dien_nguon_dl) |
+| `origin_country` | `xuat_xu` | text | có |  | HVAC spec (code: xuat_xu) |
+| `power_input_kw` | `cs_dien_kw` | text | có |  | HVAC spec (code: cs_dien_kw) |
+| `energy_efficiency` | `hieu_suat_nl` | text | có |  | HVAC spec (code: hieu_suat_nl) |
+| `energy_label` | `nhan_nang_luong` | text | có |  | HVAC spec (code: nhan_nang_luong) |
+| `airflow_m3h` | `luu_luong_gio` | text | có |  | HVAC spec (code: luu_luong_gio) |
+| `indoor_noise_db` | `do_on_dan_lanh` | text | có |  | HVAC spec (code: do_on_dan_lanh) |
+| `outdoor_noise_db` | `do_on_dan_nong` | text | có |  | HVAC spec (code: do_on_dan_nong) |
+| `cooling_area` | `pham_vi_lam_lanh` | text | có |  | HVAC spec (code: pham_vi_lam_lanh) |
+| `air_filtration` | `loc_khi` | text | có |  | HVAC spec (code: loc_khi) |
+| `hvac_control_type` | `dk_dieu_hoa` | text | có |  | HVAC spec (code: dk_dieu_hoa) |
+| `liquid_pipe` | `ong_long` | text | có |  | HVAC spec (code: ong_long) |
+| `gas_pipe` | `ong_hoi` | text | có |  | HVAC spec (code: ong_hoi) |
+| `max_pipe_length_m` | `ong_dai_max` | text | có |  | HVAC spec (code: ong_dai_max) |
+| `max_height_diff_m` | `chenh_cao_max` | text | có |  | HVAC spec (code: chenh_cao_max) |
+| `drain_pipe` | `ong_thoat_nuoc` | text | có |  | HVAC spec (code: ong_thoat_nuoc) |
+| `power_cable` | `day_nguon` | text | có |  | HVAC spec (code: day_nguon) |
+| `control_cable` | `day_dieu_khien` | text | có |  | HVAC spec (code: day_dieu_khien) |
+| `panel_model` | `mat_na` | text | có |  | HVAC spec (code: mat_na) |
+| `max_indoor_units` | `so_dan_lanh_max` | text | có |  | HVAC spec (code: so_dan_lanh_max) |
+| `refrigerant_charge` | `gas_nap` | text | có |  | HVAC spec (code: gas_nap) |
+| `indoor_unit_dimensions` | `kt_dan_lanh` | text | có |  | HVAC spec (code: kt_dan_lanh) |
+| `indoor_unit_weight_kg` | `kl_dan_lanh` | text | có |  | HVAC spec (code: kl_dan_lanh) |
+| `outdoor_unit_dimensions` | `kt_dan_nong` | text | có |  | HVAC spec (code: kt_dan_nong) |
+| `outdoor_unit_weight_kg` | `kl_dan_nong` | text | có |  | HVAC spec (code: kl_dan_nong) |
+| `panel_cutout_size` | `kt_mat_na` | text | có |  | HVAC spec (code: kt_mat_na) |
+| `installation_location` | `vi_tri_lap_dat` | text | có |  | HVAC spec (code: vi_tri_lap_dat) |
+| `outdoor_bracket` | `gia_do_dan_nong` | text | có |  | HVAC spec (code: gia_do_dan_nong) |
+| `min_clearance` | `kc_lap_min` | text | có |  | HVAC spec (code: kc_lap_min) |
+| `installation_note` | `gc_lap_dat` | text | có |  | HVAC spec (code: gc_lap_dat) |
+| `material_spec` | `quy_cach_vt` | text | có |  | HVAC spec (code: quy_cach_vt) |
+
 ## `audit_logs` (`audit_log`)
 
 Nhật ký thao tác (chỉ thêm). 2933 dòng.

@@ -226,3 +226,12 @@ type ReportRunner interface {
 	BaoCaoNhapSP(ctx context.Context, a *actor.Actor, opts *omap.Map) (*omap.Map, error)
 	DaGuiHomNay(ctx context.Context) bool
 }
+
+// DeliveryFromLead - chủ: delivery (chỉ bản Go). Khách hàng Kinh doanh sang giai đoạn thiet-ke / thi-cong ->
+// tự tạo dự án tương ứng ở trang Quản lý thiết kế / Quản lý dự án (kind "design" / "construction").
+//
+// lead là dòng kd_khach_hang (tên cột trong code), valueVnd = giá trị đang hiển thị của khách (tổng báo giá QS nếu đã gắn).
+// Đã có dự án cùng (lead, kind) -> không làm gì, trả (false, nil). Chạy trong ctx của nơi gọi (cùng transaction nếu có).
+type DeliveryFromLead interface {
+	EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, valueVnd float64, kind string) (bool, error)
+}

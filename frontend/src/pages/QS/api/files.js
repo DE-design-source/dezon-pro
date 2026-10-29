@@ -93,6 +93,7 @@ export const logoUrl = () => API_BASE + '/logo.svg'
 const TEMPLATES = {
   vs: '/mau-nhap-thiet-bi-ve-sinh.xlsx',
   ct: '/mau-nhap-cong-tac-o-cam.xlsx',
+  dl: '/api/v1/product-templates/dien-lanh', // ngành Điện lạnh: route chỉ bản Go
   son: '/mau-nhap-son-nuoc.xlsx',
   sp: '/mau-nhap-hang-loat.xlsx',
 }

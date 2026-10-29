@@ -1,5 +1,5 @@
 /* Phần còn lại của nghiệp vụ tab Nhập dữ liệu (port PUB/nhap.js): đổi ngành hàng, combo trong form, chữ xem trước biến thể,
-   nhập hàng loạt từ file Excel. Spec ngành là tham số specs = {VS_SPEC, SON_SPEC, CT_SPEC}. */
+   nhập hàng loạt từ file Excel. Spec ngành là tham số specs = {VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC}. */
 import * as api from '../../api/qsApi'
 import { qsToast, qsConfirm } from '../common/dialogs'
 import { coSpec_, specNganh_, nganhCuaSP_ } from '../../lib/productFields'
@@ -98,8 +98,8 @@ export async function impParseFile_(f, specs) {
     // File vệ sinh / sơn nước / công tắc mà ô Ngành hàng đang để Thiết bị đèn -> tự nhận theo cột HẠNG MỤC
     if (!nganh && specs && specs.VS_SPEC) {
       const ps = res.products || [], hmRaw = p => (p._raw || {})['HẠNG MỤC'] || p.hangMuc
-      const doan = [['vs', specs.VS_SPEC, 'THIẾT BỊ VỆ SINH', 'Thiết bị vệ sinh'], ['son', specs.SON_SPEC, 'SƠN NƯỚC', 'Sơn nước'], ['ct', specs.CT_SPEC, 'CÔNG TẮC - Ổ CẮM', 'Công tắc - ổ cắm']]
-        .filter(x => ps.length && ps.filter(p => x[1].chuanHM(hmRaw(p))).length * 2 >= ps.length)[0]
+      const doan = [['vs', specs.VS_SPEC, 'THIẾT BỊ VỆ SINH', 'Thiết bị vệ sinh'], ['son', specs.SON_SPEC, 'SƠN NƯỚC', 'Sơn nước'], ['ct', specs.CT_SPEC, 'CÔNG TẮC - Ổ CẮM', 'Công tắc - ổ cắm'], ['dl', specs.DL_SPEC, 'ĐIỆN LẠNH', 'Điện lạnh']]
+        .filter(x => x[1] && ps.length && ps.filter(p => x[1].chuanHM(hmRaw(p)) || (x[1].laChung && x[1].laChung(hmRaw(p)))).length * 2 >= ps.length)[0]
       if (doan) {
         nganh = doan[0]
         ps.forEach(p => { p._nganh = doan[0] })

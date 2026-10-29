@@ -1,10 +1,10 @@
-/* Thông số theo ngành (UMD PUB/vs-spec.js, son-spec.js, ct-spec.js) do máy chủ Go phục vụ tĩnh (D6).
-   Nạp 1 lần bằng <script> (UMD gán window.VS_SPEC / SON_SPEC / CT_SPEC khi không có module).
-   loadSpecs() -> Promise<{VS_SPEC, SON_SPEC, CT_SPEC}>; lỗi -> reject (UI hiện "Không tải được thông số ngành").
+/* Thông số theo ngành (UMD PUB/vs-spec.js, son-spec.js, ct-spec.js + dl-spec.js của ngành Điện lạnh) do máy chủ Go phục vụ tĩnh (D6).
+   Nạp 1 lần bằng <script> (UMD gán window.VS_SPEC / SON_SPEC / CT_SPEC / DL_SPEC khi không có module).
+   loadSpecs() -> Promise<{VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC}>; lỗi -> reject (UI hiện "Không tải được thông số ngành").
    Lỗi thì lần gọi sau thử lại. */
 import { API_BASE, QsNotConfiguredError } from './http'
 
-const FILES = [['vs-spec.js', 'VS_SPEC'], ['son-spec.js', 'SON_SPEC'], ['ct-spec.js', 'CT_SPEC']]
+const FILES = [['vs-spec.js', 'VS_SPEC'], ['son-spec.js', 'SON_SPEC'], ['ct-spec.js', 'CT_SPEC'], ['dl-spec.js', 'DL_SPEC']]
 let pending = null
 
 function loadOne(file, globalName) {
@@ -39,7 +39,7 @@ export function loadSpecs() {
   if (!API_BASE) return Promise.reject(new QsNotConfiguredError())
   if (!pending) {
     pending = Promise.all(FILES.map(([f, g]) => loadOne(f, g)))
-      .then(([VS_SPEC, SON_SPEC, CT_SPEC]) => ({ VS_SPEC, SON_SPEC, CT_SPEC }))
+      .then(([VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC]) => ({ VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC }))
       .catch(e => { pending = null; throw e })
   }
   return pending
@@ -47,6 +47,6 @@ export function loadSpecs() {
 
 /* Đã nạp xong chưa (đồng bộ, cho render): null nếu chưa */
 export function specsNow() {
-  const { VS_SPEC, SON_SPEC, CT_SPEC } = window
-  return VS_SPEC && SON_SPEC && CT_SPEC ? { VS_SPEC, SON_SPEC, CT_SPEC } : null
+  const { VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC } = window
+  return VS_SPEC && SON_SPEC && CT_SPEC && DL_SPEC ? { VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC } : null
 }

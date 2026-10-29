@@ -1,5 +1,6 @@
 {
   "vs-spec.js": "765f4b1a01fcca6f14db17d17037fe669f2bd96eeb43861128a5366745a7579d",
   "son-spec.js": "17f66b9554d534d117f50a8cc0e2b7b5600ac60c4a68cb1374d0159fb2d0ce4f",
-  "ct-spec.js": "fb71eff7ed8872f4ca04a505edbd955a9460f6c1ae4d44ef9a9f60fd2b999c8b"
+  "ct-spec.js": "fb71eff7ed8872f4ca04a505edbd955a9460f6c1ae4d44ef9a9f60fd2b999c8b",
+  "dl-spec.js": "d2fd6e27457054f516868538a5d6fd878ff7ee87fbd2a5dab20edf4b8a2910cd"
 }

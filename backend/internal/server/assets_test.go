@@ -12,12 +12,13 @@ import (
 	"qspro-backend/internal/config"
 )
 
-// 6 file trước đây nằm trong public/ của app Node: phục vụ từ binary, đúng từng byte bản cuối trong git
+// 6 file trước đây nằm trong public/ của app Node (+ dl-spec.js của ngành Điện lạnh, chỉ bản Go): phục vụ từ binary, đúng từng byte bản cuối trong git
 // (mã blob của git = sha1("blob <độ dài>\x00" + nội dung)), đúng Content-Type / Cache-Control như express.static.
 var embeddedWant = []struct{ path, blob, ctype, cache string }{
 	{"/vs-spec.js", "4e4e1251b21ae70fe0f329c9e196b6e9607ff3dd", "application/javascript; charset=UTF-8", "no-cache"},
 	{"/son-spec.js", "5ea484e438ccddc6af67ea895e058fdfc5c92f26", "application/javascript; charset=UTF-8", "no-cache"},
 	{"/ct-spec.js", "4e5fe093f783c1c37c5c4ba92af822af942c1d54", "application/javascript; charset=UTF-8", "no-cache"},
+	{"/dl-spec.js", "2e3b7652d6e4592025b928a64a2a0687d3ca42cd", "application/javascript; charset=UTF-8", "no-cache"}, // chép từ QS Pro ea787b6 (chỉ bản Go)
 	{"/logo.svg", "37a0c5cdd5f94eefb3d8d45b99fe3a57194e7b7f", "image/svg+xml", "public, max-age=0"},
 	{"/mau-nhap-hang-loat.xlsx", "ab186d8a9b83398a31bf0e5520a3001896497d4c",
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "public, max-age=0"},
@@ -33,7 +34,7 @@ func gitBlob(b []byte) string {
 }
 
 func TestEmbeddedAssets(t *testing.T) {
-	// không có STATIC_DIR (public/ đã bỏ): vẫn phục vụ đủ 6 file, "/" thì 404
+	// không có STATIC_DIR (public/ đã bỏ): vẫn phục vụ đủ 7 file, "/" thì 404
 	s := New(&Deps{Cfg: &config.Config{AppVer: "ver-1", VendorDir: filepath.Join(t.TempDir(), "khong-co")}})
 	if len(s.assets) != len(embeddedWant) {
 		t.Errorf("có %d file nhúng, muốn %d", len(s.assets), len(embeddedWant))

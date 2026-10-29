@@ -117,13 +117,13 @@ function VarCard({ form, loai }) {
   // chỉ xem trước các ô đang hiện theo ngành
   const shown = { varKelvin: '', varWatt: '', varAngle: '', varColor: v.varColor, varSize: '' }
   if (loai === 'son' || loai === 'vs') shown.varSize = v.varSize
-  else if (loai !== 'ct') { shown.varKelvin = v.varKelvin; shown.varWatt = v.varWatt; shown.varAngle = v.varAngle }
+  else if (loai !== 'ct' && loai !== 'dl') { shown.varKelvin = v.varKelvin; shown.varWatt = v.varWatt; shown.varAngle = v.varAngle }
   const pv = varPreview_(shown)
   return (
     <DbCard title="Nhập biến thể (tuỳ chọn)" ic="sliders" note="Nhập nhiều giá trị cách nhau bằng dấu phẩy — hệ thống tạo 1 sản phẩm cho MỖI tổ hợp (cùng mã SP, khác thông số).">
       <div className="qsi-dbgrid">
         {/* Ba trục nhiệt độ / công suất / góc chỉ có nghĩa với ĐÈN */}
-        {loai === 'ct' ? null : loai === 'son' ? inp('varSize', 'Quy cách (dung tích)', 'VD: 1L, 5L, 18L')
+        {loai === 'ct' || loai === 'dl' ? null : loai === 'son' ? inp('varSize', 'Quy cách (dung tích)', 'VD: 1L, 5L, 18L')
           : loai === 'vs' ? inp('varSize', 'Kích thước', 'VD: L580 x W380, L620 x W390')
             : <>{inp('varKelvin', 'Nhiệt độ màu (K)', 'VD: 3000, 4000, 6500')}{inp('varWatt', 'Công suất (W)', 'VD: 7, 9, 12')}{inp('varAngle', 'Góc chiếu (°)', 'VD: 24, 36, 60')}</>}
         {inp('varColor', 'Màu sắc', 'VD: Đen, Trắng, Vàng')}

@@ -1,39 +1,50 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
 import {
-  LEADS, SALES_TABS, SYNC_STAGES, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, KD_CURRENT_USER, KD_MANAGER, DEPT_LABEL,
+  SALES_TABS, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, DEPT_LABEL,
   DESIGN_STAGES, DESIGN_LABEL, DESIGN_COLOR, CONSTRUCTION_STAGES, CONSTRUCTION_LABEL, CONSTRUCTION_COLOR,
 } from '../../data/kinhDoanhData'
-import { fmtTy, matchesTimeFilter, pushSyncedProject, removeSyncedProject } from './utils'
+import { fmtTy, matchesTimeFilter } from './utils'
 import { addKdRequest } from '../../services/kdRequestService'
 import OverviewTab from './components/OverviewTab'
 import PipelineTab from './components/PipelineTab'
 import SubBoard from './components/SubBoard'
 import TasksTab from './components/TasksTab'
 import LeadModal from './components/LeadModal'
-import CustomerPage, { seedInteractions } from './components/CustomerPage'
+import CustomerPage from './components/CustomerPage'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import WorkGate from '../../components/ui/WorkGate'
+import { useWorkSession } from '../../services/workSession'
+import * as kdApi from './api'
 
 const hintStyle = { fontSize: 11.5, color: 'var(--text-muted)' }
 
 export default function KinhDoanh() {
+  return <WorkGate tab="kinhdoanh" title="Kinh doanh"><KinhDoanhPage /></WorkGate>
+}
+
+const sameId = (a, b) => String(a) === String(b)
+
+function KinhDoanhPage() {
   const { theme, toggleTheme } = useTheme()
+  const { me } = useWorkSession()
+  const meName = (me && (me.hoTen || me.username)) || ''
   const [tab, setTab] = useState('overview')
 
   /* ---------- Dữ liệu pipeline ---------- */
-  const [leads, setLeads] = useState(() => LEADS.map(l => ({ ...l })))
-  const leadCounter = useRef(LEADS.length + 1)
+  const [leads, setLeads] = useState([])
+  const [loadState, setLoadState] = useState('loading') // loading | ok | lỗi (chuỗi)
   const [dept, setDept] = useState('all')
   const [timeFilter, setTimeFilter] = useState({ time: 'all', from: '', to: '' })
 
   /* ---------- Modal ---------- */
   const [leadModal, setLeadModal] = useState({ open: false, id: null, seq: 0 })
   const [detail, setDetail] = useState({ open: false, id: null })
-  const [interactions, setInteractions] = useState({}) // id khách hàng → lịch sử chăm sóc (mặc định sinh từ giai đoạn)
+  const [interactions, setInteractions] = useState({}) // id khách hàng → lịch sử chăm sóc (tải khi mở trang khách hàng)
   const [handoff, setHandoff] = useState({ open: false, leadId: null, stageKey: null, seq: 0 })
   const [taskModal, setTaskModal] = useState({ open: false, seq: 0 })
 
@@ -48,52 +59,70 @@ export default function KinhDoanh() {
 
   const scrollRef = useRef(null)
 
+  function reload() {
+    setLoadState('loading')
+    kdApi.listLeads().then(ls => { setLeads(ls); setLoadState('ok') }, e => setLoadState(e.message || 'Lỗi tải dữ liệu'))
+  }
+  useEffect(reload, [])
+
+  /* Mở trang khách hàng -> tải lịch sử chăm sóc thật */
+  useEffect(() => {
+    if (!detail.open || !detail.id || interactions[detail.id]) return
+    kdApi.listActivities(detail.id).then(list => setInteractions(m => ({ ...m, [detail.id]: list })), e => alert('Lỗi tải lịch sử chăm sóc: ' + e.message))
+  }, [detail.open, detail.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const filteredLeads = leads.filter(l => (dept === 'all' || l.dept === dept) && matchesTimeFilter(l, timeFilter))
-  const patchLead = (id, fn) => setLeads(prev => prev.map(l => (l.id === id ? fn(l) : l)))
-  const syncLead = lead => {
-    if (SYNC_STAGES.indexOf(lead.stage) !== -1) pushSyncedProject(lead)
-    else removeSyncedProject(lead.id)
+  const replaceLead = saved => setLeads(prev => prev.map(l => (sameId(l.id, saved.id) ? saved : l)))
+  /* Sửa 1 phần: cập nhật giao diện ngay, gửi máy chủ; lỗi thì trả lại như cũ và báo */
+  function patchLead(id, changes) {
+    const old = leads.find(l => sameId(l.id, id))
+    if (!old) return Promise.resolve(null)
+    setLeads(prev => prev.map(l => (sameId(l.id, id) ? { ...l, ...changes } : l)))
+    return kdApi.updateLead(old.id, changes).then(saved => { replaceLead(saved); return saved }, e => {
+      replaceLead(old)
+      alert('Không lưu được: ' + e.message)
+      return null
+    })
   }
 
   /* ---------- Chuyển giai đoạn (moveLead) ---------- */
   function moveLead(id, newStage) {
-    const lead = leads.find(l => l.id === id)
+    const lead = leads.find(l => sameId(l.id, id))
     if (!lead || lead.stage === newStage) return
-    patchLead(id, l => ({ ...l, stage: newStage }))
-    syncLead({ ...lead, stage: newStage })
+    /* Sang thiet-ke / thi-cong: máy chủ tự tạo dự án ở Quản lý thiết kế / Quản lý dự án */
+    patchLead(lead.id, { stage: newStage })
     const cfg = HANDOFF_CONFIG[newStage]
     /* Cột nào có cấu hình phiếu thì kéo thẻ vào (từ bất kỳ cột nào) đều hiện phiếu */
-    if (cfg) setHandoff(h => ({ open: true, leadId: id, stageKey: newStage, seq: h.seq + 1 }))
+    if (cfg) setHandoff(h => ({ open: true, leadId: lead.id, stageKey: newStage, seq: h.seq + 1 }))
   }
 
   function deleteLead(id) {
-    const lead = leads.find(l => l.id === id)
+    const lead = leads.find(l => sameId(l.id, id))
     if (!lead) return
-    if (!window.confirm('Xoá lead "' + lead.name + '"? Hành động này không thể hoàn tác.')) return
-    setLeads(prev => prev.filter(l => l.id !== id))
-    removeSyncedProject(id)
+    if (!window.confirm('Xoá khách hàng "' + lead.name + '" và toàn bộ lịch sử chăm sóc? Hành động này không thể hoàn tác.')) return
+    kdApi.deleteLead(lead.id).then(() => {
+      setLeads(prev => prev.filter(l => !sameId(l.id, lead.id)))
+    }, e => alert('Không xoá được: ' + e.message))
   }
 
   /* ---------- Modal thêm / sửa lead ---------- */
   const openLeadModal = id => setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 }))
   const closeLeadModal = () => setLeadModal(m => ({ ...m, open: false }))
-  function saveLead(data) {
-    const editing = leadModal.id ? leads.find(l => l.id === leadModal.id) : null
-    if (editing) {
-      const merged = { ...editing, ...data }
-      patchLead(editing.id, () => merged)
-      syncLead(merged)
-    } else if (!leadModal.id) {
-      const created = { ...data, id: 'lnew' + (leadCounter.current++), createdAt: new Date().toISOString().slice(0, 10) }
-      setLeads(prev => [...prev, created])
-      if (SYNC_STAGES.indexOf(created.stage) !== -1) pushSyncedProject(created)
+  async function saveLead(data) {
+    const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
+    try {
+      const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
+      setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [saved, ...prev]))
+      closeLeadModal()
+    } catch (e) {
+      alert('Không lưu được: ' + e.message)
     }
-    closeLeadModal()
   }
 
   /* ---------- Người phụ trách trên thẻ kanban ---------- */
-  const addAssignee = (id, person) => patchLead(id, l => ({ ...l, assignees: [...(l.assignees || []), person] }))
-  const removeAssignee = (id, idx) => patchLead(id, l => ({ ...l, assignees: (l.assignees || []).filter((_, i) => i !== idx) }))
+  const assigneesOf = id => (leads.find(l => sameId(l.id, id)) || {}).assignees || []
+  const addAssignee = (id, person) => patchLead(id, { assignees: [...assigneesOf(id), person] })
+  const removeAssignee = (id, idx) => patchLead(id, { assignees: assigneesOf(id).filter((_, i) => i !== idx) })
 
   /* ---------- Phiếu bàn giao / yêu cầu báo giá ---------- */
   const closeHandoff = () => setHandoff(h => ({ ...h, open: false, leadId: null, stageKey: h.stageKey }))
@@ -104,33 +133,33 @@ export default function KinhDoanh() {
     const dept = pickedDept || cfg.dept
     const role = cfg.role.replace('{dept}', dept)
     /* Gửi phiếu sang Chat (SiteFlow Bot) để phòng nhận xác nhận → điều phối → duyệt */
-    const lead = leads.find(l => l.id === handoff.leadId)
+    const lead = leads.find(l => sameId(l.id, handoff.leadId))
     if (lead) {
       addKdRequest({
         leadId: lead.id, leadName: lead.name, leadInfo: `${lead.type} · ${fmtTy(lead.value)}`,
         stageKey: handoff.stageKey, title: cfg.title, dept, role,
-        sender: KD_CURRENT_USER, senderDept: DEPT_LABEL[lead.dept] || '',
+        sender: meName, senderDept: DEPT_LABEL[lead.dept] || '',
         requestedAt: dt || null, suggestedAssignee: assigneeName || null,
       })
+      patchLead(lead.id, {
+        handoff: { status: cfg.pendingStatus, dept, requestedAt: dt || null, assignee: assigneeName || null },
+        ...(assigneeName ? { assignees: [...(lead.assignees || []), { name: assigneeName, role }] } : null),
+      })
     }
-    patchLead(handoff.leadId, l => ({
-      ...l,
-      handoff: { status: cfg.pendingStatus, dept, requestedAt: dt || null, assignee: assigneeName || null },
-      ...(assigneeName ? { assignees: [...(l.assignees || []), { name: assigneeName, role }] } : null),
-    }))
     closeHandoff()
   }
   function selfQuote() {
     const cfg = HANDOFF_CONFIG[handoff.stageKey]
     if (!handoff.leadId || !cfg || !cfg.selfStatus) return
-    patchLead(handoff.leadId, l => ({ ...l, handoff: { status: cfg.selfStatus, dept: cfg.dept, requestedAt: null, assignee: null } }))
+    patchLead(handoff.leadId, { handoff: { status: cfg.selfStatus, dept: cfg.dept, requestedAt: null, assignee: null } })
     closeHandoff()
   }
 
   /* ---------- Bảng con Thiết kế / Thi công ---------- */
-  const setLeadSub = (id, sub) => patchLead(id, l => ({ ...l, sub }))
+  const setLeadSub = (id, sub) => patchLead(id, { sub })
   function addSubCard(name, parentStage, sub) {
-    setLeads(prev => [...prev, { id: 'lnew' + (leadCounter.current++), name, type: 'Chưa xác định', value: 0, stage: parentStage, sub, dept: 'dan-dung', creator: KD_CURRENT_USER, manager: KD_MANAGER, createdAt: new Date().toISOString().slice(0, 10) }])
+    kdApi.createLead({ name, stage: parentStage, sub, dept: 'dan-dung', creator: meName, manager: meName })
+      .then(saved => setLeads(prev => [saved, ...prev]), e => alert('Không thêm được: ' + e.message))
   }
 
   /* ---------- Nhiệm vụ ---------- */
@@ -161,9 +190,14 @@ export default function KinhDoanh() {
   }
 
   const panel = (name, gap) => ({ display: tab === name ? 'flex' : 'none', flexDirection: 'column', gap })
-  const editingLead = leadModal.id ? leads.find(l => l.id === leadModal.id) || null : null
-  const detailLead = detail.id ? leads.find(l => l.id === detail.id) || null : null
-  const handoffLead = handoff.leadId ? leads.find(l => l.id === handoff.leadId) || null : null
+  const editingLead = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) || null : null
+  const detailLead = detail.id ? leads.find(l => sameId(l.id, detail.id)) || null : null
+  const handoffLead = handoff.leadId ? leads.find(l => sameId(l.id, handoff.leadId)) || null : null
+  function addInteraction(lead, x) {
+    kdApi.addActivity(lead.id, x).then(saved => setInteractions(m => ({
+      ...m, [lead.id]: [saved, ...(m[lead.id] || [])].sort((a, b) => b.date.localeCompare(a.date)),
+    })), e => alert('Không lưu được lịch sử chăm sóc: ' + e.message))
+  }
 
   return (
     <div
@@ -194,12 +228,17 @@ export default function KinhDoanh() {
 
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
       <div ref={scrollRef} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
+        {loadState !== 'ok' && (
+          <div style={{ ...hintStyle, padding: '10px 12px', marginBottom: 12, borderRadius: 9, background: 'var(--surface-alt)', display: 'flex', gap: 10, alignItems: 'center' }}>
+            {loadState === 'loading' ? 'Đang tải khách hàng…' : <>Lỗi tải dữ liệu: {loadState} <button onClick={reload} style={{ border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit', padding: '3px 9px' }}>Thử lại</button></>}
+          </div>
+        )}
         {detail.open && detailLead && (
           <CustomerPage
             lead={detailLead}
-            me={KD_CURRENT_USER?.name || KD_CURRENT_USER || 'Trần Anh'}
-            interactions={interactions[detailLead.id] || seedInteractions(detailLead)}
-            onAddInteraction={x => setInteractions(m => ({ ...m, [detailLead.id]: [x, ...(m[detailLead.id] || seedInteractions(detailLead))].sort((a, b) => b.date.localeCompare(a.date)) }))}
+            me={meName}
+            interactions={interactions[detailLead.id] || []}
+            onAddInteraction={x => addInteraction(detailLead, x)}
             onBack={() => setDetail(d => ({ ...d, open: false }))}
             onEdit={() => openLeadModal(detailLead.id)}
             onMove={moveLead}
@@ -247,7 +286,7 @@ export default function KinhDoanh() {
       </div>
 
       {/* ---------- Modal (render bên trong .kd-page để dùng chung biến màu) ---------- */}
-      <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} onClose={closeLeadModal} onSave={saveLead} />
+      <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} onClose={closeLeadModal} onSave={saveLead} />
       <HandoffModal key={`handoff-${handoff.seq}`} open={handoff.open} lead={handoffLead} stageKey={handoff.stageKey} onClose={closeHandoff} onSend={sendHandoff} onSelf={selfQuote} />
       <TaskModal key={`task-${taskModal.seq}`} open={taskModal.open} steps={steps} onClose={() => setTaskModal(m => ({ ...m, open: false }))} onSubmit={createTask} />
 

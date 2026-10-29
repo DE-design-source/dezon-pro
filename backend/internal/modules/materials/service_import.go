@@ -91,7 +91,7 @@ func (s *Service) ImportCommit(ctx context.Context, a *actor.Actor, products any
 		tenLoi := jsval.S(data.Val(nhanTen))
 		// Ngành có bộ thông số theo hạng mục -> tự nhận theo hạng mục
 		var ngRow string
-		if ng := p.Val("_nganh"); ng == "vs" || ng == "son" || ng == "ct" {
+		if ng := p.Val("_nganh"); ng == "vs" || ng == "son" || ng == "ct" || ng == "dl" {
 			ngRow = ng.(string)
 		} else {
 			ngRow = categories.NganhCua(data.Val(nhanNganh), data.Val(nhanHangMuc))
@@ -100,6 +100,10 @@ func (s *Service) ImportCommit(ctx context.Context, a *actor.Actor, products any
 			// Đóng dấu ngành, chuẩn hoá tên hạng mục và CHỈ giữ thông số thuộc hạng mục đó
 			data.Set(nhanNganh, ngRow)
 			hm := spec.ChuanHM(data.Val(nhanHangMuc))
+			if hm == "" && ngRow == "dl" {
+				// Điện lạnh (chỉ bản Go, theo QS Pro): hạng mục ghi chung ("Điện lạnh", "Máy lạnh"...) -> hạng mục con theo tên SP
+				hm = specs.DLDoanHM(data.Val(nhanHangMuc), ten)
+			}
 			if hm == "" {
 				errs = append(errs, omap.Of("i", float64(i), "ten", tenLoi, "error",
 					`Hạng mục "`+jsval.S(data.Val(nhanHangMuc))+`" không thuộc danh sách: `+strings.Join(spec.HangMuc, ", ")))

@@ -44,7 +44,7 @@ func (s *Service) openSession(ctx context.Context, u *omap.Map) (string, error) 
 	if err := s.repo.RemoveExpiredSessions(ctx, u.Val("id"), isoMs(now)); err != nil {
 		return "", phienErr(err)
 	}
-	sid, err := s.repo.InsertSession(ctx, u.Val("id"), isoMs(now+tokenTTLMs))
+	sid, err := s.repo.InsertSession(ctx, u.Val("id"), isoMs(now+s.ttlMs))
 	if err != nil {
 		return "", phienErr(err)
 	}

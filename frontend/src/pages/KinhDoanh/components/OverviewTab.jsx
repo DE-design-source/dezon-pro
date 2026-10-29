@@ -65,12 +65,15 @@ export default function OverviewTab({ allLeads, leads, dept, onDeptChange, timeF
   }
 
   const s = ovComputeStats(leads)
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const newThisMonth = leads.filter(l => (l.createdAt || '').slice(0, 7) === thisMonth).length
+  const wonThisMonth = s.closedWon.filter(l => (l.wonAt || '').slice(0, 7) === thisMonth)
   /* [nhãn, giá trị, chú thích, màu] */
   const kpis = {
     'kpi-pipeline': ['Tổng giá trị pipeline', fmtTy(s.pipelineValue), `${s.total} cơ hội đang theo dõi`, 'var(--sales)'],
-    'kpi-leads': ['Khách hàng tiềm năng', s.total, '+4 trong tháng này'],
+    'kpi-leads': ['Khách hàng tiềm năng', s.total, `+${newThisMonth} trong tháng này`],
     'kpi-close-rate': ['Tỷ lệ chốt hợp đồng', s.closeRate.toFixed(0) + '%', 'Trên tổng số cơ hội', 'var(--success)'],
-    'kpi-closed-value': ['Đã chốt tháng này', fmtTy(s.closedValue), `${s.closedWon.length} hợp đồng`, 'var(--success)'],
+    'kpi-closed-value': ['Đã chốt tháng này', fmtTy(wonThisMonth.reduce((x, l) => x + l.value, 0)), `${wonThisMonth.length} hợp đồng`, 'var(--success)'],
     'kpi-lost-rate': ['Tỷ lệ hợp đồng rớt', s.lostRate.toFixed(0) + '%', `${s.closedLost.length} cơ hội trượt thầu`, 'var(--danger)'],
     'kpi-partner-rate': ['Chuyển giao cho đối tác', s.partnerRate.toFixed(0) + '%', 'Trên các hợp đồng đã chốt', 'var(--primary)'],
   }

@@ -64,6 +64,8 @@ services:
       PURCHASE_WEBHOOK: ${PURCHASE_WEBHOOK:-}
       REPORT_WEBHOOK: ${REPORT_WEBHOOK:-}
       REPORT_JOB: ${REPORT_JOB:-}
+      # Hạn phiên đăng nhập (ngày): đăng nhập 1 lần dùng cho QS + Kinh doanh / Thiết kế / Dự án
+      TOKEN_TTL_DAYS: ${TOKEN_TTL_DAYS:-30}
       # Kho ảnh / tài liệu: thư mục trong volume uploads (phục vụ qua /files/...)
       UPLOAD_DIR: /app/uploads
       LARK_DOMAIN: ${LARK_DOMAIN:-}

@@ -28,6 +28,7 @@ async function dlTpl_(e, name) {
 function TplBtn({ loai, hmVal, specs }) {
   if (loai === 'vs') return <a className="qsi-btn qsi-sm" href={templateUrl('vs')} download="Mau-nhap-thiet-bi-ve-sinh-DezonQS.xlsx" onClick={e => dlTpl_(e, 'Mau-nhap-thiet-bi-ve-sinh-DezonQS.xlsx')}><QsIcon name="download" size={14} /> Tải file mẫu thiết bị vệ sinh</a>
   if (loai === 'ct') return <a className="qsi-btn qsi-sm" href={templateUrl('ct')} download="Mau-nhap-cong-tac-o-cam-DezonQS.xlsx" onClick={e => dlTpl_(e, 'Mau-nhap-cong-tac-o-cam-DezonQS.xlsx')} title="1 file cho cả ổ cắm và công tắc — cột HẠNG MỤC quyết định bộ thông số"><QsIcon name="download" size={14} /> Tải file mẫu công tắc - ổ cắm</a>
+  if (loai === 'dl') return <a className="qsi-btn qsi-sm" href={templateUrl('dl')} download="Mau-nhap-dien-lanh-DezonQS.xlsx" onClick={e => dlTpl_(e, 'Mau-nhap-dien-lanh-DezonQS.xlsx')} title="1 file cho điều hoà, vật tư lắp đặt và thông gió — cột HẠNG MỤC quyết định bộ thông số"><QsIcon name="download" size={14} /> Tải file mẫu điện lạnh</a>
   if (loai === 'son') {
     // file mẫu sơn nước chỉ gồm thông số của hạng mục đang chọn ở form
     const hm = specs && specs.SON_SPEC ? (specs.SON_SPEC.chuanHM(hmVal) || '') : ''

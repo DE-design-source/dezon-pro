@@ -260,6 +260,32 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/work-items/import/parse` | `ctImportParse` | `rpc.Login` | estimates | Đọc file nhập công tác -> `{rows, loi}` (M5.1) |
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
+| `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); route gốc `/mau-nhap-*.xlsx` đóng băng theo bản Node nên ngành mới đi dưới `/api/v1` |
+| `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
+| `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng |
+| `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
+| `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |
+| `GET` | `/sales/leads/:id/activities` | `kdListActivities` | `rpc.Login` | sales | Lịch sử chăm sóc |
+| `POST` | `/sales/leads/:id/activities` | `kdAddActivity` | `rpc.Login` | sales | Ghi 1 lần chăm sóc |
+| `GET` | `/delivery/projects` | `tkListProjects` | `rpc.Login` | delivery | Dự án theo `?kind=design|construction`, kèm `progress`, `taskCount`, `members` |
+| `POST` | `/delivery/projects` | `tkCreateProject` | `rpc.Login` | delivery | Tạo dự án bằng tay |
+| `GET` | `/delivery/projects/:id` | `tkGetProject` | `rpc.Login` | delivery | Chi tiết: thành viên, thầu phụ, giai đoạn + công việc, bình luận theo công việc |
+| `PATCH` | `/delivery/projects/:id` | `tkUpdateProject` | `rpc.Login` | delivery | Sửa thông tin dự án |
+| `DELETE` | `/delivery/projects/:id` | `tkDeleteProject` | `rpc.Login` | delivery | Xoá dự án + mọi dữ liệu con |
+| `POST / DELETE` | `/delivery/projects/:id/members[/:itemId]` | `tkAddMember / tkRemoveMember` | `rpc.Login` | delivery | Thành viên |
+| `POST / PATCH / DELETE` | `/delivery/projects/:id/subcontractors[/:itemId]` | `tkAddSubcontractor / tkUpdateSubcontractor / tkRemoveSubcontractor` | `rpc.Login` | delivery | Thầu phụ |
+| `POST / PATCH / DELETE` | `/delivery/projects/:id/phases[/:itemId]` | `tkAddPhase / tkUpdatePhase / tkRemovePhase` | `rpc.Login` | delivery | Đề mục tiến độ (xoá kéo theo công việc) |
+| `POST / PATCH / DELETE` | `/delivery/projects/:id/tasks[/:itemId]` | `tkAddTask / tkUpdateTask / tkRemoveTask` | `rpc.Login` | delivery | Công việc / cột mốc / mốc thu chi |
+| `POST` | `/delivery/projects/:id/tasks/:itemId/comments` | `tkAddComment` | `rpc.Login` | delivery | Bình luận công việc |
+
+Kinh doanh (`sales`) và dự án triển khai (`delivery`, trang Quản lý thiết kế / Quản lý dự án), migration 0015-0016:
+- Route chỉ cần đăng nhập; quyền kiểm trong service như `canTab` của giao diện: super phải gửi `x-view-company` (không thì 400),
+  công ty có `tinh_nang` mà thiếu tab -> 403, admin được, nhân viên cần tab trong `perms`: `kinhdoanh` (sales), `thietke` (`kind=design`),
+  `thicong` (`kind=construction`). Route theo `:id` dự án kiểm quyền theo `kind` của chính dự án đó.
+- Dòng con (`:itemId`) phải thuộc đúng dự án `:id`, không thì 404. Dữ liệu công ty khác: 404 (lớp dữ liệu lọc theo công ty).
+- Kéo khách sang giai đoạn `thiet-ke` / `thi-cong` (tạo hoặc sửa) tự tạo dự án `design` / `construction` (1 lần / khách / loại),
+  chép tên, khách, liên hệ, loại công trình, mã dự án QS và giá trị (tổng báo giá QS nếu đã gắn), trong cùng transaction với lệnh sửa khách.
+- Tiền gửi / trả bằng đồng (`valueVnd`, `contractValueVnd`, `amountVnd`); ngày dạng `yyyy-mm-dd`.
 
 `GET /my-proposals/:code` (tag "Mua hàng"):
 - admin / super: như `GET /proposals/:code` (`getDeXuat`) - mọi phiếu của công ty; không có -> `Không tìm thấy đề xuất`.

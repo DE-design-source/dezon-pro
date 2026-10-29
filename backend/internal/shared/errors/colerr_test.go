@@ -3,6 +3,7 @@ package errors
 import (
 	"encoding/json"
 	"os"
+	"qspro-backend/internal/shared/specs"
 	"testing"
 )
 
@@ -51,10 +52,20 @@ func TestHangSo(t *testing.T) {
 func TestColSQL(t *testing.T) {
 	g := loadGolden(t)
 	got := ColSQL()
-	if len(got) != len(g.Cols) {
+	if len(got) < len(g.Cols) {
 		t.Fatalf("số cột: go %d, node %d", len(got), len(g.Cols))
 	}
-	for i := range got {
+	// phần thêm sau cột của Node: chỉ cột của ngành Điện lạnh (chỉ bản Go)
+	dl := map[string]bool{}
+	for _, lb := range specs.DL.All {
+		dl[specs.DL.MetricCol(lb)] = true
+	}
+	for _, c := range got[len(g.Cols):] {
+		if !dl[c] {
+			t.Errorf("cột thêm %q không thuộc dl-spec.js", c)
+		}
+	}
+	for i := range g.Cols {
 		if got[i] != g.Cols[i] {
 			t.Fatalf("cột %d: go %q, node %q", i, got[i], g.Cols[i])
 		}

@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import { STAGES, STAGE_LABEL, OV_TREND_CFG } from '../../../data/kinhDoanhData'
-import { FONT_STACK, stageAccent, mulberry32 } from '../utils'
+import { STAGES, STAGE_LABEL } from '../../../data/kinhDoanhData'
+import { FONT_STACK, stageAccent, startOfWeek } from '../utils'
 
 /* Các biểu đồ của tab Tổng quan — bản HTML ghép chuỗi SVG/HTML, ở đây tính từ dữ liệu ra JSX */
 
 /* ---------- Doanh số theo thời gian ---------- */
 export function ovTrendData(allLeads, period) {
-  const cfg = OV_TREND_CFG[period] || OV_TREND_CFG.month
-  const rand = mulberry32(cfg.seed)
-  const avg = allLeads.reduce((s, l) => s + l.value, 0) / cfg.labels.length
-  const values = cfg.labels.map((_, i) => {
-    const trend = avg * (0.55 + i / (cfg.labels.length - 1 || 1) * 0.75)
-    const variance = (rand() - 0.5) * avg * 0.7
-    return Math.max(0.5, +(trend + variance).toFixed(1))
-  })
-  values[values.length - 1] = +avg.toFixed(1)
-  return { labels: cfg.labels, values }
+  /* Doanh số = tổng giá trị các khách hàng chốt (wonAt) rơi vào từng mốc: 7 ngày tuần này / 6 tháng gần nhất / 4 năm gần nhất */
+  const now = new Date()
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+  let buckets
+  if (period === 'week') {
+    const mon = startOfWeek(now)
+    buckets = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((label, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); const k = iso(d); return { label, hit: w => w === k } })
+  } else if (period === 'year') {
+    buckets = [3, 2, 1, 0].map(n => { const y = String(now.getFullYear() - n); return { label: y, hit: w => w.slice(0, 4) === y } })
+  } else {
+    buckets = [5, 4, 3, 2, 1, 0].map(n => { const d = new Date(now.getFullYear(), now.getMonth() - n, 1); const k = iso(d).slice(0, 7); return { label: 'Th' + (d.getMonth() + 1), hit: w => w.slice(0, 7) === k } })
+  }
+  const values = buckets.map(b => +allLeads.reduce((s, l) => s + (l.wonAt && b.hit(l.wonAt) ? l.value : 0), 0).toFixed(1))
+  return { labels: buckets.map(b => b.label), values }
 }
 
 /* Đo kích thước thật của khung chứa để biểu đồ vẽ vừa khít widget (to ra / nhỏ lại theo khi kéo giãn) */

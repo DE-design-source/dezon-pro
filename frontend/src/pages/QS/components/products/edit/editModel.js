@@ -1,5 +1,5 @@
 /* Hàm thuần cho modal Cập nhật sản phẩm (P6) và Tạo nhanh biến thể (P7). Port nguyên văn PUB/sanpham.js + nhap.js,
-   spec ngành là THAM SỐ (specs = {VS_SPEC, SON_SPEC, CT_SPEC}). Không React, không gọi API ngoài uploadImg_.
+   spec ngành là THAM SỐ (specs = {VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC}). Không React, không gọi API ngoài uploadImg_.
    Nguồn: fmtDateTime_ sanpham.js:1988-1993 · btLbl_ 2066-2071 · cbLbl_ 2029-2032 · SP_MAU_CSS / spMauCss_ 2182-2191
    NBT_BM 2203 · spNbtDong_ 2228-2229 · spNhieuBTDan_ 2250-2260 · BT_TRUC 2303-2304 · speField_ 1964-1987 · vsApplyHM_ nhap.js:249-268
    imgSrc1_ nhap.js:350 · downscaleImage_ / readB64_ / uploadImg_ nhap.js:1078-1114, 1232 */
@@ -115,8 +115,9 @@ export function speFieldDef_(f, raw, L2C, specs){
    theo ô Ngành của tab Nhập (impLoai_); ở đây dùng ngành của chính SP đang sửa (cùng kết quả khi tab Nhập đang ở ngành đó). */
 export function vsApply_(hmRaw, ng, larks, specs){
   var out={};
-  if(!specs||!specs.VS_SPEC||!specs.SON_SPEC||!specs.CT_SPEC) return out;
-  var SP=specs.SON_SPEC.chuanHM(hmRaw) ? specs.SON_SPEC : (specs.CT_SPEC.chuanHM(hmRaw) ? specs.CT_SPEC : specNganh_(ng, specs));
+  if(!specs||!specs.VS_SPEC||!specs.SON_SPEC||!specs.CT_SPEC||!specs.DL_SPEC) return out;
+  var SP=specs.SON_SPEC.chuanHM(hmRaw) ? specs.SON_SPEC : (specs.CT_SPEC.chuanHM(hmRaw) ? specs.CT_SPEC
+    : (specs.DL_SPEC.chuanHM(hmRaw) ? specs.DL_SPEC : specNganh_(ng, specs)));
   if(!SP) return out;
   var hm=SP.chuanHM(hmRaw), cho=hm?SP.labelsOf(hm):SP.ALL;
   larks.forEach(function(lb){

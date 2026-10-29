@@ -232,14 +232,53 @@
    "sau_mm": "face_depth_mm",
    "loai_de": "mounting_box_type",
    "sau_hop_am_mm": "min_box_depth_mm",
-   "tiet_dien_day": "max_wire_cross_section"
+   "tiet_dien_day": "max_wire_cross_section",
+   "loai_may": "unit_type",
+   "cs_lanh_kw": "cooling_capacity_kw",
+   "cs_hp": "capacity_hp",
+   "cs_btu": "capacity_btu",
+   "che_do_van_hanh": "operation_mode",
+   "may_nen": "compressor_type",
+   "moi_chat_lanh": "refrigerant",
+   "dien_nguon_dl": "hvac_power_supply",
+   "xuat_xu": "origin_country",
+   "cs_dien_kw": "power_input_kw",
+   "hieu_suat_nl": "energy_efficiency",
+   "nhan_nang_luong": "energy_label",
+   "luu_luong_gio": "airflow_m3h",
+   "do_on_dan_lanh": "indoor_noise_db",
+   "do_on_dan_nong": "outdoor_noise_db",
+   "pham_vi_lam_lanh": "cooling_area",
+   "loc_khi": "air_filtration",
+   "dk_dieu_hoa": "hvac_control_type",
+   "ong_long": "liquid_pipe",
+   "ong_hoi": "gas_pipe",
+   "ong_dai_max": "max_pipe_length_m",
+   "chenh_cao_max": "max_height_diff_m",
+   "ong_thoat_nuoc": "drain_pipe",
+   "day_nguon": "power_cable",
+   "day_dieu_khien": "control_cable",
+   "mat_na": "panel_model",
+   "so_dan_lanh_max": "max_indoor_units",
+   "gas_nap": "refrigerant_charge",
+   "kt_dan_lanh": "indoor_unit_dimensions",
+   "kl_dan_lanh": "indoor_unit_weight_kg",
+   "kt_dan_nong": "outdoor_unit_dimensions",
+   "kl_dan_nong": "outdoor_unit_weight_kg",
+   "kt_mat_na": "panel_cutout_size",
+   "vi_tri_lap_dat": "installation_location",
+   "gia_do_dan_nong": "outdoor_bracket",
+   "kc_lap_min": "min_clearance",
+   "gc_lap_dat": "installation_note",
+   "quy_cach_vt": "material_spec"
   },
   "view": "product_catalog",
   "parts": {
    "product_lighting_specs": "product_id",
    "product_sanitary_specs": "product_id",
    "product_paint_specs": "product_id",
-   "product_switch_socket_specs": "product_id"
+   "product_switch_socket_specs": "product_id",
+   "product_hvac_specs": "product_id"
   }
  },
  "db_san_pham_history": {
@@ -568,6 +607,183 @@
    "gia_tri": "setting_value",
    "cap_nhat": "updated_at",
    "nguoi_sua": "updated_by"
+  }
+ },
+ "kd_khach_hang": {
+  "table": "sales_leads",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ten_khach": "customer_name",
+   "sdt": "phone",
+   "email": "email",
+   "dia_chi": "address",
+   "nguon": "lead_source",
+   "phong_kd": "sales_unit",
+   "giai_doan": "stage",
+   "giai_doan_con": "board_stage",
+   "loai_cong_trinh": "project_type",
+   "quy_mo": "scale_note",
+   "gia_tri_vnd": "estimated_value_vnd",
+   "hang_muc": "categories",
+   "concept": "concept_note",
+   "ghi_chu": "note",
+   "doi_tac": "is_partner_handover",
+   "nguoi_tao_ten": "creator_name",
+   "quan_ly": "manager_name",
+   "phu_trach": "assignees",
+   "ban_giao": "handoff",
+   "file_boq": "boq_file_name",
+   "ma_da": "project_code",
+   "ngay_chot": "won_at",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "kd_cham_soc": {
+  "table": "sales_lead_activities",
+  "columns": {
+   "id": "id",
+   "khach_hang_id": "lead_id",
+   "ngay": "activity_date",
+   "loai": "activity_kind",
+   "tieu_de": "title",
+   "noi_dung": "content",
+   "ket_qua": "outcome",
+   "hen_tiep": "next_follow_up_date",
+   "ghi_chu_hen": "next_note",
+   "nguoi_viet": "author_name",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
+ "tk_du_an": {
+  "table": "delivery_projects",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "loai": "kind",
+   "khach_hang_id": "lead_id",
+   "ma_da": "project_code",
+   "ten": "name",
+   "khach": "client_name",
+   "lien_he": "contact_name",
+   "sdt": "phone",
+   "email": "email",
+   "dia_chi": "address",
+   "loai_cong_trinh": "project_type",
+   "trang_thai": "status",
+   "ngay_bat_dau": "start_date",
+   "ngay_ban_giao": "handover_date",
+   "gia_tri_hd": "contract_value_vnd",
+   "ngan_sach": "approved_budget_vnd",
+   "ghi_chu": "note",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "tk_thanh_vien": {
+  "table": "delivery_project_members",
+  "columns": {
+   "id": "id",
+   "du_an_id": "project_id",
+   "ten": "member_name",
+   "vai_tro": "role",
+   "bo_phan": "dept_key",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "project_id",
+   "parent": "delivery_projects",
+   "key": "id"
+  }
+ },
+ "tk_thau_phu": {
+  "table": "delivery_subcontractors",
+  "columns": {
+   "id": "id",
+   "du_an_id": "project_id",
+   "ten": "name",
+   "pham_vi": "scope",
+   "lien_he": "contact_name",
+   "sdt": "phone",
+   "gia_tri": "contract_value_vnd",
+   "trang_thai": "status",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "project_id",
+   "parent": "delivery_projects",
+   "key": "id"
+  }
+ },
+ "tk_giai_doan": {
+  "table": "delivery_phases",
+  "columns": {
+   "id": "id",
+   "du_an_id": "project_id",
+   "ten": "name",
+   "thu_tu": "sort_order",
+   "thanh_vien": "members",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "project_id",
+   "parent": "delivery_projects",
+   "key": "id"
+  }
+ },
+ "tk_cong_viec": {
+  "table": "delivery_tasks",
+  "columns": {
+   "id": "id",
+   "du_an_id": "project_id",
+   "giai_doan_id": "phase_id",
+   "ten": "name",
+   "bat_dau": "start_date",
+   "ket_thuc": "end_date",
+   "tien_do": "progress_pct",
+   "quan_trong": "is_critical",
+   "cot_moc": "is_milestone",
+   "mo_ta": "description",
+   "bo_phan": "depts",
+   "phu_trach": "owners",
+   "loai_tien": "finance_kind",
+   "ngay_ke_hoach": "planned_date",
+   "so_tien": "amount_vnd",
+   "da_xac_nhan": "is_confirmed",
+   "thu_tu": "sort_order",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "project_id",
+   "parent": "delivery_projects",
+   "key": "id"
+  }
+ },
+ "tk_binh_luan": {
+  "table": "delivery_task_comments",
+  "columns": {
+   "id": "id",
+   "du_an_id": "project_id",
+   "cong_viec_id": "task_id",
+   "nguoi_viet": "author_name",
+   "noi_dung": "body",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "project_id",
+   "parent": "delivery_projects",
+   "key": "id"
   }
  }
 }

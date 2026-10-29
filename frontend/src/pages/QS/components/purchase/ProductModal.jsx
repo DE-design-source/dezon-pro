@@ -82,6 +82,18 @@ function Specs({ p, specs, ng }) {
       </>
     )
   }
+  if (ng === 'dl') {
+    const DL = specs.DL_SPEC, h = DL.hmOf(p.hangMuc), raw = p.raw || {}
+    const M = h ? h.nhom : { chinh: DL.CHINH_ALL, hs: [], ket: [], lap: DL.TK_ALL }
+    const rows = ds => ds.map(lb => DL.dong(lb, c => raw[c]) || ['', ''])
+    const chung = [['Dòng sản phẩm', p.dongSanPham || p.nhom], ['Hạng mục', DL.chuanHM(p.hangMuc) || p.hangMuc], ['Thời gian bảo hành', p.baoHanh]]
+    return (
+      <>
+        {DL.KHOI.map((k, i) => <Section key={k[0]} title={k[1]} rows={rows(M[k[0]]).concat(i === 0 ? chung : [])} />)}
+        <Features p={p} title={<>Features <i>(Tính năng)</i></>} />
+      </>
+    )
+  }
   if (ng === 'ct') {
     const CT = specs.CT_SPEC, h = CT.hmOf(p.hangMuc), raw = p.raw || {}
     const rows = ds => ds.map(lb => CT.dong(lb, c => raw[c]) || ['', ''])
@@ -130,7 +142,7 @@ function Specs({ p, specs, ng }) {
 /* pdMedia_: gallery + mã + tên + Key Product Info */
 function Media({ p, specs, ng, idx, setIdx, onZoom }) {
   let keyItems
-  if (ng === 'son' || ng === 'ct') keyItems = []
+  if (ng === 'son' || ng === 'ct' || ng === 'dl') keyItems = []
   else if (ng === 'vs') keyItems = vsChip_(p, specs)
   else {
     const cong = p.congSuat || parseWatt(p.ten), nd = p.nhietDo || parseKelvin(p.ten)

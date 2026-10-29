@@ -21,7 +21,9 @@ type Service struct{}
 func New(Deps) *Service { return &Service{} }
 
 // NganhCua = nganhCua_(nganh, hangMuc): ngành đã đóng dấu thì giữ; chưa thì đoán theo hạng mục,
-// thứ tự son -> ct -> vs -> den (KHÁC specs.NganhOf, vốn chỉ biết vs / den).
+// thứ tự son -> ct -> vs -> dl -> den (KHÁC specs.NganhOf, vốn chỉ biết vs / den).
+// dl (chỉ bản Go, theo QS Pro ea787b6): hạng mục điện lạnh chuẩn hoặc ghi chung ("Điện lạnh", "Máy lạnh"...);
+// xét sau vs để chữ chung ("thông gió"...) không giành hạng mục vệ sinh.
 func NganhCua(nganh, hangMuc any) string {
 	if n := jsval.Trim(jsval.Str(nganh)); n != "" {
 		return n
@@ -35,6 +37,9 @@ func NganhCua(nganh, hangMuc any) string {
 	if specs.VS.ChuanHM(hangMuc) != "" {
 		return "vs"
 	}
+	if specs.DL.ChuanHM(hangMuc) != "" || specs.DLLaChung(hangMuc) {
+		return "dl"
+	}
 	return "den"
 }
 
@@ -47,12 +52,14 @@ func SpecNganh(ng string) *specs.Spec {
 		return specs.SON
 	case "ct":
 		return specs.CT
+	case "dl":
+		return specs.DL
 	}
 	return nil
 }
 
 // MucNganh = MUC_NGANH: ngành -> tên đề mục trên cây. Chỉ đọc.
-var MucNganh = omap.Of("vs", "Thiết bị vệ sinh", "son", "Sơn nước", "den", "Thiết bị đèn", "ct", specs.CT.Muc)
+var MucNganh = omap.Of("vs", "Thiết bị vệ sinh", "son", "Sơn nước", "den", "Thiết bị đèn", "ct", specs.CT.Muc, "dl", specs.DL.Muc)
 
 // Muc = MUC_NGANH[ng] || "Thiết bị đèn" (cả hai nơi dùng bên Node đều kèm giá trị mặc định này).
 func Muc(ng string) string {
@@ -96,7 +103,7 @@ func init() {
 	for _, lc := range dbLabel2ColBase {
 		m.Set(lc.Label, lc.Col)
 	}
-	for _, sp := range []*specs.Spec{specs.VS, specs.SON, specs.CT} {
+	for _, sp := range []*specs.Spec{specs.VS, specs.SON, specs.CT, specs.DL} {
 		for _, lb := range sp.Metric.Keys() {
 			if !jsval.Truthy(m.Val(lb)) {
 				m.Set(lb, sp.MetricCol(lb))
