@@ -223,7 +223,7 @@ export const SP_NUMCOL={gia_ban_le:1, ck_dai_ly_pct:1, gia_ban_bo_nguon:1, quang
 export const SP_CTCOL={cong_suat_w:1, nhiet_do_mau_k:1, goc_chieu_deg:1, goc_nghieng_deg:1, cri:1, chi_so_ip:1,
   ugr:1, sdcm:1, coi:1, dvt:1, loai_chip_led:1, lap_nguon_roi:1, class_rating:1};
 export const SP_SFX={gia_ban_le:'đ', ck_dai_ly_pct:'%', gia_ban_bo_nguon:'đ'};      // đơn vị chỉ hiện cạnh ô, KHÔNG nằm trong giá trị
-export const SP_ALWAYS={gia_ban_le:1, ck_dai_ly_pct:1};       // 2 cột này sửa được cả khi CHƯA bật Edit
+export const SP_ALWAYS={ck_dai_ly_pct:1};       // cột này sửa được cả khi CHƯA bật Edit (giá bán lẻ chỉ sửa ở chế độ Edit)
 export const SP_MONEY={gia_ban_le:1, gia_ban_bo_nguon:1};     // ô tiền: hiện có dấu chấm 930.000, lưu số thuần
 export const SP_SKIP={'TÊN SẢN PHẨM':1,'MÃ SẢN PHẨM':1,'GIÁ ĐẠI LÝ':1,'ẢNH SẢN PHẨM':1};   // đã có cột đặc biệt lo
 export const SP_COLLBL={trang_thai:'Trạng thái KD'};   // tránh trùng tên với cột "Trạng thái" (duyệt)

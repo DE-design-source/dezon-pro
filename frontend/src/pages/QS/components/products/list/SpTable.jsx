@@ -227,7 +227,7 @@ function Cell({ c, p, r, on, skuCount, ts }) {
     case 'nguoiSua': return p.nguoiSua ? <span className="qspl-who" title={'Lúc ' + fmtDateTime_(p.ngayCapNhat)}>{p.nguoiSua}</span> : <Dash />
     default: {
       const col = c.e.col
-      if (SP_ALWAYS[col]) return <SpInp p={p} e={c.e} val={spEditRaw_(p, col)} />   // giá bán lẻ / chiết khấu: luôn sửa được
+      if (SP_ALWAYS[col]) return <SpInp p={p} e={c.e} val={spEditRaw_(p, col)} />   // chiết khấu: luôn sửa được
       const v = spColVal_(p, col)
       if (c.e.money) return v === '' ? <Dash /> : <>{money(v)}<span className="unit">đ</span></>
       if (col === 'link_datasheet') return v ? <a href={safeUrl_(v)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>Datasheet</a> : <Dash />
