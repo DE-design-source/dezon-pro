@@ -214,7 +214,7 @@ export default function Sidebar() {
         )}
 
 
-        {/* User Profile */}
+        {/* User Profile
         {!isUltra && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -235,7 +235,7 @@ export default function Sidebar() {
               </div>
             )}
           </div>
-        )}
+        )} */}
       </div>
 
       {isUltra && <SidebarDock onExpand={expand} />}
