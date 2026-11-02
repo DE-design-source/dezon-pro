@@ -29,6 +29,8 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const [perms, setPerms] = useState(() => PERM_TABS.filter(t => perms0.indexOf(t[0]) >= 0).map(t => t[0]))
   // Quyền trong tab Danh sách SP: CHỌN MỘT — chỉ sửa, hoặc sửa và duyệt
   const [lv, setLv] = useState(perms0.indexOf('sp_duyet') >= 0 ? 'sp_duyet' : (perms0.indexOf('sp_edit') >= 0 ? 'sp_edit' : ''))
+  // Duyệt yêu cầu sửa thông tin dự án (migration 0019, trang chi tiết dự án): quyền riêng, không gắn với tab nào
+  const [daDuyet, setDaDuyet] = useState(perms0.indexOf('da_duyet') >= 0)
   const [busy, setBusy] = useState(false)
 
   const has = k => perms.indexOf(k) >= 0
@@ -45,6 +47,7 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
     if (role !== 'admin') {
       ps = perms.slice()
       if (lv && ps.indexOf('sanpham') >= 0) ps.push(lv)
+      if (daDuyet) ps.push('da_duyet')
     }
     // Email đăng nhập (M14.1): trim + chữ thường, rỗng = không có / xoá; máy chủ kiểm trùng trong công ty khi sửa
     const em = normEmail(email)
@@ -160,6 +163,13 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                     ))}
                   </div>
                 ) : null}
+                <div className="qsa-sub">
+                  <div className="qsa-sub-h">Dự án</div>
+                  <label className={`qsa-ck${daDuyet ? ' on' : ''}`}>
+                    <input type="checkbox" checked={daDuyet} onChange={e => setDaDuyet(e.target.checked)} />
+                    Duyệt yêu cầu sửa thông tin dự án (sửa thẳng, nhận thông báo khi nhân viên gửi yêu cầu)
+                  </label>
+                </div>
               </div>
             )}
           </div>

@@ -38,9 +38,14 @@ func TestHienTrangGhiKhiCoKhoa(t *testing.T) {
 		if lastArg(0).Has("hien_trang") {
 			t.Errorf("tạo %s: không được ghi hien_trang", mustJSON(t, data))
 		}
+		// khoá chỉ bản Go nối cuối theo thứ tự projMap (goOnlyResultKeys: hienTrang, kienTrucSu - 0018, studio - 0020, 4 khoá của 0021), đều rỗng
 		keys := p.Keys()
-		if keys[len(keys)-1] != "hienTrang" || !jsval.StrictEquals(p.Val("hienTrang"), "") {
-			t.Errorf("kết quả phải nối hienTrang rỗng ở cuối: %s", mustJSON(t, p))
+		tail := keys[len(keys)-len(goOnlyResultKeys):]
+		for i, k := range goOnlyResultKeys {
+			if tail[i] != k || !jsval.StrictEquals(p.Val(k), "") {
+				t.Errorf("kết quả phải nối %v rỗng ở cuối: %s", goOnlyResultKeys, mustJSON(t, p))
+				break
+			}
 		}
 	}
 	p, err := svc.CreateProject(ctx, omap.Of("ten", "A", "hienTrang", "Nhà cũ 2 tầng"))

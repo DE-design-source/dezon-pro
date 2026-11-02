@@ -21,7 +21,7 @@ function impDateTime_(iso) {
 const img1 = v => mediaUrl(String(v || '').split('\n')[0].trim())
 const hideImg = e => { e.currentTarget.style.visibility = 'hidden' }
 
-export default function RecentPanel({ specs, onEditOpen }) {
+export default function RecentPanel({ specs, onEditOpen, open, onOpen }) {
   const { navigate, products } = useQs()
   const pd = useImp(s => s.pending)
   const ps = useImp(s => s.sessionAdded)
@@ -60,9 +60,20 @@ export default function RecentPanel({ specs, onEditOpen }) {
       </div>
     )
   })
+  /* Thu gọn: chỉ còn nút biểu tượng (kèm số) + nút Thêm sản phẩm; bấm nút -> danh sách mở rộng sang bên phải (nổi trên form) */
+  const n = pd.length + ps.length
   return (
-    <div className="qsi-recent">
-      <div className="qsi-recent-h">Sản phẩm vừa nhập (phiên này) <span className="qsi-rcount">{pad2(pd.length + ps.length)}</span></div>
+    <div className={'qsi-recent' + (open ? ' open' : '')}>
+      <button type="button" className="qsi-recent-tg" aria-expanded={open} title={open ? 'Thu gọn danh sách' : 'Mở danh sách Sản phẩm vừa nhập (phiên này)'} onClick={() => onOpen(!open)}>
+        <span className="ic"><QsIcon name="list" size={17} /></span>
+        <span className="tx">Sản phẩm vừa nhập <i>(phiên này)</i></span>
+        <span className="qsi-rcount">{pad2(n)}</span>
+        <span className="chev" aria-hidden="true">›</span>
+      </button>
+      {open && (
+      <div className="qsi-recent-fly">
+      <div className="qsi-recent-h">Sản phẩm vừa nhập (phiên này) <span className="qsi-rcount">{pad2(n)}</span>
+        <button type="button" className="qsi-recent-x" title="Đóng" onClick={() => onOpen(false)}>✕</button></div>
       <div className="qsi-recent-note">Danh sách này chỉ ghi lại thao tác của <b>phiên đang mở</b> — tải lại trang sẽ trống. Sản phẩm đã lưu <b>vẫn nằm trong Database</b>: <a onClick={() => navigate('sanpham')}>xem Danh sách sản phẩm →</a></div>
       <div className="qsi-recent-b">
         {pd.length ? <><div className="qsi-pc-hd">Chờ lưu <span>{pd.length}</span><i>Chưa vào Database</i></div><div className="qsi-pc-list">{cards}</div></> : null}
@@ -87,6 +98,8 @@ export default function RecentPanel({ specs, onEditOpen }) {
           </table>
         ) : null}
       </div>
+      </div>
+      )}
       <div className="qsi-rfoot">
         {pd.length ? <div className="qsi-rfoot-note"><b>{pd.length}</b> sản phẩm đang chờ — <b>chưa</b> lưu vào Database</div> : null}
         <button className="qsi-btn qsi-blue qsi-block" disabled={!pd.length || committing} onClick={() => pendingCommit_()}>

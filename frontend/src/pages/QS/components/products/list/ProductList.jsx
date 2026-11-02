@@ -19,7 +19,7 @@ import ProjPanel from './ProjPanel'
 import SpTable from './SpTable'
 import SpCards from './SpCards'
 import { useFitLevel } from '../../common/useFitLevel'
-import SpModal from './SpModal'
+import SpModal, { MultiProjPop } from './SpModal'
 import { CatPop, FilterPop, PresetPop, BulkEditPop, MorePop, CopyMenu, ColMenu, OverPop } from './SpPops'
 import { useSpUi, getU, setU, setPer, clearSel } from './spStore'
 import {
@@ -77,6 +77,7 @@ export default function ProductList() {
   const [panelHidden, setPanelHidden] = useState(spPanelHidden_)
   const [folded, setFolded] = useState(foldCols_)
   const [pop, setPop] = useState(null)          // {kind, anchor, p?}
+  const [multiP, setMultiP] = useState(null)   // sản phẩm đang mở bảng Ghi danh vào nhiều dự án
   const [dlg, setDlg] = useState(null)          // {kind: 'detail' | 'edit', p, mode?: 'edit' | 'copy' | 'variant' | 'nbt'}
   const [xlsBusy, setXlsBusy] = useState(false)
   const [dragOn, setDragOn] = useState(false)
@@ -499,6 +500,7 @@ export default function ProductList() {
     dragStart, dragEnd,
     fav: p => spFav(p, !p.yeuThich),
     add: p => spAddToProject(p),
+    multi: p => setMultiP(p),
     duyet: p => spDuyet(p, !p.daDuyet),
     editP: p => editP(p),
     copy: (e, p) => { e.stopPropagation(); setPop({ kind: 'copy', anchor: e.currentTarget, p }) },
@@ -555,6 +557,12 @@ export default function ProductList() {
       {!PT && (
         <div className="qspl-band">
               <div className="qspl-toolbar" ref={tbRef}>
+                {/* panel "Sản phẩm trong dự án" đang thu gọn: nút mở lại đứng đầu băng (biểu tượng + số sản phẩm) */}
+                {panelHidden && (
+                  <button type="button" className="qspl-ppbtn" title="Hiện panel Sản phẩm trong dự án" onClick={panelToggle}>
+                    <QsIcon name="layers" size={16} /><b>{(cur ? lines : []).length}</b>
+                  </button>
+                )}
                 <div className="qspl-catmod">{catBtn}</div>
                 {/* Bộ lọc: vị trí đầu tiên, chỉ biểu tượng phễu (tên ở chú thích khi rê chuột), số bộ lọc đang bật ở góc */}
                 <button type="button" className={`qspl-fltbtn${fltN ? ' on' : ''}`} title={fltN ? 'Bộ lọc (' + fltN + ' đang bật)' : 'Bộ lọc'} aria-label="Bộ lọc"
@@ -645,9 +653,11 @@ export default function ProductList() {
               </div>
         </div>
       )}
-      <button type="button" className="qspl-pp-show" title="Hiện panel Sản phẩm trong dự án" onClick={panelToggle}>
-        <QsIcon name="layers" size={15} /><span className="n">{(cur ? lines : []).length}</span>
-      </button>
+      {PT && (
+        <button type="button" className="qspl-pp-show" title="Hiện panel Sản phẩm trong dự án" onClick={panelToggle}>
+          <QsIcon name="layers" size={15} /><span className="n">{(cur ? lines : []).length}</span>
+        </button>
+      )}
       {!panelHidden && <ProjPanel qs={qs} node={node} dragOn={dragOn} onDrop={panelDrop} onHide={panelToggle} />}
       {/* Bộ lọc / Chọn nhanh cột đang mở: bảng thu hẹp sang phải nhường chỗ (has-dock), không bị che */}
       <div className={`qspl-main${pop && (pop.kind === 'flt' || pop.kind === 'preset') ? ' has-dock' : ''}`}>
@@ -757,6 +767,13 @@ export default function ProductList() {
       )}
 
       {overAt && <OverPop anchor={overAt} customs={customs} onPick={stripSaveOver} onClose={() => setOverAt(null)} />}
+      {multiP && (
+        <MrootPortal>
+          <div className="qsc-ov qspl-ov" onMouseDown={e => { if (e.target === e.currentTarget) setMultiP(null) }}>
+            <div className="qspl-pd qspl-mpbox"><MultiProjPop p={multiP} onClose={() => setMultiP(null)} /></div>
+          </div>
+        </MrootPortal>
+      )}
       {pop && pop.kind === 'colmenu' && (
         <ColMenu anchor={pop.anchor} col={pop.col} sort={U.sort} canHide={pop.col.k !== 'ten' && pop.col.k !== 'stt'}
           onSort={so => setU({ sort: so, page: 1 })} onHide={() => colToggle(pop.col.k)} onClose={() => setPop(null)} />

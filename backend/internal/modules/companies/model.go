@@ -10,6 +10,7 @@ var tenantTablesOrder = []string{
 	"de_xuat", "chi_tiet_de_xuat_ck", "chi_tiet_de_xuat_tt", "cong_tac_history",
 	"du_an_data", "cai_dat_cong_ty", "kd_cham_soc", "kd_khach_hang",
 	"tk_binh_luan", "tk_cong_viec", "tk_giai_doan", "tk_thau_phu", "tk_thanh_vien", "tk_du_an",
+	"yeu_cau_sua_du_an",
 	"users",
 }
 

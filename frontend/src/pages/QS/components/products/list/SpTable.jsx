@@ -361,9 +361,10 @@ function SpInp({ p, e, val, bare, code, placeholder }) {
    dòng kho chung Dezon thay sửa / sao chép bằng "Tạo bản sao riêng" (M10.1, chỉ bản Go) */
 function RowActions({ p, canEdit, canDuyet, isAdmin, on }) {
   return (
-    <>
+    <span className="qspl-actgrp">
       <button type="button" className={`qspl-act fav${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'} onClick={() => on.fav(p)}><QsIcon name="star" size={16} /></button>
       <button type="button" className="qspl-act add" title="Ghi danh vào dự án" onClick={() => on.add(p)}><QsIcon name="pluscircle" size={18} /></button>
+      {on.multi && <button type="button" className="qspl-act multi" title="Ghi danh vào nhiều dự án" onClick={() => on.multi(p)}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5" /><path d="m3 17 9 5 9-5" /></svg></button>}
       {canDuyet && !p.spChung && <button type="button" className={`qspl-act ${p.daDuyet ? 'undo' : 'ok'}`} title={p.daDuyet ? 'Bỏ duyệt' : 'Duyệt sản phẩm này'} onClick={() => on.duyet(p)}><QsIcon name="check" size={16} /></button>}
       {!p.spChung && <button type="button" className="qspl-act edit" title="Cập nhật sản phẩm" onClick={() => on.editP(p)}><QsIcon name="edit" size={16} /></button>}
       {(p.ma && canEdit && !p.spChung) ? <button type="button" className="qspl-act copy" title="Sao chép: tạo sản phẩm mới / biến thể / nhiều màu" onClick={e => on.copy(e, p)}><QsIcon name="copy" size={16} /></button> : null}
@@ -371,6 +372,6 @@ function RowActions({ p, canEdit, canDuyet, isAdmin, on }) {
         onClick={async () => { const np = await spPrivateCopy(p); if (np) on.editP(np) }}><QsIcon name="copy" size={16} /></button> : null}
       <button type="button" className="qspl-act" title="Xem chi tiết" onClick={() => on.open(p)}><QsIcon name="eye" size={16} /></button>
       {isAdmin && !p.spChung && <button type="button" className="qspl-act del" title="Xoá" onClick={() => on.del(p)}><QsIcon name="trash" size={16} /></button>}
-    </>
+    </span>
   )
 }

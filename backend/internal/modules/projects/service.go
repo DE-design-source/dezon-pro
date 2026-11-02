@@ -20,24 +20,33 @@ import (
 )
 
 // Deps: Catalog = materials (getProductsCached), Lines = takeoff (getLines). Repo để trống thì dùng DB.
+// Users / UserFmt / Notifier / Admins: yêu cầu sửa thông tin dự án (service_edit_requests.go); để trống thì không báo ai.
 type Deps struct {
-	DB      *database.DB
-	Cfg     *config.Config
-	Catalog contracts.CatalogReader
-	Lines   contracts.LineReader
-	Repo    Repository
+	DB       *database.DB
+	Cfg      *config.Config
+	Catalog  contracts.CatalogReader
+	Lines    contracts.LineReader
+	Users    contracts.UserReader
+	UserFmt  contracts.UserFormatter
+	Notifier contracts.Notifier
+	Admins   contracts.AdminLister
+	Repo     Repository
 }
 
 // Service: nghiệp vụ dự án.
 type Service struct {
-	repo    Repository
-	db      *database.DB // transaction (D-13); nil khi chạy repo giả
-	cfg     *config.Config
-	catalog contracts.CatalogReader
-	lines   contracts.LineReader
-	now     func() string  // nowIso()
-	genMa   func() string  // genMaDA_()
-	random  func() float64 // Math.random()
+	repo     Repository
+	db       *database.DB // transaction (D-13); nil khi chạy repo giả
+	cfg      *config.Config
+	catalog  contracts.CatalogReader
+	lines    contracts.LineReader
+	users    contracts.UserReader
+	userFmt  contracts.UserFormatter
+	notifier contracts.Notifier
+	admins   contracts.AdminLister
+	now      func() string  // nowIso()
+	genMa    func() string  // genMaDA_()
+	random   func() float64 // Math.random()
 }
 
 var _ contracts.ProjectReader = (*Service)(nil)
@@ -48,7 +57,8 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = NewRepository(d.DB)
 	}
-	s := &Service{repo: repo, db: d.DB, cfg: d.Cfg, catalog: d.Catalog, lines: d.Lines, now: jsval.NowISO, random: rand.Float64}
+	s := &Service{repo: repo, db: d.DB, cfg: d.Cfg, catalog: d.Catalog, lines: d.Lines, users: d.Users, userFmt: d.UserFmt,
+		notifier: d.Notifier, admins: d.Admins, now: jsval.NowISO, random: rand.Float64}
 	s.genMa = func() string { return genMaDA(time.Now(), s.random()) }
 	return s
 }

@@ -80,7 +80,7 @@ function Field({ label, value, onChange, type, wide, children }) {
 }
 
 function SharedCard({ p, onSaved }) {
-  const [f, setF] = useState({ ten: s(p.ten), khachHang: s(p.khachHang), sdt: s(p.sdt), diaChi: s(p.diaChi), linkDezon: s(p.linkDezon) })
+  const [f, setF] = useState({ ten: s(p.ten), kienTrucSu: s(p.kienTrucSu), khachHang: s(p.khachHang), sdt: s(p.sdt), diaChi: s(p.diaChi), linkDezon: s(p.linkDezon) })
   const [busy, setBusy] = useState(false)
   const set = k => v => setF(x => ({ ...x, [k]: v }))
   async function save() { setBusy(true); const ok = await saveProjectShared(f); setBusy(false); onSaved(ok) }
@@ -91,6 +91,7 @@ function SharedCard({ p, onSaved }) {
         <p className="qs-pi-note">Áp dụng cho tất cả bản nháp của dự án này.</p>
         <div className="qs-pi-grid">
           <Field label="Tên dự án" value={f.ten} onChange={set('ten')} />
+          <Field label="Kiến trúc sư" value={f.kienTrucSu} onChange={set('kienTrucSu')} />
           <Field label="Khách hàng" value={f.khachHang} onChange={set('khachHang')} />
           <Field label="Số điện thoại" value={f.sdt} onChange={set('sdt')} />
           <Field label="Địa chỉ" value={f.diaChi} onChange={set('diaChi')} />

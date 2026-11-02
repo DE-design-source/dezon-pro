@@ -38,6 +38,20 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("setProjData", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetProjData(ctx, a, args.ArgU(0), args.ArgU(1), args.ArgU(2))
 	})
+	// Route chỉ bản Go (migration 0019): yêu cầu sửa thông tin dự án; quyền duyệt kiểm trong service (admin / super / da_duyet)
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "requestProjectEdit", Method: "POST", Path: "/projects/:id/edit-requests", Perm: rpc.Login,
+		Tag: "Dự án", Summary: "Sửa thông tin dự án: người duyệt lưu thẳng, người khác gửi yêu cầu chờ duyệt",
+		Fields: []rpc.GoField{{Name: "id", In: "path", Desc: "Mã dự án"},
+			{Name: "fields", In: "body", Desc: "{khoá: giá trị mới} - ten, khachHang, diaChi, sdt, kienTrucSu…"},
+			{Name: "lyDo", In: "body", Desc: "Lý do / ghi chú cho người duyệt (tuỳ chọn)"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "listProjectEditRequests", Method: "GET", Path: "/project-edit-requests", Perm: rpc.Login,
+		Tag: "Dự án", Summary: "Yêu cầu sửa dự án: người duyệt thấy cả công ty, người khác chỉ thấy phiếu mình gửi",
+		Fields: []rpc.GoField{{Name: "maDA", In: "query", Desc: "Lọc theo mã dự án"},
+			{Name: "status", In: "query", Desc: "pending | approved | rejected"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "resolveProjectEditRequest", Method: "POST", Path: "/project-edit-requests/:rid/resolve", Perm: rpc.Login,
+		Tag: "Dự án", Summary: "Duyệt (áp thay đổi) / từ chối yêu cầu sửa dự án",
+		Fields: []rpc.GoField{{Name: "rid", In: "path", Desc: "Mã phiếu"}, {Name: "approve", In: "body", Desc: "true = duyệt"},
+			{Name: "lyDo", In: "body", Desc: "Lý do từ chối (tuỳ chọn)"}}})
 }
 
 // RegisterRoutes: REST /api/v1 (PORTING_MAP mục A). :id là mã dự án (ma_da); với .../data/:khoa có thể là "__cty".
@@ -71,6 +85,22 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	})
 	g.GET("/:id/data", func(c *gin.Context) {
 		r, err := s.GetProjData(c.Request.Context(), c.Param("id"))
+		response.Result(c, r, err)
+	})
+	// Yêu cầu sửa thông tin dự án: body {fields, lyDo}; người duyệt -> sửa thẳng ({applied, project}), người khác -> phiếu ({pending, id})
+	g.POST("/:id/edit-requests", func(c *gin.Context) {
+		b := middleware.BodyMap(c)
+		r, err := s.RequestProjectEdit(c.Request.Context(), actor.FromGin(c), c.Param("id"), b.Val("fields"), b.Val("lyDo"))
+		response.Result(c, r, err)
+	})
+	er := v1.Group("/project-edit-requests", middleware.RequireLogin())
+	er.GET("", func(c *gin.Context) {
+		r, err := s.ListProjectEditRequests(c.Request.Context(), actor.FromGin(c), validator.Query(c, "maDA"), validator.Query(c, "status"))
+		response.Result(c, r, err)
+	})
+	er.POST("/:rid/resolve", func(c *gin.Context) {
+		b := middleware.BodyMap(c)
+		r, err := s.ResolveProjectEditRequest(c.Request.Context(), actor.FromGin(c), c.Param("rid"), b.Val("approve"), b.Val("lyDo"))
 		response.Result(c, r, err)
 	})
 	g.PUT("/:id/data/:khoa", func(c *gin.Context) {

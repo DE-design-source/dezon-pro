@@ -33,7 +33,7 @@
 | [M8](#xong-8) | Xuất báo giá | ✅ | - |
 | [M9](#xong-9) | Mua hàng & đề xuất | ✅ | - |
 | [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3), [M10.4](#m10-4) |
-| [M11](#xong-11) | Nhập dữ liệu | ✅ | - |
+| [M11](#xong-11) | Nhập dữ liệu | 🟡 | [M11.x](#m11-x) |
 | [M12](#xong-12) | Tệp & ảnh | ✅ | - |
 | [M13](#xong-13) | Thông báo | ✅ | - |
 
@@ -56,6 +56,8 @@
 | [N3](#xong-n3) | Tích hợp QS vào frontend React SiteFlow (`frontend/`) với API Go | ✅ | - |
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 | [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
+| [N8](#n8) | Trang Danh sách dự án (lưới thẻ) | 🟡 | [N8](#n8): chạy migration 0018 - 0021, thử trên app, ảnh bìa |
+| [N9](#n9) | Trang Nhà cung cấp | 🟡 | [N9](#n9): thử trên app |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 
 ---
@@ -67,12 +69,16 @@
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
 | <a id="m10-3"></a>M10.3 | Danh sách sản phẩm: chọn chế độ xem Bảng · Lưới thẻ · Danh sách (nhớ trong máy, `qs_splayout`; dạng thẻ có ảnh, giá, duyệt, yêu thích, thêm vào dự án, chọn nhiều) + tiêu đề bảng đồng bộ kiểu Bóc tách (IN HOA, căn giữa, xuống dòng, nút phễu mở menu sắp xếp / ẩn cột) + thanh công cụ / hàng chọn cột / bảng tách thành module riêng, thanh công cụ 1 dòng tự gọn khi hẹp (Yêu thích chỉ biểu tượng, "Tất cả" không lặp tên hạng mục). Đã code + build (`SpCards.jsx`, `list.css`), còn thử trên app thật | User | 🟡 |
+| <a id="m10-4"></a>M10.4 | Modal Thông tin sản phẩm: nút "Ghi danh vào nhiều dự án" (tìm + tick nhiều dự án, số lượng, Lưu; trùng SP thì cộng số lượng, không thì thêm vào Chưa phân tầng). Đã code + build, còn thử trên app thật | User | 🟡 |
+| <a id="m11-x"></a>M11.x | Nhập dữ liệu: panel Sản phẩm vừa nhập sang cột trái (rộng như cột trái các tab) + dashboard "Ghi nhận dữ liệu nhập" (kỳ Hôm nay / Tuần / Tháng / Quý / Năm / Tuỳ chọn, lọc Người nhập / Người duyệt / Thương hiệu, KPI, biểu đồ cột, top người nhập). Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="m10-4"></a>M10.4 | Danh sách sản phẩm: bộ cột theo hạng mục - dải chip / "Hiện tất cả cột" chỉ có cột của ngành trong hạng mục (Thiết bị điện = đèn + công tắc; hạng mục chưa có bộ thông số như Thạch cao, Cửa chỉ còn 25 cột chung thay vì 135; lọc "Hạng mục SP" = 1 loại có bộ thông số riêng như Bồn cầu, Lavabo, Ổ cắm thì chỉ còn thông số của loại đó); mỗi hạng mục nhớ cột đang hiện riêng (`qs_spcolcfg.byNode`, hạng mục chưa lưu thì dùng bộ theo ngành như cũ); bộ cột tự đặt tên và nút nhanh (1)(2) chỉ hiện ở hạng mục lúc tạo (bộ / nút cũ chưa gắn hạng mục chuyển về "Tất cả hạng mục"); bộ "Của tôi" vẫn theo tài khoản, dùng chung; khung "Chọn nhanh cột" bỏ bộ "Hiện tất cả cột" (trùng nút Hiện tất cả ở dải chip). Đã code + build (`ProductList.jsx`, `spModel.js`), còn thử trên app thật | User | 🟡 |
 
 ### 2.2 Tính năng mới
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
+| <a id="n9"></a>N9 | Trang "Nhà cung cấp" (nút trên thanh đầu QS): nhà cung cấp = thương hiệu trong danh mục; lưới / danh sách thẻ (ảnh ghép sản phẩm, ngành hàng, số sản phẩm, khoảng giá, số dự án đang dùng), lọc ngành hàng, tìm; trang chi tiết tab Sản phẩm (lọc hạng mục) / Dự án đang dùng / Nhà phân phối. Đã code + build, còn thử trên app thật | User | 🟡 |
+| <a id="n8"></a>N8 | Trang "Danh sách dự án" dạng lưới thẻ (tham khảo dezon.vn/du-an): ô tìm, lọc Nền tảng / Trạng thái / Khu vực / Phân khúc, chip "Dự án có báo giá"; bấm thẻ mở trang chi tiết dự án (ảnh ghép từ ảnh sản phẩm, bảng thông tin, tab Thông tin / Hình ảnh / Sản phẩm / Nhà cung cấp / Dự án liên quan, nút Mở ở Bóc tách); liên kết từ bảng Ghi danh nhiều dự án (có nút "Ghi danh dự án mới": tạo dự án rồi ghi danh SP vào đó); nút "Nhập dự án" mở trang nhập đủ trường (chỉ thêm vào danh sách, không mở thành dự án đang làm), ô đầu là Kiến trúc sư (migration 0018 `projects.architect`): gợi ý dự án KTS đã tham gia, trùng KTS + tên thì chuyển về dự án đã có; khối BOQ (tải file PDF / Excel đính vào dự án, hoặc "Tạo BOQ từ Dezon Pro" = tạo dự án ở Bảng điều khiển rồi chuyển sang đó); trang chi tiết có nút Sửa thông tin / Yêu cầu sửa - sửa tại chỗ ngay trên bảng Thông tin của trang chi tiết (cùng các mục, thêm Studio = migration 0020 `projects.studio`; tab Thông tin = thẻ Thông tin cơ bản kiểu dezon.vn - Dự án, Công ty, Địa điểm, Nhóm thiết kế, Kiến trúc sư, Nhiếp ảnh gia, Nhà thầu thi công, Năm hoàn thiện (migration 0021) - + Thông tin nâng cao thu gọn) (migration 0019 `project_edit_requests`): admin / tài khoản có quyền `da_duyet` lưu thẳng, người khác gửi phiếu chờ duyệt (báo người duyệt, Duyệt & áp dụng / Từ chối ngay trên trang chi tiết). Đã code + build + test Go, còn: chạy migration 0018 - 0021, sinh lại schema.sql, thử trên app thật, ảnh bìa dự án, trường người tạo dự án (cần migration) | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; sơ đồ tổ chức, bảng mua hàng PO, nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot vẫn là dữ liệu mẫu | User | 🟡 |
 ### 2.3 Cần credential 🔑
@@ -102,7 +108,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N8`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N10`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
