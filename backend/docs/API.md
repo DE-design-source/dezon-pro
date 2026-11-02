@@ -212,6 +212,7 @@ Từ khi gỡ app Node, tính năng mới KHÔNG thêm hàm `POST /api/<tênHàm
 | `rpc.Super` | `middleware.RequireSuper()` | 401 như trên; nhân viên / admin 403 `{"error":"Chỉ quản trị hệ thống"}` |
 | `rpc.Admin\|rpc.Super` | `middleware.RequireAdminSuper()` | như `Admin` rồi `Super` |
 | `rpc.Public` | (không gắn) | không chặn |
+| `rpc.SelfAuth` | middleware RIÊNG của module (chat: `requireChat()`), không dùng phiên QS | module tự trả 401 (chat: `{"error":"Phiên chat đã hết, mời đăng nhập lại","code":"CHAT_NOAUTH"}`) |
 
 ```go
 // internal/modules/<tên>/handler.go
@@ -247,6 +248,8 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
   (người không đủ quyền bị chặn đúng thân; người đủ quyền KHÔNG bị middleware chặn - gắn middleware chặt hơn `Perm` cũng hỏng test);
   route gắn mà không khai, hoặc khai mà không gắn, đều làm test hỏng. Ca đủ quyền chạy handler thật với request đã huỷ context
   và server không có database: handler không được ghi gì ngoài database / dịch vụ ngoài khi đó.
+  Route `rpc.SelfAuth`: test chỉ đòi route có thật và KHÔNG trả thân chặn của QS với mọi loại token QS (không token, nhân viên, admin,
+  super); gắn nhầm `RequireLogin` cũng bị bắt (`TestSelfAuthGoRoutes`). `reg.Register` (cổng `/api/:fn`) với `SelfAuth` -> panic lúc khởi động.
 - Hàm rpc cũ (80 hàm) chỉ được thêm tham số TUỲ CHỌN ở CUỐI `args`, hoặc nối khoá MỚI vào CUỐI object kết quả; không đổi tên, quyền,
   thứ tự tham số, kiểu kết quả của hàm cũ.
 - Cột database mới: chạy `go run ./cmd/migrate` TRƯỚC khi chạy bản server mới (server không tự migrate). Lệnh ghi cột mới là lệnh RIÊNG,
@@ -277,6 +280,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/phases[/:itemId]` | `tkAddPhase / tkUpdatePhase / tkRemovePhase` | `rpc.Login` | delivery | Đề mục tiến độ (xoá kéo theo công việc) |
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/tasks[/:itemId]` | `tkAddTask / tkUpdateTask / tkRemoveTask` | `rpc.Login` | delivery | Công việc / cột mốc / mốc thu chi |
 | `POST` | `/delivery/projects/:id/tasks/:itemId/comments` | `tkAddComment` | `rpc.Login` | delivery | Bình luận công việc |
+| (nhiều) | `/chat/...` (32 route, kể cả `GET /chat/ws`) | `chat*` | `rpc.Public` (3 route đăng nhập) / `rpc.SelfAuth` (29) | chat | Chat MVP: mục "Chat" ngay dưới |
 
 Kinh doanh (`sales`) và dự án triển khai (`delivery`, trang Quản lý thiết kế / Quản lý dự án), migration 0015-0016:
 - Route chỉ cần đăng nhập; quyền kiểm trong service như `canTab` của giao diện: super phải gửi `x-view-company` (không thì 400),
@@ -286,6 +290,155 @@ Kinh doanh (`sales`) và dự án triển khai (`delivery`, trang Quản lý thi
 - Kéo khách sang giai đoạn `thiet-ke` / `thi-cong` (tạo hoặc sửa) tự tạo dự án `design` / `construction` (1 lần / khách / loại),
   chép tên, khách, liên hệ, loại công trình, mã dự án QS và giá trị (tổng báo giá QS nếu đã gắn), trong cùng transaction với lệnh sửa khách.
 - Tiền gửi / trả bằng đồng (`valueVnd`, `contractValueVnd`, `amountVnd`); ngày dạng `yyyy-mm-dd`.
+
+#### Chat (`/api/v1/chat`, module `chat`, migration 0018, 0019)
+
+Chat MVP theo `backend/CHAT.md`: tài khoản riêng theo số điện thoại HOẶC email (bảng `chat_users`; tài khoản email không có số và ngược
+lại, chưa liên kết hai loại), KHÔNG phải phiên QS, không theo công ty (`x-view-company` không có tác dụng). Lý do thiết kế:
+`docs/02-ky-thuat/database/decisions.md` D-15, D-16.
+- Khoá JSON `snake_case` như CHAT.md mục 5; phong bì như mọi route REST; mọi response có `Cache-Control: no-store`. Thời điểm là chuỗi
+  RFC3339 UTC có mili giây (`2026-10-30T03:04:05.123Z`).
+- Thân phải là JSON object (tối đa 1 MB), hỏng / sai kiểu -> 400 `BAD_REQUEST`. Lỗi database -> 500 `{"error":"Lỗi máy chủ","code":"INTERNAL"}`
+  (chi tiết chỉ ghi log).
+
+**Token.** Gửi `Authorization: Bearer <access_token>`.
+
+| Token | Dạng | Hạn | Phía máy chủ |
+|---|---|---|---|
+| access | JWT HS256 `{"sub":"<user id>","did":<device id>,"typ":"chat","iat","exp"}`; chỉ nhận `alg` = HS256 | `CHAT_ACCESS_TTL_MIN` (mặc định 15 phút) | không lưu; ký bằng `CHAT_JWT_SECRET` (trống = suy từ `AUTH_SECRET`) |
+| refresh | 32 byte ngẫu nhiên, base64url | `CHAT_REFRESH_TTL_DAYS` (mặc định 30 ngày) | sha256 hex trong `chat_refresh_tokens`, gắn với 1 thiết bị |
+
+- Middleware chat kiểm chữ ký, `typ`, `exp` và thiết bị còn tồn tại (cache 30 giây, bỏ ngay khi đăng xuất / thu hồi); sai -> 401 `CHAT_NOAUTH`.
+  Middleware QS bỏ qua token chat (token QS dạng `body.sig`, JWT 3 đoạn không bao giờ khớp, không đọc database); token QS gửi vào route chat -> 401 `CHAT_NOAUTH`.
+- Refresh xoay vòng: mỗi lần đổi, token cũ được đánh dấu đã dùng và cặp mới được cấp. Trình lại token đã dùng dưới 30 giây -> 409
+  `REFRESH_RACE` (hai tab refresh cùng lúc: đọc lại token đã lưu, không thu hồi); cũ hơn -> xoá thiết bị (mọi token, push token, đóng
+  WebSocket bằng `force_logout`) -> 401 `REFRESH_REUSED`. Token lạ / hết hạn -> 401 `REFRESH_INVALID`.
+
+**Route** (đường dẫn tính từ `/api/v1/chat`; `Name` là `operationId` `v1go_<Name>` trong `/api-docs.json`, nhóm `REST - Chat (chỉ bản Go)`):
+
+| Method | Đường dẫn | `Name` | Quyền | Thân / query -> kết quả |
+|---|---|---|---|---|
+| `POST` | `/auth/otp/request` | `chatOtpRequest` | Public | `{phone}` hoặc `{email}` -> `{phone?, email?, expires_in: 300, resend_after: 60, dev_code?}` (đúng một trong `phone` / `email`, đã chuẩn hoá); `dev_code` chỉ khi `CHAT_OTP_DEV=1`. Có `email` -> gửi mã qua SMTP (chưa đặt `SMTP_HOST` thì ghi log); gửi cả hai -> 400 `BAD_REQUEST` |
+| `POST` | `/auth/otp/verify` | `chatOtpVerify` | Public | `{phone \| email, otp, device: {platform, name}, display_name?}` -> `{access_token, refresh_token, expires_in, device_id, user: Me, is_new}`; số / email chưa có tài khoản thì tạo (tên mặc định của tài khoản email = phần trước `@`) |
+| `POST` | `/auth/refresh` | `chatRefresh` | Public | `{refresh_token}` -> như verify, không có `is_new` |
+| `POST` | `/auth/logout` | `chatLogout` | SelfAuth | xoá thiết bị hiện tại (refresh + push token), đóng WebSocket của thiết bị -> `{}` |
+| `GET` / `PATCH` | `/me` | `chatMe` / `chatUpdateMe` | SelfAuth | Me; PATCH `{display_name?, show_read_receipts?}` -> Me |
+| `GET` | `/users/search?phone=` hoặc `?email=` | `chatSearchUser` | SelfAuth | `{user: User \| null}` - đúng số / đúng email (đã chuẩn hoá); gửi cả hai -> 400 `BAD_REQUEST` |
+| `POST` | `/contacts/match` | `chatMatchContacts` | SelfAuth | `{phones?, phone_hashes?}` (mỗi loại ≤ 1000; hash = sha256 hex của số E.164) -> `{users: [User + matched]}` |
+| `GET` | `/friends` | `chatListFriends` | SelfAuth | `{friends: [User]}` sắp theo tên |
+| `DELETE` | `/friends/:user_id` | `chatUnfriend` | SelfAuth | huỷ kết bạn (xoá cả hai chiều) -> `{}` |
+| `GET` | `/friend-requests` | `chatListFriendRequests` | SelfAuth | `{incoming, outgoing}`, mỗi phần tử = User + `requested_at` |
+| `POST` | `/friend-requests` | `chatSendFriendRequest` | SelfAuth | `{user_id}` -> `{status: "pending" \| "accepted"}` (người kia đã mời mình thì thành bạn ngay) |
+| `POST` | `/friend-requests/:user_id/accept` | `chatAcceptFriendRequest` | SelfAuth | `{status: "accepted"}` |
+| `POST` | `/friend-requests/:user_id/reject` | `chatRejectFriendRequest` | SelfAuth | `{}` |
+| `DELETE` | `/friend-requests/:user_id` | `chatCancelFriendRequest` | SelfAuth | rút lời mời mình đã gửi -> `{}` |
+| `GET` / `POST` | `/blocks` | `chatListBlocks` / `chatBlockUser` | SelfAuth | `{users: [User]}`; POST `{user_id}` -> `{}` |
+| `DELETE` | `/blocks/:user_id` | `chatUnblockUser` | SelfAuth | bỏ chặn -> `{}` |
+| `GET` | `/conversations?cursor=&limit=` | `chatListConversations` | SelfAuth | `{conversations: [Conversation], next_cursor, sync_cursor}`; tin mới nhất trước; `limit` 50 (tối đa 100) |
+| `POST` | `/conversations` | `chatCreateConversation` | SelfAuth | `{type: "direct", user_id}` (cặp đã có thì trả hội thoại cũ) hoặc `{type: "group", name, member_ids}` (≥ 1 người, đều là bạn bè) -> ConversationDetail |
+| `GET` / `PATCH` | `/conversations/:id` | `chatGetConversation` / `chatRenameConversation` | SelfAuth | ConversationDetail (403 nếu không còn là thành viên); PATCH `{name}` (trưởng / phó nhóm) |
+| `POST` | `/conversations/:id/members` | `chatAddMembers` | SelfAuth | `{user_ids}`: thành viên bất kỳ thêm bạn bè của mình (nhóm tối đa 1000) -> ConversationDetail |
+| `DELETE` | `/conversations/:id/members/:user_id` | `chatRemoveMember` | SelfAuth | chính mình = rời nhóm; người khác: trưởng nhóm xoá mọi người, phó nhóm xoá thành viên thường -> `{}` |
+| `PATCH` | `/conversations/:id/members/:user_id` | `chatSetMemberRole` | SelfAuth | `{role: "admin" \| "member"}` (chỉ trưởng nhóm) -> ConversationDetail |
+| `PUT` | `/conversations/:id/mute` | `chatMuteConversation` | SelfAuth | `{until: RFC3339 \| "forever" \| null}` -> Conversation |
+| `GET` | `/conversations/:id/messages` | `chatListMessages` | SelfAuth | `?before_seq=` hoặc `?after_seq=`, `limit` 50 (tối đa 100) -> `{messages (tăng theo seq), has_more}`; không có cả hai = trang mới nhất |
+| `GET` | `/sync?cursor=` | `chatSync` | SelfAuth | `{conversations (kể cả dòng left: true), sync_cursor, truncated}`: dòng đổi từ `cursor` - 10 giây (client gộp idempotent), tối đa 500. Dòng `left: true` chỉ còn dữ liệu của mình: `name` null, `last_message` / `last_message_at` null, `member_count` 0, `last_seq` = `last_delivered_seq` của mình, `updated_at` = lúc rời (client giữ tên đã biết) |
+| `GET` | `/push/config` | `chatPushConfig` | SelfAuth | `{enabled, vapid_public_key}` |
+| `POST` / `DELETE` | `/devices/push` | `chatSetPushToken` / `chatClearPushToken` | SelfAuth | POST `{push_kind: "webpush", push_token: JSON.stringify(PushSubscription)}` (endpoint https của dịch vụ push đã biết): subscription đó bị gỡ khỏi thiết bị KHÁC của CÙNG người dùng (đăng nhập lại), thiết bị của người dùng khác vẫn giữ (một trình duyệt nhiều tài khoản, mỗi tab một tài khoản, dùng chung một subscription) / DELETE gỡ khỏi thiết bị hiện tại -> `{}` |
+| `GET` | `/ws` | `chatWebSocket` | SelfAuth | nâng cấp WebSocket (bên dưới); gateway chưa bật / đang tắt -> 503 `UNAVAILABLE` |
+
+Object (CHAT.md mục 5; kiểu Go trong `internal/modules/chat/dto.go`):
+- **User** `{id, display_name, phone, email, relation, online}`: `phone` chỉ có với chính mình, bạn bè và kết quả tra / đối chiếu đúng số (còn lại null);
+  `email` chỉ có với chính mình, bạn bè và kết quả tra đúng email (còn lại null: lời mời, thành viên nhóm, đã chặn...); tra theo email không
+  trả `phone` và ngược lại; tài khoản email có `phone` null, tài khoản số có `email` null;
+  `online` chỉ đúng với bạn bè và `peer` của chat 1-1 mà người đó đã nhắn ít nhất một tin (không ai chặn ai), còn lại luôn false;
+  `relation` = `self | friend | outgoing | incoming | blocked | none` (`blocked` = mình chặn họ; bị họ chặn hiện `none`).
+  **Me** = User + `show_read_receipts`, `created_at`.
+- **Message** `{id, conversation_id, seq, client_msg_id, sender_id, sender_name, msg_type: "text" | "system", content, created_at}`.
+- **Conversation** `{id, type, name, peer, member_count, role, last_seq, last_read_seq, last_delivered_seq, unread, last_message, last_message_at,
+  muted_until, left, created_at, updated_at}`: `peer` (User) chỉ ở chat 1-1; `unread = max(0, last_seq - last_read_seq)`; `muted_until` vĩnh viễn =
+  `"forever"`. **ConversationDetail** = Conversation + `members: [{user_id, display_name, role, last_read_seq, last_delivered_seq, joined_at}]`
+  (thành viên đang hoạt động; `last_read_seq` null khi người đó tắt "đã xem" và không phải mình).
+
+Giới hạn: OTP 5 lần / giờ / số hoặc email, 20 lần / giờ / IP (đếm chung số lẫn email), gửi lại sau 60 giây, mã sống 5 phút, xin mã mới thì mã cũ
+hết dùng, sai 5 lần (cộng mọi mã của số / email trong 1 giờ) khoá số / email 15 phút; 30 lời mời kết bạn / giờ; 60 lần tra số / email + đối chiếu
+danh bạ / phút và 5000 SỐ / email được tra / ngày (mỗi số / hash hợp lệ khác nhau trong `contacts/match` là 1, `users/search` là 1); 30 chat 1-1 MỚI với người chưa là bạn / giờ; 20 tin / giây (các bộ
+đếm sau OTP nằm trong bộ nhớ của tiến trình).
+
+**Mã lỗi** (REST: khoá `code`; WebSocket: `data.code` của gói `error`; thông báo tiếng Việt):
+
+| Mã | HTTP | Khi nào |
+|---|---|---|
+| `BAD_REQUEST` | 400 | thân / tham số sai, tin rỗng / quá 4000 ký tự, thao tác chỉ dành cho nhóm |
+| `PHONE_INVALID` | 400 | số điện thoại không chuẩn hoá được |
+| `EMAIL_INVALID` | 400 | email không hợp lệ (`Email không hợp lệ`): rỗng sau khi bỏ khoảng trắng, > 254 ký tự, phần trước `@` > 64, có khoảng trắng / ký tự điều khiển / ký tự đặc biệt `"(),:;<>[]` hay dấu gạch ngược (chặn dạng `1<victim@corp.vn>`: net/mail sẽ gửi tới hộp thư khác), dấu chấm ở đầu / cuối / liền nhau ở một trong hai phần, không khớp `x@y.z` |
+| `OTP_INVALID` | 400 | sai mã (lần 1-4, đếm cộng dồn mọi mã của số / email trong 1 giờ) |
+| `OTP_EXPIRED` | 400 | mã hết hạn hoặc số / email chưa xin mã |
+| `OTP_RATE_LIMIT` | 429 | gửi lại trước 60 giây, quá 5 lần / giờ / số hoặc email, hoặc 20 lần / giờ / IP |
+| `OTP_LOCKED` | 429 | sai lần thứ 5 (xin mã mới không đếm lại): số / email bị khoá 15 phút (cả xin mã lẫn xác thực) |
+| `CHAT_NOAUTH` | 401 | access token thiếu / sai / hết hạn, hoặc thiết bị đã đăng xuất |
+| `REFRESH_INVALID` | 401 | refresh token lạ / hết hạn |
+| `REFRESH_REUSED` | 401 | token đã xoay hơn 30 giây bị trình lại: thiết bị bị thu hồi |
+| `REFRESH_RACE` | 409 | token vừa xoay dưới 30 giây (request song song): đọc lại token đã lưu rồi gọi lại |
+| `FORBIDDEN` | 403 | không còn là thành viên, không đủ vai trò, thêm người không phải bạn bè, người kia đã chặn mình (`Không thể gửi lời mời`) |
+| `BLOCKED` | 403 | chat 1-1 / gửi tin khi một trong hai bên đã chặn; mời kết bạn người mình đang chặn |
+| `NOT_FOUND` | 404 | người dùng / hội thoại không có |
+| `RATE_LIMIT` | 429 | vượt 20 tin / giây, 30 lời mời / giờ, 60 lần tra số / email / phút, 5000 số / email được tra / ngày, 30 chat 1-1 mới với người chưa là bạn / giờ |
+| `INTERNAL` | 500 | lỗi máy chủ; không gửi được SMS / email mã OTP (`Không gửi được mã xác thực, thử lại sau`) |
+| `UNAVAILABLE` | 503 | `GET /chat/ws` khi gateway chưa bật hoặc server đang tắt |
+| `AUTH_FAILED`, `UNAUTHENTICATED`, `UNKNOWN_TYPE` | - | chỉ trong gói `error` của WebSocket |
+
+**WebSocket** `ws(s)://<máy chủ>/api/v1/chat/ws` (`internal/modules/chat/realtime`). Mỗi gói là `{"type":"...","req_id"?: chuỗi | số,"data":{...}}`;
+`req_id` được trả nguyên dạng trong `ack` / `error`. Origin: cùng host với API luôn được, thêm các host của `CORS_ORIGINS` (bỏ scheme).
+Khung tối đa 32 KiB; gói của một kết nối xử lý lần lượt; `device_id`, `conversation_id`, `user_ids` nhận cả số lẫn chuỗi số.
+
+Client -> server:
+
+| Gói | `data` | Trả lời |
+|---|---|---|
+| `auth` (BẮT BUỘC là gói đầu, trong 10 giây) | `{access_token, device_id}` (`device_id` BẮT BUỘC, phải đúng thiết bị của token; thiếu / 0 / khác -> sai) | `auth.ok {user_id, server_time}`; sai (kể cả thiết bị vừa đăng xuất / bị thu hồi) -> `error` `AUTH_FAILED` rồi đóng 4401 |
+| `ping` (client gửi mỗi 25 giây) | - | `pong` |
+| `message.send` | `{conversation_id, client_msg_id (UUID), msg_type: "text", content}` | `ack {conversation_id, client_msg_id, message_id, seq, created_at, duplicate}` hoặc `error`; gửi lại cùng `client_msg_id` -> ack của tin cũ, `duplicate: true` |
+| `message.delivered` / `message.read` | `{conversation_id, seq}` | `ack {conversation_id, delivered_seq, read_seq}`; `seq` bị kẹp về `last_seq`, con trỏ không lùi, đã xem nâng luôn đã nhận |
+| `typing.start` / `typing.stop` | `{conversation_id}` | chuyển `typing` cho các thành viên khác; `typing.start` lặp lại dưới 1 giây bị bỏ |
+| `presence.subscribe` | `{user_ids: [...]}` (≤ 100, thay tập đang theo dõi) | ngay 1 `presence.update` cho mỗi người được xem (không ai chặn ai, và là bạn bè hoặc chung nhóm hoặc chung chat 1-1 mà người đó đã nhắn ít nhất một tin), sau đó đẩy khi đổi |
+
+`ack` chỉ gửi khi gói có `req_id` (`typing.*`, `presence.subscribe` có `req_id` thì nhận `ack {}`; lỗi của `typing.*` chỉ báo khi có `req_id`).
+Chưa xác thực mà gửi gói khác -> `error` `UNAUTHENTICATED` + đóng 4401; JSON hỏng -> `BAD_REQUEST` (trước `auth`: kèm đóng 4401);
+loại gói lạ -> `UNKNOWN_TYPE`; gửi `auth` lần hai -> `BAD_REQUEST`.
+
+Server -> client:
+
+| Gói | `data` | Khi nào |
+|---|---|---|
+| `auth.ok` | `{user_id, server_time}` | xác thực xong (client gọi `GET /chat/sync` rồi gửi outbox) |
+| `pong` | - | trả `ping` |
+| `ack` | theo gói gửi lên | gói có `req_id` |
+| `error` | `{code, message}` | lỗi của một gói |
+| `message.new` | Message | tin mới / tin hệ thống, tới mọi kết nối của thành viên (cả kết nối khác của người gửi; người vừa bị xoá / rời nhóm cũng nhận tin hệ thống); client khử trùng theo `(conversation_id, seq)` |
+| `receipt.update` | `{conversation_id, user_id, delivered_seq, read_seq}` | con trỏ của một thành viên tăng; người khác nhận `read_seq: null` khi chủ con trỏ tắt `show_read_receipts`; chat 1-1 đang chặn: chỉ các thiết bị của chính mình nhận |
+| `presence.update` | `{user_id, online, last_seen}` | trạng thái online đổi (`last_seen` null khi đang online; offline sau 30 giây không còn kết nối); thôi được xem (chặn, huỷ kết bạn, rời / bị xoá khỏi hội thoại chung cuối cùng) -> 1 gói `{online: false, last_seen: null}` rồi gỡ đăng ký |
+| `typing` | `{conversation_id, user_id, is_typing}` | thành viên khác soạn / thôi soạn (chat 1-1 đang chặn: không chuyển, không báo lỗi) |
+| `reconnect` | `{}` | server sắp tắt; đóng 1012 ngay sau đó |
+| `force_logout` | `{}` | thiết bị đã đăng xuất / bị thu hồi; đóng 4403 ngay sau đó |
+
+Mã đóng kết nối:
+
+| Mã | Khi nào | Client nên |
+|---|---|---|
+| 4401 | `auth` sai, hoặc gói đầu không phải `auth` / JSON hỏng | refresh token qua REST rồi kết nối lại |
+| 4408 | không gửi `auth` trong 10 giây | kết nối lại |
+| 4403 | sau `force_logout` | xoá token, về màn đăng nhập |
+| 1012 | sau `reconnect` (server khởi động lại) | kết nối lại có backoff |
+| không có mã ứng dụng | client chậm (256 gói chờ ghi), không nhận gói nào trong 60 giây, khung quá 32 KiB (thư viện gửi 1009) | kết nối lại rồi `GET /chat/sync` |
+
+Tin được lưu (commit) TRƯỚC khi phân phối. Client phát hiện hở `seq` thì tải `GET /chat/conversations/:id/messages?after_seq=`; sau mỗi `auth.ok`
+gọi `GET /chat/sync?cursor=<sync_cursor>`. Push (Web Push, khi đặt đủ `CHAT_VAPID_*`): gửi cho thành viên khác người gửi đang offline và không
+tắt thông báo, payload `{title, body, user_id, conversation_id, seq, badge, tag: "conv-<user_id>-<id>", url: "/chat?u=<user_id>#c<id>"}`
+(`user_id` = người nhận: một subscription có thể thuộc nhiều tài khoản trong cùng trình duyệt; trang mở từ `url` chuyển tab sang tài khoản đó),
+header `Topic: c<user_id>-<id>` (bỏ khi quá 32 ký tự) để hai tài khoản trên một subscription không đè thông báo chờ giao của nhau
+(gộp tin cùng hội thoại trong 3 giây; dịch vụ push trả 404 / 410 thì gỡ token của thiết bị). Chỉ gửi tới thiết bị còn phiên (còn refresh
+token chưa hết hạn): thiết bị của phiên đã hết / đăng xuất lúc mất mạng vẫn giữ subscription chung của trình duyệt nhưng không nhận push.
 
 `GET /my-proposals/:code` (tag "Mua hàng"):
 - admin / super: như `GET /proposals/:code` (`getDeXuat`) - mọi phiếu của công ty; không có -> `Không tìm thấy đề xuất`.

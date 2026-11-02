@@ -1,53 +1,97 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './Chat.css'
-import { ME, COLORS, CONVERSATIONS } from '../../data/chatData'
+import { BOT_CONVERSATION } from '../../data/chatData'
 import ConversationList from './components/ConversationList'
-import Thread from './components/Thread'
+import Thread, { BotThread } from './components/Thread'
 import InfoPanel from './components/InfoPanel'
 import ContactsView from './components/ContactsView'
+import ChatGate from './components/ChatGate'
+import NewChatDialog from './components/NewChatDialog'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import { loadKdRequests, saveKdRequests } from '../../services/kdRequestService'
+import { setOpenConversation, takeOpenTarget, useChat } from './state/chatStore'
 
-/* Sao chép dữ liệu mẫu để state của trang không sửa trực tiếp vào hằng số */
-function cloneConversations() {
-  /* Phiếu yêu cầu gửi từ trang Kinh doanh: thêm vào cuối hội thoại SiteFlow Bot */
-  const requests = loadKdRequests()
-  const requestMsgs = requests.map(r => ({
+/* Phiếu yêu cầu gửi từ trang Kinh doanh: thêm vào cuối hội thoại cục bộ SiteFlow Bot (như bản cũ) */
+function buildBotMessages() {
+  const requestMsgs = loadKdRequests().map(r => ({
     bot: true, request: true, reqId: r.id, title: r.title, text: r.leadName,
     time: new Date(r.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
   }))
-  const waiting = requests.filter(r => r.status !== 'approved' && r.status !== 'rejected').length
-  return CONVERSATIONS.map(c => ({
-    ...c,
-    members: (c.members || []).map(m => ({ ...m })),
-    messages: c.messages.map(m => ({ ...m })).concat(c.type === 'bot' ? requestMsgs : []),
-    unread: c.type === 'bot' ? c.unread + waiting : c.unread,
-  }))
+  return BOT_CONVERSATION.messages.map(m => ({ ...m })).concat(requestMsgs)
+}
+const waitingRequests = list => list.filter(r => r.status !== 'approved' && r.status !== 'rejected').length
+
+/* #c<id> = hội thoại thật (link trong thông báo đẩy), #bot = SiteFlow Bot */
+function idFromHash(hash) {
+  const h = String(hash || '').replace('#', '')
+  if (h === 'bot') return 'bot'
+  const m = /^c(\d+)$/.exec(h)
+  return m ? Number(m[1]) : null
 }
 
 export default function Chat() {
   const location = useLocation()
-  const [conversations, setConversations] = useState(cloneConversations)
+  const navigate = useNavigate()
+  const chat = useChat()
+  const ready = chat.auth === 'ready'
   const [requests, setRequests] = useState(loadKdRequests)
-  /* Bản HTML: mở chat.html#<id> thì chọn sẵn hội thoại đó */
-  const [activeId, setActiveId] = useState(() => {
-    const hashId = (location.hash || '').replace('#', '')
-    return hashId && CONVERSATIONS.some(c => c.id === hashId) ? hashId : 'g1'
-  })
+  const [botMsgs, setBotMsgs] = useState(buildBotMessages)
+  const [botUnread, setBotUnread] = useState(() => BOT_CONVERSATION.unread + waitingRequests(loadKdRequests()))
+  const [activeId, setActiveId] = useState(() => idFromHash(location.hash))
   const [filterTab, setFilterTab] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [editingIdx, setEditingIdx] = useState(null)
   /* Popover thêm thành viên đang mở: null | 'head' (đầu thread) | 'info' (cột thông tin) */
   const [memberPop, setMemberPop] = useState(null)
   const [view, setView] = useState(() => ((location.hash || '') === '#contacts' ? 'contacts' : 'chat')) // chat | contacts
-  const [scrollTick, setScrollTick] = useState(0)
+  const [dialog, setDialog] = useState(null) // null | 'direct' | 'group'
+  const [adding, setAdding] = useState(false) // bộ chọn tài khoản ▸ Thêm tài khoản: cổng đăng nhập ở chế độ thêm
 
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
 
-  const activeConv = conversations.find(c => c.id === activeId)
+  const serverActive = typeof activeId === 'number' ? activeId : null
+  const activeConv = serverActive != null ? chat.convs[serverActive] : null
+
+  /* Đổi hash (bấm thông báo đẩy, link #c<id>, #contacts) -> mở đúng chỗ */
+  useEffect(() => {
+    const h = location.hash || ''
+    if (h === '#contacts') { setView('contacts'); return }
+    const id = idFromHash(h)
+    if (id !== null) { setView('chat'); setActiveId(id); setMemberPop(null) }
+  }, [location.hash])
+
+  /* Đăng xuất (kể cả bị thu hồi phiên) -> về màn tin nhắn, bỏ hộp thoại đang mở */
+  useEffect(() => {
+    if (chat.auth === 'signedout') { setView('chat'); setDialog(null); setMemberPop(null) }
+  }, [chat.auth])
+
+  /* Đổi tài khoản / đăng xuất: bỏ hội thoại đang mở của tài khoản cũ (tài khoản mới mở là 403) và #c<id> trên URL,
+     đóng cổng "thêm tài khoản" / hộp thoại của tài khoản cũ. Lần gắn đầu không đụng tới: link #c<id> từ thông báo đẩy vẫn
+     mở đúng hội thoại. Đổi tài khoản do bấm thông báo của tài khoản kia: mở hội thoại của thông báo. */
+  const meId = chat.me ? chat.me.id : null
+  const prevMe = useRef(meId)
+  useEffect(() => {
+    const was = prevMe.current
+    prevMe.current = meId
+    if (was === meId) return
+    setAdding(false)
+    const target = meId != null ? takeOpenTarget(meId) : null
+    if (target != null) { setView('chat'); setActiveId(target); setMemberPop(null); setDialog(null); return }
+    if (was == null) return
+    setView('chat')
+    setDialog(null)
+    setMemberPop(null)
+    setActiveId(a => (typeof a === 'number' ? null : a))
+    setOpenConversation(null)
+    if (/^#c\d+$/.test(location.hash)) navigate({ pathname: location.pathname, hash: '' }, { replace: true })
+  }, [meId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Báo store hội thoại đang mở (tải tin, báo đã xem, đăng ký online); rời trang / đang thêm tài khoản thì bỏ */
+  useEffect(() => { setOpenConversation(ready && view === 'chat' && !adding ? serverActive : null) }, [ready, serverActive, view, adding])
+  /* Trang vừa mở (kể cả sau khi bấm thông báo ở trang khác): hội thoại lấy từ #c<id>, bỏ hội thoại chờ mở còn sót */
+  useEffect(() => { takeOpenTarget(null); return () => setOpenConversation(null) }, [])
 
   /* Bấm ra ngoài thì đóng popover thêm thành viên */
   useEffect(() => {
@@ -57,34 +101,13 @@ export default function Chat() {
     return () => document.removeEventListener('click', close)
   }, [memberPop])
 
-  /* Sửa danh sách tin nhắn của hội thoại đang mở */
-  function updateActiveMessages(fn) {
-    setConversations(prev => prev.map(c => (c.id === activeId ? { ...c, messages: fn(c.messages) } : c)))
-  }
-
-  /* Bấm một dòng trong danh sách: mở hội thoại + xoá số chưa đọc */
-  function selectConv(id) {
-    setConversations(prev => prev.map(c => (c.id === id ? { ...c, unread: 0 } : c)))
-    openConv(id)
-  }
-
-  /* Mở hội thoại từ "Nhóm chung" / danh bạ: bản HTML không xoá số chưa đọc */
-  function openConv(id) {
+  function select(id) {
+    if (id === 'bot') setBotUnread(0)
+    setAdding(false)
     setActiveId(id)
-    setEditingIdx(null)
     setMemberPop(null)
-    setScrollTick(t => t + 1)
-  }
-
-  function togglePinConv(id) {
-    setConversations(prev => prev.map(c => (c.id === id ? { ...c, pinned: !c.pinned } : c)))
-  }
-
-  function sendMessage({ text, image, file }) {
-    const msg = { who: ME, time: 'Vừa xong', text }
-    if (image) msg.image = image
-    if (file) msg.file = file
-    updateActiveMessages(msgs => [...msgs, msg])
+    setView('chat')
+    navigate({ pathname: location.pathname, hash: id === 'bot' ? '#bot' : id == null ? '' : '#c' + id }, { replace: true })
   }
 
   /* Cập nhật một phiếu yêu cầu (xác nhận / điều phối / duyệt) và lưu lại */
@@ -94,48 +117,77 @@ export default function Chat() {
     saveKdRequests(next)
   }
 
-  function saveEdit(idx, val) {
-    /* Nội dung rỗng thì giữ nguyên tin cũ, chỉ đóng ô sửa */
-    if (val) updateActiveMessages(msgs => msgs.map((m, i) => (i === idx ? { ...m, text: val, edited: true } : m)))
-    setEditingIdx(null)
-  }
-
-  function togglePinMsg(idx) {
-    updateActiveMessages(msgs => msgs.map((m, i) => (i === idx ? { ...m, pinned: !m.pinned } : m)))
-  }
-
-  function unpinMsg(idx) {
-    updateActiveMessages(msgs => msgs.map((m, i) => (i === idx ? { ...m, pinned: false } : m)))
-  }
-
-  function deleteMsg(idx) {
-    if (!window.confirm('Xoá tin nhắn này?')) return
-    updateActiveMessages(msgs => msgs.filter((_, i) => i !== idx))
-    /* Giữ ô sửa (nếu đang mở) bám đúng tin nhắn sau khi danh sách dịch chỉ số */
-    setEditingIdx(cur => (cur === null ? null : cur === idx ? null : cur > idx ? cur - 1 : cur))
-  }
-
-  function addMember(name, role) {
-    const palette = Object.values(COLORS)
-    setConversations(prev => prev.map(c => (
-      c.id === activeId ? { ...c, members: [...c.members, { name, role, color: palette[c.members.length % palette.length] }] } : c
-    )))
-    setMemberPop(null)
-  }
-
-  /* Nhắn tin từ Danh bạ: mở hội thoại riêng sẵn có, chưa có thì tạo mới */
-  function messageContact(p) {
-    if (p.bot) { const bot = conversations.find(c => c.type === 'bot'); if (bot) { setView('chat'); openConv(bot.id) } return }
-    let conv = conversations.find(c => c.type === 'dm' && c.name === p.name)
-    if (!conv) {
-      conv = { id: 'dm-' + Date.now(), type: 'dm', name: p.name, sub: p.role || p.company || '', color: p.color || COLORS.blue, online: false, unread: 0, members: [], files: [], images: [], messages: [] }
-      setConversations(prev => [conv, ...prev])
-    }
-    setView('chat')
-    openConv(conv.id)
+  function sendBotMessage(text) {
+    setBotMsgs(ms => [...ms, { own: true, text, time: 'Vừa xong' }])
   }
 
   const toggleMemberPop = which => setMemberPop(cur => (cur === which ? null : which))
+
+  const botConv = { ...BOT_CONVERSATION, local: true, messages: botMsgs }
+  const lastBot = botMsgs[botMsgs.length - 1]
+  const botItem = {
+    name: BOT_CONVERSATION.name,
+    conv: botConv,
+    unread: botUnread,
+    time: lastBot ? lastBot.time : '',
+    preview: !lastBot ? '' : lastBot.bot ? (lastBot.title + ': ' + lastBot.text) : 'Bạn: ' + lastBot.text,
+  }
+  const meName = (chat.me && chat.me.display_name) || 'Bạn'
+
+  let main
+  if (adding) {
+    main = <ChatGate key="add" chat={chat} mode="add" onCancel={() => setAdding(false)} onDone={() => setAdding(false)} />
+  } else if (activeId === 'bot') {
+    main = (
+      <>
+        <BotThread conv={botConv} requests={requests} onUpdateRequest={updateRequest} onSend={sendBotMessage} meName={meName} />
+        <InfoPanel chat={chat} conv={botConv} />
+      </>
+    )
+  } else if (!ready) {
+    main = <ChatGate chat={chat} />
+  } else if (activeConv) {
+    main = (
+      <>
+        <Thread
+          key={'t' + activeConv.id}
+          chat={chat}
+          conv={activeConv}
+          memberPopOpen={memberPop === 'head'}
+          onToggleMemberPop={() => toggleMemberPop('head')}
+          onCloseMemberPop={() => setMemberPop(null)}
+        />
+        <InfoPanel
+          key={'i' + activeConv.id}
+          chat={chat}
+          conv={activeConv}
+          memberPopOpen={memberPop === 'info'}
+          onToggleMemberPop={() => toggleMemberPop('info')}
+          onCloseMemberPop={() => setMemberPop(null)}
+          onLeft={() => select(null)}
+        />
+      </>
+    )
+  } else if (serverActive != null) {
+    const e = chat.msgs[serverActive]
+    main = (
+      <div className="ch-empty">
+        <div className="ch-empty-text">{e && e.error ? 'Không mở được cuộc trò chuyện này: ' + e.error : 'Đang mở cuộc trò chuyện…'}</div>
+        {e && e.error && <button type="button" className="ch-ct-btn" onClick={() => select(null)}>Đóng</button>}
+      </div>
+    )
+  } else {
+    main = (
+      <div className="ch-empty">
+        <div className="ch-empty-title">Chào {meName}!</div>
+        <div className="ch-empty-text">Chọn một cuộc trò chuyện bên trái hoặc bắt đầu trò chuyện mới.</div>
+        <div className="ch-empty-actions">
+          <button type="button" className="ch-ct-btn solid" onClick={() => setDialog('direct')}>Nhắn tin mới</button>
+          <button type="button" className="ch-ct-btn" onClick={() => setDialog('group')}>Tạo nhóm</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -143,53 +195,31 @@ export default function Chat() {
       style={{ '--ai-panel-width': `${aiWidth}px` }}
     >
       <div className="ch-main">
-        {view === 'contacts'
-          ? <ContactsView conversations={conversations} onMessage={messageContact} onOpenConv={id => { setView('chat'); openConv(id) }} onBack={() => setView('chat')} />
+        {view === 'contacts' && ready
+          ? <ContactsView chat={chat} onOpenConv={select} onNewGroup={() => setDialog('group')} onBack={() => setView('chat')} />
           : (
           <div className="ch-chat-shell">
             <ConversationList
-              conversations={conversations}
+              chat={chat}
+              bot={botItem}
               activeId={activeId}
               filterTab={filterTab}
               searchTerm={searchTerm}
               onTab={setFilterTab}
               onSearch={setSearchTerm}
-              onSelect={selectConv}
-              onTogglePin={togglePinConv}
-              onOpenDirectory={() => setView('contacts')}
+              onSelect={select}
+              onOpenDirectory={() => { if (ready) { setAdding(false); setView('contacts') } else select(null) }}
+              onNewChat={() => { setAdding(false); setDialog('direct') }}
+              onAddAccount={() => { setMemberPop(null); setAdding(true) }}
             />
-    
-            <Thread
-              conv={activeConv}
-              requests={requests}
-              onUpdateRequest={updateRequest}
-              editingIdx={editingIdx}
-              scrollTick={scrollTick}
-              memberPopOpen={memberPop === 'head'}
-              onToggleMemberPop={() => toggleMemberPop('head')}
-              onCloseMemberPop={() => setMemberPop(null)}
-              onAddMember={addMember}
-              onStartEdit={setEditingIdx}
-              onCancelEdit={() => setEditingIdx(null)}
-              onSaveEdit={saveEdit}
-              onTogglePinMsg={togglePinMsg}
-              onUnpinMsg={unpinMsg}
-              onDeleteMsg={deleteMsg}
-              onSend={sendMessage}
-            />
-    
-            <InfoPanel
-              conv={activeConv}
-              conversations={conversations}
-              memberPopOpen={memberPop === 'info'}
-              onToggleMemberPop={() => toggleMemberPop('info')}
-              onCloseMemberPop={() => setMemberPop(null)}
-              onAddMember={addMember}
-              onOpenConv={openConv}
-            />
+            {main}
           </div>
           )}
       </div>
+
+      {dialog && ready && (
+        <NewChatDialog chat={chat} initialTab={dialog} onClose={() => setDialog(null)} onOpened={id => { setDialog(null); select(id) }} />
+      )}
 
       <Dezbot
         open={aiOpen}

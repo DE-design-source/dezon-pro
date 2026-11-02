@@ -9,7 +9,7 @@ Ngoài ra bản Go mở thêm REST dưới `/api/v1`, dùng chung service.
 
 Module Go: `qspro-backend` - Go 1.25. Thư viện đã có sẵn trong `go.mod` (không cần sửa): gin, pgx/v5,
 excelize/v2, golang.org/x/crypto (bcrypt, scrypt), golang.org/x/text (norm, collate, language, cases), golang.org/x/net,
-go-redis/v9, swaggo/files/v2 (Swagger UI nhúng).
+go-redis/v9, swaggo/files/v2 (Swagger UI nhúng), github.com/coder/websocket v1.8 (WebSocket của chat, thêm cùng Chat MVP).
 File `.env` đọc bằng `config.LoadDotenv` - bản chuyển của gói dotenv 16 của Node (không dùng godotenv, vì hai bên đọc `#`, `$`, `\` khác nhau).
 
 ## 1. Sơ đồ thư mục
@@ -17,6 +17,7 @@ File `.env` đọc bằng `config.LoadDotenv` - bản chuyển của gói dotenv
 ```
 cmd/api/main.go                  điểm khởi chạy server
 cmd/migrate/main.go              chạy migration (bản chuyển của infra/scripts/migrate.js)
+cmd/vapid/main.go                in cặp khoá VAPID (CHAT_VAPID_PUBLIC_KEY / CHAT_VAPID_PRIVATE_KEY) cho Web Push của chat
 internal/config/                 biến môi trường, đọc file .env
 internal/server/server.go        gin engine, khớp route kiểu Express, tắt êm
 internal/server/static.go        phục vụ file tĩnh TUỲ CHỌN (STATIC_DIR, /vendor)
@@ -31,6 +32,8 @@ internal/middleware/             auth, tenant, rbac, cors, rate_limit, body (đ�
 internal/platform/database/      tầng dữ liệu = server/supa.js (Select / Insert / Update / Remove) + db-map.json
 internal/platform/storage/       kho file trên đĩa (UPLOAD_DIR), URL công khai /files/<path> (thay uploadToStorage)
 internal/platform/redis|logger/  Redis tuỳ chọn, log kiểu "[tag] nội dung"
+internal/platform/webpush/       gửi Web Push: mã hoá RFC 8291 (aes128gcm) + VAPID RFC 8292, chỉ thư viện chuẩn (chat dùng)
+internal/platform/mailer/        gửi email qua SMTP (STARTTLS / TLS cổng 465, AUTH PLAIN), chỉ thư viện chuẩn (mã OTP email của chat)
 internal/platform/deps.go        import giữ chỗ để go.mod có sẵn thư viện cho các module
 internal/shared/omap/            object JSON có thứ tự khoá (JS value model)
 internal/shared/jsval/           ép kiểu / định dạng giống hệt JavaScript
@@ -41,6 +44,8 @@ internal/shared/qscore/          số của store, đọc CSV / xlsx, importPars
 internal/shared/specs/           thông số theo ngành: js/*-spec.js là nguồn (nhúng, phục vụ ở /vs-spec.js...), data/ sinh bằng scripts/gen-specs.js
 internal/shared/httpx/           gọi HTTP ra ngoài như fetch của Node (OneShot: không tự gửi lại GET khi kết nối bị đóng)
 internal/modules/<module>/       nghiệp vụ (mỗi module 1 gói)
+internal/modules/chat/realtime/  gateway WebSocket của chat: 1 tiến trình, trạng thái trong bộ nhớ (kết nối, online, đang soạn,
+                                 bộ chạy tuần tự Submit thay Kafka); api.go = hợp đồng Backend với gói chat
 internal/modules/users/userstest/  đồ nghề test đối chiếu Node <-> Go của users và auth (chỉ file test import)
 internal/jobs/                   job nền
 scripts/                         gen-specs.js (sinh internal/shared/specs/data từ *-spec.js)
@@ -380,7 +385,7 @@ Service cứ trả `apperr.New(...)`; chỉ dùng `apperr.E(4xx, ...)` khi muố
 
 ```go
 type Perm uint8
-const ( Login Perm = 0; Public; Admin; Super )         // kết hợp: rpc.Admin|rpc.Super
+const ( Login Perm = 0; Public; Admin; Super; SelfAuth )   // kết hợp: rpc.Admin|rpc.Super; SelfAuth chỉ cho GoRoute
 type Handler func(ctx context.Context, a *actor.Actor, args Args) (any, error)
 type Args []any
 func (a Args) Len() int;  Has(i int) bool
@@ -406,6 +411,11 @@ trong `SUPER_FNS` -> `rpc.Super`; trong cả hai -> `rpc.Admin|rpc.Super`; còn 
 Hàm thuộc `ACTOR_FNS` nhận actor làm tham số đầu bên Node -> handler truyền `a` vào service; hàm khác bỏ qua `a`.
 Handler trả `nil` hoặc `jsval.Undefined` -> client nhận `"result": null`.
 `ctx` của handler đã có ngữ cảnh công ty và KHÔNG bị huỷ khi client ngắt kết nối (Node cũng chạy hết handler).
+
+`rpc.SelfAuth` (chỉ bản Go, Chat MVP): route chỉ bản Go mà module TỰ xác thực bằng token riêng (chat: access token JWT của tài khoản chat,
+middleware `requireChat()` của module trả 401 `CHAT_NOAUTH`), không dùng phiên QS. Middleware phân quyền của QS không bao giờ chặn route
+này; `Register` (cổng `/api/:fn`) gặp `SelfAuth` thì panic lúc khởi động. Tài liệu `/api-docs.json` ghi quyền "Phiên chat riêng" và
+response 401 `CHAT_NOAUTH`. Test: `rpc/selfauth_test.go`, `TestSelfAuthGoRoutes` (mục 12).
 
 ### 3.9 `qspro-backend/internal/middleware`
 
@@ -456,6 +466,7 @@ type Module interface { RegisterRPC(reg *rpc.Registry); RegisterRoutes(v1 *gin.R
 type RootModule interface { RegisterRoot(root *gin.RouterGroup) }   // route lẻ: /export/..., /upload/file, /media
 func New(d *Deps) *Server;  func (s *Server) Engine() *gin.Engine;  func (s *Server) Run(ctx) error
 func (s *Server) OnShutdown(fn func(context.Context))
+func (s *Server) OnShutdownFirst(fn func(context.Context))   // chạy TRƯỚC http.Server.Shutdown (tối đa 5 giây): gateway WebSocket chat
 func (s *Server) Deps() *Deps;  func (s *Server) Reports() contracts.ReportRunner;  func (s *Server) Expiry() contracts.ExpiryReminder;  func (s *Server) SwaggerOn() bool
 type RestRoute struct { Fn, Method, Path string };  var RestRoutes []RestRoute;  var RootRoutes [][2]string   // rest.go
 ```
@@ -946,12 +957,42 @@ materials:
     notifications - import chỉ trong test - và chạy 2 Service song song trên `qspro_gotest`), `jobs/worker_test.go`. Khoá golden mới: không có.
   - Migration 0012 (chú thích 2 cột nhắc gia hạn, bỏ `DEPRECATED`) và 0013 (chú thích `product_combos.note` - M10.2, `purchase_orders.send_result`
     - M9.1) chỉ đổi COMMENT; code không phụ thuộc hai migration này.
+- Chat MVP (module `chat` + gói con `realtime`, `platform/webpush`, `platform/mailer`, migration 0018, 0019; route ở `API.md` mục 2.1 "Chat";
+  quyết định `docs/02-ky-thuat/database/decisions.md` D-15, D-16). Tính năng chỉ bản Go, không có hàm `/api/:fn`, không đụng golden / fixture nào:
+  - Tài khoản chat riêng (`chat_users`, danh tính = số điện thoại HOẶC email + OTP; hai loại là tài khoản riêng, chưa liên kết), KHÔNG phải
+    `users` của QS, không theo công ty. Token riêng của
+    module (access JWT HS256 + refresh xoay vòng) nên route dùng quyền mới `rpc.SelfAuth` (mục 3.8); 3 route đăng nhập là `rpc.Public`.
+  - NGOẠI LỆ của luật "mọi đọc / ghi qua tầng dữ liệu `database.DB`": module chat viết SQL thô qua `database.DB.Pool()` (pgx), tên bảng / cột
+    TIẾNG ANH, transaction riêng (`pgx.BeginFunc`), khoá `pg_advisory_xact_lock`, `SELECT ... FOR UPDATE`. Lý do: lớp kiểu PostgREST không
+    diễn đạt được `UPDATE ... SET last_seq = last_seq + 1 RETURNING` (cấp `seq` nguyên tử), `GREATEST(...)`, upsert `ON CONFLICT` và các câu
+    nối của danh sách hội thoại; bảng chat không thuộc công ty nên không cần lọc tenant. Pool chạy simple protocol: mọi tham số mảng /
+    thời điểm / boolean ép kiểu tường minh trong SQL (`$1::bigint[]`...). `db-map.json` vẫn có 9 mục `chat_*` (quy tắc database 17), không
+    khai `tenant`, không vào `TenantTables`. Module khác KHÔNG được bắt chước: dùng `database.DB` như mục 3.5.
+  - Gateway WebSocket MỘT tiến trình (`realtime.Hub`, CHAT.md mục 16 "MVP: WebSocket một gateway"): kết nối, online, đang soạn trong bộ nhớ;
+    phân phối tin qua `Hub.Submit(conversation_id, job)` (cùng khoá = cùng worker, giữ thứ tự) thay Kafka; tin commit trước rồi mới phân phối.
+    Chưa chia tải ngang được: chạy nhiều tiến trình thì người ở hai tiến trình không thấy nhau realtime.
+  - Gin 1.11 từ chối `Hijack` sau `WriteHeaderNow` (thư viện websocket gọi hàm này): `realtime/hijack.go` bọc ResponseWriter, lùi xuống writer
+    của net/http và xoá deadline của kết nối (`ReadTimeout` 300 giây của http.Server). Chỉ gắn WebSocket qua `Hub.ServeHTTP`, không gọi
+    `websocket.Accept` trên `c.Writer` ở chỗ khác.
+  - Tắt server: `OnShutdownFirst(chatHub.Drain)` gửi `reconnect`, đóng 1012 (tối đa 5 giây, vì `http.Server.Shutdown` không theo dõi kết nối
+    đã hijack), rồi `http.Server.Shutdown`; `OnShutdown(chatSvc.Shutdown)` mới dừng bộ chạy phân phối của hub (`Hub.Shutdown`: tin hệ thống
+    của request REST đang dở vẫn phân phối + xếp push) rồi worker push sau cùng.
+  - Web Push: `platform/webpush` chỉ dùng thư viện chuẩn (crypto/ecdh, ecdsa, hkdf, aes-gcm); bật khi đặt đủ 3 biến `CHAT_VAPID_*`
+    (`chatPush` trong `routes.go`; thiếu / khoá sai -> tắt push, 1 dòng log). SMS: `logSender` ghi mã OTP vào log (chưa có nhà cung cấp SMS).
+    Email: `platform/mailer` (SMTP, chỉ thư viện chuẩn) bật khi đặt `SMTP_HOST` (`chatMail` trong `routes.go`; chưa đặt / cấu hình sai ->
+    `logMailer` ghi mã OTP email vào log, 1 dòng log lúc khởi động).
+  - Test: `go test ./internal/modules/chat/...` (test database cần `TEST_DATABASE_URL` trỏ database đã chạy 0019), `./internal/platform/webpush`
+    (vector RFC 8291 phụ lục A), `-race` cho `realtime` (mục Kiểm thử của `backend/README.md`).
 - Biến `REPORT_JOB` (tắt job báo cáo và job nhắc gia hạn), `STATIC_DIR`, `VENDOR_DIR`, `CORS_ORIGINS`, `RATE_LIMIT_RPS`, `TRUSTED_PROXIES`, `REDIS_URL`, `DEBUG`,
-  `DB_POOL_MAX`, `DB_SORT_COLLATION`, `DOTENV`, `UPLOAD_DIR` (kho file trên đĩa, mục 3.6). CORS, giới hạn tần suất, Redis mặc định tắt.
+  `DB_POOL_MAX`, `DB_SORT_COLLATION`, `DOTENV`, `UPLOAD_DIR` (kho file trên đĩa, mục 3.6), `CHAT_JWT_SECRET`, `CHAT_ACCESS_TTL_MIN`,
+  `CHAT_REFRESH_TTL_DAYS`, `CHAT_OTP_DEV`, `CHAT_VAPID_PUBLIC_KEY` / `CHAT_VAPID_PRIVATE_KEY` / `CHAT_VAPID_SUBJECT`, `SMTP_HOST` / `SMTP_PORT` /
+  `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` (chat, `backend/README.md`).
+  CORS, giới hạn tần suất, Redis mặc định tắt; `CORS_ORIGINS` cũng là danh sách origin được mở WebSocket chat (bỏ scheme).
 - `TRUSTED_PROXIES` mặc định không tin proxy nào: đứng sau reverse proxy mà không đặt thì mọi client chung một giới hạn tần suất.
   Ảnh hưởng: không có khi `RATE_LIMIT_RPS` tắt (mặc định).
 - Đọc `backend/.env` trước rồi mới tới `../.env` của bản Node; `DOTENV=0` trong môi trường thì không đọc file nào (mặc định: đọc cả hai).
-- Tắt êm: chờ request đang chạy tối đa 15 giây, dừng job nền, đóng pool database.
+- Tắt êm: gateway chat báo `reconnect` + đóng WebSocket (tối đa 5 giây), chờ request đang chạy (tổng tối đa 15 giây), dừng job nền và
+  worker push chat, đóng pool database.
 - File nhúng (go:embed) thay cho `public/`: `/vs-spec.js`, `/son-spec.js`, `/ct-spec.js` (module categories phục vụ, nguồn
   `internal/shared/specs/js/`), `/mau-nhap-hang-loat.xlsx` (categories, `assets/`), `/mau-nhap-cong-tac.xlsx` (estimates, `assets/`),
   `/logo.svg` (server, `internal/server/assets/`).
@@ -1092,7 +1133,8 @@ func (s *Service) SetSessionInvalidator(si contracts.SessionInvalidator)  // use
 ```
 
 Hai trường tương ứng KHÔNG nằm trong `users.Deps`. Gọi cả hai trong khối MODULE WIRING, trước khi server nhận request
-(không cần khoá). Thứ tự dựng:
+(không cần khoá). Ngoại lệ không phải giữa hai module: `chatSvc.SetGateway(chatHub)` cắt vòng giữa chat và gateway WebSocket của chính nó
+(hub cần `Backend` = `chatSvc`, `chatSvc` đẩy tin qua hub). Thứ tự dựng:
 
 | # | Module | Nhận qua `Deps` (ngoài `DB`, `Cfg`) |
 |---|---|---|
@@ -1110,6 +1152,7 @@ Hai trường tương ứng KHÔNG nằm trong `users.Deps`. Gọi cả hai tron
 | 12 | purchasing | notifications: `PurchaseNotifier`, `Notifier`; users: `UserReader`, `Auditor` |
 | 13 | reports | không có (đọc database trực tiếp, import `categories`) |
 | 14 | jobs | reports: `ReportRunner`; companies: `ExpiryReminder` (qua `Server.Reports()` / `Server.Expiry()` trong `cmd/api/main.go`) |
+| 15 | chat (dựng sau `delivery`, `sales`; đứng cuối danh sách `modules()`) | không có module nào; `Push` = `*webpush.Client` khi đủ `CHAT_VAPID_*` (`chatPush`), nil = tắt push; `SMS` nil = `logSender`; `Mail` = `*mailer.Client` khi đặt `SMTP_HOST` (`chatMail`), nil = `logMailer`. Rồi `chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(CORS_ORIGINS)})`, `chatSvc.SetGateway(chatHub)`, `s.OnShutdownFirst(chatHub.Drain)`, `s.OnShutdown(chatSvc.Shutdown)` |
 
 Thứ tự dựng đổi ở M17.3 (notifications lên trước companies); thứ tự trả về của `modules()` không đổi.
 
@@ -1129,7 +1172,7 @@ Một `*Service` có thể cài nhiều interface (users cài `Auditor`, `UserRe
 
 ## 12. Nối module, tài liệu API và kiểm tra tích hợp
 
-- `internal/server/routes.go` (khối MODULE WIRING) dựng `system` rồi 15 module nghiệp vụ theo đúng thứ tự mục 11.2 (13 module chuyển từ Node + `delivery`, `sales` chỉ bản Go); `Server.Reports()` trả module reports,
+- `internal/server/routes.go` (khối MODULE WIRING) dựng `system` rồi 16 module nghiệp vụ theo đúng thứ tự mục 11.2 (13 module chuyển từ Node + `delivery`, `sales`, `chat` chỉ bản Go; chat kèm gateway `realtime.Hub`); `Server.Reports()` trả module reports,
   `Server.Expiry()` trả phần nhắc gia hạn của companies, cho `cmd/api/main.go` bật job nền (`jobs.Start`: báo cáo + nhắc gia hạn, tắt cả hai
   bằng `REPORT_JOB=0`, dừng qua `srv.OnShutdown`).
 - `internal/server/rest.go`: bảng `RestRoutes` (80 hàm rpc -> route REST) và `RootRoutes` (9 route lẻ). Hai bảng này ĐÓNG BĂNG cùng 80 hàm
@@ -1146,6 +1189,7 @@ Một `*Service` có thể cài nhiều interface (users cài `Auditor`, `UserRe
   `TestRootRoutes`, `TestRestRoutes` (đủ 80 route, route ngoài bảng phải là route chỉ bản Go đã khai, chặn quyền như cổng rpc / theo `Perm`;
   route chỉ bản Go: token đủ quyền không bị middleware chặn),
   `TestGoRoutes` (module giả chỉ có trong test: khai + gắn 3 route chỉ bản Go, có trong tài liệu, chặn quyền; module khai sai bị bắt),
+  `TestSelfAuthGoRoutes` (route `rpc.SelfAuth` không bị middleware QS chặn với mọi token QS; gắn nhầm `RequireLogin` bị bắt; tài liệu có 401 riêng),
   `TestSwaggerSpecNode` (phần Node giống từng byte; số thao tác REST = 80 + số route chỉ bản Go), `TestSwaggerEnabled`.
   `internal/server/rpc/rpc_test.go`: `TestRegisterGoRoute` (thứ tự, bản sao, panic khi trùng tên / route / tham số, field `path` không có trong `Path`, `Path` có `*`).
 - Test có database dùng chung `qspro_gotest`: chạy `go test -race -count=1 -p 1 ./...` để các gói không chạy song song trên cùng database
@@ -1160,7 +1204,8 @@ App Node đã gỡ khỏi repo (commit cuối còn Node: `83d264e`): mọi fixtu
 - KHÔNG thêm hàm `/api/:fn` (registry giữ đúng 80 hàm, `TestRegistryParity`), KHÔNG thêm dòng vào `RestRoutes` / `RootRoutes`.
 - Tính năng mới là route REST "chỉ bản Go": module khai `reg.RegisterGoRoute(rpc.GoRoute{...})` trong `RegisterRPC` và gắn route gin
   cùng method + đường dẫn trong `RegisterRoutes`, middleware khớp `Perm` (`RequireLogin` / `RequireAdmin` / `RequireSuper` /
-  `RequireAdminSuper`; `Public` không gắn). Cách viết: `docs/API.md` mục 2.1. Tài liệu `/api-docs.json` tự sinh từ `GoRoute`.
+  `RequireAdminSuper`; `Public` không gắn; `SelfAuth` gắn middleware xác thực riêng của module, vd chat). Cách viết: `docs/API.md` mục 2.1.
+  Tài liệu `/api-docs.json` tự sinh từ `GoRoute`.
 - File tĩnh mới mà giao diện tải ở gốc: module cài `AssetModule` (`Assets() map[string][]byte`, nhúng bằng `go:embed`), như
   `categories` và `estimates`.
 - Hàm rpc cũ chỉ được: thêm tham số TUỲ CHỌN ở CUỐI `args`; nối khoá MỚI vào CUỐI object kết quả. Không đổi tên, quyền, thứ tự tham số,

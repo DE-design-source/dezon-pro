@@ -1,179 +1,216 @@
-import { useState } from 'react'
-import { COMPANY_DIRECTORY, ME, ORG_NAME, TRUSTED_ORGS, EXTERNAL_CONTACTS, CONTACT_REQUESTS, HELP_DESKS, MY_CARD } from '../../../data/chatData'
-import { SearchIcon, initials } from './shared'
+import { useEffect, useState } from 'react'
+import * as L from '../state/chatLogic'
+import {
+  acceptFriend, blockUser, cancelFriendRequest, disablePush, enablePush, loadBlocks, loadFriends, loadRequests, matchContacts,
+  rejectFriend, searchByContact, sendFriendRequest, sortedConversations, startDirect, unblockUser, unfriend, updateMe,
+} from '../state/chatStore'
+import { SearchIcon, colorFor, errText, initials } from './shared'
+import { confirmSignOut } from './AccountSwitcher'
 
 /* Icon nét 2 (24x24) cho menu danh bạ */
 const I = {
-  org: <><circle cx="12" cy="5" r="2.5" /><circle cx="5" cy="19" r="2.5" /><circle cx="19" cy="19" r="2.5" /><path d="M12 7.5v4M5 16.5V14h14v2.5" /></>,
-  trusted: <><rect x="3" y="3" width="11" height="11" rx="2" /><rect x="10" y="10" width="11" height="11" rx="2" /></>,
-  external: <><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" /><circle cx="12" cy="11" r="2.5" /><path d="M8 17a4 4 0 0 1 8 0" /></>,
+  friends: <><circle cx="9" cy="7" r="4" /><path d="M2 21v-1a7 7 0 0 1 14 0v1" /><path d="M16 3.13a4 4 0 0 1 0 7.75M22 21v-1a6 6 0 0 0-4-5.6" /></>,
   newc: <><circle cx="10" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9-5.2" /><path d="M18 14v6M15 17h6" /></>,
-  star: <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />,
-  card: <><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="9" cy="11" r="2.5" /><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 10h4M15 14h3" /></>,
-  groups: <><circle cx="9" cy="8" r="3.5" /><path d="M2 20a7 7 0 0 1 14 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17.5 14.5A5 5 0 0 1 22 19" /></>,
-  help: <><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><rect x="2" y="14" width="4" height="6" rx="1.5" /><rect x="18" y="14" width="4" height="6" rx="1.5" /></>,
-  chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   plus: <><circle cx="10" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 10-4.4" /><path d="M18 14v6M15 17h6" /></>,
-  chev: <polyline points="9 18 15 12 9 6" />,
-  x: <path d="M18 6 6 18M6 6l12 12" />,
+  sync: <><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" /><path d="M3 21v-5h5" /><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8" /><path d="M21 3v5h-5" /></>,
+  groups: <><circle cx="9" cy="8" r="3.5" /><path d="M2 20a7 7 0 0 1 14 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17.5 14.5A5 5 0 0 1 22 19" /></>,
+  block: <><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></>,
+  card: <><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="9" cy="11" r="2.5" /><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 10h4M15 14h3" /></>,
+  chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   phone: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2z" />,
-  mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" /></>,
-  building: <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" /></>,
+  mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 6L2 7" /></>,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
 }
 const Ic = ({ n, size = 18, fill }) => <svg width={size} height={size} viewBox="0 0 24 24" fill={fill || 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I[n]}</svg>
 
 const MENU = [
-  { key: 'org', label: 'Danh bạ tổ chức', icon: 'org', tone: '#0E8A82' },
-  { key: 'trusted', label: 'Bên đáng tin cậy', icon: 'trusted', tone: '#7658C2' },
-  { key: 'external', label: 'Liên hệ bên ngoài', icon: 'external', tone: '#2F5DA8' },
-  { key: 'new', label: 'Liên hệ mới', icon: 'newc', tone: '#2F5DA8' },
-  { key: 'starred', label: 'Liên hệ được gắn dấu sao', icon: 'star', tone: '#E08A1E' },
-  { key: 'card', label: 'Thẻ liên lạc', icon: 'card', tone: '#E0632E' },
+  { key: 'friends', label: 'Bạn bè', icon: 'friends', tone: '#0E8A82' },
+  { key: 'requests', label: 'Lời mời kết bạn', icon: 'newc', tone: '#2F5DA8' },
+  { key: 'add', label: 'Thêm bạn', icon: 'plus', tone: '#7658C2' },
+  { key: 'sync', label: 'Đồng bộ danh bạ', icon: 'sync', tone: '#E08A1E' },
   { key: 'groups', label: 'Nhóm của tôi', icon: 'groups', tone: '#1E8E5A' },
-  { key: 'help', label: 'Bộ phận trợ giúp', icon: 'help', tone: '#C0392B' },
+  { key: 'blocked', label: 'Đã chặn', icon: 'block', tone: '#C0392B' },
+  { key: 'card', label: 'Thẻ của tôi', icon: 'card', tone: '#E0632E' },
 ]
-const REQ_STATUS = { accepted: 'Đã chấp nhận', expired: 'Đã hết hạn', sent: 'Đã gửi lời mời' }
-const Avatar = ({ name, color, size = 40 }) => <span className="ch-ct-av" style={{ width: size, height: size, background: color, fontSize: Math.round(size * 0.34) }}>{initials(name)}</span>
+const Avatar = ({ id, name, size = 40 }) => <span className="ch-ct-av" style={{ width: size, height: size, background: colorFor(id), fontSize: Math.round(size * 0.34) }}>{initials(name)}</span>
 
-/* Màn Danh bạ (tham khảo Lark): menu trái + danh sách phải */
-export default function ContactsView({ conversations, onMessage, onOpenConv, onBack }) {
-  const [section, setSection] = useState('new')
-  const [dept, setDept] = useState(null) // phòng ban đang chọn trong Danh bạ tổ chức
-  const [orgOpen, setOrgOpen] = useState(true)
+const fmtDate = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('vi-VN') }
+
+/* Màn Danh bạ (bố cục kiểu Lark): bạn bè, lời mời, thêm bạn theo số điện thoại hoặc email, đồng bộ danh bạ, nhóm, đã chặn, thẻ của tôi */
+export default function ContactsView({ chat, onOpenConv, onNewGroup, onBack }) {
+  const [section, setSection] = useState('friends')
   const [q, setQ] = useState('')
-  const [external, setExternal] = useState(EXTERNAL_CONTACTS)
-  const [requests, setRequests] = useState(CONTACT_REQUESTS)
-  const [starred, setStarred] = useState(() => new Set(['Nguyễn Đức Anh', 'Phan Bảo Ngọc', 'Bùi Thị Thanh Tiền']))
-  const [adding, setAdding] = useState(null)
-  const [copied, setCopied] = useState(false)
+  const [err, setErr] = useState('')
+  const [busyKey, setBusyKey] = useState('')
+  const [rel, setRel] = useState({}) // quan hệ vừa đổi của kết quả tìm / đồng bộ (userId -> relation)
+  const [addQ, setAddQ] = useState('') // ô "Thêm bạn": số điện thoại hoặc email
+  const [found, setFound] = useState(undefined)
+  const [syncText, setSyncText] = useState('')
+  const [syncRes, setSyncRes] = useState(null)
 
+  useEffect(() => { loadRequests().catch(() => {}) }, [])
+  useEffect(() => {
+    setErr('')
+    const f = section === 'friends' ? loadFriends : section === 'requests' ? loadRequests : section === 'blocked' ? loadBlocks : null
+    if (f) f().catch(e => setErr(errText(e)))
+  }, [section])
+
+  const me = chat.me
   const t = q.trim().toLowerCase()
-  const match = (...xs) => !t || xs.join(' ').toLowerCase().includes(t)
-  const internal = COMPANY_DIRECTORY.flatMap(g => g.people.map(p => ({ ...p, dept: g.dept })))
-  const toggleStar = name => setStarred(s => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n })
-  const pending = requests.filter(r => r.status === 'pending').length
-  const go = key => { setSection(key); if (key !== 'org') setDept(null) }
+  const match = u => !t || String(u.display_name || '').toLowerCase().includes(t) || (u.phone && L.formatPhone(u.phone).replace(/\s/g, '').includes(t.replace(/\s/g, '')))
+    || (u.email && String(u.email).toLowerCase().includes(t))
+  const incoming = (chat.requests && chat.requests.incoming) || []
+  const outgoing = (chat.requests && chat.requests.outgoing) || []
 
-  function accept(r) {
-    const c = { id: 'x' + Date.now(), name: r.name, company: r.org, role: '', phone: '', email: '', color: r.color }
-    setExternal(list => [c, ...list])
-    setRequests(list => list.map(x => (x.id === r.id ? { ...x, status: 'accepted', contactId: c.id } : x)))
+  async function run(key, fn, after) {
+    if (busyKey) return
+    setBusyKey(key); setErr('')
+    try { const r = await fn(); if (after) after(r) } catch (e) { setErr(errText(e)) }
+    setBusyKey('')
   }
-  const decline = r => setRequests(list => list.filter(x => x.id !== r.id))
-  function saveExternal() {
-    const f = adding
-    if (!f.name.trim()) return
-    const c = { id: 'x' + Date.now(), ...f, name: f.name.trim(), color: '#2F5DA8' }
-    setExternal(list => [c, ...list])
-    setRequests(list => [{ id: 'r' + Date.now(), contactId: c.id, name: c.name, org: c.company || 'Liên hệ cá nhân', note: f.note || `Lời mời từ ${ME}`, status: 'sent', color: c.color }, ...list])
-    setAdding(null)
-    setSection('new')
+  const message = u => run('msg' + u.id, () => startDirect(u.id), id => onOpenConv(id))
+  const relOf = u => rel[u.id] || u.relation
+  const setRelOf = (id, r) => setRel(m => ({ ...m, [id]: r }))
+
+  /* Nút theo quan hệ: bạn bè / lời mời đến / lời mời đi / đã chặn / người lạ / chính mình */
+  function Actions({ u }) {
+    const r = relOf(u)
+    const b = !!busyKey
+    const msgBtn = <button className="ch-ct-msg" disabled={b} onClick={e => { e.stopPropagation(); message(u) }}><Ic n="chat" size={13} />Nhắn tin</button>
+    if (r === 'self') return <span className="ch-ct-me">Bạn</span>
+    if (r === 'friend') {
+      return (
+        <div className="ch-ct-actions">
+          <button className="ch-ct-btn ghost" disabled={b} onClick={e => { e.stopPropagation(); if (window.confirm(`Xoá ${u.display_name} khỏi danh sách bạn bè?`)) run('uf' + u.id, () => unfriend(u.id), () => setRelOf(u.id, 'none')) }}>Xoá bạn</button>
+          <button className="ch-ct-btn ghost" disabled={b} onClick={e => { e.stopPropagation(); if (window.confirm(`Chặn ${u.display_name}?`)) run('bl' + u.id, () => blockUser(u.id), () => setRelOf(u.id, 'blocked')) }}>Chặn</button>
+          {msgBtn}
+        </div>
+      )
+    }
+    if (r === 'incoming') {
+      return (
+        <div className="ch-ct-actions show">
+          <button className="ch-ct-btn ghost" disabled={b} onClick={e => { e.stopPropagation(); run('rj' + u.id, () => rejectFriend(u.id), () => setRelOf(u.id, 'none')) }}>Từ chối</button>
+          <button className="ch-ct-btn solid" disabled={b} onClick={e => { e.stopPropagation(); run('ac' + u.id, () => acceptFriend(u.id), () => setRelOf(u.id, 'friend')) }}>Chấp nhận</button>
+        </div>
+      )
+    }
+    if (r === 'outgoing') {
+      return (
+        <div className="ch-ct-actions show">
+          <span className="ch-ct-status">Đã gửi lời mời</span>
+          <button className="ch-ct-btn ghost" disabled={b} onClick={e => { e.stopPropagation(); run('cc' + u.id, () => cancelFriendRequest(u.id), () => setRelOf(u.id, 'none')) }}>Huỷ lời mời</button>
+          {msgBtn}
+        </div>
+      )
+    }
+    if (r === 'blocked') {
+      return (
+        <div className="ch-ct-actions show">
+          <button className="ch-ct-btn ghost" disabled={b} onClick={e => { e.stopPropagation(); run('ub' + u.id, () => unblockUser(u.id), () => setRelOf(u.id, 'none')) }}>Bỏ chặn</button>
+        </div>
+      )
+    }
+    return (
+      <div className="ch-ct-actions show">
+        {msgBtn}
+        <button className="ch-ct-btn solid" disabled={b} onClick={e => { e.stopPropagation(); run('fr' + u.id, () => sendFriendRequest(u.id), res => setRelOf(u.id, res && res.status === 'accepted' ? 'friend' : 'outgoing')) }}>Kết bạn</button>
+      </div>
+    )
   }
 
-  const StarBtn = ({ name }) => (
-    <button className={`ch-ct-star${starred.has(name) ? ' on' : ''}`} title={starred.has(name) ? 'Bỏ gắn sao' : 'Gắn dấu sao'} onClick={e => { e.stopPropagation(); toggleStar(name) }}>
-      <Ic n="star" size={15} fill={starred.has(name) ? 'currentColor' : 'none'} />
-    </button>
-  )
-  const MsgBtn = ({ p }) => p.name === ME ? <span className="ch-ct-me">Bạn</span> : (
-    <button className="ch-ct-msg" onClick={e => { e.stopPropagation(); onMessage(p) }}><Ic n="chat" size={13} />Nhắn tin</button>
-  )
-  const PersonRow = ({ p, sub, sub2 }) => (
-    <div className="ch-ct-row" onClick={() => p.name !== ME && onMessage(p)}>
-      <Avatar name={p.name} color={p.color} />
-      <div className="ch-ct-main"><b>{p.name}</b>{sub && <span>{sub}</span>}{sub2 && <span>{sub2}</span>}</div>
-      <div className="ch-ct-actions"><StarBtn name={p.name} /><MsgBtn p={p} /></div>
+  const UserRow = ({ u, sub, sub2 }) => (
+    <div className="ch-ct-row" onClick={() => relOf(u) !== 'self' && relOf(u) !== 'blocked' && message(u)}>
+      <Avatar id={u.id} name={u.display_name} />
+      <div className="ch-ct-main"><b>{u.display_name}</b>{sub && <span>{sub}</span>}{sub2 && <span>{sub2}</span>}</div>
+      <Actions u={u} />
     </div>
   )
-
-  /* ---------- Nội dung bên phải ---------- */
-  let title = MENU.find(m => m.key === section).label
-  let action = <button className="ch-ct-btn" onClick={() => setAdding({ name: '', company: '', role: '', phone: '', email: '', note: '' })}><Ic n="plus" size={15} />Thêm Liên hệ bên ngoài</button>
-  let body = null
   const empty = text => <div className="ch-ct-empty">{text}</div>
+  const loading = empty('Đang tải…')
 
-  if (section === 'org') {
-    if (dept) {
-      const g = COMPANY_DIRECTORY.find(x => x.dept === dept)
-      title = dept
-      const list = g.people.filter(p => match(p.name, p.role))
-      body = list.length ? list.map(p => <PersonRow key={p.name} p={p} sub={p.role} sub2={`${ORG_NAME} · ${dept}`} />) : empty('Không tìm thấy thành viên')
-    } else {
-      title = ORG_NAME
-      const people = internal.filter(p => match(p.name, p.role, p.dept))
-      body = t
-        ? (people.length ? people.map(p => <PersonRow key={p.dept + p.name} p={p} sub={p.role} sub2={p.dept} />) : empty('Không tìm thấy thành viên'))
-        : COMPANY_DIRECTORY.map(g => (
-          <div key={g.dept} className="ch-ct-row" onClick={() => setDept(g.dept)}>
-            <span className="ch-ct-av sq" style={{ background: '#E8EEFB', color: '#2F5DA8' }}><Ic n="org" size={18} /></span>
-            <div className="ch-ct-main"><b>{g.dept}</b><span>{g.people.length} thành viên</span></div>
-            <span className="ch-ct-chev"><Ic n="chev" size={16} /></span>
-          </div>
-        ))
+  let title = (MENU.find(m => m.key === section) || {}).label
+  let action = null
+  let body = null
+
+  if (section === 'friends') {
+    action = <button className="ch-ct-btn" onClick={() => setSection('add')}><Ic n="plus" size={15} />Thêm bạn</button>
+    if (chat.friends === null) body = loading
+    else {
+      const list = chat.friends.filter(match)
+      body = list.length ? list.map(u => <UserRow key={u.id} u={u} sub={L.contactText(u)} />) : empty(t ? 'Không tìm thấy bạn bè' : 'Chưa có bạn bè. Vào "Thêm bạn" để tìm theo số điện thoại hoặc email.')
     }
-  } else if (section === 'trusted') {
-    const list = TRUSTED_ORGS.filter(o => match(o.name, o.kind))
-    body = list.map(o => (
-      <div key={o.id} className="ch-ct-row">
-        <span className="ch-ct-av sq" style={{ background: o.color }}><Ic n="building" size={18} /></span>
-        <div className="ch-ct-main"><b>{o.name}</b><span>{o.kind} · {o.members} thành viên</span><span>Kết nối từ {o.since}</span></div>
-        <span className="ch-ct-status ok">Đã kết nối</span>
-      </div>
-    ))
-  } else if (section === 'external') {
-    const list = external.filter(c => match(c.name, c.company, c.role))
-    body = list.length ? list.map(c => <PersonRow key={c.id} p={c} sub={[c.role, c.company].filter(Boolean).join(' · ')} sub2={[c.phone, c.email].filter(Boolean).join(' · ')} />) : empty('Chưa có liên hệ bên ngoài')
-  } else if (section === 'new') {
-    const list = requests.filter(r => match(r.name, r.org, r.note))
-    body = list.map(r => (
-      <div key={r.id} className="ch-ct-row">
-        <Avatar name={r.name} color={r.color} />
-        <div className="ch-ct-main"><b>{r.name}</b><span>{r.org}</span><span>{r.note}</span></div>
-        {r.status === 'pending'
-          ? <div className="ch-ct-actions show"><button className="ch-ct-btn ghost" onClick={() => decline(r)}>Từ chối</button><button className="ch-ct-btn solid" onClick={() => accept(r)}>Chấp nhận</button></div>
-          : <span className={`ch-ct-status${r.status === 'expired' ? ' muted' : ''}`}>{REQ_STATUS[r.status]}</span>}
-      </div>
-    ))
-  } else if (section === 'starred') {
-    const all = [...internal.map(p => ({ ...p, sub: p.role, sub2: `${ORG_NAME} · ${p.dept}` })), ...external.map(c => ({ ...c, sub: [c.role, c.company].filter(Boolean).join(' · '), sub2: 'Liên hệ bên ngoài' }))]
-    const seen = new Set()
-    const list = all.filter(p => starred.has(p.name) && !seen.has(p.name) && seen.add(p.name) && match(p.name, p.sub))
-    body = list.length ? list.map(p => <PersonRow key={p.name} p={p} sub={p.sub} sub2={p.sub2} />) : empty('Bấm biểu tượng ☆ trên một liên hệ để gắn dấu sao')
-  } else if (section === 'card') {
-    action = null
-    const text = `${MY_CARD.name}\n${MY_CARD.role} · ${MY_CARD.dept}\n${ORG_NAME}\n${MY_CARD.phone}\n${MY_CARD.email}`
+  } else if (section === 'requests') {
+    if (chat.requests === null) body = loading
+    else {
+      const inc = incoming.filter(match)
+      const out = outgoing.filter(match)
+      body = (
+        <>
+          <div className="ch-ct-group-title">Lời mời đến ({inc.length})</div>
+          {inc.length ? inc.map(u => <UserRow key={'i' + u.id} u={{ ...u, relation: u.relation || 'incoming' }} sub={u.requested_at ? 'Gửi ngày ' + fmtDate(u.requested_at) : ''} />) : empty('Không có lời mời nào')}
+          <div className="ch-ct-group-title">Lời mời đã gửi ({out.length})</div>
+          {out.length ? out.map(u => <UserRow key={'o' + u.id} u={{ ...u, relation: u.relation || 'outgoing' }} sub={u.requested_at ? 'Gửi ngày ' + fmtDate(u.requested_at) : ''} />) : empty('Chưa gửi lời mời nào')}
+        </>
+      )
+    }
+  } else if (section === 'add') {
+    const isEmail = L.looksLikeEmail(addQ)
+    const norm = isEmail ? L.normalizeEmail(addQ) : L.normalizePhone(addQ) // '' khi sai định dạng
     body = (
-      <div className="ch-ct-cardwrap">
-        <div className="ch-ct-card">
-          <div className="ch-ct-card-top"><Avatar name={MY_CARD.name} color={MY_CARD.color} size={64} /><div><b>{MY_CARD.name}</b><span>{MY_CARD.role} · {MY_CARD.dept}</span><span>{ORG_NAME}</span></div></div>
-          <div className="ch-ct-card-line"><Ic n="phone" size={15} />{MY_CARD.phone}</div>
-          <div className="ch-ct-card-line"><Ic n="mail" size={15} />{MY_CARD.email}</div>
-          <div className="ch-ct-qr" aria-hidden="true">{Array.from({ length: 81 }, (_, i) => <i key={i} className={(i * 37 + (i % 7) * 11) % 3 === 0 || [0, 1, 2, 9, 11, 18, 19, 20, 6, 7, 8, 15, 17, 24, 25, 26, 54, 55, 56, 63, 65, 72, 73, 74].includes(i) ? 'on' : ''} />)}</div>
-          <button className="ch-ct-btn solid" onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800) }}>{copied ? 'Đã sao chép thẻ' : 'Sao chép thẻ liên lạc'}</button>
+      <div className="ch-ct-pad">
+        <form className="ch-dialog-search" onSubmit={e => {
+          e.preventDefault()
+          if (!norm) { setErr(isEmail ? 'Email không hợp lệ' : 'Số điện thoại không hợp lệ'); return }
+          run('search', () => searchByContact(addQ), u => setFound(u))
+        }}>
+          <label className="ch-ct-field" style={{ flex: 1 }}><span>Số điện thoại hoặc email</span><input autoFocus type="text" value={addQ} onChange={e => { setAddQ(e.target.value); setFound(undefined) }} placeholder="Vd. 0901 234 567 hoặc ten@congty.vn" /></label>
+          <button className="ch-ct-btn solid" disabled={!!busyKey || !addQ.trim()}>Tìm</button>
+        </form>
+        {found === null && empty(isEmail ? `Chưa có ai dùng email ${norm || addQ.trim()} trên Dezon Chat.` : `Chưa có ai dùng số ${L.formatPhone(norm) || addQ} trên Dezon Chat.`)}
+        {found && <UserRow u={found} sub={L.contactText(found) || (isEmail ? norm : L.formatPhone(norm))} />}
+      </div>
+    )
+  } else if (section === 'sync') {
+    const res = syncRes
+    body = (
+      <div className="ch-ct-pad">
+        <label className="ch-ct-field">
+          <span>Dán danh sách số điện thoại (mỗi dòng một số, hoặc cách nhau bằng dấu phẩy)</span>
+          <textarea className="ch-ct-textarea" rows={6} value={syncText} onChange={e => setSyncText(e.target.value)} placeholder={'0901 234 567\n0912 345 678'} />
+        </label>
+        <div className="ch-ct-row-actions">
+          <button className="ch-ct-btn solid" disabled={!!busyKey || !syncText.trim()} onClick={() => run('sync', () => matchContacts(syncText), r => setSyncRes(r))}>Tìm bạn bè đang dùng Dezon Chat</button>
         </div>
-        <p className="ch-ct-hint">Người khác quét mã hoặc nhận thẻ này để gửi lời mời kết nối tới bạn.</p>
+        {res && (
+          <>
+            <p className="ch-ct-hint">
+              Đã kiểm tra {res.valid.length} số{res.invalid.length ? `, bỏ qua ${res.invalid.length} số không hợp lệ` : ''}. Tìm thấy {res.users.length} người dùng.
+              {res.hashed ? ' Số điện thoại được băm SHA-256 ngay trên máy trước khi gửi.' : ''}
+            </p>
+            {res.users.filter(match).map(u => <UserRow key={u.id} u={u} sub={u.input || (u.phone ? L.formatPhone(u.phone) : '')} />)}
+          </>
+        )}
       </div>
     )
   } else if (section === 'groups') {
-    action = null
-    const list = conversations.filter(c => c.type === 'group' && match(c.name))
-    body = list.map(c => (
+    action = <button className="ch-ct-btn" onClick={onNewGroup}><Ic n="groups" size={15} />Tạo nhóm</button>
+    const list = sortedConversations(chat).filter(c => c.type === 'group' && (!t || String(c.name || '').toLowerCase().includes(t)))
+    body = list.length ? list.map(c => (
       <div key={c.id} className="ch-ct-row" onClick={() => onOpenConv(c.id)}>
-        <span className="ch-ct-av sq" style={{ background: c.color }}><Ic n="groups" size={18} /></span>
-        <div className="ch-ct-main"><b>{c.name}</b><span>{c.sub || `${(c.members || []).length} thành viên`}</span></div>
+        <span className="ch-ct-av sq" style={{ background: colorFor(c.id) }}><Ic n="groups" size={18} /></span>
+        <div className="ch-ct-main"><b>{c.name}</b><span>{c.member_count} thành viên · {L.ROLE_LABEL[c.role] || ''}</span></div>
         <button className="ch-ct-msg" onClick={e => { e.stopPropagation(); onOpenConv(c.id) }}><Ic n="chat" size={13} />Mở nhóm</button>
       </div>
-    ))
-  } else if (section === 'help') {
-    action = null
-    const list = HELP_DESKS.filter(h => match(h.name, h.desc))
-    body = list.map(h => (
-      <div key={h.id} className="ch-ct-row" onClick={() => onMessage({ name: h.owner || h.name, color: h.color, bot: !h.owner })}>
-        <span className="ch-ct-av sq" style={{ background: h.color }}><Ic n="help" size={18} /></span>
-        <div className="ch-ct-main"><b>{h.name}</b><span>{h.desc}</span>{h.owner && <span>Phụ trách: {h.owner}</span>}</div>
-        <button className="ch-ct-msg" onClick={e => { e.stopPropagation(); onMessage({ name: h.owner || h.name, color: h.color, bot: !h.owner }) }}><Ic n="chat" size={13} />Liên hệ</button>
-      </div>
-    ))
+    )) : empty('Chưa có nhóm nào')
+  } else if (section === 'blocked') {
+    if (chat.blocks === null) body = loading
+    else {
+      const list = chat.blocks.filter(match)
+      body = list.length ? list.map(u => <UserRow key={u.id} u={{ ...u, relation: 'blocked' }} />) : empty('Bạn chưa chặn ai')
+    }
+  } else if (section === 'card') {
+    body = <MyCard chat={chat} />
   }
 
   return (
@@ -183,51 +220,94 @@ export default function ContactsView({ conversations, onMessage, onOpenConv, onB
           {onBack && <button className="ch-ct-tomsg" onClick={onBack} title="Quay lại tin nhắn" aria-label="Quay lại tin nhắn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg></button>}
           <h2>Danh bạ</h2>
         </div>
-        <div className="ch-search-box" style={{ margin: '4px 0 10px' }}><SearchIcon /><input type="text" placeholder="Tìm liên hệ, phòng ban..." value={q} onChange={e => setQ(e.target.value)} /></div>
-        <button className={`ch-ct-org${section === 'org' && !dept ? ' active' : ''}`} onClick={() => { setSection('org'); setDept(null) }}>
-          <span className="ch-ct-orgav">{ORG_NAME[0]}</span>{ORG_NAME}
+        <div className="ch-search-box" style={{ margin: '4px 0 10px' }}><SearchIcon /><input type="text" placeholder="Tìm theo tên, số điện thoại, email..." value={q} onChange={e => setQ(e.target.value)} /></div>
+        <button className={`ch-ct-org${section === 'card' ? ' active' : ''}`} onClick={() => setSection('card')}>
+          <span className="ch-ct-orgav" style={{ background: colorFor(me.id) }}>{initials(me.display_name)}</span>{me.display_name}
         </button>
         {MENU.map(m => (
-          <div key={m.key}>
-            <button className={`ch-ct-item${section === m.key && !(m.key === 'org' && dept) ? ' active' : ''}`} onClick={() => { go(m.key); if (m.key === 'org') setOrgOpen(o => (section === 'org' ? !o : true)) }}>
-              <span className="ch-ct-ico" style={{ color: m.tone }}><Ic n={m.icon} /></span>
-              <span className="ch-ct-label">{m.label}</span>
-              {m.key === 'new' && pending > 0 && <span className="ch-ct-badge">{pending}</span>}
-            </button>
-            {m.key === 'org' && orgOpen && (
-              <div className="ch-ct-sub">
-                {COMPANY_DIRECTORY.map(g => (
-                  <button key={g.dept} className={`ch-ct-subitem${section === 'org' && dept === g.dept ? ' active' : ''}`} onClick={() => { setSection('org'); setDept(g.dept) }}>
-                    <span className="ch-ct-elbow" />{g.dept}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <button key={m.key} className={`ch-ct-item${section === m.key ? ' active' : ''}`} onClick={() => setSection(m.key)}>
+            <span className="ch-ct-ico" style={{ color: m.tone }}><Ic n={m.icon} /></span>
+            <span className="ch-ct-label">{m.label}</span>
+            {m.key === 'requests' && incoming.length > 0 && <span className="ch-ct-badge">{incoming.length}</span>}
+          </button>
         ))}
+        <button className="ch-ct-item" onClick={() => confirmSignOut(chat)}>
+          <span className="ch-ct-ico" style={{ color: 'var(--text-muted)' }}><Ic n="logout" /></span>
+          <span className="ch-ct-label">Đăng xuất</span>
+        </button>
       </aside>
 
       <section className="ch-ct-panel">
         <header className="ch-ct-head">
-          {section === 'org' && dept && <button className="ch-ct-back" onClick={() => setDept(null)} title="Quay lại"><Ic n="chev" size={16} /></button>}
           <h3>{title}</h3>
           <span className="ch-ct-grow" />
           {action}
         </header>
+        {err && <div className="ch-ct-error" role="alert">{err}</div>}
         <div className="ch-ct-list">{body}</div>
       </section>
+    </div>
+  )
+}
 
-      {adding && (
-        <div className="ch-ct-modal" onMouseDown={e => { if (e.target === e.currentTarget) setAdding(null) }}>
-          <div className="ch-ct-modal-box">
-            <div className="ch-ct-modal-head"><h3>Thêm liên hệ bên ngoài</h3><button className="ch-ct-x" onClick={() => setAdding(null)}><Ic n="x" size={16} /></button></div>
-            {[['name', 'Họ và tên *'], ['company', 'Công ty / tổ chức'], ['role', 'Chức danh'], ['phone', 'Số điện thoại'], ['email', 'Email'], ['note', 'Lời nhắn kèm lời mời']].map(([k, l]) => (
-              <label key={k} className="ch-ct-field"><span>{l}</span><input autoFocus={k === 'name'} value={adding[k]} onChange={e => setAdding({ ...adding, [k]: e.target.value })} placeholder={k === 'note' ? `Tôi là ${ME}, ${ORG_NAME}` : ''} /></label>
-            ))}
-            <div className="ch-ct-modal-foot"><button className="ch-ct-btn ghost" onClick={() => setAdding(null)}>Hủy</button><button className="ch-ct-btn solid" disabled={!adding.name.trim()} onClick={saveExternal}>Gửi lời mời</button></div>
-          </div>
+/* Thẻ của tôi: tên hiển thị, số điện thoại / email, "cho người khác biết tôi đã xem", thông báo đẩy, đăng xuất */
+function MyCard({ chat }) {
+  const me = chat.me
+  const push = chat.push
+  const [name, setName] = useState(me.display_name || '')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function save(patch, ok) {
+    if (busy) return
+    setBusy(true); setMsg('')
+    try { await updateMe(patch); setMsg(ok) } catch (e) { setMsg(errText(e)) }
+    setBusy(false)
+  }
+
+  let pushPart
+  if (!push.supported) pushPart = <span className="ch-ct-hint">Trình duyệt này không hỗ trợ thông báo đẩy.</span>
+  else if (!push.enabled) pushPart = <span className="ch-ct-hint">Máy chủ chưa bật thông báo đẩy.</span>
+  else if (push.subscribed) {
+    pushPart = (
+      <>
+        <span className="ch-ct-hint">Đã bật thông báo trên trình duyệt này.</span>
+        <button className="ch-ct-btn ghost" disabled={push.busy} onClick={() => disablePush({ optOut: true })}>Tắt thông báo</button>
+      </>
+    )
+  } else if (push.permission === 'denied') pushPart = <span className="ch-ct-hint">Bạn đã chặn thông báo của trang này. Mở cài đặt trang trong trình duyệt để cho phép lại.</span>
+  else pushPart = <button className="ch-ct-btn solid" disabled={push.busy} onClick={() => enablePush()}>{push.busy ? 'Đang bật…' : 'Bật thông báo tin nhắn mới'}</button>
+
+  return (
+    <div className="ch-ct-cardwrap">
+      <div className="ch-ct-card">
+        <div className="ch-ct-card-top">
+          <Avatar id={me.id} name={me.display_name} size={64} />
+          <div><b>{me.display_name}</b><span>Tài khoản Dezon Chat</span>{me.created_at && <span>Tham gia {fmtDate(me.created_at)}</span>}</div>
         </div>
-      )}
+        {me.phone && <div className="ch-ct-card-line"><Ic n="phone" size={15} />{L.formatPhone(me.phone)}</div>}
+        {me.email && <div className="ch-ct-card-line"><Ic n="mail" size={15} />{me.email}</div>}
+        <form className="ch-ct-field" onSubmit={e => {
+          e.preventDefault()
+          const n = name.trim()
+          if (!n || n.length > 100) { setMsg('Tên hiển thị từ 1 đến 100 ký tự'); return }
+          save({ display_name: n }, 'Đã lưu tên hiển thị')
+        }}>
+          <span>Tên hiển thị</span>
+          <div className="ch-ct-inline">
+            <input maxLength={100} value={name} onChange={e => setName(e.target.value)} />
+            <button className="ch-ct-btn" disabled={busy || !name.trim() || name.trim() === me.display_name}>Lưu</button>
+          </div>
+        </form>
+        <label className="ch-ct-toggle">
+          <input type="checkbox" checked={me.show_read_receipts !== false} disabled={busy}
+            onChange={e => save({ show_read_receipts: e.target.checked }, e.target.checked ? 'Người khác sẽ thấy bạn đã xem' : 'Đã tắt báo "đã xem"')} />
+          <span>Cho người khác biết tôi đã xem tin nhắn</span>
+        </label>
+        <div className="ch-ct-card-push">{pushPart}</div>
+        {(msg || push.error) && <div className="ch-ct-hint">{msg || push.error}</div>}
+        <button className="ch-ct-btn ghost" onClick={() => confirmSignOut(chat)}>Đăng xuất</button>
+      </div>
     </div>
   )
 }

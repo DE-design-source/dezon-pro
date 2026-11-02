@@ -382,3 +382,146 @@ html[data-theme="dark"] .ch-req-wrap.t-thi-cong{--req-accent:#E8935A;}
 .ch-ct-title h2{padding:0 8px 0 4px;}
 .ch-ct-tomsg{display:grid; place-items:center; width:32px; height:32px; border:none; border-radius:9px; background:none; color:var(--text-muted); cursor:pointer;}
 .ch-ct-tomsg:hover{background:var(--surface-alt); color:var(--text);}
+
+/* =====================================================================
+   Dezon Chat thật (MVP): cổng đăng nhập, trạng thái tin, tin hệ thống,
+   danh sách chọn bạn bè, hộp tin nhắn mới, các nút ở cột thông tin.
+   ===================================================================== */
+
+/* ---------- Cổng đăng nhập (giống thẻ WorkGate) ---------- */
+.ch-gate{flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--bg);}
+.ch-gate-card{width:360px; max-width:100%; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:26px 26px 22px; box-shadow:0 12px 40px rgba(15,30,60,.12); display:flex; flex-direction:column; gap:12px; color:var(--text);}
+.ch-gate-title{font-size:16px; font-weight:700;}
+.ch-gate-text{font-size:13px; color:var(--text-muted);}
+.ch-gate-form{display:flex; flex-direction:column; gap:12px;}
+.ch-gate-input{border:1px solid var(--border); border-radius:9px; padding:10px 12px; font-size:13.5px; font-family:inherit; background:var(--surface); color:var(--text);}
+.ch-gate-input:focus{outline:none; border-color:var(--primary);}
+.ch-gate-otp{font-size:22px; letter-spacing:.5em; text-align:center; font-weight:700; padding-left:calc(12px + .5em);}
+.ch-gate-btn{border:none; border-radius:9px; padding:10px 14px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; background:var(--primary); color:#fff;}
+.ch-gate-btn:disabled{opacity:.55; cursor:default;}
+.ch-gate-err{font-size:12.5px; color:var(--danger); background:var(--danger-tint); border-radius:8px; padding:8px 10px;}
+.ch-gate-hint{font-size:12px; color:var(--text-muted); background:var(--surface-alt); border-radius:8px; padding:8px 10px;}
+.ch-gate-row{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px;}
+.ch-gate-muted{color:var(--text-faint);}
+.ch-gate-link{border:none; background:none; padding:0; color:var(--primary); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer;}
+.ch-gate-link:disabled{opacity:.5; cursor:default;}
+
+/* ---------- Trạng thái chung của cột giữa ---------- */
+.ch-empty{flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px; text-align:center; background:var(--bg);}
+.ch-empty-title{font-size:18px; font-weight:700;}
+.ch-empty-text{font-size:13px; color:var(--text-muted); max-width:360px;}
+.ch-empty-actions{display:flex; gap:8px; margin-top:4px;}
+.ch-thread-state{align-self:center; margin:auto 0; font-size:13px; color:var(--text-muted); text-align:center; padding:20px;}
+.ch-history-loader{align-self:center; font-size:11.5px; color:var(--text-faint); padding:2px 0 10px;}
+
+/* ---------- Danh sách hội thoại ---------- */
+.ch-net{font-size:11.5px; font-weight:600; color:var(--finance); background:var(--finance-tint); border-radius:8px; padding:6px 10px;}
+.ch-push-hint{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--primary); background:var(--primary-tint); border-radius:8px; padding:6px 8px 6px 10px;}
+.ch-push-hint span{flex:1;}
+.ch-push-hint button{flex:none; border:none; border-radius:6px; background:var(--primary); color:#fff; font-size:11.5px; font-weight:700; font-family:inherit; padding:4px 10px; cursor:pointer;}
+.ch-push-hint button:disabled{opacity:.6; cursor:default;}
+.ch-conv-note{padding:14px 16px; font-size:12.5px; color:var(--text-muted); text-align:center;}
+.ch-conv-pinned-icon + .ch-conv-name{flex:1; min-width:0;}
+.ch-conv-unread.muted{background:var(--text-faint);}
+.ch-conv-preview i{color:var(--primary);}
+.ch-icon-btn:disabled{opacity:.45; cursor:default;}
+.ch-icon-btn:disabled:hover{color:var(--text-muted); border-color:var(--border);}
+
+/* ---------- Bộ chọn tài khoản (mỗi tab một tài khoản) ---------- */
+.ch-row1-title{display:flex; align-items:center; gap:8px; min-width:0;}
+.ch-acct{position:relative; flex:none;}
+.ch-acct-chip{display:flex; align-items:center; gap:4px; height:32px; padding:0 7px 0 4px; border-radius:16px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted); cursor:pointer;}
+.ch-acct-chip:hover, .ch-acct-chip.open{color:var(--text); border-color:var(--primary);}
+.ch-acct-av{width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:700; flex:none;}
+.ch-acct-av.empty{background:var(--text-faint);}
+.ch-acct-menu{position:absolute; top:100%; left:0; margin-top:6px; width:264px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 26px rgba(20,25,35,.18); padding:6px; z-index:60; display:flex; flex-direction:column; gap:2px;}
+.ch-acct-title{font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-faint); font-weight:700; padding:6px 8px 4px;}
+.ch-acct-row{display:flex; align-items:center; gap:9px; width:100%; padding:7px 8px; border:none; border-radius:8px; background:none; color:var(--text); text-align:left; cursor:pointer; font-family:inherit;}
+.ch-acct-row:hover{background:var(--surface-alt);}
+.ch-acct-row.active{background:var(--primary-tint);}
+.ch-acct-row .ch-acct-av{width:30px; height:30px; font-size:11px;}
+.ch-acct-info{flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.3;}
+.ch-acct-info b{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-acct-info span{font-size:11.5px; color:var(--text-muted);}
+.ch-acct-check{color:var(--primary); flex:none;}
+.ch-acct-sep{height:1px; background:var(--border); margin:4px 2px;}
+.ch-acct-act{display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; border:none; border-radius:8px; background:none; color:var(--text); font-size:12.5px; font-weight:600; font-family:inherit; text-align:left; cursor:pointer;}
+.ch-acct-act:hover{background:var(--surface-alt);}
+.ch-acct-act svg{color:var(--text-muted);}
+.ch-acct-act.danger, .ch-acct-act.danger svg{color:var(--danger);}
+.ch-gate-accounts{display:flex; flex-direction:column; gap:4px; border-top:1px solid var(--border); padding-top:12px; font-size:12.5px;}
+.ch-gate-accounts .ch-acct-row{border:1px solid var(--border); margin-top:4px;}
+.ch-gate-back{align-self:center;}
+.ch-gate-method{background:var(--surface-alt); border-radius:9px; padding:3px; gap:3px;}
+.ch-gate-method button{flex:1; padding:6px 10px; font-family:inherit;}
+.ch-gate-method button:disabled{cursor:default;}
+.ch-gate-note{font-size:12.5px;}
+
+/* ---------- Thread: tin văn bản, trạng thái, tin hệ thống ---------- */
+.ch-bubble.ch-text{white-space:pre-wrap;}
+.ch-bubble.sending{opacity:.75;}
+.ch-msg-group.own .ch-bubble.failed{background:var(--danger-tint); color:var(--danger); border-color:var(--danger); cursor:pointer;}
+.ch-msg-time{display:inline-flex; align-items:center; gap:3px;}
+.ch-msg-status{display:inline-flex; color:var(--text-faint);}
+.ch-msg-status.seen{color:var(--primary);}
+.ch-seen-line{font-size:10.5px; color:var(--text-muted); padding:0 2px;}
+.ch-msg-failed{display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px; font-size:11px;}
+.ch-msg-failed button{border:none; background:none; padding:0; font-family:inherit; font-size:11px; font-weight:600; color:var(--danger); cursor:pointer;}
+.ch-msg-failed button.ch-msg-discard{color:var(--text-muted); font-weight:500;}
+.ch-msg-failed-why{color:var(--text-muted);}
+.ch-sys-msg{align-self:center; max-width:80%; margin:12px 0 4px; padding:4px 12px; border-radius:14px; background:var(--surface-alt); color:var(--text-muted); font-size:11.5px; text-align:center;}
+.ch-thread-notice{flex:none; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; border-top:1px solid var(--border); background:var(--surface); padding:14px 18px; font-size:12.5px; color:var(--text-muted);}
+.ch-thread-notice .ch-pjm-btn{flex:none; padding:6px 14px;}
+.ch-thread-notice-err{color:var(--danger);}
+.ch-composer-count{font-size:10.5px; color:var(--text-faint); text-align:right; margin-top:4px;}
+.ch-composer-count.over{color:var(--danger); font-weight:600;}
+.ch-composer textarea:disabled{opacity:.6;}
+.ch-send-btn:disabled{opacity:.5; cursor:default; filter:none;}
+
+/* ---------- Chọn bạn bè (popover thêm thành viên, tạo nhóm) ---------- */
+.ch-pick-list{max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:2px;}
+.ch-pick-row{display:flex; align-items:center; gap:9px; padding:5px 4px; border-radius:7px; cursor:pointer; font-size:12.5px;}
+.ch-pick-row:hover{background:var(--surface-alt);}
+.ch-pick-row input{margin:0; accent-color:var(--primary);}
+.ch-pick-row .ch-m-avatar{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:700; flex:none;}
+.ch-pick-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-pjm-btn:disabled{opacity:.5; cursor:default;}
+
+/* ---------- Cột thông tin ---------- */
+.ch-member-row .ch-member-actions{display:flex; gap:3px; flex:none; opacity:.35; transition:opacity .15s ease;}
+.ch-member-row:hover .ch-member-actions{opacity:1;}
+.ch-msg-action-btn:disabled{opacity:.4; cursor:default;}
+.ch-info-actions{display:flex; flex-direction:column; gap:6px;}
+.ch-info-btn{width:100%; text-align:left; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); border-radius:8px; padding:8px 11px; font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer;}
+.ch-info-btn:hover{border-color:var(--primary);}
+.ch-info-btn.ghost{background:none; color:var(--text-muted);}
+.ch-info-btn.danger{color:var(--danger);}
+.ch-info-btn.danger:hover{border-color:var(--danger);}
+.ch-info-btn:disabled{opacity:.5; cursor:default;}
+.ch-info-note{font-size:12px; color:var(--text-muted); margin-bottom:6px;}
+.ch-info-err{font-size:12px; color:var(--danger); background:var(--danger-tint); border-radius:8px; padding:7px 10px;}
+.ch-info-rename{display:flex; flex-direction:column; gap:8px;}
+.ch-info-rename input{padding:7px 9px; border-radius:6px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); font-size:12.5px; font-family:inherit;}
+
+/* ---------- Hộp "Tin nhắn mới" ---------- */
+.ch-dialog{width:480px; max-height:min(640px, 90vh);}
+.ch-dialog-search{display:flex; align-items:flex-end; gap:8px;}
+.ch-dialog-form{display:flex; flex-direction:column; gap:10px; min-height:0;}
+.ch-dialog-list{flex:1; min-height:120px; max-height:340px; overflow-y:auto; margin:0 -8px;}
+.ch-dialog-list.ch-pick-list{margin:0; max-height:260px;}
+
+/* ---------- Danh bạ ---------- */
+.ch-ct-error{margin:10px 22px 0; font-size:12.5px; color:var(--danger); background:var(--danger-tint); border-radius:8px; padding:8px 10px;}
+.ch-ct-modal-box .ch-ct-error{margin:0;}
+.ch-ct-pad{padding:14px 10px; display:flex; flex-direction:column; gap:12px;}
+.ch-ct-textarea{padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); font-size:13px; font-family:inherit; resize:vertical;}
+.ch-ct-textarea:focus{outline:none; border-color:var(--primary); background:var(--surface);}
+.ch-ct-row-actions{display:flex; gap:8px;}
+.ch-ct-group-title{font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint); font-weight:700; padding:14px 12px 4px;}
+.ch-ct-inline{display:flex; gap:8px;}
+.ch-ct-inline input{flex:1; min-width:0;}
+.ch-ct-toggle{display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer;}
+.ch-ct-toggle input{margin:0; width:16px; height:16px; accent-color:var(--primary);}
+.ch-ct-card-push{display:flex; flex-direction:column; gap:8px;}
+.ch-ct-card-push .ch-ct-hint{margin-top:0;}
+.ch-ct-msg:disabled{opacity:.5; cursor:default;}

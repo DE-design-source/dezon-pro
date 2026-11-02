@@ -1,9 +1,19 @@
 /* Phần dùng chung của trang Chat: initials(), iconSvg(), convAvatarHTML() trong chat.html */
+import { COLORS } from '../../../data/chatData'
 
 export function initials(name) {
-  const parts = name.trim().split(/\s+/)
+  /* bỏ ký tự không phải chữ / số ở đầu từ: "Châu Lê (QS)" -> CQ, không phải "C(" */
+  const parts = String(name || '').trim().split(/\s+/).map(w => w.replace(/^[^\p{L}\p{N}]+/u, '')).filter(Boolean)
+  if (!parts.length) return '?'
   if (parts.length === 1) return parts[0][0].toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+/* Màu avatar cố định theo id người dùng / hội thoại */
+const PALETTE = [COLORS.blue, COLORS.teal, COLORS.amber, COLORS.purple, COLORS.green, COLORS.pink]
+export function colorFor(id) {
+  const n = Math.abs(Number(id) || 0)
+  return PALETTE[n % PALETTE.length]
 }
 
 /* iconSvg(kind) — icon trắng 19px của nhóm / bot */
@@ -12,10 +22,12 @@ export function IconSvg({ kind }) {
   if (kind === 'building') return <svg {...p}><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18" /><path d="M6 12h12M6 8h12M6 16h12" /><path d="M10 22v-4h4v4" /></svg>
   if (kind === 'hardhat') return <svg {...p}><path d="M3 18h18" /><path d="M5 18a7 7 0 0 1 14 0" /><path d="M12 8v3" /><path d="M9 4h6" /></svg>
   if (kind === 'bot') return <svg {...p}><rect x="4" y="8" width="16" height="12" rx="3" /><path d="M12 8V4" /><circle cx="9" cy="14" r="1.2" fill="#fff" stroke="none" /><circle cx="15" cy="14" r="1.2" fill="#fff" stroke="none" /></svg>
+  if (kind === 'group') return <svg {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2 20a7 7 0 0 1 14 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17.5 14.5A5 5 0 0 1 22 19" /></svg>
   return null
 }
 
-/* convAvatarHTML(c, size) — extraClass dùng cho đầu thread ("conv-avatar t-avatar") */
+/* convAvatarHTML(c, size) — extraClass dùng cho đầu thread ("conv-avatar t-avatar").
+   conv: {type: 'dm' | 'group' | 'bot', name, color, icon, online} */
 export function ConvAvatar({ conv, size = 42, extraClass = '' }) {
   const style = { width: size, height: size, background: conv.color }
   const cls = 'ch-conv-avatar' + (extraClass ? ' ' + extraClass : '')
@@ -28,6 +40,15 @@ export function ConvAvatar({ conv, size = 42, extraClass = '' }) {
     )
   }
   return <div className={cls} style={style}><IconSvg kind={conv.type === 'bot' ? 'bot' : conv.icon} /></div>
+}
+
+/* Hội thoại máy chủ -> dạng ConvAvatar cần (1-1 tròn có chấm online, nhóm vuông icon nhóm) */
+export function avatarConv(c, online) {
+  if (c.type === 'direct') {
+    const peer = c.peer || {}
+    return { type: 'dm', name: peer.display_name || c.name || '', color: colorFor(peer.id || c.id), online: !!online }
+  }
+  return { type: 'group', name: c.name || '', color: colorFor(c.id), icon: 'group' }
 }
 
 /* Đường path của icon ghim (dùng ở danh sách hội thoại, bubble, thanh ghim) */
@@ -47,3 +68,17 @@ export function UsersIcon({ size = 15 }) {
 export function SearchIcon({ size = 14 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
 }
+
+/* Trạng thái tin của mình: đang gửi (đồng hồ), đã gửi (✓), đã nhận (✓✓), đã xem (✓✓ màu chính) */
+const STATUS_TITLE = { sending: 'Đang gửi', sent: 'Đã gửi', delivered: 'Đã nhận', seen: 'Đã xem' }
+export function StatusIcon({ status }) {
+  const p = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  let body
+  if (status === 'sending') body = <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 2" /></>
+  else if (status === 'sent') body = <path d="M5 12.5l4.5 4.5L19 7.5" />
+  else body = <><path d="M2.5 12.5L7 17l9.5-9.5" /><path d="M11.5 16l1 1L22 7.5" /></>
+  return <span className={'ch-msg-status ' + status} title={STATUS_TITLE[status] || ''} aria-label={STATUS_TITLE[status] || ''}><svg {...p}>{body}</svg></span>
+}
+
+/* Thông báo lỗi ngắn trong các thao tác (kết bạn, đổi tên nhóm...) */
+export const errText = e => (e && e.message) || 'Có lỗi, thử lại sau'

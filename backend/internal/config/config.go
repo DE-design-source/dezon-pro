@@ -45,6 +45,22 @@ type Config struct {
 	// TRUSTED_PROXIES (IP / CIDR, cách nhau dấu phẩy): proxy được tin khi lấy IP client từ X-Forwarded-For
 	// cho RATE_LIMIT_RPS. Rỗng = không tin proxy nào, IP là địa chỉ kết nối trực tiếp.
 	TrustedProxies []string
+
+	// Chat (module internal/modules/chat, tài khoản theo số điện thoại, không dùng phiên QS)
+	ChatJWTSecret      string  // CHAT_JWT_SECRET: khoá ký access token chat; rỗng = suy ra từ AUTH_SECRET
+	ChatAccessTTLMin   float64 // CHAT_ACCESS_TTL_MIN: hạn access token (phút); trống / sai / <= 0 = 15
+	ChatRefreshTTLDays float64 // CHAT_REFRESH_TTL_DAYS: hạn refresh token (ngày); trống / sai / <= 0 = 30
+	ChatOTPDev         bool    // CHAT_OTP_DEV: chỉ "1" mới bật - API trả luôn mã OTP (dev_code), CHỈ dùng khi thử ở máy
+	ChatVAPIDPublic    string  // CHAT_VAPID_PUBLIC_KEY: khoá công khai VAPID (Web Push); rỗng = tắt push
+	ChatVAPIDPrivate   string  // CHAT_VAPID_PRIVATE_KEY
+	ChatVAPIDSubject   string  // CHAT_VAPID_SUBJECT: mailto:... hoặc https://... của bên gửi push
+
+	// Email (SMTP, internal/platform/mailer): gửi mã OTP khi đăng nhập chat bằng email; SMTP_HOST rỗng = mã ghi vào log
+	SMTPHost     string // SMTP_HOST: máy chủ SMTP; rỗng = không gửi email
+	SMTPPort     int    // SMTP_PORT: trống / sai / <= 0 = 587; 465 = TLS ngay, cổng khác STARTTLS nếu máy chủ hỗ trợ
+	SMTPUsername string // SMTP_USERNAME: rỗng = không đăng nhập (AUTH)
+	SMTPPassword string // SMTP_PASSWORD: giữ nguyên, không cắt khoảng trắng
+	SMTPFrom     string // SMTP_FROM: người gửi, vd "Dezon Chat <no-reply@dezon.vn>"
 }
 
 // Giá trị mặc định lấy từ server Node.
@@ -90,7 +106,37 @@ func Load() *Config {
 	c.TokenTTLDays, _ = strconv.ParseFloat(strings.TrimSpace(os.Getenv("TOKEN_TTL_DAYS")), 64)
 	c.CORSOrigins = list(os.Getenv("CORS_ORIGINS"))
 	c.TrustedProxies = list(os.Getenv("TRUSTED_PROXIES"))
+	c.ChatJWTSecret = os.Getenv("CHAT_JWT_SECRET")
+	c.ChatAccessTTLMin = positive(os.Getenv("CHAT_ACCESS_TTL_MIN"), 15)
+	c.ChatRefreshTTLDays = positive(os.Getenv("CHAT_REFRESH_TTL_DAYS"), 30)
+	c.ChatOTPDev = os.Getenv("CHAT_OTP_DEV") == "1"
+	c.ChatVAPIDPublic = strings.TrimSpace(os.Getenv("CHAT_VAPID_PUBLIC_KEY"))
+	c.ChatVAPIDPrivate = strings.TrimSpace(os.Getenv("CHAT_VAPID_PRIVATE_KEY"))
+	c.ChatVAPIDSubject = strings.TrimSpace(os.Getenv("CHAT_VAPID_SUBJECT"))
+	c.SMTPHost = strings.TrimSpace(os.Getenv("SMTP_HOST"))
+	c.SMTPPort = tcpPort(os.Getenv("SMTP_PORT"), 587)
+	c.SMTPUsername = strings.TrimSpace(os.Getenv("SMTP_USERNAME"))
+	c.SMTPPassword = os.Getenv("SMTP_PASSWORD")
+	c.SMTPFrom = strings.TrimSpace(os.Getenv("SMTP_FROM"))
 	return c
+}
+
+// tcpPort: số cổng nguyên đọc từ v; trống / sai / <= 0 / > 65535 -> def.
+func tcpPort(v string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n <= 0 || n > 65535 {
+		return def
+	}
+	return n
+}
+
+// positive: số thực dương đọc từ v; trống / sai / <= 0 / vô cực -> def.
+func positive(v string, def float64) float64 {
+	f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+	if err != nil || !(f > 0) || f > 1e9 {
+		return def
+	}
+	return f
 }
 
 // list tách chuỗi cách nhau dấu phẩy, bỏ khoảng trắng và phần tử rỗng.

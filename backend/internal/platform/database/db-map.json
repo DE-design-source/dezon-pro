@@ -785,5 +785,116 @@
    "parent": "delivery_projects",
    "key": "id"
   }
+ },
+ "chat_nguoi_dung": {
+  "table": "chat_users",
+  "columns": {
+   "id": "id",
+   "sdt": "phone",
+   "sdt_hash": "phone_hash",
+   "email": "email",
+   "ten_hien_thi": "display_name",
+   "hien_da_xem": "show_read_receipts",
+   "truy_cap_cuoi": "last_seen_at",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "chat_thiet_bi": {
+  "table": "chat_devices",
+  "columns": {
+   "id": "id",
+   "nguoi_dung_id": "user_id",
+   "nen_tang": "platform",
+   "ten_thiet_bi": "device_name",
+   "loai_push": "push_kind",
+   "push_token": "push_token",
+   "truy_cap_cuoi": "last_seen_at",
+   "ngay_tao": "created_at"
+  }
+ },
+ "chat_refresh_token": {
+  "table": "chat_refresh_tokens",
+  "columns": {
+   "id": "id",
+   "thiet_bi_id": "device_id",
+   "token_hash": "token_hash",
+   "het_han": "expires_at",
+   "da_dung": "used_at",
+   "ngay_tao": "created_at"
+  }
+ },
+ "chat_otp": {
+  "table": "chat_otp_codes",
+  "columns": {
+   "id": "id",
+   "sdt": "phone",
+   "email": "email",
+   "ma_hash": "code_hash",
+   "ip": "request_ip",
+   "so_lan_sai": "attempts",
+   "het_han": "expires_at",
+   "da_dung": "consumed_at",
+   "khoa_den": "locked_until",
+   "ngay_tao": "created_at"
+  }
+ },
+ "chat_ban_be": {
+  "table": "chat_friendships",
+  "columns": {
+   "nguoi_dung_id": "user_id",
+   "ban_id": "friend_id",
+   "trang_thai": "status",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "chat_hoi_thoai": {
+  "table": "chat_conversations",
+  "columns": {
+   "id": "id",
+   "loai": "conversation_type",
+   "ten": "name",
+   "seq_cuoi": "last_seq",
+   "tin_cuoi_luc": "last_message_at",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "chat_thanh_vien": {
+  "table": "chat_conversation_members",
+  "columns": {
+   "hoi_thoai_id": "conversation_id",
+   "nguoi_dung_id": "user_id",
+   "vai_tro": "member_role",
+   "da_xem_seq": "last_read_seq",
+   "da_nhan_seq": "last_delivered_seq",
+   "tat_bao_den": "muted_until",
+   "roi_nhom_luc": "left_at",
+   "ngay_vao": "joined_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "chat_cap_1_1": {
+  "table": "chat_direct_pairs",
+  "columns": {
+   "nguoi_thap": "user_low",
+   "nguoi_cao": "user_high",
+   "hoi_thoai_id": "conversation_id"
+  }
+ },
+ "chat_tin_nhan": {
+  "table": "chat_messages",
+  "columns": {
+   "id": "id",
+   "hoi_thoai_id": "conversation_id",
+   "seq": "seq",
+   "client_msg_id": "client_msg_id",
+   "nguoi_gui": "sender_id",
+   "loai": "message_type",
+   "noi_dung": "content",
+   "ngay_tao": "created_at"
+  }
  }
 }

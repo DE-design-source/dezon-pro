@@ -4,6 +4,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useSidebar } from '../../hooks/useSidebar'
 import { NAV_MAIN, NAV_BOTTOM } from '../../data/navigation'
 import SidebarDock from './SidebarDock'
+import { useChatUnreadTotal } from '../../pages/Chat/state/chatStore'
 
 function NavIcon({ pathData }) {
   return (
@@ -17,7 +18,7 @@ function NavIcon({ pathData }) {
   )
 }
 
-function NavItem({ item, collapsed }) {
+function NavItem({ item, collapsed, badge = item.badge }) {
   return (
     <NavLink
       to={item.path}
@@ -28,16 +29,16 @@ function NavItem({ item, collapsed }) {
     >
       <NavIcon pathData={item.icon} />
       {!collapsed && <span className="nav-label" style={{ flex: 1, fontSize: '13px' }}>{item.label}</span>}
-      {item.badge && !collapsed && (
+      {badge && !collapsed && (
         <span style={{
           background: 'var(--danger, #ff4d4f)', color: '#fff',
           fontSize: '10px', fontWeight: 700,
           padding: '1px 6px', borderRadius: '20px', flex: 'none',
         }}>
-          {item.badge}
+          {badge}
         </span>
       )}
-      {item.badge && collapsed && (
+      {badge && collapsed && (
         <span style={{
           position: 'absolute', top: 6, right: 6,
           width: 7, height: 7, borderRadius: '50%',
@@ -57,6 +58,7 @@ export default function Sidebar() {
 
   const isCollapsed = level === 'icons'
   const isUltra = level === 'logo'
+  const chatUnread = useChatUnreadTotal() // 0 = không hiện số (chưa đăng nhập chat / không có tin chưa đọc)
 
   /* Thu gọn tối đa: sidebar không chiếm chỗ, chỉ còn nút tròn nổi (SidebarDock) để mở menu */
   /* Báo mức thu gọn cho CSS (global.css chừa chỗ cho cụm nổi ở các trang có lề hẹp) */
@@ -202,7 +204,8 @@ export default function Sidebar() {
           // Màn hình thấp (laptop, cỡ chữ lớn): menu tự cuộn thay vì bị cắt mất các mục cuối
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             {NAV_MAIN.map(item => (
-              <NavItem key={item.path} item={item} collapsed={isCollapsed} />
+              <NavItem key={item.path} item={item} collapsed={isCollapsed}
+                badge={item.path === '/chat' ? (chatUnread > 99 ? '99+' : chatUnread || null) : item.badge} />
             ))}
 
             <div className="sidebar-divider" style={{ margin: '10px 0 6px' }} />

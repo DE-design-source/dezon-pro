@@ -24,6 +24,8 @@
 | D-12 | Lớp tương thích và công cụ migration | Giữ `supa.js` + `db-map.json`; migration SQL đánh số | 1 | Không |
 | D-13 | Transaction cho thao tác nhiều bước | Thêm ở đợt 2 | 2 | Không |
 | D-14 | Vị trí tài liệu | `docs/02-ky-thuat/database/` | - | Không |
+| D-15 | Chat MVP (2026-10-30): danh tính riêng, SQL thô, chỉ PostgreSQL | Bảng `chat_*` không theo công ty; SQL qua `DB.Pool()`; chưa dùng Redis / Cassandra / Kafka | - | Không (đã chốt) |
+| D-16 | Chat đăng nhập bằng email (2026-11-02) | Danh tính = số HOẶC email, tài khoản riêng, chưa liên kết; OTP email qua SMTP | - | Không (đã chốt) |
 
 ---
 
@@ -164,3 +166,52 @@
 ## D-14. Vị trí tài liệu
 
 Yêu cầu ghi `docs/database/*.md`; quy tắc bắt buộc của repo (`.claude/rules/docs/docs-placement.md`) yêu cầu tài liệu kỹ thuật nằm ở `docs/02-ky-thuat/`, tên file kebab-case. Đã đặt ở `docs/02-ky-thuat/database/`. Bảng đối chiếu tên file: [docs/README.md](../../README.md).
+
+## D-15. Chat MVP: danh tính riêng, SQL thô qua `Pool()`, chỉ PostgreSQL (2026-10-30)
+
+- **Bối cảnh:** Chat MVP (`backend/CHAT.md`, roadmap N8) đăng nhập bằng số điện thoại + OTP và dùng chung giữa mọi công ty (như Zalo).
+  CHAT.md mục 4 thiết kế PostgreSQL (người dùng, nhóm) + Cassandra / ScyllaDB (tin nhắn) + Redis (online, `seq`, đang soạn, OTP), nhưng ghi
+  "Giai đoạn đầu có thể dùng PostgreSQL cho tất cả, giữ nguyên cấu trúc bên dưới để sau này tách ra"; mục 16 (Lộ trình) đặt MVP là
+  "WebSocket một gateway", còn tách gateway, Kafka, Cassandra để "khi có tăng trưởng". Production (VPS dezon.tech) chỉ có PostgreSQL, không có Redis.
+- **Quyết định 1 - danh tính riêng:** bảng `chat_users` (khoá nghiệp vụ = số điện thoại E.164), KHÔNG dùng `users` của QS, KHÔNG có
+  `company_id`, không vào `TenantTables` (quy tắc 25: user-owned, không theo công ty; `chat_otp_codes` là bảng hệ thống). Token riêng: access
+  JWT HS256 15 phút (`typ = "chat"`, `did` = thiết bị) + refresh token mờ 30 ngày lưu sha256, xoay vòng, phát hiện dùng lại. Phiên QS và token
+  chat không dùng lẫn được. Phương án bị loại: gắn chat vào `users` - tài khoản QS thuộc một công ty, đăng nhập bằng tên + mật khẩu, người
+  ngoài công ty (khách, thầu phụ) không có tài khoản.
+- **Quyết định 2 - SQL thô qua `database.DB.Pool()`:** lớp `database.DB` kiểu PostgREST không diễn đạt được `UPDATE ... SET last_seq = last_seq + 1
+  RETURNING` (cấp `seq` nguyên tử dưới khoá dòng), `GREATEST(...)` cho con trỏ đã nhận / đã xem, upsert `ON CONFLICT`, `SELECT ... FOR UPDATE`,
+  khoá `pg_advisory_xact_lock` theo số điện thoại / cặp người dùng và các câu nối của danh sách hội thoại; bảng chat cũng không cần lọc công ty.
+  Module chat viết SQL tên tiếng Anh, transaction riêng (`pgx.BeginFunc`), ép kiểu tham số tường minh (pool chạy simple protocol). Ngoại lệ
+  này ghi ở `backend/docs/ARCHITECTURE.md` mục 10.4; `db-map.json` vẫn có 9 mục `chat_*` (quy tắc 17), không có khoá `tenant`.
+- **Quyết định 3 - PostgreSQL thay Redis / Cassandra / Kafka ở MVP:**
+
+  | Thành phần của CHAT.md | MVP dùng |
+  |---|---|
+  | Bảng `messages` trên Cassandra | `chat_messages`, cùng khoá đọc `(conversation_id, seq)` |
+  | `message_dedup` (TTL 1 ngày) | unique `(conversation_id, sender_id, client_msg_id)`, không TTL |
+  | Redis `seq:{conversation_id}` (`INCR`) | `chat_conversations.last_seq` + `UPDATE ... RETURNING` trong transaction gửi |
+  | Redis `otp:{phone}` (TTL 5 phút) | `chat_otp_codes` (lưu HMAC; giới hạn gửi đếm bằng số dòng trong 1 giờ) |
+  | Redis `conn`, `presence`, `typing`, `members` | bộ nhớ của gateway `realtime.Hub` + cache thành viên 30 giây trong service |
+  | Kafka (phân phối theo thứ tự) | bộ chạy tuần tự trong tiến trình `Hub.Submit(conversation_id, job)` (cùng khoá = cùng worker) |
+
+  Tin được commit TRƯỚC khi phân phối; tiến trình chết giữa hai bước thì client bù bằng phát hiện hở `seq` + `GET /chat/sync`.
+- **Giới hạn chấp nhận:** chỉ một tiến trình server (gateway trong bộ nhớ, chưa chia tải ngang); khởi động lại thì mọi WebSocket nối lại.
+  Khi cần nhiều gateway: làm theo CHAT.md mục 16 bước 4 (tách gateway, Redis cho presence / định tuyến, Kafka, Cassandra); khoá
+  `(conversation_id, seq)` giữ nguyên nên dữ liệu chuyển được.
+- **Tác động code:** `infra/db/migrations/0018_chat.sql`, `backend/internal/modules/chat` (+ gói con `realtime`), `backend/internal/platform/webpush`,
+  quyền mới `rpc.SelfAuth`. Không đổi bảng, hàm hay route nào của QS.
+
+## D-16. Chat đăng nhập / tìm bạn bằng email (2026-11-02)
+
+- **Bối cảnh:** D-15 lấy số điện thoại làm danh tính chat, nhưng SMS thật chưa có (mã ghi log, roadmap N8.1) và nhiều người (khách, đối tác)
+  quen dùng email công ty hơn.
+- **Quyết định:** danh tính `chat_users` = số điện thoại HOẶC email (migration 0019: `phone` thôi NOT NULL, thêm `email` unique, CHECK có ít nhất
+  một). Tài khoản tạo bằng email không có số và ngược lại; cùng một người dùng số và email là HAI tài khoản riêng, CHƯA liên kết / gộp (để sau).
+  Email chuẩn hoá trước khi ghi / tra: bỏ khoảng trắng hai đầu, chữ thường toàn bộ, không bỏ dấu chấm / `+tag` (Go `chat/email.go`
+  `NormalizeEmail` và JS `chatLogic.normalizeEmail` cho cùng kết quả; CHECK `ck_chat_users_email` chặn chữ hoa ở tầng DB).
+- **OTP email cùng giới hạn với SMS:** cùng bảng `chat_otp_codes` (cột `phone` HOẶC `email`), mã 6 số sống 5 phút, gửi lại sau 60 giây,
+  5 mã / giờ / email, 20 mã / giờ / IP đếm chung cả số lẫn email, sai 5 lần khoá 15 phút; khoá advisory `otp:email:<email>`.
+- **Gửi mail:** SMTP thư viện chuẩn (`backend/internal/platform/mailer`, biến `SMTP_HOST`, `SMTP_PORT` mặc định 587, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`, `SMTP_FROM`). Chưa đặt `SMTP_HOST` thì mã OTP email ghi vào log server (giống SMS).
+- **Lộ thông tin:** email chỉ trả cho chính mình, bạn bè và kết quả tra đúng email; tra theo email không lộ số và ngược lại.
+- **Phương án bị loại:** liên kết email vào tài khoản số ngay đợt này - cần luồng xác minh cả hai đích và gộp dữ liệu hai tài khoản đã có.

@@ -283,6 +283,153 @@ Bảng 1-1 với `products`, chỉ có dòng khi SP có ít nhất 1 thông số
 | `installation_note` | `gc_lap_dat` | text | có |  | HVAC spec (code: gc_lap_dat) |
 | `material_spec` | `quy_cach_vt` | text | có |  | HVAC spec (code: quy_cach_vt) |
 
+## `chat_users` (`chat_nguoi_dung`)
+
+Tài khoản chat (danh tính = số điện thoại HOẶC email) - migration 0018 (2026-10-30), cột `email` từ 0019 (2026-11-02), module
+`backend/internal/modules/chat` (Chat MVP, roadmap N8). Tài khoản tạo bằng email không có số (`phone` null) và ngược lại; CHECK
+`ck_chat_users_phone_email`: phải có ít nhất một trong hai. Chưa liên kết email vào tài khoản số (hai tài khoản riêng, [decisions.md](decisions.md) D-16).
+**Xếp loại (quy tắc 25) của 9 bảng `chat_*`: user-owned, không theo công ty** (riêng `chat_otp_codes`: hệ thống). Tài khoản chat KHÔNG phải
+`users` của QS và dùng chung mọi công ty (như Zalo): không có `company_id`, không vào `TenantTables`, không khai `tenant` trong `db-map.json`;
+module chat tự kiểm quyền theo `user_id` / `device_id` của access token chat (không dùng phiên QS). Module đọc / ghi bằng SQL thô qua
+`database.DB.Pool()` với tên tiếng Anh (lý do: [decisions.md](decisions.md) D-15); khoá tiếng Việt `chat_*` trong `db-map.json` có đủ cho quy
+tắc 17 nhưng code chat không dùng. Không bảng nào có cột `jsonb`. MVP không xoá tài khoản chat (khoá ngoại tới người tạo / người gửi là RESTRICT).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (user_id in the chat API). |  |
+| `phone` | `sdt` | text | có |  | UNIQUE, CHECK | Phone number in E.164 form (+84901234567), normalized by the service; unique. Null = account created by email. | **NHẠY CẢM (PII)**. CHECK `^\+[1-9][0-9]{7,14}$`. Service chuẩn hoá trước (`chat/phone.go`): `0` + 9 số / `84` + 9 số -> `+84...`, di động VN phải đầu 3/5/7/8/9; sai -> `PHONE_INVALID`. Chỉ trả cho chính mình, bạn bè và kết quả tra đúng số (tra theo email không lộ số). NULL từ 0019 (tài khoản email). |
+| `email` | `email` | text | có |  | UNIQUE, CHECK | Lowercase email address, normalized by the service; unique. Null = account created by phone. At least one of phone / email is set. | **NHẠY CẢM (PII)**. Migration 0019. CHECK `ck_chat_users_email`: chữ thường, <= 254 ký tự, khớp `^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$`. Service chuẩn hoá trước (`chat/email.go` `NormalizeEmail`, client `chatLogic.normalizeEmail` cho cùng kết quả): bỏ khoảng trắng hai đầu, chữ thường toàn bộ; phần trước `@` <= 64; không bỏ dấu chấm / `+tag`; sai -> `EMAIL_INVALID`. Unique `uq_chat_users_email` (tìm / tạo tài khoản khi xác thực OTP email, `GET /chat/users/search?email=`). Chỉ trả cho chính mình, bạn bè và kết quả tra đúng email (tra theo số không lộ email). |
+| `phone_hash` | `sdt_hash` | text | có |  | GENERATED | Derived: lowercase hex SHA-256 of phone (null when phone is null); contact matching without sending raw numbers. | **C (dẫn xuất)**: `GENERATED ALWAYS AS (encode(sha256(phone::bytea), 'hex')) STORED` (quy tắc 14). Dùng `phone::bytea` vì `convert_to` là STABLE, không dùng được trong cột GENERATED; CHECK của `phone` chỉ cho `+` và chữ số nên kết quả = SHA-256 của chuỗi UTF-8. Index `idx_chat_users_phone_hash` (`POST /chat/contacts/match`). |
+| `display_name` | `ten_hien_thi` | text | không |  | CHECK | Name shown to other users, 1..100 characters. | Tài khoản mới không gửi tên -> `Người dùng <4 số cuối>`; tài khoản email -> phần trước `@` (cắt 100 ký tự; rỗng thì `Người dùng`). |
+| `show_read_receipts` | `hien_da_xem` | boolean | không | true |  | False: other members never see this user's read pointer (last_read_seq); the user's own devices still do. | Lệch quy tắc 16 (boolean nên bắt đầu `is_` / `has_`): giữ đúng khoá API `show_read_receipts` của CHAT.md. |
+| `last_seen_at` | `truy_cap_cuoi` | timestamp with time zone | có |  |  | Time the user went offline (last connection closed + grace period); null = never. | Ghi khi người dùng offline (kết nối cuối đóng + 30 giây chống nhấp nháy) và lúc tắt server. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Account creation time (first successful OTP verification, by SMS or email). |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last profile change time (set by the service). |  |
+
+## `chat_devices` (`chat_thiet_bi`)
+
+Thiết bị đã đăng nhập chat: 1 dòng / lần xác thực OTP thành công - migration 0018. User-owned (qua `user_id`). Đăng xuất = xoá dòng
+(refresh token đi theo CASCADE, push token nằm trên chính dòng).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (device_id, also the "did" claim of the access token). |  |
+| `user_id` | `nguoi_dung_id` | bigint | không |  | FK CASCADE | Owning chat account. | CASCADE: thiết bị không có nghĩa khi thiếu tài khoản (quy tắc 7). Index `idx_chat_devices_user_id` (thiết bị nhận push của một người). |
+| `platform` | `nen_tang` | text | không |  | CHECK | ios / android / web / desktop. |  |
+| `device_name` | `ten_thiet_bi` | text | không | '' | CHECK | Free-text label (browser / OS), at most 200 characters. |  |
+| `push_kind` | `loai_push` | text | có |  | CHECK | Push channel of push_token: webpush / fcm / apns; null = no push for this device. | MVP chỉ nhận `webpush`; `fcm` / `apns` để sẵn cho app mobile (roadmap N8.2). CHECK `ck_chat_devices_push_token`: null cùng lúc với `push_token`. |
+| `push_token` | `push_token` | text | có |  | CHECK | webpush: the PushSubscription JSON string; fcm / apns: the device token. Null together with push_kind. | **NHẠY CẢM**: endpoint là bí mật của subscription (log chỉ ghi tên máy). Chuỗi JSON `{"endpoint","keys":{"p256dh","auth"}}` lưu dạng `text`, đọc / ghi nguyên khối, không truy vấn phần tử (không cần `jsonb`, quy tắc 19). Endpoint phải là https của dịch vụ push đã biết (`fcm.googleapis.com`, `android.googleapis.com`, `*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com` - chống SSRF). Đăng ký lại cùng subscription thì gỡ khỏi thiết bị khác (index một phần `idx_chat_devices_push_token`); dịch vụ push trả 404 / 410 -> service đặt về null. |
+| `last_seen_at` | `truy_cap_cuoi` | timestamp with time zone | có |  |  | Last token refresh or WebSocket authentication from this device. | Ghi lúc xác thực OTP, refresh token và gói `auth` của WebSocket. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Login time. |  |
+
+## `chat_refresh_tokens` (`chat_refresh_token`)
+
+Refresh token của thiết bị chat, lưu băm, xoay vòng mỗi lần refresh - migration 0018. User-owned (qua `chat_devices`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `device_id` | `thiet_bi_id` | bigint | không |  | FK CASCADE | Device the token belongs to. | CASCADE: đăng xuất / thu hồi thiết bị xoá mọi token của nó. Index `idx_chat_refresh_tokens_device_id`. |
+| `token_hash` | `token_hash` | text | không |  | UNIQUE, CHECK | Lowercase hex SHA-256 of the opaque token (the token itself is never stored). | **NHẠY CẢM**. Token = 32 byte ngẫu nhiên base64url, chỉ client giữ; CHECK `^[0-9a-f]{64}$`. |
+| `expires_at` | `het_han` | timestamp with time zone | không |  |  | Expiry (issue time + CHAT_REFRESH_TTL_DAYS). | **C (dẫn xuất)**: = lúc cấp + `CHAT_REFRESH_TTL_DAYS` (mặc định 30 ngày); nguồn chuẩn là lúc service cấp token. |
+| `used_at` | `da_dung` | timestamp with time zone | có |  |  | Set when the token was rotated; null = still usable. | Trình lại token đã dùng: dưới 30 giây -> `REFRESH_RACE` (409, không thu hồi); cũ hơn -> xoá thiết bị -> `REFRESH_REUSED` (401). |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Issue time. |  |
+
+## `chat_otp_codes` (`chat_otp`)
+
+Mã OTP đăng nhập chat, đồng thời là nguồn đếm giới hạn gửi mã - migration 0018, cột `email` từ 0019. **Xếp loại: hệ thống, không theo công ty**
+(mã tạm theo số điện thoại hoặc email, tài khoản có thể chưa tồn tại). Mỗi dòng gửi tới đúng MỘT đích: `phone` (SMS) hoặc `email` (CHECK
+`ck_chat_otp_codes_phone_email`). Mã 6 số sống 5 phút, gửi lại sau 60 giây, tối đa 5 lần / giờ / số hoặc email và 20 lần / giờ / IP (đếm chung
+cả số lẫn email); mỗi lần xin mã xoá dòng quá 24 giờ của số / email đó. MVP chưa gửi SMS thật: mã ghi vào log server (roadmap N8.1). Email gửi qua
+SMTP (`SMTP_*`); chưa đặt `SMTP_HOST` thì mã email cũng ghi vào log.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `phone` | `sdt` | text | có |  | CHECK | E.164 phone the code was sent to; null when sent by email. Soft reference: the account may not exist yet, no FK. | **Tham chiếu mềm** tới `chat_users.phone` (quy tắc 9). **NHẠY CẢM (PII)**. Index `(phone, created_at desc)`: mã mới nhất, đếm theo số, khoá. NULL từ 0019 (mã gửi qua email). |
+| `email` | `email` | text | có |  | CHECK | Lowercase email the code was sent to; null when sent by SMS. Exactly one of phone / email is set. | Migration 0019. **Tham chiếu mềm** tới `chat_users.email` (quy tắc 9). **NHẠY CẢM (PII)**. CHECK `ck_chat_otp_codes_email`: chữ thường, <= 254 ký tự. Index một phần `idx_chat_otp_codes_email_created_at (email, created_at desc) where email is not null`: mã mới nhất, đếm theo email, khoá. |
+| `code_hash` | `ma_hash` | text | không |  |  | Lowercase hex HMAC-SHA256(server OTP secret, phone-or-email \|\| ':' \|\| code); the code itself is never stored. | **NHẠY CẢM**. Khoá OTP suy từ khoá JWT chat (`CHAT_JWT_SECRET`, trống thì từ `AUTH_SECRET`); so không lộ thời gian. |
+| `request_ip` | `ip` | text | không | '' |  | Client IP of the request (rate limit per IP); empty when unknown. | **NHẠY CẢM (PII)**. Đứng sau reverse proxy phải đặt `TRUSTED_PROXIES`, không thì mọi client chung một IP. Index `(request_ip, created_at desc)`. |
+| `attempts` | `so_lan_sai` | integer | không | 0 | CHECK | Wrong verification attempts against this code. | Sai lần 1-4 -> `OTP_INVALID`; lần 5 -> `OTP_LOCKED`. |
+| `expires_at` | `het_han` | timestamp with time zone | không |  |  | created_at + 5 minutes. | **C (dẫn xuất)**: = lúc ghi + 5 phút (service ghi `now() + interval`). |
+| `consumed_at` | `da_dung` | timestamp with time zone | có |  |  | Set when verified successfully; a consumed code is never accepted again. |  |
+| `locked_until` | `khoa_den` | timestamp with time zone | có |  |  | Set when attempts reach 5: the phone / email cannot request or verify codes until then (15 minutes). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Request time. |  |
+
+## `chat_friendships` (`chat_ban_be`)
+
+Quan hệ bạn bè / lời mời / chặn giữa hai tài khoản chat, CÓ HƯỚNG (user -> friend) - migration 0018. User-owned. Bạn bè = hai chiều đều
+`accepted`; lời mời = một dòng `pending` của người gửi; chặn = dòng `blocked` của người chặn (dòng ngược lại bị xoá trừ khi người kia cũng chặn).
+Bị người khác chặn thì API trả `relation = none` (không lộ).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `user_id` | `nguoi_dung_id` | bigint | không |  | PK, FK CASCADE | Account that owns this side of the relation. | CASCADE: quan hệ không có nghĩa khi thiếu một bên. |
+| `friend_id` | `ban_id` | bigint | không |  | PK, FK CASCADE, CHECK | The other account. | CHECK `user_id <> friend_id`. Index `idx_chat_friendships_friend_id_status` (lời mời gửi tới tôi). |
+| `status` | `trang_thai` | text | không |  | CHECK | pending / accepted / blocked. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Time the relation row was created (friend request time for pending). |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last status change (set by the service). |  |
+
+## `chat_conversations` (`chat_hoi_thoai`)
+
+Hội thoại 1-1 (`direct`) hoặc nhóm (`group`) - migration 0018. User-owned (thuộc các thành viên). Mọi tin của hội thoại được cấp `seq` tăng
+dần từ `last_seq` trong transaction gửi (khoá dòng hội thoại = thứ tự tin).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (conversation_id). |  |
+| `conversation_type` | `loai` | text | không |  | CHECK | direct / group. |  |
+| `name` | `ten` | text | có |  | CHECK | Group name (1..100 characters); null for direct conversations. | CHECK `(conversation_type = 'group') = (name is not null)`. |
+| `last_seq` | `seq_cuoi` | bigint | không | 0 | CHECK | Derived: seq of the newest message (= max(chat_messages.seq) of the conversation, 0 = none). Written only by the send path. | **C (tổng lưu sẵn)**: chỉ đường gửi tin ghi, bằng `UPDATE ... SET last_seq = last_seq + 1 RETURNING`. CHECK không tham chiếu được bảng khác; cách kiểm: `select c.id from chat_conversations c left join chat_messages m on m.conversation_id = c.id group by c.id having c.last_seq <> coalesce(max(m.seq), 0)` phải ra 0 dòng. |
+| `last_message_at` | `tin_cuoi_luc` | timestamp with time zone | có |  |  | Derived: created_at of the newest message; null = no message yet. Orders the conversation list. | **C (dẫn xuất)**: = `created_at` của tin `seq = last_seq` (cùng một `clock_timestamp()` lấy dưới khoá dòng, nên `created_at` tăng theo `seq`). |
+| `created_by` | `nguoi_tao` | bigint | không |  | FK RESTRICT | Account that created the conversation (chat accounts are not deleted in the MVP: restrict). | RESTRICT thay cho SET NULL của quy tắc 7 vì cột NOT NULL và MVP không xoá tài khoản chat. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Bumped on every message, rename and membership change; drives GET /chat/sync. |  |
+
+## `chat_conversation_members` (`chat_thanh_vien`)
+
+Thành viên hội thoại kèm con trỏ đã nhận / đã xem (theo `seq`) - migration 0018. User-owned. Bảng trung gian N-N `chat_users` -
+`chat_conversations` (quy tắc 11: khoá chính trên cặp). Dòng được GIỮ khi rời nhóm / bị xoá (`left_at`) để `/chat/sync` báo được việc rời.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | PK, FK CASCADE | Conversation. |  |
+| `user_id` | `nguoi_dung_id` | bigint | không |  | PK, FK CASCADE | Member account. | Index `idx_chat_conversation_members_user_id` (danh sách hội thoại, `/chat/sync`, tổng chưa đọc). |
+| `member_role` | `vai_tro` | text | không | 'member' | CHECK | owner / admin / member (direct conversations: member). | Trưởng nhóm rời -> quyền chuyển cho phó nhóm vào sớm nhất, không có thì thành viên vào sớm nhất. |
+| `last_read_seq` | `da_xem_seq` | bigint | không | 0 | CHECK | Every message with seq <= this was seen by the member. Never decreases while active. | Chưa đọc = `max(0, last_seq - last_read_seq)`; gửi tin đặt con trỏ của người gửi = `seq`. Người khác thấy null khi chủ con trỏ tắt `show_read_receipts`. |
+| `last_delivered_seq` | `da_nhan_seq` | bigint | không | 0 | CHECK | Every message with seq <= this reached a device of the member. Never decreases; the service keeps it >= last_read_seq. | Không có CHECK `>= last_read_seq`: service giữ bất biến này (đánh dấu đã xem cũng nâng đã nhận). |
+| `muted_until` | `tat_bao_den` | timestamp with time zone | có |  |  | No push for this conversation until then; 'infinity' = muted forever; null or past = not muted. | API trả `"forever"` cho `infinity`. |
+| `left_at` | `roi_nhom_luc` | timestamp with time zone | có |  |  | Null = active member; set when the member left or was removed (re-adding clears it). | Thêm lại: xoá `left_at`, `joined_at = now()`, hai con trỏ = `last_seq` hiện tại (không thấy tin cũ là chưa đọc). |
+| `joined_at` | `ngay_vao` | timestamp with time zone | không | now() |  | Time the member (re)joined; earliest-joined admin / member inherits ownership when the owner leaves. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Bumped when this member's pointers, mute or membership change; drives GET /chat/sync. |  |
+
+## `chat_direct_pairs` (`chat_cap_1_1`)
+
+Mỗi cặp tài khoản có tối đa 1 hội thoại 1-1 - migration 0018. User-owned. Dòng được chèn cùng transaction với hội thoại; khoá chính trên
+(id nhỏ, id lớn) chặn hai lần tạo đồng thời ra hai hội thoại. **C (dẫn xuất)** từ 2 dòng thành viên của hội thoại `direct`, giữ để có ràng buộc duy nhất.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `user_low` | `nguoi_thap` | bigint | không |  | PK, FK CASCADE, CHECK | Smaller account id of the pair. | CHECK `user_low < user_high`. |
+| `user_high` | `nguoi_cao` | bigint | không |  | PK, FK CASCADE | Larger account id of the pair. |  |
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | FK CASCADE, UNIQUE | The direct conversation of the pair. | CASCADE theo hội thoại. |
+
+## `chat_messages` (`chat_tin_nhan`)
+
+Tin nhắn của mọi hội thoại chat - migration 0018. User-owned (thuộc hội thoại). MVP giữ ở PostgreSQL (CHAT.md mục 4 cho phép chuyển sang
+Cassandra sau với cùng khoá); chỉ văn bản và tin hệ thống, không sửa / xoá / thu hồi (giai đoạn 2, roadmap N8.3).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (message_id). |  |
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | FK CASCADE, UNIQUE | Conversation. | CASCADE: tin không có nghĩa khi thiếu hội thoại. |
+| `seq` | `seq` | bigint | không |  | UNIQUE, CHECK | Position in the conversation: 1, 2, 3... without gaps (allocated from chat_conversations.last_seq). | `uq_chat_messages_conversation_id_seq` cũng là index đọc lịch sử (`before_seq` / `after_seq`) và tin cuối. CHECK `seq > 0`. |
+| `client_msg_id` | `client_msg_id` | uuid | có |  | UNIQUE, CHECK | UUID generated by the sending client; resending the same id returns the stored message (idempotent). Null for system messages. | Chống trùng bằng `uq_chat_messages_conversation_id_sender_id_client_msg_id` (thay bảng `message_dedup` của CHAT.md, không có TTL). CHECK: null khi và chỉ khi `message_type = 'system'`. Service đổi về chữ thường. |
+| `sender_id` | `nguoi_gui` | bigint | không |  | FK RESTRICT, UNIQUE | Sender (for system messages: the member who performed the action). | RESTRICT: tin là lịch sử, MVP không xoá tài khoản chat. |
+| `message_type` | `loai` | text | không |  | CHECK | text / system (group created, members added / removed / left, renamed, role changed). |  |
+| `content` | `noi_dung` | text | không |  | CHECK | Message text, 1..4000 characters, not blank. | Tin hệ thống tiếng Việt do service sinh, vd `Lan đã thêm Bình, Châu vào nhóm` (quá 5 tên thì `... và N người khác`). |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Time the message was stored (the "sent" time). | Service ghi `clock_timestamp()` lấy dưới khoá dòng hội thoại (trùng `last_message_at`). |
+
 ## `audit_logs` (`audit_log`)
 
 Nhật ký thao tác (chỉ thêm). 2933 dòng.

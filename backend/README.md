@@ -57,6 +57,29 @@ webhook Lark thật ghi sẵn trong code):
 | `PURCHASE_WEBHOOK` | `http://127.0.0.1:9/x` | tin yêu cầu mua hàng / đề xuất |
 | `REPORT_WEBHOOK` | `http://127.0.0.1:9/x` | tin báo cáo (hàm `baoCaoNhapSP` gọi tay) |
 
+### Biến của chat (module `chat`, chỉ bản Go)
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `CHAT_JWT_SECRET` | trống = `hex(HMAC-SHA256(AUTH_SECRET, "qspro-chat-jwt"))` | khoá ký access token chat (và suy ra khoá băm OTP). Đổi khoá = mọi access token chat hết hiệu lực (refresh token vẫn dùng được) |
+| `CHAT_ACCESS_TTL_MIN` | 15 | hạn access token (phút); trống / sai / ≤ 0 = 15 |
+| `CHAT_REFRESH_TTL_DAYS` | 30 | hạn refresh token (ngày); trống / sai / ≤ 0 = 30 |
+| `CHAT_OTP_DEV` | trống (tắt) | CHỈ giá trị `1` mới bật: API trả luôn mã OTP (`dev_code`), cổng đăng nhập hiện nút "Điền mã". CHỈ dùng khi thử ở máy, không bao giờ bật trên server thật |
+| `CHAT_VAPID_PUBLIC_KEY` / `CHAT_VAPID_PRIVATE_KEY` | trống = tắt push | cặp khoá VAPID của Web Push; sinh bằng `go run ./cmd/vapid` (từ `backend/`, in 2 dòng chép vào `.env`). Khoá riêng là bí mật; đổi khoá thì người dùng phải bật lại thông báo |
+| `CHAT_VAPID_SUBJECT` | trống = tắt push | `https://<tên miền>` hoặc `mailto:<email>` của bên gửi push (sai dạng -> tắt push, ghi log lúc khởi động) |
+| `SMTP_HOST` | trống = tắt email | máy chủ SMTP gửi mã OTP đăng nhập chat bằng email (`platform/mailer`, chỉ thư viện chuẩn) |
+| `SMTP_PORT` | 587 | trống / sai / ≤ 0 = 587. Cổng `465` = TLS ngay; cổng khác = kết nối thường rồi STARTTLS nếu máy chủ hỗ trợ |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | trống = không đăng nhập | tài khoản AUTH PLAIN; có `SMTP_USERNAME` thì bắt buộc kết nối đã TLS (trừ `localhost` / `127.0.0.1`). Mật khẩu là bí mật |
+| `SMTP_FROM` | trống | địa chỉ người gửi, vd `Dezon Chat <no-reply@dezon.vn>`; phải hợp lệ (sai -> tắt email, ghi log lúc khởi động) |
+
+- Thiếu một trong ba biến `CHAT_VAPID_*` thì push tắt (1 dòng log lúc khởi động), chat realtime vẫn chạy.
+- Chưa có nhà cung cấp SMS: mã OTP được GHI VÀO LOG server (`[chat] OTP cho +84...: 123456`, `logSender`). Server thật chưa gửi được OTP cho
+  người dùng cho tới khi nối SMS (roadmap N8.1).
+- Không đặt `SMTP_HOST` (hoặc cấu hình SMTP sai) thì mã OTP email cũng GHI VÀO LOG server (`OTP email cho <email>: 123456`, `logMailer`;
+  1 dòng log lúc khởi động `email chat tắt: chưa đặt SMTP_HOST, mã OTP email ghi vào log`). Đăng nhập bằng email cần migration 0019.
+- `CORS_ORIGINS` (có sẵn) cũng là danh sách origin được mở WebSocket chat (`/api/v1/chat/ws`, bỏ scheme); cùng host với API luôn được.
+- Route, token, mã lỗi, giao thức WebSocket: [docs/API.md](docs/API.md) mục 2.1 "Chat".
+
 ## Chạy song song / thay bản Node
 
 | Điểm | Chi tiết |
@@ -91,6 +114,38 @@ $env:PORT = '3998'; $env:DATABASE_URL = 'postgresql://qspro:<mật khẩu>@local
 $env:REPORT_JOB = '0'; $env:PURCHASE_WEBHOOK = 'http://127.0.0.1:9/x'; $env:REPORT_WEBHOOK = 'http://127.0.0.1:9/x'
 go run ./cmd/api
 ```
+
+## Thử chat ở máy
+
+Dùng database thử RIÊNG `qspro_chattest` (container `qspro-postgres`), KHÔNG dùng `.env` / `backend/.env` (trỏ database thật và Lark thật):
+`DOTENV=0` rồi truyền đủ biến.
+
+1. Tạo database nếu chưa có (từ gốc repo; `schema.sql` đã gồm 0019 và sổ `schema_migrations`):
+   `docker exec qspro-postgres createdb -U qspro qspro_chattest`, `docker cp infra/db/schema.sql qspro-postgres:/tmp/schema.sql`,
+   `docker exec qspro-postgres psql -q -U qspro -d qspro_chattest -f /tmp/schema.sql`. Database đã có từ trước: `go run ./cmd/migrate --url=...`.
+2. Chạy server (PowerShell, từ `backend/`):
+
+   ```
+   $env:DOTENV = '0'; $env:PORT = '3998'
+   $env:DATABASE_URL = 'postgresql://qspro:<mật khẩu>@localhost:5434/qspro_chattest'
+   $env:AUTH_SECRET = 'test-secret'; $env:REPORT_JOB = '0'
+   $env:PURCHASE_WEBHOOK = 'http://127.0.0.1:9/x'; $env:REPORT_WEBHOOK = 'http://127.0.0.1:9/x'
+   $env:CORS_ORIGINS = 'http://localhost:5173,http://127.0.0.1:5173'
+   $env:CHAT_OTP_DEV = '1'
+   go run ./cmd/migrate "--url=$env:DATABASE_URL" --status
+   go run ./cmd/api
+   ```
+
+3. Chạy giao diện (từ `frontend/`): `$env:VITE_API_URL = 'http://localhost:3998'; npm run dev` (biến môi trường thắng
+   `frontend/.env.development`, file đó trỏ cổng 3000). Mở `/chat`.
+4. Nhiều người dùng = mỗi tab một tài khoản, ngay trong cùng một cửa sổ: tab 1 đăng nhập số thứ nhất, mở tab 2 (cùng
+   `http://localhost:5173/chat`), bấm ảnh đại diện cạnh chữ "Chat" (bộ chuyển tài khoản) -> "Thêm tài khoản" rồi đăng nhập số thứ hai
+   (vd `0901234567`, `0912345678`): mã OTP hiện ngay ở cổng đăng nhập (`dev_code`) và trong log server. Mọi tài khoản đã đăng nhập nằm
+   trong bộ chuyển của mọi tab; mỗi tab nhớ tài khoản của mình (tải lại tab vẫn giữ), đổi tài khoản ở tab này không ảnh hưởng tab khác.
+   "Đăng xuất tài khoản này" chỉ đăng xuất tài khoản đang chọn, các tài khoản khác vẫn đăng nhập.
+5. Thử push (tuỳ chọn): đặt thêm 3 biến `CHAT_VAPID_*` (`go run ./cmd/vapid`), bấm bật thông báo trong trang Chat. Người nhận chỉ nhận push khi
+   KHÔNG có kết nối WebSocket (đã rời trang Chat quá 3 giây hoặc đóng tab). Nhiều tài khoản trong một trình duyệt: mỗi tài khoản bật
+   thông báo riêng (cùng một subscription của trình duyệt), thông báo mở đúng tài khoản nhận.
 
 ## Chạy bằng Docker
 
@@ -156,6 +211,12 @@ Hai bộ kiểm tra dùng ở lượt nghiệm thu, theo đúng thứ tự (mỗ
 
 - `-p 1` BẮT BUỘC khi có database: các gói dùng chung `qspro_gotest`, chạy song song thì gói này thấy dòng tạm của gói kia
   (đã gặp ở `estimates`, `notifications`, `purchasing`).
+- `-race` chạy thẳng trên Windows (không qua container) cần gcc 64-bit: gcc mặc định trên PATH của máy phát triển (`C:\MinGW`, 32-bit) báo
+  `cc1.exe: sorry, unimplemented: 64-bit mode not compiled in`. Dùng bản MSYS2 (Git Bash):
+  `PATH=/c/Users/ADMIN/MSYS2/mingw64/bin:$PATH CC=/c/Users/ADMIN/MSYS2/mingw64/bin/gcc.exe CGO_ENABLED=1 go test -race -count=1 ./internal/modules/chat/...`
+  (hoặc chạy trong container `golang:1.25` như trên).
+- Test có database của chat (`internal/modules/chat`) cần database đã chạy migration 0018: đặt `DOTENV=0` và
+  `TEST_DATABASE_URL=postgresql://qspro:<mật khẩu>@localhost:5434/qspro_chattest` (hoặc `qspro_gotest` sau khi migrate tới 0018); test tự dọn dòng thử.
 - `./...` gồm cả `tests/integration/server_test.go`; `./internal/...` thì bỏ sót gói này.
 - `TEST_DATABASE_URL` chỉ được trỏ tới database THỬ: test có ghi và xoá dữ liệu đánh dấu.
 - Mật khẩu database thử: `docker exec qspro-postgres printenv POSTGRES_PASSWORD`.
@@ -195,12 +256,13 @@ mục 12.1); các script sinh cũ đã chuyển khỏi repo (ghi chú đầu m�
 
 ```
 cmd/api, cmd/migrate     điểm khởi chạy server và công cụ migration
+cmd/vapid                in cặp khoá VAPID cho Web Push của chat (CHAT_VAPID_*)
 internal/config          biến môi trường, đọc file .env
 internal/server          gin engine, route, file tĩnh, bảng route REST (rest.go), Swagger, cổng /api/:fn (rpc)
 internal/middleware      auth, tenant, rbac, cors, rate limit, đọc thân JSON
-internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger
+internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger, webpush (Web Push của chat)
 internal/shared          omap, jsval, tenant, actor, response, errors, validator, contracts, qscore, specs, httpx
-internal/modules         nghiệp vụ theo module (14 gói)
+internal/modules         nghiệp vụ theo module (17 gói kể cả system; chat có gói con realtime = gateway WebSocket)
 internal/jobs            job nền (báo cáo nhập sản phẩm)
 scripts                  gen-specs.js: sinh specs/data từ *-spec.js
 tests/fixtures           dữ liệu đối chiếu tầng dữ liệu, registry, swagger (đóng băng) + jsref.js

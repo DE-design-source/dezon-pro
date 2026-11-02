@@ -12,7 +12,9 @@ import (
 var bienCauHinh = []string{"PORT", "DATABASE_URL", "DB_POOL_MAX", "DB_SORT_COLLATION", "AUTH_SECRET", "LARK_DOMAIN",
 	"LARK_APP_ID", "LARK_APP_SECRET", "PURCHASE_WEBHOOK", "REPORT_WEBHOOK", "RENDER_GIT_COMMIT", "SWAGGER_DOCS",
 	"NODE_ENV", "STATIC_DIR", "VENDOR_DIR", "CORS_ORIGINS", "RATE_LIMIT_RPS", "REDIS_URL", "DEBUG", "REPORT_JOB",
-	"TRUSTED_PROXIES", "UPLOAD_DIR"}
+	"TRUSTED_PROXIES", "UPLOAD_DIR", "CHAT_JWT_SECRET", "CHAT_ACCESS_TTL_MIN", "CHAT_REFRESH_TTL_DAYS", "CHAT_OTP_DEV",
+	"CHAT_VAPID_PUBLIC_KEY", "CHAT_VAPID_PRIVATE_KEY", "CHAT_VAPID_SUBJECT", "SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME",
+	"SMTP_PASSWORD", "SMTP_FROM"}
 
 // xoaEnv bỏ mọi biến cấu hình trong lúc test (t.Setenv trước để hết test được trả lại giá trị cũ).
 func xoaEnv(t *testing.T) {
@@ -46,9 +48,67 @@ func TestLoadDefaults(t *testing.T) {
 		VendorDir:       filepath.Join("..", "node_modules"), // STATIC_DIR mặc định rỗng: không phục vụ giao diện cũ
 		ReportJob:       true,
 		UploadDir:       "uploads",
+		// chat: access 15 phút, refresh 30 ngày, không trả mã OTP, không có push
+		ChatAccessTTLMin:   15,
+		ChatRefreshTTLDays: 30,
+		SMTPPort:           587, // email: chưa đặt SMTP_HOST = không gửi email
 	}
 	if !reflect.DeepEqual(c, want) {
 		t.Errorf("mặc định:\n got %+v\nwant %+v", c, want)
+	}
+}
+
+// Biến của chat: hạn token chỉ nhận số dương, CHAT_OTP_DEV chỉ "1" mới bật, khoá VAPID cắt khoảng trắng.
+func TestLoadChat(t *testing.T) {
+	xoaEnv(t)
+	for k, v := range map[string]string{
+		"CHAT_JWT_SECRET": "khoa-chat", "CHAT_ACCESS_TTL_MIN": " 5 ", "CHAT_REFRESH_TTL_DAYS": "0.5", "CHAT_OTP_DEV": "1",
+		"CHAT_VAPID_PUBLIC_KEY": " BPub ", "CHAT_VAPID_PRIVATE_KEY": "priv\n", "CHAT_VAPID_SUBJECT": "mailto:a@dezon.vn",
+	} {
+		t.Setenv(k, v)
+	}
+	c := Load()
+	if c.ChatJWTSecret != "khoa-chat" || c.ChatAccessTTLMin != 5 || c.ChatRefreshTTLDays != 0.5 || !c.ChatOTPDev ||
+		c.ChatVAPIDPublic != "BPub" || c.ChatVAPIDPrivate != "priv" || c.ChatVAPIDSubject != "mailto:a@dezon.vn" {
+		t.Errorf("chat: %+v", c)
+	}
+	for _, v := range []string{"", "abc", "0", "-3", "NaN", "Inf", "1e400"} {
+		t.Setenv("CHAT_ACCESS_TTL_MIN", v)
+		t.Setenv("CHAT_REFRESH_TTL_DAYS", v)
+		if c := Load(); c.ChatAccessTTLMin != 15 || c.ChatRefreshTTLDays != 30 {
+			t.Errorf("hạn token %q: %v / %v, mong 15 / 30", v, c.ChatAccessTTLMin, c.ChatRefreshTTLDays)
+		}
+	}
+	for v, want := range map[string]bool{"1": true, "": false, "0": false, "true": false, "yes": false} {
+		t.Setenv("CHAT_OTP_DEV", v)
+		if got := Load().ChatOTPDev; got != want {
+			t.Errorf("CHAT_OTP_DEV=%q: %v", v, got)
+		}
+	}
+}
+
+// Biến email (SMTP): host / tài khoản / người gửi cắt khoảng trắng, mật khẩu giữ nguyên, SMTP_PORT trống / sai -> 587.
+func TestLoadSMTP(t *testing.T) {
+	xoaEnv(t)
+	for k, v := range map[string]string{
+		"SMTP_HOST": " smtp.gmail.com ", "SMTP_PORT": " 465 ", "SMTP_USERNAME": " otp@dezon.vn\n", "SMTP_PASSWORD": " mk #1 ",
+		"SMTP_FROM": " Dezon Chat <no-reply@dezon.vn> ",
+	} {
+		t.Setenv(k, v)
+	}
+	c := Load()
+	if c.SMTPHost != "smtp.gmail.com" || c.SMTPPort != 465 || c.SMTPUsername != "otp@dezon.vn" || c.SMTPPassword != " mk #1 " ||
+		c.SMTPFrom != "Dezon Chat <no-reply@dezon.vn>" {
+		t.Errorf("smtp: %+v", c)
+	}
+	for v, want := range map[string]int{
+		"": 587, "abc": 587, "0": 587, "-25": 587, "587.5": 587, "1e3": 587, "70000": 587, "0x19": 587,
+		"25": 25, "2525": 2525, " 587 ": 587, "65535": 65535,
+	} {
+		t.Setenv("SMTP_PORT", v)
+		if got := Load().SMTPPort; got != want {
+			t.Errorf("SMTP_PORT=%q: %d, mong %d", v, got, want)
+		}
 	}
 }
 
@@ -114,6 +174,7 @@ func TestLoadValues(t *testing.T) {
 		UploadDir: "/srv/uploads", AppVer: "abc123", SwaggerDocs: "1", NodeEnv: "production", StaticDir: "/srv/public", VendorDir: "/srv/nm",
 		CORSOrigins: []string{"https://a.vn", "https://b.vn"}, RateLimit: 2.5, RedisURL: "redis://r:6379/0", Debug: true,
 		ReportJob: false, TrustedProxies: []string{"10.0.0.0/8", "127.0.0.1"},
+		ChatAccessTTLMin: 15, ChatRefreshTTLDays: 30, SMTPPort: 587,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("đặt đủ:\n got %+v\nwant %+v", got, want)

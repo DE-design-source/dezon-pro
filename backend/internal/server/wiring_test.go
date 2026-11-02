@@ -284,6 +284,16 @@ func restProblems(s *Server) []string {
 			}
 			continue
 		}
+		// SelfAuth (vd chat): module tự xác thực bằng token riêng - middleware QS không được chặn, dù có phiên QS hay không.
+		// Module trả gì cũng được (401 CHAT_NOAUTH, 400, 503...) miễn route có thật và không phải thân chặn của QS.
+		if g.Perm&rpc.SelfAuth != 0 {
+			for _, tok := range []string{"", "u", "a", "s"} {
+				if w := hitCancelled(s, g.Method, url, tok); w.Code == 404 || denyBodies[w.Body.String()] {
+					bad("%s (SelfAuth) token %q: %d %s", key, tok, w.Code, w.Body.String())
+				}
+			}
+			continue
+		}
 		if w.Code != 401 || w.Body.String() != bodyNoAuth {
 			bad("%s chưa đăng nhập: %d %s", key, w.Code, w.Body.String())
 		}
@@ -369,6 +379,38 @@ func (leakyGoModule) RegisterRoutes(v1 *gin.RouterGroup) {
 	v1.POST("/zz-ho", middleware.RequireLogin(), func(c *gin.Context) { response.OK(c, nil) })
 	v1.GET("/zz-qua-chat/:code", middleware.RequireAdmin(), func(c *gin.Context) { response.OK(c, nil) })
 	v1.GET("/zz-khong-khai", middleware.RequireLogin(), func(c *gin.Context) { response.OK(c, nil) })
+}
+
+// selfAuthModule: 1 route SelfAuth tự trả 401 riêng (đúng), 1 route SelfAuth lại gắn RequireLogin của QS (sai).
+type selfAuthModule struct{}
+
+func (selfAuthModule) RegisterRPC(reg *rpc.Registry) {
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "zzRieng", Method: "GET", Path: "/zz-rieng/:id", Perm: rpc.SelfAuth, Tag: "Thử"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "zzRiengSai", Method: "GET", Path: "/zz-rieng-sai", Perm: rpc.SelfAuth})
+}
+
+func (selfAuthModule) RegisterRoutes(v1 *gin.RouterGroup) {
+	v1.GET("/zz-rieng/:id", func(c *gin.Context) { response.Fail(c, 401, "Phiên riêng hết hạn", "ZZ_NOAUTH") })
+	v1.GET("/zz-rieng-sai", middleware.RequireLogin(), func(c *gin.Context) { response.OK(c, nil) })
+}
+
+// Route SelfAuth: không bị middleware QS chặn; gắn nhầm RequireLogin thì restProblems bắt được; tài liệu ghi 401 riêng.
+func TestSelfAuthGoRoutes(t *testing.T) {
+	s := newWiredServer(t, nil)
+	mountModule(s, selfAuthModule{})
+	probs := strings.Join(restProblems(s), "\n")
+	if !strings.Contains(probs, `GET /api/v1/zz-rieng-sai (SelfAuth) token "": 401`) {
+		t.Errorf("restProblems không bắt được route SelfAuth gắn RequireLogin:\n%s", probs)
+	}
+	if strings.Contains(probs, "/zz-rieng/") {
+		t.Errorf("route SelfAuth đúng mà bị báo:\n%s", probs)
+	}
+	op, _ := omap.MarshalString(jsval.AsMap(jsval.AsMap(jsval.AsMap(BuildSpec(s.deps.Reg).Val("paths")).Val("/api/v1/zz-rieng/{id}")).Val("get")))
+	for _, want := range []string{`Phiên chat riêng`, `CHAT_NOAUTH`, `"security":[{"bearerAuth":[]}]`} {
+		if !strings.Contains(op, want) {
+			t.Errorf("tài liệu route SelfAuth thiếu %s:\n%s", want, op)
+		}
+	}
 }
 
 // Cơ chế route chỉ bản Go: module giả qua được TestRestRoutes, có trong /api-docs.json, chặn quyền đúng Perm;

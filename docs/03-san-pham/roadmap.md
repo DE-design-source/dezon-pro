@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-10-28 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-02 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -57,6 +57,7 @@
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 | [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
+| [N8](#xong-n8) | Chat realtime MVP: đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push | 🟡 | [N8](#n8): thấy thông báo push trên Chrome thường, người dùng thử, triển khai production; [N8.1](#n8-1) SMS thật, [N8.2](#n8-2) FCM / APNs, [N8.3](#n8-3) giai đoạn 2-3, [N8.4](#n8-4) đăng nhập / kết bạn bằng email |
 
 ---
 
@@ -73,18 +74,22 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
+| <a id="n8"></a>N8 | Chat realtime MVP (đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push): đã code ở máy phát triển 2026-10-30 - migration 0018 (9 bảng `chat_*`, tài khoản chat riêng, không theo công ty), module Go `chat` (REST `/api/v1/chat/...` + WebSocket `/api/v1/chat/ws`, quyền `rpc.SelfAuth`), Web Push VAPID (`platform/webpush`), trang Chat React nối máy chủ thật (giữ Dezbot / SiteFlow Bot); đã thử ở máy phát triển (xem [mục 5](#xong-n8)). Còn lại: thấy thông báo push hiện lên trên Chrome thường (headless chỉ kiểm được tới FCM nhận gói, 201), người dùng thử, triển khai production (migration 0018, `CHAT_*`, WebSocket qua Caddy, `/chat-sw.js`). Tài liệu: `backend/docs/API.md` mục 2.1 "Chat", `docs/02-ky-thuat/database/decisions.md` D-15 | Toàn hệ thống | 🟡 |
+| <a id="n8-4"></a>N8.4 | Chat ([N8](#n8)): đăng nhập / thêm tài khoản bằng email (mã OTP 6 số gửi qua email, SMTP `SMTP_*`; chưa cấu hình thì mã ghi vào log) bên cạnh số điện thoại; tìm người dùng và gửi lời mời kết bạn bằng email. Tài khoản email là tài khoản riêng (chưa liên kết với tài khoản số điện thoại). Đã code + test API ở máy phát triển 2026-11-02 (xem [mục 5](#xong-n8)); còn thử giao diện trên trình duyệt, cấu hình SMTP thật (mailer mới có AUTH PLAIN), chạy migration 0019 ở database dev / production | Toàn hệ thống | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; sơ đồ tổ chức, bảng mua hàng PO, nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot vẫn là dữ liệu mẫu | User | 🟡 |
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
-| - | Chưa có | - | - |
+| <a id="n8-1"></a>N8.1 | Chat ([N8](#n8)): nhà cung cấp SMS thật cho mã OTP (cài interface `chat.SMSSender`; hiện `logSender` chỉ ghi mã vào log server nên server thật chưa đăng nhập chat được nếu không xem log) | Toàn hệ thống | ⬜ |
+| <a id="n8-2"></a>N8.2 | Chat ([N8](#n8)): push FCM / APNs cho app mobile (cột `chat_devices.push_kind` đã nhận `fcm` / `apns`, API hiện chỉ nhận `webpush`) | Toàn hệ thống | ⬜ |
 
 ### 2.4 Subsystem lớn 🏗
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
+| <a id="n8-3"></a>N8.3 | Chat giai đoạn 2-3 ([N8](#n8), `backend/CHAT.md` mục 1 và 16): ảnh / file, trả lời / thu hồi, reaction, tìm kiếm, đa thiết bị (đăng nhập web bằng QR), gọi thoại / video, mã hoá đầu cuối (E2E) | Toàn hệ thống | ⬜ |
 | <a id="n1"></a>N1 | Refactor database sang PostgreSQL trực tiếp (`DATABASE_URL`; bản Node dùng `pg`, bản Go dùng `pgx`): đã triển khai trên database local `qspro_en2`; mọi tab QS đã chạy thử tự động trên trình duyệt (React + Go, database thử `qspro_gotest`, xem [N3](#xong-n3)); 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (xem [N2](#n2)); còn người dùng thử tay trên dữ liệu thật, xoá 8 cột `DEPRECATED` (D-09; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date` / `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15 vì M15.2 / M10.2 / M17.3 dùng lại; migration 0010 / 0012 / 0013 đổi chú thích cột) - xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md` mục 8 | Toàn hệ thống | 🟡 |
 | <a id="n2"></a>N2 | Chuyển server Node + Express sang Go + Gin (`backend/`, đã commit ở `5fa5d52` / `033c421`; app Node và `render.yaml` đã gỡ khỏi repo): đã chuyển mã; cấu hình deploy VPS đã có (`infra/deploy/`: Docker Compose + Caddy HTTPS phục vụ React và chuyển tiếp route Go cùng tên miền, PostgreSQL 17, script sao lưu / khôi phục / tạo super; hướng dẫn `docs/04-van-hanh/trien-khai-vps-cloudfly.md`), đã chạy thử trọn bộ trên máy 2026-10-22; 2026-10-24 đã chạy trên VPS CloudFly bằng IP (`http://222.255.184.134/qs`, mã chép thẳng từ máy phát triển, chưa qua GitHub) và nạp dữ liệu `qspro_en2` + 1430 file, mở cổng 80/443 ở Cloud Firewall của CloudFly, vào được từ Internet; tối 2026-10-24 chuyển sang `https://dezon.tech` (chứng chỉ Let's Encrypt, `www` và `http` chuyển về); còn bật Lark (`REPORT_JOB` và webhook đang tắt / giả), so vi sai job báo cáo và các nhánh chỉ chạy khi database thiếu cột - xem `backend/docs/ARCHITECTURE.md` mục "Việc còn mở" | Toàn hệ thống | 🟡 |
 
@@ -102,7 +107,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N8`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N9`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -520,5 +525,18 @@
 - Bảng `product_hvac_specs` + view `product_catalog` 179 cột (migration 0017); file mẫu `GET /api/v1/product-templates/dien-lanh`
 - Giao diện: ngành "Điện lạnh · sản phẩm" ở Nhập dữ liệu (form 4 khối, nút tải file mẫu), bộ lọc Bóc tách 3.2.7, bộ cột Danh sách SP, panel thông tin SP, modal Mua hàng
 - Thử trên máy phát triển 2026-10-28: lưu SP qua API (hạng mục "Điện lạnh" + tên "Ống đồng dẫn gas" tự thành hạng mục Ống đồng dẫn gas), đề mục 3.2.7 hiện SP, panel chi tiết, form nhập
+- 🟡 phần còn lại ở 2.2
+
+<a id="xong-n8"></a>
+#### N8 - Chat realtime MVP (theo `backend/CHAT.md` giai đoạn MVP)
+
+- Migration 0018: 9 bảng `chat_*` (tài khoản chat riêng theo số điện thoại, không theo công ty); module Go `chat` (REST `/api/v1/chat/...`, quyền `rpc.SelfAuth`), gateway WebSocket `chat/realtime` (1 gateway trong bộ nhớ), Web Push VAPID `platform/webpush` + `go run ./cmd/vapid`
+- Đăng ký / đăng nhập số điện thoại + OTP (giới hạn gửi theo số và IP, sai 5 lần khoá 15 phút; chưa có SMS thật - mã ghi vào log), access token 15 phút + refresh token xoay vòng, phát hiện dùng lại
+- Danh bạ: tìm theo số, đồng bộ danh bạ (số hoặc hash SHA-256), lời mời kết bạn, chặn; chat 1-1 và nhóm (vai trò, thêm / xoá / rời, đổi tên, tin hệ thống), tắt thông báo
+- Đã gửi / đã nhận / đã xem (con trỏ seq, tuỳ chọn ẩn "đã xem"), online / truy cập lần cuối, đang soạn tin, đồng bộ sau khi mất mạng + outbox, push khi người nhận offline
+- Trang Chat React nối máy chủ thật (giữ Dezbot, SiteFlow Bot), huy hiệu sidebar = tổng chưa đọc thật
+- Thử trên máy phát triển 2026-10-30 (database `qspro_chattest`): test Go gói chat / realtime / webpush / server đạt cả `-race`; E2E `backend/tests/chat-e2e/chat-e2e.js` 299/299 với server Go thật; 3 người dùng trên trình duyệt (Playwright) qua các luồng chính; review 4 mảng, 32 lỗi đã xác nhận đều đã sửa
+- Nhiều tài khoản trong một trình duyệt (mỗi tab một tài khoản): kho `chat_accounts` + tài khoản của tab (sessionStorage), bộ chọn tài khoản (thêm / đổi / đăng xuất từng tài khoản), làm mới token theo từng tài khoản, tự chuyển phiên kiểu cũ vào kho, push dùng chung một subscription (gói có `user_id`, bấm thông báo thì tab đổi đúng tài khoản); thử trên máy phát triển 2026-10-30 (3 tab cùng cửa sổ, Playwright + push thật qua FCM)
+- Đăng nhập / thêm tài khoản bằng email + OTP qua email, tìm và kết bạn bằng email ([N8.4](#n8-4)): migration 0019 (`chat_users.email`, `chat_otp_codes.email`, `phone` thành nullable), gửi thư SMTP `platform/mailer` (`SMTP_*`, chưa đặt thì mã ghi vào log), cùng giới hạn OTP với số; email chỉ hiện với chính mình, bạn bè và người tra đúng email; thử trên máy phát triển 2026-11-02 (database `qspro_chattest`): test Go đạt, smoke API email 20/20, `chat-e2e.js` 286/286, chuẩn hoá email Go / JS khớp 1094/1094 ca - 🟡 phần còn lại ở 2.2
 - 🟡 phần còn lại ở 2.2
 

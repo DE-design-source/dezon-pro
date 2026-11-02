@@ -34,6 +34,10 @@ cong_tac_history, du_an_data, cai_dat_cong_ty`
 - Người không phải super mà không có công ty: lỗi `Tài khoản chưa gắn với công ty nào`.
 - `NoScope: true`: bỏ lọc cho lệnh gọi đó.
 - INSERT tự gắn `cong_ty_id` cho dòng chưa có; bảng con thì kiểm tra dòng cha thuộc công ty (sai -> lỗi 409 / 23503, không chèn dòng nào).
+- 9 bảng `chat_*` (migration 0018, Chat MVP) KHÔNG thuộc công ty và không nằm trong `TenantTables`: tài khoản chat theo số điện thoại HOẶC
+  email (0019: `chat_users.email` unique chữ thường, `phone` thôi NOT NULL; `chat_otp_codes` ghi `phone` hoặc `email`, đúng một trong hai), dùng
+  chung mọi công ty. Module chat không đi qua tầng này mà viết SQL thô qua `DB.Pool()` (ngoại lệ duy nhất, lý do ở `ARCHITECTURE.md` mục 10.4);
+  9 mục `chat_*` trong `db-map.json` chỉ để danh mục tên, không khai `tenant`.
 
 ## Chuỗi lọc kiểu PostgREST
 
@@ -83,6 +87,11 @@ Không truyền `--url=` (hoặc truyền rỗng) thì công cụ đọc `.env` 
 
 Thông báo lỗi thiếu cột giữ nguyên câu của bản Node: `Hãy chạy "npm run migrate" rồi khởi động lại server.`
 Khi chỉ triển khai bản Go, lệnh tương ứng là `go run ./cmd/migrate` (hoặc `/app/qspro-migrate`).
+
+Migration mới nhất: `0019_chat_email.sql` (chat đăng nhập / tìm bạn bằng email: cột `email` của `chat_users` / `chat_otp_codes`), trước đó
+`0018_chat.sql` (9 bảng `chat_*`). Database chưa chạy 0018 thì lúc nạp danh mục server ghi log
+`Database thiếu bảng của: chat_... — có vẻ CHƯA chạy migration` (QS vẫn chạy, route chat lỗi 500); chưa chạy 0019 thì đăng nhập / tra bằng email
+lỗi 500 (cột `email` chưa có). `qspro_gotest` phải migrate tới 0019 trước lượt `go test ./...` đầy đủ.
 
 Thêm thay đổi cấu trúc: viết file mới `infra/db/migrations/NNNN_ten.sql` (không sửa file đã chạy; dùng chung cho cả hai bản), và nếu thêm cột vào
 `products` / `product_*_specs` thì tạo lại view `product_catalog` trong cùng migration.
