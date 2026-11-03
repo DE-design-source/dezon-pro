@@ -1,4 +1,4 @@
-/* Phiên đăng nhập dùng chung cho các trang nghiệp vụ ngoài QS (Kinh doanh, Quản lý thiết kế, Quản lý dự án).
+/* Phiên đăng nhập dùng chung cho các trang nghiệp vụ ngoài QS (Kinh doanh, Quản lý thiết kế, Quản lý dự án, HR).
    Cùng token với trang QS (localStorage qs_token, http.js) nên đăng nhập ở đâu cũng dùng được ở đây,
    nhưng KHÔNG nạp bootstrap 4 MB của QS. useWorkSession() -> {auth, me, congTy, error, canTab(tab), login, logout, retry}.
    auth: 'unconfigured' | 'checking' | 'login' | 'unreachable' | 'ready'. */

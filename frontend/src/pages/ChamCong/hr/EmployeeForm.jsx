@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, LEVELS, CONTRACT_TYPES, WORK_SITES, STATUS, EMPTY_EMPLOYEE } from '../../../data/hrData'
+import { DEPTS, LEVELS, CONTRACT_TYPES, siteOptions, STATUS, EMPTY_EMPLOYEE } from '../../../data/hrData'
 import { Modal, Field, Seg } from './shared'
 
 const TABS = [
@@ -41,7 +41,11 @@ export default function EmployeeForm({ open, employee, employees, onClose, onSav
     if (!open) return
     setTab('personal')
     setErrors({})
-    setF(employee ? JSON.parse(JSON.stringify(employee)) : { ...EMPTY_EMPLOYEE, code: 'NV' + String(Math.max(...employees.map(e => Number(e.code.slice(2)) || 0)) + 1).padStart(3, '0') })
+    setF(employee ? JSON.parse(JSON.stringify(employee)) : {
+      ...EMPTY_EMPLOYEE, code: 'NV' + String(Math.max(0, ...employees.map(e => Number(String(e.code).slice(2)) || 0)) + 1).padStart(3, '0'),
+      dept: DEPTS.some(d => d.key === EMPTY_EMPLOYEE.dept) ? EMPTY_EMPLOYEE.dept : DEPTS[0]?.key || '',
+      joinDate: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }),
+    })
   }, [open, employee, employees])
 
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
@@ -99,7 +103,7 @@ export default function EmployeeForm({ open, employee, employees, onClose, onSav
             </select>
           </Field>
           <Field label="Trạng thái"><select value={f.status} onChange={e => set('status', e.target.value)}>{Object.entries(STATUS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}</select></Field>
-          <Field label="Nơi làm việc"><select value={f.site} onChange={e => set('site', e.target.value)}>{WORK_SITES.map(s => <option key={s}>{s}</option>)}</select></Field>
+          <Field label="Nơi làm việc"><select value={f.site} onChange={e => set('site', e.target.value)}><option value="">— Chọn địa điểm —</option>{siteOptions(f.site).map(s => <option key={s}>{s}</option>)}</select></Field>
           <Field label="Ngày vào làm">{inp('joinDate', { type: 'date' })}</Field>
           <Field label="Loại hợp đồng hiện tại"><select value={f.contractType} onChange={e => set('contractType', e.target.value)}>{CONTRACT_TYPES.map(c => <option key={c}>{c}</option>)}</select></Field>
           <Field label="Lương cơ bản (đ/tháng)">

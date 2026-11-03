@@ -235,6 +235,379 @@ Bình luận công việc - migration 0016. **Bảng con** (tenant qua `project_
 | `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote it; set null if deleted. |  |
 | `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
 
+## `hr_org_units` (`hr_don_vi`)
+
+Nút sơ đồ tổ chức của trang HR (`/cham-cong`) - migration 0020 (2026-10-30), module `backend/internal/modules/hr`. **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`). Khoá ngoại ghép `(company_id, ...)` giữ cấp trên, trưởng đơn vị trong cùng công ty. Self-reference dùng `NO ACTION` (kiểm cuối câu lệnh) để xoá công ty xoá được cả cây trong một câu.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `unit_key` | `ma` | text | không |  | CHECK, UNIQUE (company_id, unit_key) | Stable key chosen when the unit is created (frontend uses it as the unit id); never changed afterwards. | Khoá ổn định do giao diện đặt (regex `^[a-z0-9][a-z0-9_]{0,59}$`, `__holding` / `__mother` là khoá giả của giao diện nên không lưu); service không cho đổi. |
+| `label` | `nhan` | text | không |  | CHECK | Short label drawn on the chart. |  |
+| `unit_name` | `ten` | text | không | '' |  | Full name used in profiles and filters; empty = same as label. |  |
+| `unit_kind` | `loai` | text | không |  | CHECK | governance / board / exec / dept / subsidiary. |  |
+| `parent_key` | `cap_tren` | text | có |  | FK (company_id, parent_key) NO ACTION, CHECK | Parent unit (same company); null = top level, see group_link. | Giao diện nhận `parent` = `parent_key`, hoặc `__holding` / `__mother` khi `group_link` có giá trị, hoặc null. Service chặn vòng (đơn vị nằm dưới chính nó). |
+| `group_link` | `lien_ket` | text | có |  | CHECK | Only when parent_key is null: holding (member of the holding group) / mother (directly under the parent company); null = root or standalone. |  |
+| `head_employee_id` | `truong_don_vi` | bigint | có |  | FK (head_employee_id, company_id) SET NULL (head_employee_id) | Head of the unit (same company); set null when the employee is deleted. |  |
+| `tone` | `mau` | text | không | 'primary' |  | Colour tone of the node (frontend palette key, open list). | Danh sách mở (bảng màu giao diện), không CHECK. |
+| `description` | `mo_ta` | text | không | '' |  | What the unit does. |  |
+| `is_appointed_from_parent` | `bo_nhiem_tu_me` | boolean | không | false |  | Board of a subsidiary whose members are appointed from the parent company. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_employees` (`hr_nhan_vien`)
+
+Hồ sơ nhân sự của trang HR - migration 0020. **Tenant-owned, bảng gốc.** Không gắn với tài khoản đăng nhập (`users`). Phòng ban / quản lý / trưởng đơn vị đều qua khoá ngoại ghép `(…, company_id)` nên database từ chối liên kết sang công ty khác.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `employee_code` | `ma_nv` | text | không |  | CHECK, UNIQUE (company_id, employee_code) | Employee code (NV001...), unique within the company. |  |
+| `full_name` | `ho_ten` | text | không |  | CHECK | Full name. |  |
+| `gender` | `gioi_tinh` | text | không | '' |  | Nam / Nữ / ... (free text). |  |
+| `birth_date` | `ngay_sinh` | date | có |  |  | Date of birth; null = not entered. |  |
+| `dept_key` | `phong_ban` | text | không |  | FK (company_id, dept_key) NO ACTION | Main unit (hr_org_units.unit_key of the same company). |  |
+| `job_title` | `chuc_danh` | text | không | '' |  | Position title. |  |
+| `job_level` | `cap_bac` | text | không | 'Nhân viên' |  | Level (frontend LEVELS: Nhân viên ... Giám đốc). Open list, no CHECK. | Danh sách mở (LEVELS trong hrData.js), không CHECK. |
+| `employment_status` | `trang_thai` | text | không | 'probation' | CHECK | probation / active / left. |  |
+| `join_date` | `ngay_vao` | date | không |  |  | First working day. |  |
+| `leave_date` | `ngay_nghi` | date | có |  |  | Last day when status = left; null otherwise. |  |
+| `manager_id` | `quan_ly_id` | bigint | có |  | FK (manager_id, company_id) SET NULL (manager_id), CHECK | Direct manager (same company); set null when the manager is deleted. Reports move to the manager's manager on delete / offboarding (service). | Service chặn vòng quản lý; nghỉ việc / xoá -> cấp dưới chuyển cho quản lý cấp trên (cùng transaction). |
+| `work_site` | `noi_lam_viec` | text | không | '' |  | Work location (open list). |  |
+| `contract_type` | `loai_hd` | text | không | '' |  | Current contract type (Thử việc, Xác định thời hạn, ...). Open list. |  |
+| `salary_vnd` | `luong` | numeric(18,0) | không | 0 | CHECK | Current gross base salary, VND. |  |
+| `phone` | `sdt` | text | không | '' |  | Phone, free text. |  |
+| `email` | `email` | text | không | '' |  | Work email, free text. |  |
+| `details` | `chi_tiet` | jsonb | không | '{}' | CHECK | Document read/written whole with the profile form: every other profile key of the frontend employee object (hometown, address, cccd, bank, education[], experience[], contracts[], certificates[], tax{}, insurance{}, promotions[], attachments[], profile{} ...). See data-dictionary.md. | jsonb tài liệu nguyên khối (quy tắc 19), đọc/ghi cùng form hồ sơ, không truy vấn theo phần tử: mọi khoá còn lại của object nhân sự giao diện - `hometown, address, marital, cccd, cccdDate, cccdPlace, emergencyName, emergencyPhone, bankName, bankAccount` (chuỗi), `education[] {school, major, degree, from, to}`, `experience[] {company, role, from, to}`, `contracts[] {no, type, start, end, salary, status}`, `certificates[] {name, issuer, date, expiry}`, `tax {mst, dependents, taxOffice}`, `insurance {bhxhNo, hospital, base, since}`, `promotions[] {date, note}`, `attachments[] {name, url?, type?}`, `profile {...}` (trang Nhận việc). Sửa 1 phần gộp theo khoá cấp 1; tối đa 100 khoá, 512 KB. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+| `user_id` | `tai_khoan_id` | uuid | có |  | FK SET NULL, UNIQUE khi có | Login account of this employee (same company, checked by the service); null = not linked. | Migration 0024. |
+| `hr_role` | `vai_tro_hr` | text | không | 'employee' | CHECK | HR role of the linked account. | Migration 0024; admin công ty luôn là sysadmin. |
+
+## `hr_unit_members` (`hr_kiem_nhiem`)
+
+Kiêm nhiệm (HĐQT, ban, đơn vị khác ngoài phòng ban chính) - migration 0020. **Bảng con** của `hr_org_units` (không có `company_id`; db-map `tenant` qua `unit_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `unit_id` | `don_vi_id` | bigint | không |  | FK CASCADE, UNIQUE (unit_id, employee_id) | Unit the employee sits in concurrently; rows are deleted with it. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE | Employee (same company as the unit, checked by the service); rows are deleted with it. | Cùng công ty với đơn vị: service kiểm (đọc nhân sự có phạm vi công ty); database không ép được vì bảng con không mang `company_id` (quy tắc 8). |
+| `role_title` | `chuc_vu` | text | không | '' |  | Title in that unit (Thành viên, Chủ tịch HĐQT, ...). |  |
+| `time_pct` | `ty_le_pct` | numeric(5,2) | không | 0 | CHECK | Share of working time given to this unit, 0-90; the main department keeps at least 10% (sum checked by the service). | Tổng theo nhân sự <= 90 do service kiểm sau mỗi lệnh `/hr/org` (phòng ban chính giữ >= 10%). |
+| `allowance_vnd` | `phu_cap` | numeric(18,0) | không | 0 | CHECK | Monthly concurrent-role allowance, VND. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `hr_shifts` (`hr_ca`)
+
+Ca làm việc của trang HR - migration 0021 (2026-10-31), module `backend/internal/modules/hr` (`attendance.go`). **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `shift_code` | `ma` | text | không |  | CHECK, UNIQUE (company_id, shift_code) | Short code shown in the schedule grid (HC, CT...), unique within the company; may be renamed (patterns follow by id). |  |
+| `shift_name` | `ten` | text | không |  | CHECK | Shift name. |  |
+| `start_time` | `gio_vao` | time without time zone | không |  |  | Start time; check-in later than start + 5 minutes counts as late. |  |
+| `end_time` | `gio_ra` | time without time zone | không |  |  | End time; earlier than start_time = overnight shift. |  |
+| `break_minutes` | `nghi_phut` | integer | không | 0 | CHECK | Unpaid break inside the shift, minutes. |  |
+| `tone` | `mau` | text | không | 'primary' |  | Colour tone (frontend palette key, open list). |  |
+| `note` | `ghi_chu` | text | không | '' |  | Free note. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_work_patterns` (`hr_lich_tuan`)
+
+Lịch làm việc tuần lặp lại - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE, UNIQUE (employee_id, weekday) | Employee; rows are deleted with it. |  |
+| `weekday` | `thu` | smallint | không |  | CHECK | 1 = Monday ... 7 = Sunday (ISO). | Lịch lặp lại hằng tuần; chưa có lịch riêng từng ngày. Nhân sự chưa có dòng nào: Tổng hợp công coi như làm T2–T6. |
+| `shift_id` | `ca_id` | bigint | không |  | FK CASCADE | Shift worked that day (same company, checked by the service); rows are deleted with the shift. | Cùng công ty với nhân sự: service kiểm (bảng con không mang `company_id`, quy tắc 8). |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `hr_attendance_logs` (`hr_cham_cong`)
+
+Chấm công 1 người / 1 ngày - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE, UNIQUE (employee_id, work_date) | Employee; rows are deleted with it. |  |
+| `work_date` | `ngay` | date | không |  |  | Working day. |  |
+| `check_in` | `gio_vao` | time without time zone | có |  | CHECK (check_out cần check_in) | Check-in time (local time, Asia/Ho_Chi_Minh); null = not checked in. |  |
+| `check_out` | `gio_ra` | time without time zone | có |  |  | Check-out time; null = not checked out yet. |  |
+| `log_source` | `nguon` | text | không |  | CHECK | machine / gps / import / manual (HR correction) - source of the last change. | Máy chấm công chưa tích hợp: giao diện ghi `gps`, `import` (CSV), `manual`. |
+| `gps_zone` | `gps` | text | có |  | CHECK | GPS check only: in / out of the work site radius; null for other sources. |  |
+| `gps_distance_m` | `khoang_cach` | integer | có |  | CHECK | GPS check only: distance to the work site, metres. |  |
+| `note` | `ghi_chu` | text | không | '' |  | Free note (e.g. reason of an HR correction). |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote the row last; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_requests` (`hr_don_tu`)
+
+Đơn nghỉ / đi muộn - về sớm / OT kèm luồng duyệt - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE | Employee who asks; rows are deleted with it. |  |
+| `request_kind` | `loai` | text | không |  | CHECK | leave / late / ot. |  |
+| `leave_kind` | `loai_nghi` | text | có |  | CHECK | Only for leave: annual (deducts annual leave) / sick / other (paid) / unpaid. |  |
+| `title` | `tieu_de` | text | không |  | CHECK | One-line summary built by the service (type + dates). | **C (dẫn xuất)** từ loại đơn + ngày; service dựng khi tạo, không sửa sau. |
+| `from_date` | `tu_ngay` | date | không |  |  | First day concerned. |  |
+| `to_date` | `den_ngay` | date | không |  | CHECK >= from_date | Last day concerned (= from_date for late / ot). |  |
+| `days` | `so_ngay` | numeric(5,1) | có |  | CHECK | Leave only: days asked (0.5 steps); null otherwise. |  |
+| `hours` | `so_gio` | numeric(5,1) | có |  | CHECK | OT only: overtime hours; null otherwise. |  |
+| `reason` | `ly_do` | text | không | '' |  | Reason written by the requester. |  |
+| `approval_steps` | `cac_buoc` | jsonb | không | '[]' | CHECK | Document read/written whole by the service: [{"name","role","state": done/active/waiting/rejected,"time","note"}] in approval order. Request status is derived from it (any rejected = rejected, all done = approved, else pending). | jsonb tài liệu nguyên khối (quy tắc 19): `[{"name","role","state","time","by","note"}]`; `state` = done / active / waiting / rejected, `by` = tài khoản đã duyệt. Bước: quản lý trực tiếp (nếu có, chưa nghỉ việc) rồi Nhân sự (tên trưởng đơn vị `hcns` nếu có). Trạng thái đơn tính từ mảng này, không lưu cột riêng. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who entered the request; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_payroll_settings` (`hr_cau_hinh_luong`)
+
+Cấu hình công thức lương - migration 0022 (2026-11-03), module `backend/internal/modules/hr` (`payroll.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE, UNIQUE | Owning company; set from the login session, never from the client. |  |
+| `config` | `cau_hinh` | jsonb | không |  | CHECK | Document read/written whole: allowances, OT rate, commission rate, insurance cap and rates, tax deductions and brackets (frontend DEFAULT_PAYROLL_CONFIG). See data-dictionary.md. | jsonb tài liệu nguyên khối (quy tắc 19): `{lunch, phoneByLevel {cấp bậc: số tiền}, siteAllowance, otRate, commissionRate, insCap, emp {bhxh, bhyt, bhtn}, com {bhxh, bhyt, bhtn}, personalDeduction, dependentDeduction, brackets [{upTo, rate}]}` (DEFAULT_PAYROLL_CONFIG trong `frontend/src/data/hrData2.js`); giao diện gộp lên mặc định. Không để trong `company_settings` vì bảng đó trang QS đọc / ghi chung. |
+| `updated_by` | `nguoi_sua` | uuid | có |  | FK SET NULL | User who saved last; set null if the user is deleted. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_pay_adjustments` (`hr_dieu_chinh_luong`)
+
+Thưởng / phạt / doanh số theo tháng - migration 0022. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE | Employee; rows are deleted with it. |  |
+| `pay_month` | `thang` | date | không |  | CHECK (ngày 1) | Pay month, always the first day of the month. | Bị khoá (service từ chối thêm / xoá) khi kỳ lương của tháng không còn `draft`. |
+| `adjustment_kind` | `loai` | text | không |  | CHECK | bonus (added) / penalty (deducted) / sales (sales amount, commission = amount x commission rate). |  |
+| `label` | `noi_dung` | text | không |  | CHECK | What it is for. |  |
+| `amount_vnd` | `so_tien` | numeric(18,0) | không |  | CHECK | Amount, VND, always positive (the kind gives the sign). |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who entered it; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `hr_payroll_runs` (`hr_ky_luong`)
+
+Kỳ lương theo tháng (chốt công, duyệt, chi trả) - migration 0022. **Tenant-owned, bảng gốc**; chưa có dòng = nháp, chưa chốt công.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE, UNIQUE (company_id, pay_month) | Owning company; set from the login session, never from the client. |  |
+| `pay_month` | `thang` | date | không |  | CHECK (ngày 1) | Pay month, always the first day of the month. |  |
+| `run_status` | `trang_thai` | text | không | 'draft' | CHECK | draft / approved / paid. Adjustments of the month are locked unless draft. |  |
+| `is_attendance_closed` | `chot_cong` | boolean | không | false |  | Attendance of the month is closed: attendance records of that month can no longer be written. | `true` -> service từ chối ghi `hr_attendance_logs` của tháng đó. Duyệt bảng lương tự chốt công. |
+| `payslips` | `phieu_luong` | jsonb | có |  | CHECK | Snapshot taken at approval, read/written whole: {"<employee id>": {"emp": {...}, "att": {...}, "p": {...}}} - attendance summary and pay breakdown computed by the frontend (calcPay). Null while draft. | **B (snapshot)** lúc duyệt, do giao diện tính (`calcPay`): `{"<empId>": {"emp": {id, code, name, dept, position}, "att": {std, worked, paidLeave, unpaid, late, early, ot, total, ...}, "adj": [...], "p": {base, basePay, gross, ins, tax, net, ...}}}`; null khi nháp, xoá khi mở lại. Không đồng bộ lại tự động. |
+| `approved_at` | `ngay_duyet` | timestamp with time zone | có |  |  | Approval time; kept when paid, cleared on reopen. |  |
+| `approved_by` | `nguoi_duyet` | uuid | có |  | FK SET NULL | User who approved; set null if the user is deleted. |  |
+| `paid_at` | `ngay_chi` | timestamp with time zone | có |  | CHECK | Time it was marked paid (no email / bank transfer is sent by the system). | Chỉ ghi nhận; hệ thống chưa gửi email phiếu lương hay chuyển khoản. |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_unit_budgets` (`hr_dinh_phi`)
+
+Định phí theo đơn vị (quỹ lương kế hoạch + khoản cố định khác) - migration 0022. **Bảng con** của `hr_org_units` (db-map `tenant` qua `unit_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `unit_id` | `don_vi_id` | bigint | không |  | FK CASCADE, UNIQUE | Org unit; the row is deleted with it. |  |
+| `monthly_fund_vnd` | `quy_luong` | numeric(18,0) | không | 0 | CHECK | Planned payroll fund per month (salary, allowances, employer insurance), VND. |  |
+| `cost_items` | `khoan_khac` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "amount": number}] - other fixed monthly costs, shown and summed only. | jsonb tài liệu nguyên khối: `[{"name": text, "amount": number}]`, chỉ hiển thị và cộng tổng. |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_job_descriptions` (`hr_jd`)
+
+Thư viện JD - migration 0023 (2026-11-03), module `backend/internal/modules/hr` (`talent.go`). **Tenant-owned, bảng gốc.**
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `jd_code` | `ma` | text | không | '' |  | Short code (JD-TC-01...), free text. |  |
+| `title` | `ten` | text | không |  | CHECK | Position title. |  |
+| `dept_key` | `phong_ban` | text | không | '' |  | Soft reference to hr_org_units.unit_key of the same company (kept when the unit is removed); empty = none. | Tham chiếu mềm (quy tắc 9): JD cũ giữ được khi đơn vị bị xoá. |
+| `job_level` | `cap_bac` | text | không | '' |  | Level (frontend JD_LEVELS). Open list. |  |
+| `salary_text` | `luong` | text | không | '' |  | Salary range as shown (e.g. "18–25 triệu"), free text. |  |
+| `summary` | `tom_tat` | text | không | '' |  | One-paragraph summary. |  |
+| `duties` | `nhiem_vu` | text[] | không | '{}' |  | Duties, one per element (display only). | Danh sách chỉ để hiển thị (quy tắc 6), mỗi phần tử 1 dòng; tương tự `requirements`, `benefits`. |
+| `requirements` | `yeu_cau` | text[] | không | '{}' |  | Requirements, one per element (display only). |  |
+| `benefits` | `quyen_loi` | text[] | không | '{}' |  | Benefits, one per element (display only). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service); shown as the JD update date. |  |
+
+## `hr_job_openings` (`hr_tin_tuyen`)
+
+Tin tuyển dụng đăng từ JD - migration 0023. **Tenant-owned, bảng gốc.** JD đang được tin dùng không xoá được (RESTRICT).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `jd_id` | `jd_id` | bigint | không |  | FK RESTRICT | Source JD (same company, checked by the service); RESTRICT. |  |
+| `title` | `ten` | text | không |  | CHECK | Position title (copied from the JD, renamed with it). | **B (snapshot)** từ JD, service đổi theo khi sửa tên / phòng ban JD. |
+| `dept_key` | `phong_ban` | text | không | '' |  | Soft reference to hr_org_units.unit_key (copied from the JD). | Tham chiếu mềm; chép từ JD. |
+| `quantity` | `so_luong` | integer | không | 1 | CHECK | Number of people to hire. |  |
+| `work_site` | `noi_lam_viec` | text | không | '' |  | Work location (open list). |  |
+| `salary_text` | `luong` | text | không | '' |  | Salary as advertised, free text. |  |
+| `deadline_date` | `han_nop` | date | có |  |  | Application deadline; null = none. |  |
+| `opening_status` | `trang_thai` | text | không | 'open' | CHECK | open / paused / closed. |  |
+| `channels` | `kenh` | text[] | không | '{}' |  | Posting channels (LinkedIn, TopCV...), display only. Nothing is posted automatically. | Danh sách chỉ để hiển thị; hệ thống không tự đăng tin. |
+| `description` | `mo_ta` | text | không | '' |  | Short description. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_candidates` (`hr_ung_vien`)
+
+Ứng viên của 1 tin, kèm đánh giá phỏng vấn và lịch phỏng vấn - migration 0023. **Bảng con** của `hr_job_openings` (db-map `tenant` qua `job_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `job_id` | `tin_id` | bigint | không |  | FK CASCADE | Job opening applied to; rows are deleted with it. |  |
+| `full_name` | `ho_ten` | text | không |  | CHECK | Candidate name. |  |
+| `email` | `email` | text | không | '' |  | Email, free text. |  |
+| `phone` | `sdt` | text | không | '' |  | Phone, free text. |  |
+| `lead_source` | `nguon` | text | không | '' |  | Where the CV came from (frontend SOURCES). Open list. |  |
+| `stage` | `giai_doan` | text | không | 'applied' | CHECK | applied / screening / interview / offer / hired / rejected. |  |
+| `applied_date` | `ngay_nop` | date | không |  |  | Application date. |  |
+| `cv_name` | `cv` | text | không | '' |  | CV file name (name only, no upload yet). |  |
+| `experience_note` | `kinh_nghiem` | text | không | '' |  | Short experience summary. |  |
+| `reviews` | `danh_gia` | jsonb | không | '[]' | CHECK | Document appended by the service: [{"by","round","scores": {criterion: 1-5},"note","date"}] - interview evaluations, shown only. | jsonb tài liệu (quy tắc 19), service chỉ nối thêm: `[{"by","round","scores": {chuyenmon, kinhnghiem, giaotiep, vanhoa: 1-5},"note","date"}]`. `by` là tên hiển thị tại thời điểm (B). |
+| `interviews` | `phong_van` | jsonb | không | '[]' | CHECK | Document appended by the service: [{"date","time","round","interviewer","mode","place"}] - interview schedule, shown only. No invitation is sent. | jsonb tài liệu, service chỉ nối thêm: `[{"date","time","round","interviewer","mode","place"}]`. GET /hr/talent trải ra danh sách `interviews` với id = id ứng viên x 1000 + vị trí. Chưa gửi thư mời. |
+| `hired_employee_id` | `nhan_vien_id` | bigint | có |  | FK SET NULL | Employee profile created at onboarding (same company, checked by the service); set null if deleted. | Cùng công ty: service kiểm (đọc nhân sự có phạm vi công ty). Có giá trị thì không đổi giai đoạn được nữa. |
+| `hired_date` | `ngay_nhan_viec` | date | có |  |  | Date the candidate was marked hired. |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who entered the candidate; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_objectives` (`hr_muc_tieu`)
+
+Mục tiêu OKR theo kỳ kèm kết quả then chốt - migration 0023. **Tenant-owned, bảng gốc.**
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `period_label` | `ky` | text | không |  | CHECK | Period label (Q4/2026, Năm 2026...). Open list. |  |
+| `title` | `ten` | text | không |  | CHECK | Objective. |  |
+| `owner_employee_id` | `phu_trach_id` | bigint | có |  | FK (owner_employee_id, company_id) SET NULL (owner_employee_id) | Objective owner (same company); set null when deleted. |  |
+| `dept_key` | `phong_ban` | text | không | '' |  | Soft reference to hr_org_units.unit_key: the owner's unit when created (snapshot). | **B (snapshot)** đơn vị của người phụ trách lúc tạo; tham chiếu mềm. |
+| `key_results` | `ket_qua` | jsonb | không | '[]' | CHECK | Document read/written by the service: [{"id","title","target","current","unit","owner","inverse"}]; owner = soft reference to hr_employees.id; only "current" changes after creation. | jsonb tài liệu: `[{"id","title","target","current","unit","owner","inverse"}]`; `id` 1..n trong mục tiêu, `owner` tham chiếu mềm tới `hr_employees.id`; chỉ `current` đổi sau khi tạo (POST /hr/okrs/:id/kr). |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_performance_reviews` (`hr_danh_gia`)
+
+Đánh giá nhân sự theo kỳ (tự đánh giá -> quản lý) - migration 0023. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`). Giao diện dùng kỳ = quý hiện tại.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE, UNIQUE (employee_id, review_period) | Employee reviewed; rows are deleted with it. |  |
+| `review_period` | `ky` | text | không |  |  | Period label (Q4/2026...). |  |
+| `review_state` | `trang_thai` | text | không | 'self' | CHECK | self (waiting for self review) / manager (waiting for manager) / done. No row = not started. |  |
+| `self_scores` | `tu_cham` | jsonb | có |  | CHECK | Document: {skill key: 1-5} (frontend REVIEW_SKILLS); null until self review. | jsonb: `{kq, cm, pp, kl, pt: 1-5}` (REVIEW_SKILLS); tương tự `manager_scores`. |
+| `manager_scores` | `ql_cham` | jsonb | có |  | CHECK | Document: {skill key: 1-5}; null until manager review. |  |
+| `self_note` | `tu_nhan_xet` | text | không | '' |  | Self review comment. |  |
+| `manager_note` | `ql_nhan_xet` | text | không | '' |  | Manager comment. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_course_enrollments` (`hr_ghi_danh`)
+
+Ghi danh và tiến độ khoá học - migration 0023. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE, UNIQUE (employee_id, course_id) | Employee; rows are deleted with it. |  |
+| `course_id` | `khoa_hoc_id` | integer | không |  | CHECK | Course id in the frontend catalog COURSES (catalog not stored in the database yet). | Mã trong danh mục cố định COURSES của giao diện (chưa có bảng khoá học); không khoá ngoại. |
+| `progress_pct` | `tien_do_pct` | numeric(5,2) | không | 0 | CHECK | Progress, 0-100 (100 = completed). |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_security_settings` (`hr_bao_mat`)
+
+Ma trận quyền HR + ẩn lương theo công ty - migration 0024 (2026-11-03), module `backend/internal/modules/hr` (`access.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty. Cùng migration: `hr_employees.user_id` (tài khoản đăng nhập, unique khi có, SET NULL) và `hr_employees.hr_role` (sysadmin / hradmin / manager / employee). Nhật ký HR ghi vào `audit_logs` (action `hr.<phân hệ>.<thao tác>`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE, UNIQUE | Owning company; set from the login session, never from the client. |  |
+| `perms` | `quyen` | jsonb | không |  | CHECK | Document read/written whole: {"hradmin"/"manager"/"employee": {"employees"/"attendance"/"payroll"/"recruit"/"performance"/"security": ["view","create","edit","delete","approve","export"]}}. sysadmin always has everything. | jsonb tài liệu nguyên khối (quy tắc 19): `{hradmin, manager, employee: {employees, attendance, payroll, recruit, performance, security: [view, create, edit, delete, approve, export]}}`; service chỉ nhận khoá / thao tác hợp lệ. Thiếu dòng = `DefaultPerms()` (= DEFAULT_PERMS giao diện). |
+| `mask_salary` | `an_luong` | boolean | không | true |  | Hide salary amounts by default in the payroll screens. |  |
+| `updated_by` | `nguoi_sua` | uuid | có |  | FK SET NULL | User who saved last; set null if the user is deleted. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_courses` (`hr_khoa_hoc`)
+
+Danh mục khoá học theo công ty - migration 0025. **Tenant-owned, bảng gốc.** `hr_course_enrollments.course_id` tham chiếu mềm tới bảng này (ghi danh của khoá đã xoá bị bỏ qua khi đọc). Cùng migration: `hr_candidates.cv_url` (link CV trong kho file).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key; referenced (soft) by hr_course_enrollments.course_id and hr_learning_paths.course_ids. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `title` | `ten` | text | không |  | CHECK | Course title. |  |
+| `category` | `nhom` | text | không | '' |  | Category (Bắt buộc, Chuyên môn...). Open list. |  |
+| `hours` | `so_gio` | numeric(6,1) | không | 0 | CHECK | Duration, hours. |  |
+| `course_format` | `hinh_thuc` | text | không | '' |  | Format (Trực tiếp, E-learning, Blended). Open list. |  |
+| `is_mandatory` | `bat_buoc` | boolean | không | false |  | Mandatory course: counted in the training compliance KPI. |  |
+| `tone` | `mau` | text | không | 'primary' |  | Colour tone (frontend palette key). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_learning_paths` (`hr_lo_trinh`)
+
+Lộ trình học theo công ty - migration 0025. **Tenant-owned, bảng gốc.**
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE | Owning company; set from the login session, never from the client. |  |
+| `title` | `ten` | text | không |  | CHECK | Path title. |  |
+| `audience` | `doi_tuong` | text | không | '' |  | Who it is for (free text). |  |
+| `course_ids` | `khoa_hoc_ids` | bigint[] | không | '{}' |  | Ordered hr_courses.id of the same company (soft references, checked by the service; removed when a course is deleted). Display / one-click enrollment only. | Danh sách tham chiếu mềm có thứ tự (quy tắc 6, 9): chỉ hiển thị / ghi danh 1 lần; service kiểm khoá học cùng công ty khi lưu và bỏ id khi xoá khoá; đọc bỏ id không còn. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `hr_schedule_overrides` (`hr_lich_ngay`)
+
+Lịch làm việc riêng từng ngày, thắng lịch tuần - migration 0025. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `employee_id` | `nhan_vien_id` | bigint | không |  | FK CASCADE, UNIQUE (employee_id, work_date) | Employee; rows are deleted with it. |  |
+| `work_date` | `ngay` | date | không |  |  | Date overridden. |  |
+| `shift_id` | `ca_id` | bigint | có |  | FK CASCADE | Shift that day (same company, checked by the service); null = day off. Deleted with the shift (back to the weekly pattern). | Cùng công ty với nhân sự: service kiểm. Null = nghỉ ngày đó. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `hr_work_sites` (`hr_dia_diem`)
+
+Địa điểm làm việc theo công ty - migration 0026 (2026-11-03), module `backend/internal/modules/hr` (`attendance.go`). **Tenant-owned, bảng gốc.** Thay danh sách địa điểm / toạ độ mẫu cố định trong giao diện.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `company_id` | `cong_ty_id` | uuid | không |  | FK CASCADE, UNIQUE (company_id, site_name) | Owning company; set from the login session, never from the client. |  |
+| `site_name` | `ten` | text | không |  | CHECK | Location name; hr_employees.work_site / hr_job_openings.work_site refer to it by name (soft reference). | `hr_employees.work_site`, `hr_job_openings.work_site` tham chiếu mềm theo tên; đổi tên thì service đổi theo ở 2 bảng đó. |
+| `latitude` | `vi_do` | numeric(9,6) | có |  | CHECK | GPS latitude; null = no GPS check-in at this site. |  |
+| `longitude` | `kinh_do` | numeric(9,6) | có |  | CHECK | GPS longitude; null together with latitude. |  |
+| `radius_m` | `ban_kinh` | integer | không | 200 | CHECK | Check-in radius, metres. |  |
+| `is_field_site` | `cong_truong` | boolean | không | false |  | Construction site: site allowance in payroll, Mon–Sat template schedule. | Giao diện: phụ cấp công trường (calcPay) và lịch mẫu T2–T7. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
 ## `product_hvac_specs` (phần của `db_san_pham`)
 
 Thông số ngành Điện lạnh (đề mục 3.2.7, nguồn `backend/internal/shared/specs/js/dl-spec.js`, chép từ QS Pro ea787b6) - migration 0017 (2026-10-28).

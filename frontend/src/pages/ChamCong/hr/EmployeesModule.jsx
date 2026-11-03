@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, STATUS, LEVELS, HR_TODAY, deptOf, fmtDate, fmtMoney, yearsBetween, daysBetween } from '../../../data/hrData'
+import { DEPTS, STATUS, LEVELS, HR_TODAY, MONTHS, deptOf, fmtDate, fmtMoney, yearsBetween, daysBetween } from '../../../data/hrData'
 import { Avatar, DeptPill, StatusPill, Pill, Seg, Empty, downloadCsv, RoleList } from './shared'
 import { useAccess } from './access'
 import { DEFAULT_PAYROLL_CONFIG } from '../../../data/hrData2'
@@ -176,14 +176,14 @@ function Allocation({ emp, concurrent, boardUnits = [], editable, onSave, pay, s
       )}
       {!draft && rows.length > 0 && <div className="cc-sub" style={{ marginTop: 8 }}>Tỉ trọng này được dùng để phân bổ chi phí lương theo đơn vị trong Bảng lương.</div>}
       {!draft && pay && showMoney && (
-        <AllocationMatrix p={pay} title="Phân bổ chi tiết theo khoản lương · Tháng 9/2026" sub="Tổng (100%) của từng khoản & phần chia cho mỗi đơn vị theo tỉ trọng kiêm nhiệm" />
+        <AllocationMatrix p={pay} title={`Phân bổ chi tiết theo khoản lương · ${MONTHS[0].label}`} sub="Tổng (100%) của từng khoản & phần chia cho mỗi đơn vị theo tỉ trọng kiêm nhiệm" />
       )}
     </div>
   )
 }
 
 function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveConcurrent, pay, onBack, onEdit, onDelete, onOffboard, onOpen }) {
-  const { can, role } = useAccess()
+  const { can, canAll, role } = useAccess()
   const [tab, setTab] = useState('info')
   const [editSignal, setEditSignal] = useState(0)
   const manager = employees.find(e => e.id === emp.managerId)
@@ -212,8 +212,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
           <StatusPill status={emp.status} />
           <div className="cc-actions">
             {can('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onEdit(emp)}><Icon name="edit" size={14} />Sửa</button>}
-            {emp.status !== 'left' && can('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onOffboard(emp)}><Icon name="logIn" size={14} />Cho nghỉ việc</button>}
-            {can('employees', 'delete') && <button className="cc-icon-btn danger" title="Xoá hồ sơ" onClick={() => onDelete(emp)}><Icon name="trash" size={15} /></button>}
+            {emp.status !== 'left' && canAll('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onOffboard(emp)}><Icon name="logIn" size={14} />Cho nghỉ việc</button>}
+            {canAll('employees', 'delete') && <button className="cc-icon-btn danger" title="Xoá hồ sơ" onClick={() => onDelete(emp)}><Icon name="trash" size={15} /></button>}
           </div>
         </div>
       </div>
@@ -224,7 +224,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div><span>Quản lý trực tiếp</span>{manager ? <button className="cc-link-btn" onClick={() => onOpen(manager.id)}>{manager.name}</button> : <b>—</b>}</div>
         <div><span>Cấp dưới trực tiếp</span><b>{reports.length} người</b></div>
         <div className="cc-mini-edit">
-          <span>Kiêm nhiệm {can('employees', 'edit') && emp.status !== 'left' && <button className="cc-link-btn" onClick={() => { setTab('info'); setEditSignal(n => n + 1) }}><Icon name="edit" size={11} />Sửa</button>}</span>
+          <span>Kiêm nhiệm {canAll('employees', 'edit') && emp.status !== 'left' && <button className="cc-link-btn" onClick={() => { setTab('info'); setEditSignal(n => n + 1) }}><Icon name="edit" size={11} />Sửa</button>}</span>
           <b>{concurrent.length ? concurrent.map(c => `${c.unit.label} ${c.pct}%`).join(' · ') : 'Không'}</b>
           {pay && can('payroll', 'view') && <em>100% = {Math.round(pay.cost).toLocaleString('vi-VN')} đ/tháng{concurrent.length ? ` · phòng chính ${+(100 - concurrent.reduce((t, c) => t + c.pct, 0)).toFixed(1)}%` : ''}</em>}
         </div>
@@ -232,7 +232,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
 
       <Seg value={tab} onChange={setTab} options={DETAIL_TABS} />
 
-      {tab === 'info' && (concurrent.length > 0 || can('employees', 'edit')) && emp.status !== 'left' && (
+      {tab === 'info' && (concurrent.length > 0 || canAll('employees', 'edit')) && emp.status !== 'left' && (
         <Allocation key={emp.id} emp={emp} concurrent={concurrent} boardUnits={boardUnits} editable={can('employees', 'edit')} onSave={list => onSaveConcurrent(emp, list)} pay={pay} showMoney={can('payroll', 'view')} editSignal={editSignal} />
       )}
       {tab === 'info' && (
@@ -355,7 +355,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
 
 /* Phân hệ "Hồ sơ nhân sự" — danh sách + lọc + CRUD + chi tiết */
 export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEdit, onDelete, onOffboard, concurrentOf = () => [], boardUnits = [], onSaveConcurrent, payOf = () => null }) {
-  const { can } = useAccess()
+  const { can, canAll } = useAccess()
   const [q, setQ] = useState('')
   const [dept, setDept] = useState('all')
   const [level, setLevel] = useState('all')
@@ -425,7 +425,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
             <button className={view === 'grid' ? 'active' : ''} title="Dạng thẻ" onClick={() => setView('grid')}><Icon name="grid" size={14} /></button>
           </div>
           {can('employees', 'export') && <button className="cc-btn ghost" onClick={exportCsv}><Icon name="download" size={14} />Xuất CSV</button>}
-          {can('employees', 'create') && <button className="cc-btn" onClick={() => onAdd()}><Icon name="userPlus" size={14} />Thêm nhân viên</button>}
+          {canAll('employees', 'create') && <button className="cc-btn" onClick={() => onAdd()}><Icon name="userPlus" size={14} />Thêm nhân viên</button>}
         </div>
         <Seg value={status} onChange={setStatus} options={[
           { value: 'current', label: 'Đang làm việc', count: counts.current },
@@ -453,7 +453,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
                     <td className="r" onClick={ev => ev.stopPropagation()}>
                       <div className="cc-row-actions">
                         {can('employees', 'edit') && <button className="cc-icon-btn sm" title="Sửa" onClick={() => onEdit(e)}><Icon name="edit" size={14} /></button>}
-                        {can('employees', 'delete') && <button className="cc-icon-btn sm danger" title="Xoá" onClick={() => onDelete(e)}><Icon name="trash" size={14} /></button>}
+                        {canAll('employees', 'delete') && <button className="cc-icon-btn sm danger" title="Xoá" onClick={() => onDelete(e)}><Icon name="trash" size={14} /></button>}
                       </div>
                     </td>
                   </tr>

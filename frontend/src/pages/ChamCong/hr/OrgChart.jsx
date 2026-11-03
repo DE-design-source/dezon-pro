@@ -55,7 +55,7 @@ function UnitsView({ company, setCompany, employees, units, heads, extraMembers,
   const [dragKey, setDragKey] = useState(null)
   const [overKey, setOverKey] = useState(null)
   const [history, setHistory] = useState([]) // [{ key, from, to }] để hoàn tác
-  const { can } = useAccess()
+  const { canAll } = useAccess()
   const [zoom, setZoom] = useState(1)
   const [sel, setSel] = useState(null) // đơn vị đang xem chi tiết — bảng bên phải chỉ hiện khi bấm vào 1 đơn vị
   const [focus, setFocus] = useState('') // lọc: chỉ xem sơ đồ của 1 đơn vị
@@ -67,7 +67,7 @@ function UnitsView({ company, setCompany, employees, units, heads, extraMembers,
   const wrapRef = useRef(null)
   const orgRef = useRef(null)
   const onDown = usePan(wrapRef)
-  const editable = can('employees', 'edit')
+  const editable = canAll('employees', 'edit') // cơ cấu tổ chức: cấp công ty
   // Thu phóng vừa khung: so độ rộng thật của cây (ở 100%) với khung hiển thị
   const fit = () => {
     const w = wrapRef.current, o = orgRef.current
@@ -751,8 +751,8 @@ function PeopleView({ employees, units, heads, extraMembers, onOpen }) {
 /* Phân hệ "Sơ đồ tổ chức": cơ cấu phòng ban + sơ đồ nhân sự */
 /* ================= Sơ đồ tập đoàn: chỉ các công ty (mẹ → con; thành viên độc lập đứng riêng) ================= */
 function GroupView({ employees, units, heads, onPick, onCreateUnit }) {
-  const { can } = useAccess()
-  const editable = can('employees', 'edit')
+  const { canAll } = useAccess()
+  const editable = canAll('employees', 'edit') // cơ cấu tổ chức: cấp công ty
   const [addOpen, setAddOpen] = useState(false)
   const wrapRef = useRef(null)
   const orgRef = useRef(null)
@@ -851,7 +851,8 @@ function GroupView({ employees, units, heads, onPick, onCreateUnit }) {
 }
 
 export default function OrgChart({ employees, units, heads, extraMembers, onSaveUnit, onDeleteUnit, onAssign, onRemoveExtra, onUpdateExtra, onCommitExtra, onMoveUnit, onCreateUnit, onOpen }) {
-  const [view, setView] = useState('group') // group: chỉ công ty · units: cơ cấu từng công ty (hoặc ALL) · people: sơ đồ nhân sự
+  // group: chỉ công ty (mặc định khi có công ty con) · units: cơ cấu từng công ty (hoặc ALL) · people: sơ đồ nhân sự
+  const [view, setView] = useState(() => (units.some(u => u.type === 'subsidiary') ? 'group' : 'units'))
   const [company, setCompany] = useState('root')
   const pick = key => { setCompany(key); setView('units') }
   return (
