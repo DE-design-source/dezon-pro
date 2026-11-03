@@ -77,6 +77,9 @@ func TestRealtimeBackendDB(t *testing.T) {
 		{"message.send", `[1]`, CodeBadRequest},
 		{"message.send", `{"conversation_id":"x"}`, CodeBadRequest},
 		{"message.send", `{"conversation_id":` + itoa(d.ID) + `,"client_msg_id":"` + newUUID() + `","msg_type":"image","content":"a"}`, CodeBadRequest},
+		{"message.send", `{"conversation_id":` + itoa(d.ID) + `,"client_msg_id":"` + newUUID() + `","msg_type":"system","content":"a"}`, CodeBadRequest},
+		{"message.send", `{"conversation_id":` + itoa(d.ID) + `,"client_msg_id":"` + newUUID() + `","msg_type":"text","content":"a","attachments":[1]}`, CodeBadRequest},
+		{"message.send", `{"conversation_id":` + itoa(d.ID) + `,"client_msg_id":"` + newUUID() + `","msg_type":"image","attachments":[1]}`, CodeMediaDisabled},
 		{"message.read", `{"conversation_id":` + itoa(d.ID) + `,"seq":-1}`, CodeBadRequest},
 		{"message.read", ``, CodeBadRequest},
 	} {

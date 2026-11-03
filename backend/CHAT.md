@@ -11,7 +11,7 @@ Tài liệu chia làm ba phần: kiến trúc và dữ liệu (mục 2–5), cá
 | Giai đoạn | Tính năng |
 | --- | --- |
 | MVP | Đăng ký/đăng nhập bằng số điện thoại + OTP; danh bạ, kết bạn; chat 1-1 và nhóm (text); đã gửi / đã nhận / đã xem; online, đang soạn tin; push notification |
-| Giai đoạn 2 | Ảnh, video, file, tin nhắn thoại; trả lời, chuyển tiếp, thu hồi, chỉnh sửa tin; reaction; tìm kiếm tin nhắn; đa thiết bị (điện thoại + máy tính) |
+| Giai đoạn 2 | Ảnh, video, file, tin nhắn thoại; trả lời, chuyển tiếp, thu hồi, chỉnh sửa tin; reaction; tìm kiếm tin nhắn; đa thiết bị (điện thoại + máy tính) - đã cài đặt (migration 0020 - 0023) |
 | Giai đoạn 3 | Gọi thoại/video 1-1 và nhóm; mã hóa đầu cuối; bot, mini app; nhóm lớn/cộng đồng |
 
 ### Yêu cầu phi chức năng
@@ -223,7 +223,13 @@ Mọi gói tin là JSON (giai đoạn sau có thể chuyển sang Protobuf để
 | Server → Client | `receipt.update` | conversation\_id, user\_id, delivered\_seq, read\_seq | Người khác đã nhận/xem |
 | Server → Client | `presence.update` | user\_id, online, last\_seen | Thay đổi online |
 | Server → Client | `typing` | conversation\_id, user\_id, is\_typing | Ai đó đang soạn |
+| Server → Client | `message.updated` | conversation\_id, action (edit / recall), message | Tin bị sửa / thu hồi (giai đoạn 2) |
+| Server → Client | `reactions.updated` | conversation\_id, message\_id, seq, counts, total, user\_id, reaction | Reaction của một tin đổi (giai đoạn 2) |
+| Server → Client | `devices.updated` | reason (login / logout / revoked), device\_id | Danh sách thiết bị của chính tài khoản đổi (giai đoạn 2) |
 | Hai chiều | `call.*` | offer, answer, ice, end | Tín hiệu cuộc gọi |
+
+Bản cài đặt: `message.send` nhận thêm `reply_to_message_id`; sửa / thu hồi / chuyển tiếp / reaction / tìm tin / thiết bị / QR đi qua
+REST (`backend/docs/API.md` mục "Giai đoạn 2"), chỉ phần đẩy thay đổi đi qua WebSocket.
 
 ### REST API chính
 
@@ -489,7 +495,21 @@ sequenceDiagram
 4. Thiết bị mới đăng nhập tải lịch sử từ server (không cần đồng bộ máy–máy như Zalo cũ). Nếu sau này dùng mã hóa đầu cuối, phần này phải thiết kế lại.
 5. Người dùng xem và đăng xuất từ xa các thiết bị trong mục cài đặt: xóa refresh token, gửi `force_logout` qua WebSocket.
 
+**Bản cài đặt (giai đoạn 2, migration 0023):**
+- Bước 3 (QR): máy chờ nhận token bằng **poll** `POST /chat/auth/qr/poll` mỗi 2 giây (không giữ WebSocket khi chưa đăng nhập).
+  Mã 10 ký tự Crockford base32 (QR chứa `<origin>/chat/qr#<mã>`), sống 2 phút, dùng một lần; token chỉ trao cho bên giữ `poll_token`
+  (không nằm trong QR). Luồng `pending -> scanned -> approved | rejected -> consumed` - chi tiết ở API.md mục "Đăng nhập bằng QR".
+- Bước 5: `GET /chat/devices`, `DELETE /chat/devices/:device_id`, `POST /chat/devices/logout-others`; xoá dòng thiết bị (kéo theo refresh
+  token + push token) rồi `force_logout` + đóng 4403; các thiết bị còn lại nhận `devices.updated`.
+- Sửa / thu hồi / reaction đồng bộ giữa thiết bị qua `message.updated` / `reactions.updated`; thiết bị lỡ gói bù bằng `/sync` +
+  `GET /chat/conversations/:id/messages/changes` (theo `chat_messages.updated_at`).
+
 ## 12. Luồng gửi ảnh và file
+
+> **Trạng thái (2026-11-02):** đã code ở bản Go cho ảnh, video, tệp và tin nhắn thoại (migration 0020 bảng `chat_media`, gói
+> `platform/objstore` trên MinIO, 4 route `/chat/media/...`, giao diện React). Bản cài đặt lệch thiết kế gốc dưới đây ở một số điểm:
+> xem bảng "Bản cài đặt khác thiết kế" cuối mục. Hợp đồng API: `docs/API.md` mục "Tệp đính kèm"; lý do: `docs/02-ky-thuat/database/decisions.md` D-17.
+> Chưa triển khai production (cần MinIO, `S3_DOMAIN`, `CHAT_S3_*`, migration 0020).
 
 File không đi qua server chat: client tải thẳng lên kho lưu trữ bằng presigned URL, rồi gửi một tin nhắn bình thường chứa đường dẫn.
 
@@ -521,6 +541,30 @@ sequenceDiagram
 6. Người nhận tải file qua CDN bằng URL có chữ ký, hết hạn sau vài giờ, để người ngoài không tải được.
 7. Tin nhắn thoại: ghi âm Opus/AAC, tải lên như file, kèm thời lượng và dạng sóng.
 8. Chính sách lưu trữ: chuyển file cũ hơn 90 ngày sang lớp lưu trữ rẻ hơn; cân nhắc giới hạn thời gian lưu như Zalo để kiểm soát chi phí.
+
+### Bản cài đặt khác thiết kế
+
+Luồng đang chạy: client xin URL (`POST /chat/media/upload-url`) -> PUT thẳng lên khoá tạm `chat/in/...` (URL ký `Content-Type` và
+`Content-Length`, sống 15 phút) -> `POST /chat/media/:id/complete` (server chép sang khoá cuối `chat/m/...` rồi kiểm) -> `message.send
+{msg_type, content (chú thích), attachments: [media_id], file_name?}`. Mỗi tin đúng 1 tệp; tin nhiều ảnh = nhiều tin.
+
+| Thiết kế gốc | Bản cài đặt | Lý do |
+|---|---|---|
+| Sự kiện bucket kích media worker | Client gọi `complete`; server xử lý đồng bộ (tối đa 60 giây), giành dòng bằng `status = processing` | Sự kiện bucket cần hàng đợi / webhook; hệ thống chưa có Kafka |
+| Chống trùng `sha256` toàn hệ thống | Chống trùng theo `(người tải, sha256, loại)`; server tự tính lại sha256 trong `complete` | Chống trùng toàn hệ thống: ai biết hash là lấy được tệp người khác. Chống trùng giữa người dùng làm cùng chuyển tiếp tin (chưa làm) |
+| Tệp tới 1 GB, multipart | Một lần PUT; mặc định 100 MB (`CHAT_MEDIA_MAX_FILE_MB`), trần cứng 200 MB khớp CHECK của DB | `crypto.subtle.digest` cần cả tệp trong bộ nhớ, 1 GB làm treo tab. Băm từng phần + multipart tải tiếp để giai đoạn sau |
+| Nén video về 720p | Không chuyển mã; chỉ giới hạn kích thước; `<video>` không phát được (vd HEVC `.mov` trên Chrome / Firefox) thì hiện chip tải về | Không có ffmpeg; WebCodecs quá lớn cho đợt này |
+| Quét virus trong worker | Interface `MediaScanner` gọi trong `complete`; mặc định `logScanner` coi là sạch (ghi log 1 lần lúc khởi động) | ClamAV để sau |
+| Tải qua CDN | MinIO phục vụ thẳng qua Caddy ở `{$S3_DOMAIN}`; presigned GET 60 phút + `Cache-Control: private` | Một VPS, chưa có tài khoản CDN |
+| Lưu trữ lạnh sau 90 ngày | Chưa làm; chỉ khoá tạm `chat/in/` có ILM hết hạn 1 ngày | MinIO một tầng; chính sách lưu giữ là quyết định sản phẩm |
+| Ảnh thu nhỏ 320 px | Ảnh: server làm ảnh nhỏ 320 px + blurhash. Video: client làm ảnh bìa cạnh dài 640 px (≤ 512 KB) | Ảnh bìa 320 px bị mờ trong khung 280x320 trên màn HiDPI |
+| URL có chữ ký hết hạn sau vài giờ | 60 phút (`CHAT_MEDIA_URL_TTL_MIN`, 5..720); URL là link mang quyền: người rời nhóm vẫn mở được tới khi hết hạn | Chấp nhận, ghi ở D-17 |
+| Ảnh nén cạnh dài 2048 px | Giữ: giao diện nén ảnh (trừ khi chọn "Gửi ảnh gốc"); ảnh HEIC / SVG phải gửi dạng tệp | Server chỉ nhận JPEG / PNG / WebP / GIF cho loại `image` |
+
+**Thứ tự ở máy người gửi:** mỗi tệp là một tin trong outbox, ở trạng thái `uploading` (chuẩn bị -> xin URL -> PUT -> complete) rồi mới
+sang `sending`. Outbox chỉ gửi tin `sending` theo thứ tự, nên tin chữ gõ SAU một ảnh đang tải KHÔNG phải chờ ảnh: máy chủ cấp `seq` theo lúc
+nhận `message.send`, nên tin chữ có thể đứng trước ảnh. Trong lúc chờ, bong bóng ảnh giữ chỗ theo thứ tự tạo giữa các tin chờ; có `ack`
+thì về đúng vị trí `seq`. Tối đa 2 tệp tải cùng lúc; tệp chỉ giữ trong bộ nhớ của tab (tải lại trang mà chưa tải xong -> phải chọn lại tệp).
 
 ## 13. Luồng push notification
 

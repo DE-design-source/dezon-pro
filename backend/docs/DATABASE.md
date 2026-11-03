@@ -88,10 +88,12 @@ Không truyền `--url=` (hoặc truyền rỗng) thì công cụ đọc `.env` 
 Thông báo lỗi thiếu cột giữ nguyên câu của bản Node: `Hãy chạy "npm run migrate" rồi khởi động lại server.`
 Khi chỉ triển khai bản Go, lệnh tương ứng là `go run ./cmd/migrate` (hoặc `/app/qspro-migrate`).
 
-Migration mới nhất: `0019_chat_email.sql` (chat đăng nhập / tìm bạn bằng email: cột `email` của `chat_users` / `chat_otp_codes`), trước đó
-`0018_chat.sql` (9 bảng `chat_*`). Database chưa chạy 0018 thì lúc nạp danh mục server ghi log
+Migration mới nhất: `0020_chat_media.sql` (chat gửi ảnh / video / tệp / tin thoại: bảng `chat_media` + cột `chat_messages.media_id` /
+`file_name`, `message_type` thêm `image` / `video` / `file` / `voice`), trước đó `0019_chat_email.sql` (chat đăng nhập / tìm bạn bằng email:
+cột `email` của `chat_users` / `chat_otp_codes`) và `0018_chat.sql` (9 bảng `chat_*`). Database chưa chạy 0018 thì lúc nạp danh mục server ghi log
 `Database thiếu bảng của: chat_... — có vẻ CHƯA chạy migration` (QS vẫn chạy, route chat lỗi 500); chưa chạy 0019 thì đăng nhập / tra bằng email
-lỗi 500 (cột `email` chưa có). `qspro_gotest` phải migrate tới 0019 trước lượt `go test ./...` đầy đủ.
+lỗi 500 (cột `email` chưa có); chưa chạy 0020 thì route `/chat/media/*` và tin có tệp lỗi 500 (bảng `chat_media` chưa có).
+`qspro_gotest` / `qspro_chattest` phải migrate tới 0020 trước lượt `go test ./...` đầy đủ.
 
 Thêm thay đổi cấu trúc: viết file mới `infra/db/migrations/NNNN_ten.sql` (không sửa file đã chạy; dùng chung cho cả hai bản), và nếu thêm cột vào
 `products` / `product_*_specs` thì tạo lại view `product_catalog` trong cùng migration.

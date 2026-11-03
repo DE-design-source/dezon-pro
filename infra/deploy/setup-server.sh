@@ -61,7 +61,11 @@ else
   cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env"
   sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" "$DEPLOY_DIR/.env"
   sed -i "s/^AUTH_SECRET=.*/AUTH_SECRET=$(openssl rand -hex 32)/" "$DEPLOY_DIR/.env"
-  echo "Đã tạo .env với POSTGRES_PASSWORD và AUTH_SECRET ngẫu nhiên."
+  # kho tệp chat (MinIO): mật khẩu root + khoá user ứng dụng, chỉ chữ và số
+  sed -i "s/^MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)/" "$DEPLOY_DIR/.env"
+  sed -i "s/^CHAT_S3_SECRET_KEY=.*/CHAT_S3_SECRET_KEY=$(openssl rand -hex 24)/" "$DEPLOY_DIR/.env"
+  echo "Đã tạo .env với POSTGRES_PASSWORD, AUTH_SECRET, MINIO_ROOT_PASSWORD, CHAT_S3_SECRET_KEY ngẫu nhiên."
+  echo "CÒN PHẢI ĐIỀN: DOMAIN, ACME_EMAIL, S3_DOMAIN (bắt buộc - thiếu thì mọi lệnh docker compose, kể cả sao lưu, đều dừng)."
 fi
 chmod 600 "$DEPLOY_DIR/.env"
 
@@ -79,7 +83,7 @@ systemctl restart cron || true
 step "XONG"
 cat <<EOF
 Bước tiếp theo:
-  1) Sửa cấu hình:        nano $DEPLOY_DIR/.env      (điền DOMAIN, ACME_EMAIL, khoá Lark...)
+  1) Sửa cấu hình:        nano $DEPLOY_DIR/.env      (điền DOMAIN, ACME_EMAIL, S3_DOMAIN, khoá Lark...)
   2) Kiểm tra DNS:        bản ghi A của tên miền phải trỏ về IP máy chủ này
   3) Triển khai:          bash $DEPLOY_DIR/deploy.sh
 EOF

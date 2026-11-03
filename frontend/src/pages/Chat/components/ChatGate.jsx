@@ -3,6 +3,8 @@ import * as api from '../api/chatApi'
 import { retry, signIn, switchAccount } from '../state/chatStore'
 import { contactText, formatPhone, normalizeEmail, normalizePhone } from '../state/chatLogic'
 import { colorFor, initials } from './shared'
+import QrLogin from './QrLogin'
+import { takeForcedSignOutNotice } from './qrUtil'
 
 /* Cổng đăng nhập Dezon Chat (CHAT.md mục 6): số điện thoại HOẶC email (công tắc ở bước đầu) -> mã OTP 6 số gửi qua
    SMS / email -> (tài khoản mới) tên hiển thị. Tài khoản email và tài khoản số là hai tài khoản riêng (chưa liên kết).
@@ -10,7 +12,9 @@ import { colorFor, initials } from './shared'
    không tới được máy chủ thì hiện thẻ trạng thái.
    mode 'add' (bộ chọn tài khoản ▸ Thêm tài khoản): cùng các bước, có nút "Quay lại"; đăng nhập xong tab chuyển sang
    tài khoản mới, tài khoản cũ vẫn đăng nhập. Tài khoản đã có trong kho thì chỉ thay token của nó (không thêm trùng)
-   và báo máy chủ xoá thiết bị cũ. Tab chưa có tài khoản mà kho đã có tài khoản khác: liệt kê để chọn nhanh. */
+   và báo máy chủ xoá thiết bị cũ. Tab chưa có tài khoản mà kho đã có tài khoản khác: liệt kê để chọn nhanh.
+   "Đăng nhập bằng mã QR" (API.md "Đăng nhập bằng QR"): hiện QR để điện thoại đã đăng nhập quét và xác nhận (QrLogin).
+   Vừa bị đăng xuất mà không tự bấm (thiết bị bị đăng xuất từ xa / phiên bị thu hồi) -> báo một lần ở bước đầu. */
 
 const METHODS = [{ key: 'phone', label: 'Số điện thoại' }, { key: 'email', label: 'Email' }]
 
@@ -43,7 +47,13 @@ export default function ChatGate({ chat, mode, onCancel, onDone }) {
   const [err, setErr] = useState('')
   const [resendAt, setResendAt] = useState(0)
   const [now, setNow] = useState(Date.now())
+  const [qr, setQr] = useState(false)
+  const [forced, setForced] = useState(false)
   const otpRef = useRef(null)
+
+  useEffect(() => {
+    if (!adding && chat.auth === 'signedout' && takeForcedSignOutNotice()) setForced(true)
+  }, [adding, chat.auth])
 
   /* Đếm ngược "Gửi lại mã sau N giây" */
   useEffect(() => {
@@ -70,6 +80,8 @@ export default function ChatGate({ chat, mode, onCancel, onDone }) {
     signIn(user)
     if (onDone) onDone()
   }
+
+  if (qr) return <QrLogin onCancel={() => setQr(false)} onDone={onDone} />
 
   /* resend: danh tính của mã đang chờ (Gửi lại mã); không có thì lấy từ ô nhập theo công tắc */
   async function requestOtp(e, resend) {
@@ -216,6 +228,11 @@ export default function ChatGate({ chat, mode, onCancel, onDone }) {
           >{m.label}</button>
         ))}
       </div>
+      {forced && (
+        <div role="status" className="ch-gate-hint">
+          Thiết bị này đã bị đăng xuất (từ thiết bị khác hoặc phiên đã hết hạn). Mời đăng nhập lại.
+        </div>
+      )}
       <form className="ch-gate-form" onSubmit={requestOtp}>
         {errBox}
         {byEmail
@@ -223,6 +240,10 @@ export default function ChatGate({ chat, mode, onCancel, onDone }) {
           : <input key="phone" className="ch-gate-input" autoFocus type="tel" inputMode="tel" autoComplete="tel" placeholder="Số điện thoại, vd. 0901 234 567" value={phoneInput} onChange={e => setPhoneInput(e.target.value)} />}
         <button className="ch-gate-btn" disabled={busy || !(byEmail ? emailInput : phoneInput).trim()}>
           {busy ? 'Đang gửi mã…' : byEmail ? 'Nhận mã qua email' : 'Nhận mã xác thực'}
+        </button>
+        <button type="button" className="ch-gate-link ch-gate-qr" disabled={busy} onClick={() => { setErr(''); setForced(false); setQr(true) }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" /></svg>
+          Đăng nhập bằng mã QR
         </button>
         {back}
       </form>

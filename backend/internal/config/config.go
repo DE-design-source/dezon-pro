@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/shared/jsval"
 )
 
@@ -61,6 +62,18 @@ type Config struct {
 	SMTPUsername string // SMTP_USERNAME: rỗng = không đăng nhập (AUTH)
 	SMTPPassword string // SMTP_PASSWORD: giữ nguyên, không cắt khoảng trắng
 	SMTPFrom     string // SMTP_FROM: người gửi, vd "Dezon Chat <no-reply@dezon.vn>"
+
+	// Tệp đính kèm chat (MinIO / S3, internal/platform/objstore): CHAT_S3_ENDPOINT rỗng = tắt gửi ảnh / tệp
+	ChatS3Endpoint      string  // CHAT_S3_ENDPOINT: URL nội bộ kèm scheme (http://minio:9000); scheme quyết định SSL
+	ChatS3PublicURL     string  // CHAT_S3_PUBLIC_URL: host trình duyệt dùng (https://s3.<DOMAIN>); trống = như ChatS3Endpoint
+	ChatS3AccessKey     string  // CHAT_S3_ACCESS_KEY: user ứng dụng (không phải root MinIO); bắt buộc khi có endpoint
+	ChatS3SecretKey     string  // CHAT_S3_SECRET_KEY: giữ nguyên, không cắt khoảng trắng
+	ChatS3Bucket        string  // CHAT_S3_BUCKET, mặc định chat-media
+	ChatS3Region        string  // CHAT_S3_REGION, mặc định us-east-1
+	ChatMediaMaxImageMB float64 // CHAT_MEDIA_MAX_IMAGE_MB: ảnh tối đa (MB); trống / sai / <= 0 = 25; > 200 kẹp về 200
+	ChatMediaMaxFileMB  float64 // CHAT_MEDIA_MAX_FILE_MB: video + tệp tối đa (MB); trống / sai / <= 0 = 100; > 200 kẹp về 200
+	ChatMediaDailyMB    float64 // CHAT_MEDIA_DAILY_MB: dung lượng khai báo / người / 24 giờ (MB); trống / sai / <= 0 = 2048
+	ChatMediaURLTTLMin  float64 // CHAT_MEDIA_URL_TTL_MIN: hạn presigned GET (phút); trống / sai / <= 0 = 60; kẹp 5..720
 }
 
 // Giá trị mặc định lấy từ server Node.
@@ -118,7 +131,33 @@ func Load() *Config {
 	c.SMTPUsername = strings.TrimSpace(os.Getenv("SMTP_USERNAME"))
 	c.SMTPPassword = os.Getenv("SMTP_PASSWORD")
 	c.SMTPFrom = strings.TrimSpace(os.Getenv("SMTP_FROM"))
+	c.ChatS3Endpoint = strings.TrimRight(strings.TrimSpace(os.Getenv("CHAT_S3_ENDPOINT")), "/")
+	c.ChatS3PublicURL = strings.TrimRight(strings.TrimSpace(os.Getenv("CHAT_S3_PUBLIC_URL")), "/")
+	if c.ChatS3PublicURL == "" {
+		c.ChatS3PublicURL = c.ChatS3Endpoint
+	}
+	c.ChatS3AccessKey = strings.TrimSpace(os.Getenv("CHAT_S3_ACCESS_KEY"))
+	c.ChatS3SecretKey = os.Getenv("CHAT_S3_SECRET_KEY")
+	c.ChatS3Bucket = env("CHAT_S3_BUCKET", "chat-media")
+	c.ChatS3Region = env("CHAT_S3_REGION", "us-east-1")
+	c.ChatMediaMaxImageMB = mediaMB("CHAT_MEDIA_MAX_IMAGE_MB", 25)
+	c.ChatMediaMaxFileMB = mediaMB("CHAT_MEDIA_MAX_FILE_MB", 100)
+	c.ChatMediaDailyMB = positive(os.Getenv("CHAT_MEDIA_DAILY_MB"), 2048)
+	c.ChatMediaURLTTLMin = min(max(positive(os.Getenv("CHAT_MEDIA_URL_TTL_MIN"), 60), 5), 720)
 	return c
+}
+
+// MaxMediaMB: trần cứng kích thước một tệp chat (giới hạn băm SHA-256 ở trình duyệt, khớp ck_chat_media_size_bytes).
+const MaxMediaMB = 200
+
+// mediaMB: số MB dương đọc từ biến k (trống / sai / <= 0 -> def), lớn hơn MaxMediaMB thì kẹp lại và ghi log.
+func mediaMB(k string, def float64) float64 {
+	v := positive(os.Getenv(k), def)
+	if v > MaxMediaMB {
+		logger.Infof("config", "%s=%g vượt trần %d MB, dùng %d", k, v, MaxMediaMB, MaxMediaMB)
+		return MaxMediaMB
+	}
+	return v
 }
 
 // tcpPort: số cổng nguyên đọc từ v; trống / sai / <= 0 / > 65535 -> def.

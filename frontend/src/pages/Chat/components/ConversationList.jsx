@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import * as L from '../state/chatLogic'
 import { enablePush, loadMoreConversations, sortedConversations, togglePin, unreadFor } from '../state/chatStore'
 import { ConvAvatar, PIN_PATH, SearchIcon, UsersIcon, avatarConv } from './shared'
 import AccountSwitcher from './AccountSwitcher'
+import './Mention.css'
+import './Search.css'
 
 const TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -14,7 +17,9 @@ const NET_TEXT = { connecting: 'Đang kết nối…', authing: 'Đang kết n�
 /* Cột danh sách hội thoại — renderConvList() trong chat.html.
    Dòng đầu luôn là hội thoại cục bộ SiteFlow Bot (ghim cố định), sau đó là hội thoại thật của máy chủ chat.
    Cạnh tiêu đề "Chat": bộ chọn tài khoản (mỗi tab một tài khoản). */
-export default function ConversationList({ chat, bot, activeId, filterTab, searchTerm, onTab, onSearch, onSelect, onOpenDirectory, onNewChat, onAddAccount }) {
+export default function ConversationList({ chat, bot, activeId, filterTab, searchTerm, onTab, onSearch, onSelect, onOpenDirectory, onNewChat, onAddAccount, onSearchMessages }) {
+  /* Chuỗi người dùng gõ (giữ hoa / dấu) cho dòng "Tìm tin nhắn chứa ..." - searchTerm đã lowercase */
+  const [rawTerm, setRawTerm] = useState('')
   const ready = chat.auth === 'ready'
   const me = chat.me
   const now = Date.now()
@@ -57,9 +62,12 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
       let preview
       if (typing) preview = <i>đang soạn tin…</i>
       else if (lastPend && (!c.last_message || Date.parse(lastPend.created_at) >= Date.parse(c.last_message.created_at))) {
-        preview = (lastPend.status === 'failed' ? 'Gửi lỗi: ' : 'Bạn: ') + lastPend.content
+        /* "Gửi lỗi: ...", tin có tệp chưa xác nhận "Đang gửi: [Hình ảnh]", văn bản "Bạn: ..." (L.mediaLabel) */
+        preview = L.pendingPreview(lastPend)
       } else preview = L.previewText(c.last_message, me.id, c.type)
       const muted = L.isMuted(c.muted_until, now)
+      /* Dấu '@': có tin nhắc tới mình (tên riêng / @Tất cả) chưa đọc - hiện cả khi đã tắt thông báo */
+      const mention = L.hasUnreadMention(c, chat.localRead[c.id])
       rows.push(
         <div key={c.id} className={'ch-conv-item' + (c.id === activeId ? ' active' : '') + (pinned ? ' pinned' : '')} onClick={() => onSelect(c.id)}>
           <ConvAvatar conv={avatarConv(c, online)} />
@@ -71,7 +79,12 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
             </div>
             <div className="ch-conv-bottom">
               <span className="ch-conv-preview">{preview}</span>
-              {unread > 0 && <span className={'ch-conv-unread' + (muted ? ' muted' : '')} title={muted ? 'Đã tắt thông báo' : undefined}>{unread > 99 ? '99+' : unread}</span>}
+              {(mention || unread > 0) && (
+                <span className="ch-conv-badges">
+                  {mention && <span className="ch-conv-mention" title="Có người nhắc đến bạn">@</span>}
+                  {unread > 0 && <span className={'ch-conv-unread' + (muted ? ' muted' : '')} title={muted ? 'Đã tắt thông báo' : undefined}>{unread > 99 ? '99+' : unread}</span>}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -132,7 +145,12 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
         <div className="ch-search-box">
           <SearchIcon />
           {/* Ô nhập không điều khiển (giữ nguyên chuỗi người dùng gõ), từ khoá lọc = trim + lowercase */}
-          <input type="text" placeholder="Tìm cuộc trò chuyện..." onChange={e => onSearch(e.target.value.trim().toLowerCase())} />
+          <input
+            type="text"
+            placeholder="Tìm cuộc trò chuyện..."
+            onChange={e => { setRawTerm(e.target.value.trim()); onSearch(e.target.value.trim().toLowerCase()) }}
+            onKeyDown={e => { if (e.key === 'Enter' && ready && onSearchMessages && rawTerm) onSearchMessages(rawTerm) }}
+          />
         </div>
         <div className="ch-conv-tabs">
           {TABS.map(t => (
@@ -142,6 +160,12 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
       </div>
 
       <div className="ch-conv-items" onScroll={onScroll}>
+        {ready && onSearchMessages && rawTerm && searchTerm && (
+          <button type="button" className="ch-sr-conv-row" onClick={() => onSearchMessages(rawTerm)}>
+            <span className="ch-sr-conv-icon"><SearchIcon size={15} /></span>
+            <span>Tìm tin nhắn chứa “{rawTerm}”</span>
+          </button>
+        )}
         {rows}
         {note && <div className="ch-conv-note">{note}</div>}
         {ready && chat.loadingMore && <div className="ch-conv-note">Đang tải thêm…</div>}

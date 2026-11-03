@@ -33,6 +33,18 @@ const (
 	TypeTyping         = "typing"
 	TypeReconnect      = "reconnect"
 	TypeForceLogout    = "force_logout"
+
+	// Server -> client, do Backend gửi qua bộ chạy tuần tự theo hội thoại (API.md mục "Quản trị nhóm" / ghim).
+	TypePinsUpdated         = "pins.updated"
+	TypeConversationUpdated = "conversation.updated"
+	TypeMembersUpdated      = "members.updated"
+	TypeJoinRequestsUpdated = "join_requests.updated"
+
+	// Server -> client, giai đoạn 2 (API.md mục "Giai đoạn 2"; trùng tên chat.Ev*): tin bị sửa / thu hồi, reaction đổi
+	// (qua bộ chạy tuần tự theo hội thoại), danh sách thiết bị của chính tài khoản đổi.
+	TypeMessageUpdated   = "message.updated"
+	TypeReactionsUpdated = "reactions.updated"
+	TypeDevicesUpdated   = "devices.updated"
 )
 
 // Mã lỗi trong gói "error" do chính gateway sinh (mã nghiệp vụ khác do Backend trả qua *Error).

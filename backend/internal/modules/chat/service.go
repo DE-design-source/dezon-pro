@@ -63,7 +63,11 @@ type Deps struct {
 	SMS  SMSSender  // nil = logSender
 	Mail MailSender // nil = logMailer
 	Push PushSender // nil = tắt push
-	Now  func() time.Time
+	// Media: kho tệp S3 (*objstore.Client); nil = tắt gửi ảnh / tệp (route tệp trả MEDIA_DISABLED).
+	// Phải là nil interface thật, không phải con trỏ nil bọc trong interface.
+	Media MediaStore
+	Scan  MediaScanner // nil = logScanner (chưa quét virus, coi như sạch)
+	Now   func() time.Time
 }
 
 // Service: nghiệp vụ chat.
@@ -73,6 +77,17 @@ type Service struct {
 	mail MailSender
 	push PushSender
 	now  func() time.Time
+
+	media         MediaStore   // nil = tắt tệp
+	scan          MediaScanner // không nil khi media != nil
+	mediaMaxImage int64        // byte, CHAT_MEDIA_MAX_IMAGE_MB
+	mediaMaxFile  int64        // byte, CHAT_MEDIA_MAX_FILE_MB (video + tệp)
+	mediaDaily    int64        // byte / người / 24 giờ, CHAT_MEDIA_DAILY_MB
+	mediaURLTTL   time.Duration
+	uploadLimit   *limiter       // upload-url: 60 lần / phút / người
+	imgSem        chan struct{}  // giới hạn số ảnh giải mã cùng lúc
+	mediaQuit     chan struct{}  // đóng khi Shutdown: dừng janitor
+	mediaWG       sync.WaitGroup // janitor
 
 	jwtKey     []byte
 	otpKey     []byte
@@ -96,6 +111,13 @@ type Service struct {
 	searchLimit *limiter // tra số điện thoại / email, đồng bộ danh bạ: 60 lần / phút / người
 	matchLimit  *limiter // số điện thoại / email / hash được tra: 5000 / ngày / người (mỗi số 1 lượt; chống dò cả dải số)
 	directLimit *limiter // mở chat 1-1 MỚI với người chưa là bạn: 30 lần / giờ / người
+
+	// Giai đoạn 2 (dto_phase2.go). Chuyển tiếp dùng sendLimit (mỗi đích 1 lượt).
+	editLimit      *limiter // sửa + thu hồi tin: 30 lần / phút / người
+	reactLimit     *limiter // đặt / bỏ reaction: 60 lần / phút / người
+	msgSearchLimit *limiter // tìm tin: 30 lần / phút / người
+	qrPollLimit    *limiter // poll phiên QR: 3 lần / 3 giây / qr_id (client poll mỗi 2 giây)
+	qrScanLimit    *limiter // quét / gõ mã QR (kể cả sai): 20 lần / phút / người
 
 	pushQ       chan pushJob
 	pushStartMu sync.Mutex
@@ -156,6 +178,12 @@ func New(d Deps) *Service {
 		matchLimit:  newLimiter(matchPerDay, 24*time.Hour, now),
 		directLimit: newLimiter(30, time.Hour, now),
 
+		editLimit:      newLimiter(30, time.Minute, now),
+		reactLimit:     newLimiter(60, time.Minute, now),
+		msgSearchLimit: newLimiter(30, time.Minute, now),
+		qrPollLimit:    newLimiter(3, 3*time.Second, now),
+		qrScanLimit:    newLimiter(20, time.Minute, now),
+
 		pushQ:     make(chan pushJob, 1000),
 		pushQuit:  make(chan struct{}),
 		pushLast:  map[[2]int64]time.Time{},
@@ -170,7 +198,38 @@ func New(d Deps) *Service {
 	if s.otpDev {
 		logger.Info("chat", "CHAT_OTP_DEV=1: API trả luôn mã OTP (chỉ dùng khi thử ở máy)")
 	}
+	s.initMedia(d, cfg)
 	return s
+}
+
+// initMedia: giới hạn tệp từ config (trống / sai -> mặc định), bộ quét, janitor (chỉ khi có kho tệp).
+func (s *Service) initMedia(d Deps, cfg *config.Config) {
+	mb := func(v float64, def int64) int64 {
+		if v > 0 {
+			return int64(v * (1 << 20))
+		}
+		return def
+	}
+	s.mediaMaxImage = mb(cfg.ChatMediaMaxImageMB, mediaMaxImageBytesD)
+	s.mediaMaxFile = min(mb(cfg.ChatMediaMaxFileMB, mediaMaxFileBytesD), mediaHardMaxBytes)
+	s.mediaMaxImage = min(s.mediaMaxImage, mediaHardMaxBytes)
+	s.mediaDaily = mb(cfg.ChatMediaDailyMB, mediaDailyBytesD)
+	s.mediaURLTTL = mediaURLTTLD
+	if cfg.ChatMediaURLTTLMin > 0 {
+		s.mediaURLTTL = time.Duration(min(max(cfg.ChatMediaURLTTLMin, 5), 720) * float64(time.Minute))
+	}
+	s.uploadLimit = newLimiter(mediaUploadPerMin, time.Minute, s.now)
+	s.imgSem = make(chan struct{}, mediaImgConc)
+	s.mediaQuit = make(chan struct{})
+	s.media, s.scan = d.Media, d.Scan
+	if s.media == nil {
+		return
+	}
+	if s.scan == nil {
+		s.scan = logScanner{}
+		noteLogScanner()
+	}
+	s.startMediaJanitor()
 }
 
 func hmacHex(key []byte, msg string) string {
@@ -203,8 +262,9 @@ func (s *Service) Shutdown(ctx context.Context) {
 		s.pushStopped = true
 		s.pushStartMu.Unlock()
 		close(s.pushQuit)
+		close(s.mediaQuit)
 		done := make(chan struct{})
-		go func() { s.pushWG.Wait(); close(done) }()
+		go func() { s.pushWG.Wait(); s.mediaWG.Wait(); close(done) }()
 		select {
 		case <-done:
 		case <-ctx.Done():

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"errors"
+	"fmt"
 
 	"qspro-backend/internal/modules/chat/realtime"
 	"qspro-backend/internal/platform/logger"
@@ -79,4 +80,73 @@ func wsError(where string, err error) error {
 	}
 	logger.Error("chat", where+" lỗi:", err.Error())
 	return err
+}
+
+// Mã lỗi phần tệp đính kèm (MEDIA_DISABLED khai ở media.go). REST: khoá "code"; WebSocket: data.code (qua wsError).
+const (
+	CodeMediaType        = "MEDIA_TYPE"
+	CodeMediaTooLarge    = "MEDIA_TOO_LARGE"
+	CodeMediaQuota       = "MEDIA_QUOTA"
+	CodeMediaNotFound    = "MEDIA_NOT_FOUND"
+	CodeMediaNotUploaded = "MEDIA_NOT_UPLOADED"
+	CodeMediaMismatch    = "MEDIA_MISMATCH"
+	CodeMediaNotReady    = "MEDIA_NOT_READY"
+	CodeMediaBlocked     = "MEDIA_BLOCKED"
+)
+
+var (
+	errMediaType        = apperr.E(415, "Loại tệp này không gửi được", CodeMediaType)
+	errMediaImageType   = apperr.E(415, "Loại ảnh này không gửi được, hãy gửi dạng tệp", CodeMediaType)
+	errMediaQuota       = apperr.E(429, "Hôm nay bạn đã gửi quá dung lượng cho phép", CodeMediaQuota)
+	errMediaNotFound    = apperr.E(404, "Không tìm thấy tệp", CodeMediaNotFound)
+	errMediaNotUploaded = apperr.E(409, "Tệp chưa tải lên xong", CodeMediaNotUploaded)
+	errMediaMismatch    = apperr.E(422, "Tệp tải lên không khớp, mời gửi lại", CodeMediaMismatch)
+	errMediaNotReady    = apperr.E(409, "Tệp chưa sẵn sàng để gửi", CodeMediaNotReady)
+	errMediaBlocked     = apperr.E(422, "Tệp bị chặn vì nghi chứa mã độc", CodeMediaBlocked)
+	errMediaStarting    = apperr.E(503, "Kho tệp đang khởi động, thử lại sau", CodeUnavailable)
+	errMediaScanDown    = apperr.E(503, "Chưa kiểm tra được tệp, thử lại sau", CodeUnavailable)
+)
+
+// Mã lỗi phần quản trị nhóm (migration 0022, API.md mục "Quản trị nhóm").
+const (
+	CodeGroupDisbanded = "GROUP_DISBANDED"
+	CodeGroupFull      = "GROUP_FULL"
+	CodeInviteInvalid  = "INVITE_INVALID"
+	CodeInviteExpired  = "INVITE_EXPIRED"
+)
+
+var (
+	errGroupDisbanded = apperr.E(410, "Nhóm đã bị giải tán", CodeGroupDisbanded)
+	errGroupFull      = apperr.E(409, "Nhóm đã đủ 1000 thành viên", CodeGroupFull)
+	errInviteInvalid  = apperr.E(404, "Link mời không tồn tại hoặc đã bị thu hồi", CodeInviteInvalid)
+	errInviteExpired  = apperr.E(410, "Link mời đã hết hạn", CodeInviteExpired)
+)
+
+// Mã lỗi giai đoạn 2 (migration 0023, API.md mục "Giai đoạn 2 ..."): sửa / thu hồi / trả lời / chuyển tiếp, đăng nhập QR.
+const (
+	CodeMessageRecalled = "MESSAGE_RECALLED"
+	CodeMessageTooOld   = "MESSAGE_TOO_OLD"
+	CodeQRInvalid       = "QR_INVALID"
+	CodeQRExpired       = "QR_EXPIRED"
+	CodeQRUsed          = "QR_USED"
+)
+
+var (
+	errMessageNotFound = apperr.E(404, "Không tìm thấy tin nhắn", CodeNotFound)
+	errMessageRecalled = apperr.E(410, "Tin nhắn đã bị thu hồi", CodeMessageRecalled)
+	errRecallTooOld    = apperr.E(403, "Chỉ thu hồi được tin nhắn gửi trong vòng 24 giờ", CodeMessageTooOld)
+	errEditTooOld      = apperr.E(403, "Chỉ sửa được tin nhắn gửi trong vòng 24 giờ", CodeMessageTooOld)
+	errActionRateLimit = apperr.E(429, "Bạn thao tác quá nhanh, thử lại sau", CodeRateLimit)
+	errQRInvalid       = apperr.E(404, "Mã đăng nhập không đúng hoặc đã bị huỷ", CodeQRInvalid)
+	errQRExpired       = apperr.E(410, "Mã đăng nhập đã hết hạn, hãy tạo mã mới", CodeQRExpired)
+	errQRUsed          = apperr.E(409, "Mã đăng nhập đã được dùng", CodeQRUsed)
+)
+
+// errMediaTooLarge: 413 kèm giới hạn (MB, làm tròn lên; dưới 1 MB ghi KB).
+func errMediaTooLarge(maxBytes int64) error {
+	lim := fmt.Sprintf("%d MB", (maxBytes+(1<<20)-1)>>20)
+	if maxBytes < 1<<20 {
+		lim = fmt.Sprintf("%d KB", (maxBytes+1023)>>10)
+	}
+	return apperr.E(413, "Tệp quá lớn (tối đa "+lim+")", CodeMediaTooLarge)
 }

@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import * as L from '../state/chatLogic'
 import {
-  acceptFriend, blockUser, cancelFriendRequest, removeMember, renameGroup, sendFriendRequest, setMemberRole, setMute, unblockUser,
+  acceptFriend, blockUser, cancelFriendRequest, removeMember, sendFriendRequest, setMemberRole, setMute, unblockUser,
 } from '../state/chatStore'
 import { IconSvg, avatarConv, colorFor, errText, initials } from './shared'
 import AddMemberPopover from './AddMemberPopover'
+import GroupInfoEditor, { GroupAvatarImg } from './GroupInfoEditor'
+import GroupSettingsPanel from './GroupSettingsPanel'
+import InviteLinkPanel from './InviteLinkPanel'
+import JoinRequestsPanel from './JoinRequestsPanel'
 
 const MUTE_OPTIONS = [
   { label: 'Trong 1 giờ', ms: 3600e3 },
@@ -17,11 +21,12 @@ const ico = { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke:
 
 /* Cột thông tin hội thoại bên phải — renderInfo() trong chat.html.
    Hội thoại cục bộ SiteFlow Bot: chỉ phần đầu (như bản cũ). Hội thoại thật: thành viên + vai trò, thêm / xoá / rời nhóm,
-   đổi tên, đặt / bỏ quản trị viên (trưởng nhóm), tắt thông báo, kết bạn / chặn (chat 1-1). */
+   đổi tên, đặt / bỏ quản trị viên (trưởng nhóm), tắt thông báo, kết bạn / chặn (chat 1-1).
+   Quản trị nhóm (0022): ảnh + mô tả, sửa thông tin, yêu cầu vào nhóm, link mời, cài đặt quyền, chuyển trưởng nhóm, giải tán;
+   hiện / ẩn theo L.canDo. Nhóm đã giải tán: chỉ đọc, chỉ còn nút "Xoá khỏi danh sách". */
 export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop, onCloseMemberPop, onLeft }) {
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
-  const [renaming, setRenaming] = useState(null)
   const [muteOpen, setMuteOpen] = useState(false)
 
   if (conv.local) {
@@ -46,6 +51,10 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
   const now = Date.now()
   const muted = L.isMuted(c.muted_until, now)
   const av = avatarConv(c, online)
+  const disbanded = c.type === 'group' && L.isDisbanded(c)
+  /* Còn quyền ghi trên nhóm: chưa rời, chưa giải tán (nhóm giải tán chỉ đọc, mọi thao tác ghi -> 410) */
+  const live = !c.left && !disbanded
+  const can = action => live && L.canDo(myRole, c.settings, action)
 
   async function act(key, fn, after) {
     if (busy) return
@@ -55,10 +64,10 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
   }
 
   const sub = c.type === 'group'
-    ? (c.left ? '' : `${c.member_count || members.length} thành viên`)
+    ? (disbanded ? 'Nhóm đã bị giải tán' : c.left ? '' : `${c.member_count || members.length} thành viên`)
     : online ? 'Đang hoạt động' : (pres && pres.last_seen ? L.lastSeenLabel(pres.last_seen, now) : '')
 
-  const muteBlock = !c.left && (
+  const muteBlock = !c.left && !disbanded && (
     <div className="ch-info-section">
       <div className="ch-sec-title">Thông báo</div>
       {muted ? (
@@ -126,10 +135,18 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
       <>
         {/* Đã rời / bị xoá: không còn xem được danh sách thành viên (danh sách cũ không còn đúng) */}
         {c.left && <div className="ch-info-section"><div className="ch-info-note">Bạn không còn là thành viên của nhóm này.</div></div>}
-        {!c.left && <div className="ch-info-section">
+        {/* Đã giải tán: chỉ đọc lịch sử, không còn danh sách thành viên (members: []) */}
+        {disbanded && (
+          <div className="ch-info-section">
+            <div className="ch-info-note">Nhóm đã bị giải tán. Bạn vẫn xem được tin nhắn cũ nhưng không gửi tin được nữa.</div>
+          </div>
+        )}
+        {live && <GroupInfoEditor conv={c} canEdit={can('edit_info')} />}
+        {can('manage_requests') && <JoinRequestsPanel chat={chat} conv={c} />}
+        {live && <div className="ch-info-section">
           <div className="ch-sec-title-row">
             <div className="ch-sec-title">Thành viên ({members.length || c.member_count || 0})</div>
-            {!c.left && (
+            {can('add_members') && (
               <button type="button" className="ch-pjm-add-btn" title="Thêm người vào nhóm" onClick={e => { e.stopPropagation(); onToggleMemberPop() }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
               </button>
@@ -139,8 +156,8 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
           {!members.length && <div className="ch-info-note">Đang tải thành viên…</div>}
           {sorted.map(m => {
             const self = m.user_id === me.id
-            const canRole = !c.left && L.canSetRole(myRole, m.role) && !self
-            const canRemove = !c.left && !self && L.canRemoveMember(myRole, m.role, false)
+            const canRole = live && L.canSetRole(myRole, m.role) && !self
+            const canRemove = live && !self && L.canRemoveMember(myRole, m.role, false)
             return (
               <div key={m.user_id} className="ch-member-row">
                 <span className="ch-m-avatar" style={{ background: colorFor(m.user_id) }}>{initials(m.display_name)}</span>
@@ -167,29 +184,20 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
             )
           })}
         </div>}
-        {!c.left && L.canRename(myRole) && (
+        {live && <InviteLinkPanel chat={chat} conv={c} me={me} myRole={myRole} />}
+        {muteBlock}
+        {live && (
+          <GroupSettingsPanel conv={c} members={members} me={me} canSettings={can('settings')} isOwner={can('disband')} />
+        )}
+        {disbanded && (
           <div className="ch-info-section">
-            <div className="ch-sec-title">Tên nhóm</div>
-            {renaming === null ? (
-              <button type="button" className="ch-info-btn" onClick={() => setRenaming(c.name || '')}>Đổi tên nhóm</button>
-            ) : (
-              <form className="ch-info-rename" onSubmit={e => {
-                e.preventDefault()
-                const n = renaming.trim()
-                if (!n || n.length > L.MAX_GROUP_NAME) { setErr('Tên nhóm từ 1 đến 100 ký tự'); return }
-                act('rename', () => renameGroup(c.id, n), () => setRenaming(null))
-              }}>
-                <input autoFocus maxLength={L.MAX_GROUP_NAME} value={renaming} onChange={e => setRenaming(e.target.value)} />
-                <div className="ch-pjm-actions">
-                  <button type="button" className="ch-pjm-btn" onClick={() => setRenaming(null)}>Huỷ</button>
-                  <button className="ch-pjm-btn primary" disabled={!!busy}>Lưu</button>
-                </div>
-              </form>
-            )}
+            <button type="button" className="ch-info-btn danger" disabled={!!busy}
+              onClick={() => { if (window.confirm('Xoá nhóm "' + L.convTitle(c) + '" khỏi danh sách? Bạn sẽ không xem lại được tin nhắn của nhóm.')) act('leave', () => removeMember(c.id, me.id), onLeft) }}>
+              Xoá khỏi danh sách
+            </button>
           </div>
         )}
-        {muteBlock}
-        {!c.left && (
+        {live && (
           <div className="ch-info-section">
             <button type="button" className="ch-info-btn danger" disabled={!!busy}
               onClick={() => {
@@ -207,11 +215,12 @@ export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop
   return (
     <div className="ch-info-panel">
       <div className="ch-info-hero">
-        <div className={'ch-avatar-lg' + (av.type === 'dm' ? ' round' : '')} style={{ background: av.color }}>
-          {av.type === 'dm' ? initials(av.name) : <IconSvg kind="group" />}
-        </div>
+        {av.type === 'dm' ? (
+          <div className="ch-avatar-lg round" style={{ background: av.color }}>{initials(av.name)}</div>
+        ) : <GroupAvatarImg key={c.avatar ? c.avatar.id : 0} conv={c} className="ch-avatar-lg" />}
         <div className="ch-name">{L.convTitle(c)}</div>
         {sub && <div className="ch-sub">{sub}</div>}
+        {c.type === 'group' && c.description && <div className="ch-ga-desc">{c.description}</div>}
       </div>
       {err && <div className="ch-info-err" role="alert">{err}</div>}
       {c.left && <div className="ch-info-note">Bạn không còn là thành viên của cuộc trò chuyện này.</div>}

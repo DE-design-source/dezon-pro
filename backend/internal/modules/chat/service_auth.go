@@ -253,10 +253,8 @@ func (s *Service) VerifyOTP(ctx context.Context, in VerifyInput) (*AuthResult, e
 			return nil, errBad("Tên hiển thị tối đa 100 ký tự")
 		}
 	}
-	raw, hash, err := newRefreshToken()
-	if err != nil {
-		return nil, err
-	}
+	ua, ip := devCleanUA(in.UserAgent, maxUserAgent), devCleanIP(in.ClientIP)
+	var raw string
 	var biz error
 	var uid, did int64
 	var isNew bool
@@ -328,12 +326,7 @@ func (s *Service) VerifyOTP(ctx context.Context, in VerifyInput) (*AuthResult, e
 		default:
 			return err
 		}
-		if err := tx.QueryRow(ctx, `insert into chat_devices (user_id, platform, device_name, last_seen_at)
-			values ($1, $2, $3, now()) returning id`, uid, platform, devName).Scan(&did); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `insert into chat_refresh_tokens (device_id, token_hash, expires_at)
-			values ($1, $2, now() + $3::interval)`, did, hash, secs(s.refreshTTL)); err != nil {
+		if did, raw, err = s.devCreateTx(ctx, tx, uid, platform, devName, ua, ip, LoginOTP); err != nil {
 			return err
 		}
 		me, err = s.loadMe(ctx, tx, uid)
@@ -350,6 +343,7 @@ func (s *Service) VerifyOTP(ctx context.Context, in VerifyInput) (*AuthResult, e
 	}
 	res := s.authResult(uid, did, raw, me)
 	res.IsNew = &isNew
+	s.devNotify(uid, "login", did)
 	return res, nil
 }
 
@@ -366,6 +360,12 @@ func (s *Service) authResult(uid, did int64, refresh string, me *MeDTO) *AuthRes
 // Refresh xoay vòng refresh token (CHAT.md 6.5): token cũ đánh dấu đã dùng, cấp cặp mới. Token đã dùng bị trình lại:
 // trong 30 giây -> REFRESH_RACE (request song song, không thu hồi); cũ hơn -> xoá thiết bị (mọi token) -> REFRESH_REUSED.
 func (s *Service) Refresh(ctx context.Context, token string) (*AuthResult, error) {
+	return s.RefreshFrom(ctx, token, "")
+}
+
+// RefreshFrom: như Refresh, ip khác rỗng thì ghi vào chat_devices.last_ip (bảng thiết bị).
+func (s *Service) RefreshFrom(ctx context.Context, token, ip string) (*AuthResult, error) {
+	ip = devCleanIP(ip)
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, errBad("Thiếu refresh_token")
@@ -430,7 +430,8 @@ func (s *Service) Refresh(ctx context.Context, token string) (*AuthResult, error
 			values ($1, $2, now() + $3::interval)`, did, hash, secs(s.refreshTTL)); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `update chat_devices set last_seen_at = now() where id = $1`, did); err != nil {
+		if _, err := tx.Exec(ctx, `update chat_devices set last_seen_at = now(),
+			last_ip = case when $2::text = '' then last_ip else $2::text end where id = $1`, did, ip); err != nil {
 			return err
 		}
 		me, err = s.loadMe(ctx, tx, uid)
@@ -454,10 +455,14 @@ func (s *Service) Logout(ctx context.Context, uid, did int64) error {
 	if err != nil {
 		return err
 	}
-	if _, err := p.Exec(ctx, `delete from chat_devices where id = $1 and user_id = $2`, did, uid); err != nil {
+	tag, err := p.Exec(ctx, `delete from chat_devices where id = $1 and user_id = $2`, did, uid)
+	if err != nil {
 		return err
 	}
 	s.dropDevice(did)
+	if tag.RowsAffected() > 0 {
+		s.devNotify(uid, "logout", did)
+	}
 	return nil
 }
 

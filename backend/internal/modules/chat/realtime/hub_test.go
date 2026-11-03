@@ -37,6 +37,9 @@ func TestAuthOK(t *testing.T) {
 	if !h.OnlineUsers([]int64{5})[5] || h.OnlineUsers([]int64{6})[6] {
 		t.Fatal("OnlineUsers sai sau khi xác thực")
 	}
+	if od := h.OnlineDevices([]int64{7, 8}); !od[7] || od[8] || len(od) != 2 {
+		t.Fatalf("OnlineDevices = %v", od)
+	}
 	c.ping()
 }
 

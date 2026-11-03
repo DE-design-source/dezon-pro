@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,7 @@ import (
 	"qspro-backend/internal/modules/users"
 	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/platform/mailer"
+	"qspro-backend/internal/platform/objstore"
 	"qspro-backend/internal/platform/webpush"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/response"
@@ -140,7 +142,8 @@ func (s *Server) modules() []Module {
 	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
 	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);
 	// bộ chạy phân phối + worker push dừng SAU, khi request REST đang dở đã xong (tin hệ thống của chúng vẫn phân phối + push).
-	chatSvc := chat.New(chat.Deps{DB: d.DB, Cfg: d.Cfg, Mail: chatMail(d.Cfg), Push: chatPush(d.Cfg)})
+	chatSvc := chat.New(chat.Deps{DB: d.DB, Cfg: d.Cfg, Mail: chatMail(d.Cfg), Push: chatPush(d.Cfg),
+		Media: chatMedia(d.Cfg, s)})
 	chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(d.Cfg.CORSOrigins)})
 	chatSvc.SetGateway(chatHub)
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
@@ -192,6 +195,31 @@ func chatPush(cfg *config.Config) chat.PushSender {
 	}
 	return c
 }
+
+// chatMedia: kho tệp chat (MinIO / S3) khi đặt CHAT_S3_ENDPOINT; thiếu khoá hoặc cấu hình sai -> nil (route tệp trả
+// MEDIA_DISABLED, ghi 1 dòng log). Bucket kiểm / tạo ở nền (Ready), dừng thử lại khi server tắt. Trả interface nil thật.
+func chatMedia(cfg *config.Config, s *Server) chat.MediaStore {
+	if cfg.ChatS3Endpoint == "" {
+		logger.Info("chat", "tệp chat tắt: chưa đặt CHAT_S3_ENDPOINT")
+		return nil
+	}
+	if cfg.ChatS3AccessKey == "" || cfg.ChatS3SecretKey == "" {
+		logger.Error("chat", "tệp chat tắt: phải đặt CHAT_S3_ACCESS_KEY và CHAT_S3_SECRET_KEY khi có CHAT_S3_ENDPOINT")
+		return nil
+	}
+	c, err := objstore.New(objstore.Config{Endpoint: cfg.ChatS3Endpoint, PublicURL: cfg.ChatS3PublicURL, AccessKey: cfg.ChatS3AccessKey,
+		SecretKey: cfg.ChatS3SecretKey, Bucket: cfg.ChatS3Bucket, Region: cfg.ChatS3Region})
+	if err != nil {
+		logger.Error("chat", "tệp chat tắt:", err.Error())
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Start(ctx)
+	s.OnShutdown(func(context.Context) { cancel() })
+	return c
+}
+
+var _ chat.MediaStore = (*objstore.Client)(nil)
 
 // wsOrigins: OriginPatterns của gateway chat = host (bỏ scheme) của CORS_ORIGINS - trang ở origin khác API (giao diện
 // React) được mở WebSocket; cùng host với API luôn được phép. CORS so khớp nguyên chuỗi nên ký tự đặc biệt của

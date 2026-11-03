@@ -29,7 +29,11 @@ type pushJob struct {
 	convID, seq int64
 	title, body string
 	users       []int64 // người nhận (đã bỏ người online / tắt thông báo / vừa được push trong 3 giây)
+	noCoalesce  bool    // job của người được @nhắc tên: không bỏ ai vì gộp 3 giây (vẫn ghi nhận lần push để gộp tin sau)
 }
+
+// mentionPushPrefix: đầu nội dung push gửi người được @nhắc tên (API.md mục "Quản trị nhóm" - Push).
+const mentionPushPrefix = "Nhắc đến bạn: "
 
 // pushPayload: thân thông báo mà service worker (chat-sw.js) đọc. UserID = người nhận: một trình duyệt có thể đăng
 // nhập nhiều tài khoản (mỗi tab một tài khoản) dùng chung một subscription, service worker cần biết thông báo của ai.
@@ -147,7 +151,10 @@ func (s *Service) enqueuePush(j pushJob) {
 	}
 	users := make([]int64, 0, len(j.users))
 	for _, u := range j.users {
-		if !s.coalesced(u, j.convID) {
+		if j.noCoalesce {
+			s.markPushed(u, j.convID)
+			users = append(users, u)
+		} else if !s.coalesced(u, j.convID) {
 			users = append(users, u)
 		}
 	}
@@ -223,6 +230,14 @@ func (s *Service) coalesced(user, conv int64) bool {
 	return false
 }
 
+// markPushed: ghi nhận vừa push cho (người nhận, hội thoại) mà không kiểm gộp (push @nhắc tên); tin thường ngay sau đó bị gộp.
+func (s *Service) markPushed(user, conv int64) {
+	now := s.now()
+	s.pushMu.Lock()
+	s.pushLast[[2]int64{user, conv}] = now
+	s.pushMu.Unlock()
+}
+
 type pushDevice struct {
 	id, userID int64
 	token      string
@@ -238,6 +253,16 @@ func (s *Service) runPush(j pushJob) {
 	p, err := s.pool()
 	if err != nil {
 		logger.Error("chat", "push:", err.Error())
+		return
+	}
+	// tin đã bị thu hồi khi job còn trong hàng đợi (cửa sổ gộp 3 giây / hàng chờ) -> bỏ, không lộ nội dung đã xoá
+	var recalled bool
+	if err := p.QueryRow(ctx, `select exists (select 1 from chat_messages where conversation_id = $1 and seq = $2 and recalled_at is not null)`,
+		j.convID, j.seq).Scan(&recalled); err != nil {
+		logger.Error("chat", "push: đọc trạng thái thu hồi lỗi:", err.Error())
+		return
+	}
+	if recalled {
 		return
 	}
 	rows, err := p.Query(ctx, `select d.id, d.user_id, d.push_token from chat_devices d

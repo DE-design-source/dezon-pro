@@ -36,6 +36,8 @@ type SyncResult struct {
 type MessagePage struct {
 	Messages []MessageDTO `json:"messages"`
 	HasMore  bool         `json:"has_more"`
+	// HasNewer: còn tin mới hơn trang này - chỉ có ở chế độ around_seq (MessagesAround).
+	HasNewer *bool `json:"has_newer,omitempty"`
 }
 
 // convRow: 1 hội thoại nhìn từ một thành viên (kể cả đã rời).
@@ -59,28 +61,51 @@ type convRow struct {
 	lmClient, lmType, lmText *string
 	lmAt                     *time.Time
 	lmSenderName             *string
+	lmMedia                  *int64  // chat_messages.media_id của tin cuối
+	lmFile                   *string // chat_messages.file_name của tin cuối
+	lmMentions               *string // chat_messages.mentions (jsonb dạng chữ) của tin cuối
+	description              *string // null với chat 1-1 / dòng đã rời
+	avatarID                 *int64  // chat_conversations.avatar_media_id (null với dòng đã rời)
+	settings                 GroupSettingsDTO
+	disbanded                bool       // nhóm đã giải tán và dòng này là dòng chỉ đọc (left_at = disbanded_at)
+	lastMention              int64      // last_mention_seq (0 với dòng đã rời)
+	lmEdited                 *time.Time // chat_messages.edited_at của tin cuối
+	lmRecalled               bool       // tin cuối đã thu hồi
+	lmRecalledBy             *int64
+	lmForwarded              bool
 }
+
+// convVisible: dòng thành viên còn xem được hội thoại - đang hoạt động, hoặc dòng chỉ đọc của nhóm đã giải tán
+// (left_at = disbanded_at). m = chat_conversation_members, c = chat_conversations.
+const convVisible = `(m.left_at is null or m.left_at is not distinct from c.disbanded_at)`
 
 // convSelect: $1 = người xem. Dòng đã rời (left) chỉ còn dữ liệu của chính mình: không tên, không tin cuối, last_seq =
 // con trỏ đã nhận của mình, updated_at = lúc dòng thành viên đổi, member_count 0 - người đã rời / bị xoá không theo dõi
-// được tên, lượng tin, hoạt động, số thành viên của nhóm qua /sync?cursor=0.
-const convSelect = `select c.id, c.conversation_type, case when m.left_at is null then c.name end,
-  case when m.left_at is null then c.last_seq else m.last_delivered_seq end,
-  case when m.left_at is null then c.last_message_at end, c.created_at,
-  case when m.left_at is null then c.updated_at else m.updated_at end,
+// được tên, lượng tin, hoạt động, số thành viên của nhóm qua /sync?cursor=0. Dòng chỉ đọc của nhóm đã giải tán hiện
+// như hội thoại thường (left = false, disbanded = true, member_count 0).
+const convSelect = `select c.id, c.conversation_type, case when ` + convVisible + ` then c.name end,
+  case when ` + convVisible + ` then c.last_seq else m.last_delivered_seq end,
+  case when ` + convVisible + ` then c.last_message_at end, c.created_at,
+  case when ` + convVisible + ` then c.updated_at else m.updated_at end,
   m.member_role, m.last_read_seq, m.last_delivered_seq,
   coalesce(m.muted_until > now() and m.muted_until = 'infinity'::timestamptz, false),
   case when m.muted_until > now() and m.muted_until < 'infinity'::timestamptz then m.muted_until end,
-  m.left_at is not null, m.updated_at,
+  not ` + convVisible + `, m.updated_at,
   case when m.left_at is null then
     (select count(*) from chat_conversation_members x where x.conversation_id = c.id and x.left_at is null) else 0 end,
   case when c.conversation_type = 'direct' then
     (select x.user_id from chat_conversation_members x where x.conversation_id = c.id and x.user_id <> m.user_id limit 1) end,
   c.conversation_type = 'direct' and exists (select 1 from chat_messages x where x.conversation_id = c.id and x.sender_id <> m.user_id),
-  lm.id, lm.seq, lm.sender_id, lm.client_msg_id::text, lm.message_type, lm.content, lm.created_at, su.display_name
+  lm.id, lm.seq, lm.sender_id, lm.client_msg_id::text, lm.message_type, lm.content, lm.created_at, su.display_name,
+  lm.media_id, lm.file_name, lm.mentions::text,
+  case when ` + convVisible + ` then c.description end, case when ` + convVisible + ` then c.avatar_media_id end,
+  c.is_admin_only_send, c.is_admin_only_info, c.is_admin_only_add,
+  c.disbanded_at is not null and m.left_at is not distinct from c.disbanded_at,
+  case when ` + convVisible + ` then m.last_mention_seq else 0 end,
+  lm.edited_at, coalesce(lm.recalled_at is not null, false), lm.recalled_by, coalesce(lm.is_forwarded, false)
 from chat_conversation_members m
 join chat_conversations c on c.id = m.conversation_id
-left join chat_messages lm on m.left_at is null and lm.conversation_id = c.id and lm.seq = c.last_seq
+left join chat_messages lm on ` + convVisible + ` and lm.conversation_id = c.id and lm.seq = c.last_seq
 left join chat_users su on su.id = lm.sender_id
 where m.user_id = $1 `
 
@@ -96,7 +121,10 @@ func queryConvs(ctx context.Context, q querier, sql string, args ...any) ([]*con
 		if err := rows.Scan(&r.id, &r.typ, &r.name, &r.lastSeq, &r.lastMsgAt, &r.createdAt, &r.updatedAt,
 			&r.role, &r.readSeq, &r.delivSeq, &r.mutedForever, &r.mutedUntil, &r.left, &r.memberUpdated,
 			&r.memberCount, &r.peerID, &r.peerPosted,
-			&r.lmID, &r.lmSeq, &r.lmSender, &r.lmClient, &r.lmType, &r.lmText, &r.lmAt, &r.lmSenderName); err != nil {
+			&r.lmID, &r.lmSeq, &r.lmSender, &r.lmClient, &r.lmType, &r.lmText, &r.lmAt, &r.lmSenderName, &r.lmMedia, &r.lmFile,
+			&r.lmMentions, &r.description, &r.avatarID, &r.settings.AdminsOnlySend, &r.settings.AdminsOnlyEditInfo,
+			&r.settings.AdminsOnlyAddMembers, &r.disbanded, &r.lastMention,
+			&r.lmEdited, &r.lmRecalled, &r.lmRecalledBy, &r.lmForwarded); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -117,6 +145,19 @@ func (s *Service) convDTOs(ctx context.Context, q querier, uid int64, rows []*co
 		return nil, err
 	}
 	online := s.online(peers)
+	var mediaIDs []int64
+	for _, r := range rows {
+		if r.lmMedia != nil {
+			mediaIDs = append(mediaIDs, *r.lmMedia)
+		}
+		if r.avatarID != nil {
+			mediaIDs = append(mediaIDs, *r.avatarID)
+		}
+	}
+	mds, err := s.mediaDTOs(ctx, q, mediaIDs)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]ConversationDTO, 0, len(rows))
 	for _, r := range rows {
 		d := ConversationDTO{
@@ -129,8 +170,17 @@ func (s *Service) convDTOs(ctx context.Context, q querier, uid int64, rows []*co
 			f := "forever"
 			d.MutedUntil = &f
 		}
-		if !r.left && r.lastSeq > r.readSeq {
+		if !r.left && !r.disbanded && r.lastSeq > r.readSeq {
 			d.Unread = r.lastSeq - r.readSeq
+		}
+		if r.typ == "group" && !r.left {
+			d.Description = r.description
+			d.Avatar = groupAvatar(r.avatarID, mds)
+			st := r.settings
+			d.Settings = &st
+			d.Disbanded = r.disbanded
+			d.LastMentionSeq = r.lastMention
+			d.UnreadMention = !r.disbanded && r.lastMention > r.readSeq
 		}
 		if r.peerID != nil {
 			if u := users[*r.peerID]; u != nil {
@@ -143,6 +193,18 @@ func (s *Service) convDTOs(ctx context.Context, q querier, uid int64, rows []*co
 		if r.lmID != nil {
 			m := MessageDTO{ID: *r.lmID, ConversationID: r.id, Seq: *r.lmSeq, ClientMsgID: r.lmClient, SenderID: *r.lmSender,
 				MsgType: deref(r.lmType), Content: deref(r.lmText), SenderName: deref(r.lmSenderName)}
+			// tin đã thu hồi: content rỗng, không tệp / nhắc tên (đã xoá khỏi dòng), không nhãn sửa / chuyển tiếp
+			if r.lmRecalled {
+				m.Content, m.Recalled, m.RecalledBy = "", true, r.lmRecalledBy
+			} else {
+				m.Forwarded, m.EditedAt = r.lmForwarded, isoPtr(r.lmEdited)
+				if r.lmMentions != nil {
+					m.Mentions = parseMentions([]byte(*r.lmMentions))
+				}
+				if m.Attachments, err = s.msgMedia(ctx, r.lmMedia, r.lmFile, mds); err != nil {
+					return nil, err
+				}
+			}
 			if r.lmAt != nil {
 				m.CreatedAt = iso(*r.lmAt)
 			}
@@ -189,7 +251,7 @@ func (s *Service) ListConversations(ctx context.Context, uid int64, cursor strin
 	if err != nil {
 		return nil, err
 	}
-	sql := convSelect + `and m.left_at is null `
+	sql := convSelect + `and ` + convVisible + ` `
 	args := []any{uid}
 	switch {
 	case cur == nil:
@@ -233,8 +295,8 @@ func (s *Service) Sync(ctx context.Context, uid int64, cursor string) (*SyncResu
 	if err != nil {
 		return nil, err
 	}
-	rows, err := queryConvs(ctx, p, convSelect+`and ((m.left_at is null and c.updated_at >= $2::timestamptz) or m.updated_at >= $2::timestamptz)
-		order by case when m.left_at is null then greatest(c.updated_at, m.updated_at) else m.updated_at end desc, c.id desc
+	rows, err := queryConvs(ctx, p, convSelect+`and ((`+convVisible+` and c.updated_at >= $2::timestamptz) or m.updated_at >= $2::timestamptz)
+		order by case when `+convVisible+` then greatest(c.updated_at, m.updated_at) else m.updated_at end desc, c.id desc
 		limit `+strconv.Itoa(maxSyncRows+1), uid, pgTime(since.Add(-syncOverlap)))
 	if err != nil {
 		return nil, err
@@ -265,7 +327,8 @@ func (s *Service) convFor(ctx context.Context, q querier, uid, convID int64, act
 	return &ds[0], nil
 }
 
-// Conversation: chi tiết hội thoại + thành viên đang hoạt động (chỉ thành viên xem được).
+// Conversation: chi tiết hội thoại + thành viên đang hoạt động (chỉ thành viên xem được; nhóm đã giải tán: dòng chỉ đọc
+// xem được, members rỗng). pending_join_requests chỉ có số thật với trưởng / phó nhóm.
 func (s *Service) Conversation(ctx context.Context, uid, convID int64) (*ConversationDetailDTO, error) {
 	p, err := s.pool()
 	if err != nil {
@@ -275,6 +338,17 @@ func (s *Service) Conversation(ctx context.Context, uid, convID int64) (*Convers
 	if err != nil {
 		return nil, err
 	}
+	if c.Disbanded {
+		return &ConversationDetailDTO{ConversationDTO: *c, Members: []MemberDTO{}}, nil
+	}
+	var pending int64
+	if c.Type == "group" && (c.Role == "owner" || c.Role == "admin") {
+		n, err := pendingJoinRequestCount(ctx, p, convID)
+		if err != nil {
+			return nil, err
+		}
+		pending = int64(n)
+	}
 	rows, err := p.Query(ctx, `select m.user_id, u.display_name, m.member_role, m.last_read_seq, u.show_read_receipts,
 		m.last_delivered_seq, m.joined_at
 		from chat_conversation_members m join chat_users u on u.id = m.user_id
@@ -283,7 +357,7 @@ func (s *Service) Conversation(ctx context.Context, uid, convID int64) (*Convers
 		return nil, err
 	}
 	defer rows.Close()
-	d := &ConversationDetailDTO{ConversationDTO: *c, Members: []MemberDTO{}}
+	d := &ConversationDetailDTO{ConversationDTO: *c, Members: []MemberDTO{}, PendingJoinRequests: pending}
 	for rows.Next() {
 		var m MemberDTO
 		var read int64
@@ -428,7 +502,7 @@ func (s *Service) CreateGroup(ctx context.Context, uid int64, name string, membe
 			return err
 		}
 		msg, err = insertMessageTx(ctx, tx, convRef{id: convID, typ: "group", name: &name}, uid, names[uid], "system",
-			names[uid]+" đã tạo nhóm “"+name+"”", nil)
+			names[uid]+" đã tạo nhóm “"+name+"”", nil, nil, nil)
 		return err
 	})
 	if err != nil {
@@ -440,15 +514,17 @@ func (s *Service) CreateGroup(ctx context.Context, uid int64, name string, membe
 }
 
 // lockGroup: khoá dòng hội thoại (tuần tự với gửi tin / đổi thành viên khác), uid phải là thành viên nhóm đang hoạt động.
+// Nhóm đã giải tán (uid còn dòng chỉ đọc) -> 410 GROUP_DISBANDED.
 func lockGroup(ctx context.Context, tx pgx.Tx, convID, uid int64) (convRef, string, string, error) {
 	var c convRef
 	var role, actor string
-	err := tx.QueryRow(ctx, `select c.conversation_type, c.name, m.member_role, u.display_name
+	var visible, disbanded bool
+	err := tx.QueryRow(ctx, `select c.conversation_type, c.name, m.member_role, u.display_name, `+convVisible+`, c.disbanded_at is not null
 		from chat_conversations c
-		join chat_conversation_members m on m.conversation_id = c.id and m.user_id = $2 and m.left_at is null
+		join chat_conversation_members m on m.conversation_id = c.id and m.user_id = $2
 		join chat_users u on u.id = m.user_id
-		where c.id = $1 for update of c`, convID, uid).Scan(&c.typ, &c.name, &role, &actor)
-	if noRows(err) {
+		where c.id = $1 for update of c`, convID, uid).Scan(&c.typ, &c.name, &role, &actor, &visible, &disbanded)
+	if noRows(err) || (err == nil && !visible) {
 		return c, "", "", errNotMember
 	}
 	if err != nil {
@@ -457,6 +533,9 @@ func lockGroup(ctx context.Context, tx pgx.Tx, convID, uid int64) (convRef, stri
 	c.id = convID
 	if c.typ != "group" {
 		return c, "", "", errNotGroup
+	}
+	if disbanded {
+		return c, "", "", errGroupDisbanded
 	}
 	return c, role, actor, nil
 }
@@ -472,7 +551,8 @@ func activeRole(ctx context.Context, tx pgx.Tx, convID, user int64) (string, err
 	return role, err
 }
 
-// AddMembers: thành viên bất kỳ thêm bạn bè của mình vào nhóm (người đã rời được thêm lại).
+// AddMembers: thành viên thêm bạn bè của mình vào nhóm (người đã rời được thêm lại); nhóm bật admins_only_add_members
+// thì chỉ trưởng / phó nhóm. Người được thêm đang có yêu cầu vào nhóm chờ duyệt -> yêu cầu thành cancelled.
 func (s *Service) AddMembers(ctx context.Context, uid, convID int64, userIDs []int64) (*ConversationDetailDTO, error) {
 	ids := cleanIDs(userIDs, uid)
 	if len(ids) == 0 {
@@ -482,10 +562,18 @@ func (s *Service) AddMembers(ctx context.Context, uid, convID int64, userIDs []i
 		return nil, errBad("Nhóm tối đa 1000 thành viên")
 	}
 	var msg *msgRow
+	var cancelled bool
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
-		c, _, actor, err := lockGroup(ctx, tx, convID, uid)
+		c, role, actor, err := lockGroup(ctx, tx, convID, uid)
 		if err != nil {
 			return err
+		}
+		st, err := groupSettings(ctx, tx, convID)
+		if err != nil {
+			return err
+		}
+		if !canDo(role, st, ActAddMembers) {
+			return errForbidden("Chỉ trưởng / phó nhóm được thêm thành viên")
 		}
 		n, err := countFriends(ctx, tx, uid, ids)
 		if err != nil {
@@ -528,11 +616,17 @@ func (s *Service) AddMembers(ctx context.Context, uid, convID int64, userIDs []i
 			convID, add); err != nil {
 			return err
 		}
+		tag, err := tx.Exec(ctx, `update chat_group_join_requests set status = 'cancelled', resolved_at = clock_timestamp()
+			where conversation_id = $1 and user_id = any($2::bigint[]) and status = 'pending'`, convID, add)
+		if err != nil {
+			return err
+		}
+		cancelled = tag.RowsAffected() > 0
 		names, err := displayNames(ctx, tx, add)
 		if err != nil {
 			return err
 		}
-		msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", actor+" đã thêm "+nameList(names, add)+" vào nhóm", nil)
+		msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", actor+" đã thêm "+nameList(names, add)+" vào nhóm", nil, nil, nil)
 		return err
 	})
 	if err != nil {
@@ -541,6 +635,10 @@ func (s *Service) AddMembers(ctx context.Context, uid, convID int64, userIDs []i
 	if msg != nil {
 		s.forgetMembers(convID)
 		s.dispatch(msg, nil)
+		s.emitMembersUpdated(convID)
+		if cancelled {
+			s.emitJoinRequestsUpdated(convID)
+		}
 	}
 	return s.Conversation(ctx, uid, convID)
 }
@@ -550,6 +648,12 @@ func (s *Service) AddMembers(ctx context.Context, uid, convID int64, userIDs []i
 func (s *Service) RemoveMember(ctx context.Context, uid, convID, target int64) error {
 	if target <= 0 {
 		return errBad("Mã người dùng không hợp lệ")
+	}
+	if target == uid {
+		// nhóm đã giải tán: gỡ dòng chỉ đọc khỏi danh sách của mình (không tin hệ thống)
+		if done, err := s.hideDisbanded(ctx, uid, convID); err != nil || done {
+			return err
+		}
 	}
 	var msg *msgRow
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
@@ -586,7 +690,7 @@ func (s *Service) RemoveMember(ctx context.Context, uid, convID, target int64) e
 			content = actor + " đã xoá " + names[target] + " khỏi nhóm"
 		}
 		// tin hệ thống trước (người rời vẫn là thành viên lúc gửi), rồi mới đánh dấu rời
-		if msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", content, nil); err != nil {
+		if msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", content, nil, nil, nil); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `update chat_conversation_members set left_at = now(), member_role = 'member', updated_at = clock_timestamp()
@@ -597,7 +701,9 @@ func (s *Service) RemoveMember(ctx context.Context, uid, convID, target int64) e
 		return err
 	}
 	s.forgetMembers(convID)
+	forgetSendGate(convID)
 	s.dispatch(msg, []int64{target})
+	s.emitMembersUpdated(convID)
 	// người rời và các thành viên còn lại: ai không còn chung hội thoại nào (và không là bạn) thì thôi xem online của nhau
 	if mem, err := s.activeMembers(ctx, convID); err == nil {
 		ids := make([]int64, 0, len(mem))
@@ -651,50 +757,23 @@ func (s *Service) SetMemberRole(ctx context.Context, uid, convID, target int64, 
 		if newRole == "member" {
 			content = actor + " đã bỏ quyền quản trị của " + names[target]
 		}
-		msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", content, nil)
+		msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", content, nil, nil, nil)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 	if msg != nil {
+		forgetSendGate(convID)
 		s.dispatch(msg, nil)
+		s.emitMembersUpdated(convID)
 	}
 	return s.Conversation(ctx, uid, convID)
 }
 
-// RenameGroup: trưởng / phó nhóm đổi tên nhóm.
+// RenameGroup: đổi tên nhóm (= UpdateGroupInfo chỉ với name; quyền theo admins_only_edit_info).
 func (s *Service) RenameGroup(ctx context.Context, uid, convID int64, name string) (*ConversationDetailDTO, error) {
-	name, err := groupName(name)
-	if err != nil {
-		return nil, err
-	}
-	var msg *msgRow
-	err = s.inTx(ctx, func(tx pgx.Tx) error {
-		c, role, actor, err := lockGroup(ctx, tx, convID, uid)
-		if err != nil {
-			return err
-		}
-		if role != "owner" && role != "admin" {
-			return errForbidden("Chỉ trưởng / phó nhóm được đổi tên nhóm")
-		}
-		if c.name != nil && *c.name == name {
-			return nil
-		}
-		if _, err := tx.Exec(ctx, `update chat_conversations set name = $2, updated_at = now() where id = $1`, convID, name); err != nil {
-			return err
-		}
-		c.name = &name
-		msg, err = insertMessageTx(ctx, tx, c, uid, actor, "system", actor+" đã đổi tên nhóm thành “"+name+"”", nil)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	if msg != nil {
-		s.dispatch(msg, nil)
-	}
-	return s.Conversation(ctx, uid, convID)
+	return s.UpdateGroupInfo(ctx, uid, convID, GroupInfoPatch{Name: &name})
 }
 
 // Mute: tắt thông báo tới until (RFC3339), "forever" = vĩnh viễn, null / quá khứ = bật lại.
@@ -724,6 +803,12 @@ func (s *Service) Mute(ctx context.Context, uid, convID int64, until *string) (*
 		return nil, err
 	}
 	if tag.RowsAffected() == 0 {
+		if ro, err := readonlyDisbanded(ctx, p, uid, convID); err != nil || ro {
+			if err == nil {
+				err = errGroupDisbanded
+			}
+			return nil, err
+		}
 		return nil, errNotMember
 	}
 	s.forgetMembers(convID)
@@ -741,16 +826,14 @@ func (s *Service) Messages(ctx context.Context, uid, convID int64, beforeSeq, af
 	if err != nil {
 		return nil, err
 	}
-	var ok bool
-	if err := p.QueryRow(ctx, `select exists(select 1 from chat_conversation_members where conversation_id = $1 and user_id = $2 and left_at is null)`,
-		convID, uid).Scan(&ok); err != nil {
+	ok, err := canReadConv(ctx, p, uid, convID)
+	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errNotMember
 	}
-	sql := `select m.id, m.seq, m.client_msg_id::text, m.sender_id, u.display_name, m.message_type, m.content, m.created_at
-		from chat_messages m join chat_users u on u.id = m.sender_id where m.conversation_id = $1 `
+	sql := msgSelect + `where m.conversation_id = $1 `
 	args := []any{convID}
 	asc := false
 	switch {
@@ -764,33 +847,21 @@ func (s *Service) Messages(ctx context.Context, uid, convID int64, beforeSeq, af
 	default:
 		sql += `order by m.seq desc`
 	}
-	rows, err := p.Query(ctx, sql+` limit `+strconv.Itoa(limit+1), args...)
+	recs, err := msgQuery(ctx, p, sql+` limit `+strconv.Itoa(limit+1), args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := []MessageDTO{}
-	for rows.Next() {
-		m := MessageDTO{ConversationID: convID}
-		var at time.Time
-		if err := rows.Scan(&m.ID, &m.Seq, &m.ClientMsgID, &m.SenderID, &m.SenderName, &m.MsgType, &m.Content, &at); err != nil {
-			return nil, err
-		}
-		m.CreatedAt = iso(at)
-		out = append(out, m)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
 	page := &MessagePage{}
-	if len(out) > limit {
-		out, page.HasMore = out[:limit], true
+	if len(recs) > limit {
+		recs, page.HasMore = recs[:limit], true
 	}
 	if !asc {
-		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-			out[i], out[j] = out[j], out[i]
+		for i, j := 0, len(recs)-1; i < j; i, j = i+1, j-1 {
+			recs[i], recs[j] = recs[j], recs[i]
 		}
 	}
-	page.Messages = out
+	if page.Messages, err = s.msgDTOs(ctx, p, uid, recs, true); err != nil {
+		return nil, err
+	}
 	return page, nil
 }

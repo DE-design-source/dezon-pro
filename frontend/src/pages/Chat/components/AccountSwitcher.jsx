@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import * as L from '../state/chatLogic'
 import { signOut, switchAccount, unreadTotal, unsentCount } from '../state/chatStore'
 import { colorFor, initials } from './shared'
+import DevicesPanel from './DevicesPanel'
+import QrApprove from './QrApprove'
+import { markSelfSignOut } from './qrUtil'
 
 /* Hỏi trước khi đăng xuất tài khoản của tab (Danh bạ ▸ Đăng xuất, bộ chọn tài khoản ▸ Đăng xuất tài khoản này).
    Còn tin chưa gửi (cả của tab khác cùng tài khoản) thì báo sẽ huỷ; còn tài khoản khác thì nói rõ chúng vẫn đăng nhập. */
@@ -14,16 +17,25 @@ export function confirmSignOut(chat) {
     : others
       ? 'Đăng xuất tài khoản này khỏi trình duyệt? Các tài khoản khác vẫn đăng nhập.'
       : 'Đăng xuất Dezon Chat trên trình duyệt này?'
-  if (window.confirm(msg)) signOut()
+  if (!window.confirm(msg)) return
+  markSelfSignOut(meId || (chat && chat.accountId)) // cổng không báo "bị đăng xuất từ xa" cho lần tự đăng xuất này
+  signOut()
 }
 
 const displayName = (u, id) => (u && u.display_name) || 'Tài khoản #' + id
 
 /* Bộ chọn tài khoản ở đầu danh sách hội thoại (mỗi tab một tài khoản): chip avatar của tài khoản đang dùng; bấm mở menu
    các tài khoản đã đăng nhập trên trình duyệt này, "Thêm tài khoản", "Đăng xuất tài khoản này". Đổi tài khoản chỉ đổi
-   tab này. Bấm ra ngoài / Esc thì đóng. */
+   tab này. Bấm ra ngoài / Esc thì đóng. Tài khoản đang dùng có thêm "Thiết bị đăng nhập" (DevicesPanel) và
+   "Quét mã QR đăng nhập" (QrApprove: duyệt đăng nhập cho máy mới). */
 export default function AccountSwitcher({ chat, onAdd }) {
   const [open, setOpen] = useState(false)
+  const [panel, setPanel] = useState('') // '' | devices | qr
+  const closePanel = useCallback(() => setPanel(''), [])
+  const meId = chat.me ? chat.me.id : null
+
+  /* Đổi tài khoản / bị đăng xuất khi đang mở bảng thiết bị / quét QR: đóng (bảng thuộc tài khoản cũ) */
+  useEffect(() => { setPanel('') }, [meId])
 
   useEffect(() => {
     if (!open) return undefined
@@ -86,6 +98,18 @@ export default function AccountSwitcher({ chat, onAdd }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 10-4.4" /><path d="M18 14v6M15 17h6" /></svg>
             Thêm tài khoản
           </button>
+          {chat.me && chat.auth === 'ready' && (
+            <>
+              <button type="button" role="menuitem" className="ch-acct-act" onClick={() => { setOpen(false); setPanel('devices') }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="11" rx="2" /><path d="M6 19h6" /><rect x="17" y="8" width="5" height="12" rx="1.2" /></svg>
+                Thiết bị đăng nhập
+              </button>
+              <button type="button" role="menuitem" className="ch-acct-act" onClick={() => { setOpen(false); setPanel('qr') }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><path d="M7 12h10" /></svg>
+                Quét mã QR đăng nhập
+              </button>
+            </>
+          )}
           {activeId && entry && (
             <button type="button" role="menuitem" className="ch-acct-act danger" onClick={() => { setOpen(false); confirmSignOut(chat) }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
@@ -94,6 +118,8 @@ export default function AccountSwitcher({ chat, onAdd }) {
           )}
         </div>
       )}
+      {panel === 'devices' && <DevicesPanel onClose={closePanel} />}
+      {panel === 'qr' && <QrApprove onClose={closePanel} />}
     </div>
   )
 }

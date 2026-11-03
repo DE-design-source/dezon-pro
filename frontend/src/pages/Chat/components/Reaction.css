@@ -1,0 +1,32 @@
+/* Cảm xúc trên tin nhắn: hàng chip dưới bubble, bảng chọn nhanh, hộp "ai đã thả" */
+.ch-react-bar{display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:-2px;}
+.ch-msg-group.own .ch-react-bar{justify-content:flex-end;}
+.ch-react-chip{display:inline-flex; align-items:center; gap:3px; height:22px; padding:0 7px; border-radius:11px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:11.5px; font-weight:600; font-family:inherit; line-height:1; cursor:pointer; transition:border-color .12s, background .12s;}
+.ch-react-chip:hover{border-color:var(--primary);}
+.ch-react-chip.ro{cursor:default;}
+.ch-react-chip.ro:not(.mine):hover{border-color:var(--border);}
+.ch-react-chip.mine{background:var(--primary-tint); border-color:var(--primary); color:var(--primary);}
+.ch-react-emoji{font-size:13px; line-height:1;}
+.ch-react-total{height:22px; min-width:22px; padding:0 6px; border-radius:11px; border:none; background:none; color:var(--text-faint); font-size:11px; font-family:inherit; cursor:pointer;}
+.ch-react-total:hover{color:var(--text); text-decoration:underline;}
+.ch-react-chip:focus-visible, .ch-react-total:focus-visible, .ch-react-opt:focus-visible{outline:2px solid var(--primary); outline-offset:1px;}
+
+.ch-react-picker{position:absolute; bottom:calc(100% + 6px); left:0; z-index:40; display:flex; gap:2px; padding:4px 6px; border-radius:22px; background:var(--surface); border:1px solid var(--border); box-shadow:0 8px 24px rgba(15,18,25,.18); animation:ch-react-pop .12s ease-out;}
+.ch-react-picker.right{left:auto; right:0;}
+.ch-react-opt{width:34px; height:34px; border-radius:50%; border:none; background:none; font-size:21px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; transition:transform .12s, background .12s;}
+.ch-react-opt:hover{transform:scale(1.22); background:var(--surface-alt);}
+.ch-react-opt.mine{background:var(--primary-tint);}
+@keyframes ch-react-pop{from{opacity:0; transform:translateY(4px) scale(.96);} to{opacity:1; transform:none;}}
+@media (prefers-reduced-motion: reduce){.ch-react-picker{animation:none;} .ch-react-opt:hover{transform:none;}}
+
+.ch-react-dlg{max-width:380px; max-height:70vh;}
+.ch-react-tabs{display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--border); padding-bottom:6px; flex:none;}
+.ch-react-tabs button{flex:none; display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:14px; border:none; background:none; color:var(--text-muted); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer;}
+.ch-react-tabs button:hover{background:var(--surface-alt);}
+.ch-react-tabs button.active{background:var(--primary-tint); color:var(--primary);}
+.ch-react-list{overflow-y:auto; min-height:60px;}
+.ch-react-row{cursor:default; padding:8px 6px;}
+.ch-react-row-emoji{font-size:18px; flex:none;}
+.ch-react-empty{padding:14px 6px; font-size:12.5px; color:var(--text-muted); display:flex; flex-direction:column; align-items:flex-start; gap:8px;}
+.ch-react-empty .ch-ct-error{margin:0;}
+.ch-react-retry{border:1px solid var(--border); background:var(--surface-alt); color:var(--text); border-radius:8px; padding:5px 12px; font-size:12.5px; font-family:inherit; cursor:pointer;}

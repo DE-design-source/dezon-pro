@@ -91,6 +91,14 @@ export function contactText(u) {
 export function maxSeq(list) { return list && list.length ? list[list.length - 1].seq : 0 }
 export function minSeq(list) { return list && list.length ? list[0].seq : 0 }
 
+/* Hai bản của cùng một tin khác nhau (nội dung, tệp, nhắc tên, sửa / thu hồi, reaction, trích dẫn, chuyển tiếp) */
+function msgChanged(old, m) {
+  return old.id !== m.id || old.content !== m.content || old.created_at !== m.created_at || attachKey(old) !== attachKey(m) ||
+    mentionKey(old) !== mentionKey(m) || (old.edited_at || null) !== (m.edited_at || null) || !!old.recalled !== !!m.recalled ||
+    (old.recalled_by || null) !== (m.recalled_by || null) || !!old.forwarded !== !!m.forwarded ||
+    reactionKey(old.reactions) !== reactionKey(m.reactions) || replyKey(old.reply_to) !== replyKey(m.reply_to)
+}
+
 /* Gộp tin mới vào danh sách đã sắp theo seq, khoá (conversation_id, seq): trùng seq thì bản mới thay bản cũ.
    Không có gì đổi -> trả lại đúng mảng cũ (React không vẽ lại). */
 export function mergeMessages(list, incoming) {
@@ -102,10 +110,152 @@ export function mergeMessages(list, incoming) {
   let changed = false
   for (const m of add) {
     const old = map.get(m.seq)
-    if (!old || old.id !== m.id || old.content !== m.content || old.created_at !== m.created_at) { map.set(m.seq, m); changed = true }
+    if (!old || msgChanged(old, m)) { map.set(m.seq, m); changed = true }
   }
   if (!changed) return base
   return Array.from(map.values()).sort((a, b) => a.seq - b.seq)
+}
+
+/* ---------- Trả lời / sửa / thu hồi / reaction (giai đoạn 2) ---------- */
+
+export const RECALLED_TEXT = 'Tin nhắn đã bị thu hồi'
+export const RECALLED_BY_ADMIN_TEXT = 'Tin nhắn đã bị trưởng / phó nhóm thu hồi'
+export const REPLY_SNIPPET = 200
+
+/* Chữ của bong bóng tin đã thu hồi: người khác (trưởng / phó nhóm) thu hồi -> câu kiểm duyệt */
+export function recalledText(m) {
+  if (!m) return RECALLED_TEXT
+  return m.recalled_by && m.recalled_by !== m.sender_id ? RECALLED_BY_ADMIN_TEXT : RECALLED_TEXT
+}
+
+function reactionKey(r) {
+  if (!r || !r.total) return ''
+  const c = r.counts || {}
+  return Object.keys(c).sort().map(k => k + ':' + c[k]).join(',') + '|' + r.total + '|' + (r.mine || '')
+}
+function replyKey(r) {
+  if (!r) return ''
+  return [r.message_id, r.seq, r.sender_name || '', r.msg_type || '', r.content || '', r.file_name || '', r.recalled ? 1 : 0].join('\u0001')
+}
+
+/* ReplyPreview dựng ở máy từ một tin (tin chờ gửi đang trả lời, vá khung trích dẫn khi tin gốc sửa / thu hồi):
+   {message_id, seq, sender_id, sender_name, msg_type, content (văn bản thuần, tối đa 200 ký tự), file_name?, recalled} */
+export function replyPreviewOf(m) {
+  if (!m) return null
+  const out = {
+    message_id: m.id,
+    seq: m.seq,
+    sender_id: m.sender_id,
+    sender_name: m.sender_name || '',
+    msg_type: m.msg_type || 'text',
+    content: m.recalled ? '' : firstRunes(m.content, REPLY_SNIPPET),
+    recalled: !!m.recalled,
+  }
+  if (!m.recalled && m.msg_type === 'file') {
+    const md = mediaOf(m)
+    const fn = m.file_name || (md && md.file_name) || ''
+    if (fn) out.file_name = fn
+  }
+  return out
+}
+
+/* Chữ một dòng của khung trích dẫn: thu hồi -> "Tin nhắn đã bị thu hồi"; có chữ -> chữ; rỗng -> nhãn tệp như previewBody */
+export function replyText(r) {
+  if (!r) return ''
+  if (r.recalled) return RECALLED_TEXT
+  const text = String(r.content || '').replace(/\s+/g, ' ').trim()
+  if (text) return text
+  switch (r.msg_type) {
+    case 'image': return '[Hình ảnh]'
+    case 'video': return '[Video]'
+    case 'file': return ('[Tệp] ' + String(r.file_name || '').trim()).trim()
+    case 'voice': return '[Tin nhắn thoại]'
+    default: return ''
+  }
+}
+
+/* Bản đã thu hồi của tin: bỏ nội dung, tệp, nhắc tên, trích dẫn, sửa, reaction */
+function recalledShape(m) {
+  const out = { ...m, content: '', recalled: true }
+  for (const k of ['attachments', 'mentions', 'reply_to', 'edited_at', 'reactions', 'file_name']) delete out[k]
+  out.forwarded = false
+  return out
+}
+
+/* Thay một tin đã sửa / thu hồi vào danh sách theo seq (KHÔNG chèn tin chưa có - tránh tạo chỗ hở) và vá reply_to của các
+   tin đang trích tin đó. fromRest: tin lấy từ REST (kết quả sửa / thu hồi, changes) mang reaction đầy đủ (vắng = không có);
+   mặc định (gói message.updated): giữ reaction đang có, trừ khi thu hồi. Không đổi gì -> trả lại đúng mảng cũ. */
+export function applyMessageUpdate(list, msg, fromRest = false) {
+  const base = list || []
+  if (!msg || !Number.isFinite(msg.seq)) return base
+  let next = msg.recalled ? recalledShape(msg) : msg
+  let changed = false
+  const out = base.map(m => {
+    if (m.seq === msg.seq && (m.id === msg.id || msg.id == null)) {
+      let n = next
+      if (!fromRest && !msg.recalled) {
+        n = { ...next }
+        if (m.reactions) n.reactions = m.reactions
+        else delete n.reactions
+      }
+      if (!msgChanged(m, n)) return m
+      changed = true
+      return n
+    }
+    if (m.reply_to && m.reply_to.message_id === msg.id) {
+      const r = msg.recalled
+        ? { ...m.reply_to, content: '', recalled: true }
+        : { ...m.reply_to, content: firstRunes(msg.content, REPLY_SNIPPET), recalled: false }
+      if (msg.recalled) delete r.file_name
+      if (replyKey(r) === replyKey(m.reply_to)) return m
+      changed = true
+      return { ...m, reply_to: r }
+    }
+    return m
+  })
+  return changed ? out : base
+}
+
+/* Gói reactions.updated {message_id, seq, counts, total, user_id, reaction}: thay counts / total; user_id là mình thì
+   mine = reaction, không thì giữ mine cũ. total = 0 -> bỏ khoá reactions. */
+export function applyReactionsUpdate(list, ev, meId) {
+  const base = list || []
+  if (!ev) return base
+  let changed = false
+  const out = base.map(m => {
+    if (!(m.id === ev.message_id || (ev.message_id == null && m.seq === ev.seq))) return m
+    const old = m.reactions || null
+    const mine = ev.user_id === meId ? (ev.reaction || null) : (old ? old.mine || null : null)
+    const total = Number(ev.total) || 0
+    const n = { ...m }
+    if (total > 0) n.reactions = { counts: { ...(ev.counts || {}) }, total, mine }
+    else delete n.reactions
+    if (reactionKey(n.reactions) === reactionKey(old)) return m
+    changed = true
+    return n
+  })
+  return changed ? out : base
+}
+
+/* Reaction tính lạc quan khi bấm: mine === code -> bỏ; khác -> đặt (thay reaction cũ của mình). Trả ReactionSummary | null */
+export function toggledReactions(r, code) {
+  const counts = { ...((r && r.counts) || {}) }
+  let total = (r && r.total) || 0
+  const mine = (r && r.mine) || null
+  const dec = k => { if (counts[k] > 1) counts[k]--; else delete counts[k]; total = Math.max(0, total - 1) }
+  if (mine) dec(mine)
+  let next = null
+  if (mine !== code) { counts[code] = (counts[code] || 0) + 1; total++; next = code }
+  return total > 0 ? { counts, total, mine: next } : null
+}
+
+/* last_message của hội thoại là tin vừa sửa / thu hồi -> thay (không mang reactions / reply_to) */
+export function patchLastMessage(c, msg) {
+  if (!c || !msg || !c.last_message || c.last_message.id !== msg.id) return c
+  const lm = msg.recalled ? recalledShape(msg) : { ...msg }
+  delete lm.reactions
+  delete lm.reply_to
+  return { ...c, last_message: lm }
 }
 
 /* Chỗ hở thấp nhất trong danh sách (seq liên tục là bất biến của máy chủ): trả seq ngay TRƯỚC chỗ hở
@@ -140,21 +290,59 @@ export function pruneOutbox(items, confirmedIds) {
   return out.length === (items || []).length ? items : out
 }
 
-/* Đọc outbox đã lưu: tin đang gửi dở khi tải lại trang quay về 'sending' (gửi lại cùng client_msg_id, máy chủ chống trùng) */
+export const UPLOAD_LOST = 'Tệp chưa tải xong, hãy chọn lại tệp'
+
+/* Đọc outbox đã lưu: tin đang gửi dở khi tải lại trang quay về 'sending' (gửi lại cùng client_msg_id, máy chủ chống trùng).
+   Tin tệp (ảnh / video / tệp / thoại, nội dung có thể rỗng): tệp gốc chỉ nằm trong bộ nhớ tab nên mất khi tải lại -
+   đã tải lên xong (có media_id, phase 'done') thì gửi tiếp; chưa xong thì 'failed' "Tệp chưa tải xong, hãy chọn lại tệp". */
 export function restoreOutbox(raw) {
   if (!Array.isArray(raw)) return []
-  return raw
-    .filter(i => i && typeof i.client_msg_id === 'string' && Number.isFinite(i.conversation_id) && typeof i.content === 'string' && i.content)
-    .map(i => ({
+  const out = []
+  for (const i of raw) {
+    if (!i || typeof i.client_msg_id !== 'string' || !Number.isFinite(i.conversation_id) || typeof i.content !== 'string') continue
+    const base = {
       client_msg_id: i.client_msg_id,
       conversation_id: i.conversation_id,
       content: i.content,
       created_at: i.created_at || new Date(0).toISOString(),
       ord: Number.isFinite(i.ord) ? i.ord : 0,
-      status: i.status === 'failed' ? 'failed' : 'sending',
-      tries: i.status === 'failed' ? (i.tries || 0) : 0,
-      error: i.status === 'failed' ? (i.error || '') : '',
-    }))
+    }
+    /* đang trả lời một tin (giai đoạn 2): id tin gốc + khung trích dẫn dựng ở máy */
+    if (Number.isFinite(i.reply_to_message_id) && i.reply_to_message_id > 0) {
+      base.reply_to_message_id = i.reply_to_message_id
+      if (i.reply_to && typeof i.reply_to === 'object') base.reply_to = i.reply_to
+    }
+    const failed = i.status === 'failed'
+    if (!isMediaType(i.msg_type)) {
+      if (!i.content) continue
+      const t = { ...base, status: failed ? 'failed' : 'sending', tries: failed ? (i.tries || 0) : 0, error: failed ? (i.error || '') : '' }
+      const ms = normalizeMentions(i.content, i.mentions)
+      if (ms.length) t.mentions = ms
+      out.push(t)
+      continue
+    }
+    const md = i.media && typeof i.media === 'object' ? i.media : {}
+    const media = {
+      media_id: Number.isFinite(md.media_id) && md.media_id > 0 ? md.media_id : null,
+      type: i.msg_type,
+      mime: typeof md.mime === 'string' ? md.mime : '',
+      size: Number(md.size) || 0,
+      sha256: typeof md.sha256 === 'string' ? md.sha256 : '',
+      width: Number.isFinite(md.width) ? md.width : null,
+      height: Number.isFinite(md.height) ? md.height : null,
+      duration_ms: Number.isFinite(md.duration_ms) ? md.duration_ms : null,
+      waveform: Array.isArray(md.waveform) ? md.waveform : null,
+    }
+    const phase = PHASES.includes(i.phase) ? i.phase : 'prepare'
+    const ready = !!media.media_id && phase === 'done'
+    const item = { ...base, msg_type: i.msg_type, media, phase }
+    if (typeof i.file_name === 'string' && i.file_name) item.file_name = i.file_name
+    if (failed) Object.assign(item, { status: 'failed', tries: i.tries || 0, error: i.error || (ready ? '' : UPLOAD_LOST) })
+    else if (ready) Object.assign(item, { status: 'sending', tries: 0, error: '' })
+    else Object.assign(item, { status: 'failed', tries: 0, error: UPLOAD_LOST })
+    out.push(item)
+  }
+  return out
 }
 
 /* ---------- Đã gửi / đã nhận / đã xem ---------- */
@@ -165,7 +353,7 @@ export function restoreOutbox(raw) {
 export function ownMessageStatus(seq, receipts, meId) {
   const others = Object.keys(receipts || {}).filter(id => Number(id) !== meId).map(id => receipts[id])
   const total = others.length
-  if (!total) return { status: 'sent', seenCount: 0, total: 0 }
+  if (!total) return { status: 'sent', seenCount: 0, deliveredCount: 0, total: 0 }
   let seenCount = 0
   let deliveredCount = 0
   for (const r of others) {
@@ -174,14 +362,29 @@ export function ownMessageStatus(seq, receipts, meId) {
     if (read || (r.d || 0) >= seq) deliveredCount++
   }
   const status = seenCount === total ? 'seen' : deliveredCount === total ? 'delivered' : 'sent'
-  return { status, seenCount, total }
+  return { status, seenCount, deliveredCount, total }
+}
+
+/* Ai đã xem / chỉ mới nhận tin seq (nhóm): người tắt "cho biết đã xem" (r = null) chỉ nằm ở "đã nhận" */
+export function readByLists(seq, receipts, meId) {
+  const read = []
+  const delivered = []
+  for (const id of Object.keys(receipts || {})) {
+    const uid = Number(id)
+    if (uid === meId) continue
+    const r = receipts[id] || {}
+    if (r.r != null && r.r >= seq) read.push(uid)
+    else if ((r.d || 0) >= seq) delivered.push(uid)
+  }
+  return { read, delivered }
 }
 
 /* Dòng chữ dưới tin cuối của mình */
 export function seenLabel(type, st) {
   if (!st) return ''
   if (type === 'direct') return st.status === 'seen' ? 'Đã xem' : ''
-  return st.seenCount > 0 ? `Đã xem bởi ${st.seenCount} người` : ''
+  if (st.seenCount > 0) return `Đã xem bởi ${st.seenCount} người`
+  return st.deliveredCount > 0 ? 'Đã nhận' : ''
 }
 
 /* Gộp con trỏ đã nhận / đã xem: không bao giờ lùi; r = null (ẩn) thì giữ null */
@@ -203,7 +406,7 @@ export function convTitle(c) {
 
 /* Số chưa đọc = last_seq - last_read_seq (con trỏ đọc lấy max với bản đã báo đọc lạc quan ở máy này) */
 export function unreadOf(c, localRead = 0) {
-  if (!c) return 0
+  if (!c || c.disbanded) return 0
   return Math.max(0, (c.last_seq || 0) - Math.max(c.last_read_seq || 0, localRead || 0))
 }
 
@@ -223,14 +426,33 @@ export function mergeConvRow(old, row) {
   out.last_message = !nm ? om || null : !om ? nm : (nm.seq >= om.seq ? nm : om)
   out.last_message_at = later(old.last_message_at, row.last_message_at)
   if (old.updated_at && row.updated_at && Date.parse(row.updated_at) < Date.parse(old.updated_at)) {
-    out.name = old.name
-    out.member_count = old.member_count
+    for (const k of STALE_KEYS) if (k in old) out[k] = old[k]
     out.updated_at = old.updated_at
   }
   /* Dòng đã rời từ /sync không còn tên nhóm (máy chủ không lộ tên đổi sau khi rời): giữ tên đã biết */
   if (row.left && row.name == null && old.name != null) out.name = old.name
-  out.unread = Math.max(0, out.last_seq - out.last_read_seq)
+  out.last_mention_seq = out.left ? 0 : Math.max(old.left ? 0 : old.last_mention_seq || 0, row.last_mention_seq || 0)
+  return finishConv(out)
+}
+
+/* Khoá theo updated_at: dòng cũ hơn không ghi đè (tên, số thành viên, thông tin + cài đặt nhóm, giải tán) */
+const STALE_KEYS = ['name', 'member_count', 'description', 'avatar', 'settings', 'disbanded']
+
+/* Số chưa đọc + dấu '@' tính lại từ con trỏ; nhóm đã giải tán: không chưa đọc, không dấu '@' */
+function finishConv(out) {
+  out.unread = out.disbanded ? 0 : Math.max(0, (out.last_seq || 0) - (out.last_read_seq || 0))
+  out.unread_mention = !out.disbanded && !out.left && (out.last_mention_seq || 0) > (out.last_read_seq || 0)
   return out
+}
+
+/* Gói conversation.updated {conversation_id, name, description, avatar, settings, disbanded, updated_at} -> dòng gộp được
+   bằng mergeConvRow (chỉ các khoá có trong gói) */
+export function convUpdateRow(d) {
+  if (!d || !Number.isFinite(d.conversation_id)) return null
+  const row = { id: d.conversation_id }
+  for (const k of ['name', 'description', 'avatar', 'settings', 'disbanded', 'updated_at']) if (k in d) row[k] = d[k]
+  if (row.disbanded) { row.member_count = 0; row.pending_join_requests = 0 }
+  return row
 }
 
 /* Cập nhật dòng hội thoại khi có tin mới (realtime hoặc ack của mình) */
@@ -243,8 +465,8 @@ export function applyMessageToConv(c, m, meId) {
     out.last_read_seq = Math.max(c.last_read_seq || 0, m.seq)
     out.last_delivered_seq = Math.max(c.last_delivered_seq || 0, m.seq)
   }
-  out.unread = Math.max(0, out.last_seq - (out.last_read_seq || 0))
-  return out
+  if (mentionsMe(m, meId)) out.last_mention_seq = Math.max(c.last_mention_seq || 0, m.seq)
+  return finishConv(out)
 }
 
 export function isMuted(mutedUntil, now = Date.now()) {
@@ -293,8 +515,106 @@ export function canRemoveMember(actorRole, targetRole, isSelf) {
   if (actorRole === 'admin') return targetRole === 'member'
   return false
 }
-export const canRename = role => role === 'owner' || role === 'admin'
 export const canSetRole = (actorRole, targetRole) => actorRole === 'owner' && targetRole !== 'owner'
+
+/* Cờ quyền mặc định của nhóm (cả nhóm cũ sau 0022): settings null (chưa tải / chat 1-1 / đã rời) dùng bộ này */
+export const DEFAULT_GROUP_SETTINGS = { admins_only_send: false, admins_only_edit_info: true, admins_only_add_members: false }
+export const isGroupAdmin = role => role === 'owner' || role === 'admin'
+
+/* Ma trận quyền nhóm (API.md "Quản trị nhóm" - Ma trận quyền), giống kiểm ở máy chủ. action:
+   send | typing | edit_info | add_members | create_invite | view_invite | revoke_invite (member: chỉ link do mình tạo,
+   xem canRevokeInvite) | manage_requests | settings | mention_all | pin | set_role | transfer | disband.
+   Không kiểm nhóm đã giải tán: nơi gọi xét isDisbanded(conv) trước (mọi thao tác ghi đều bị chặn). */
+export function canDo(role, settings, action) {
+  const st = { ...DEFAULT_GROUP_SETTINGS, ...(settings || {}) }
+  const admin = isGroupAdmin(role)
+  switch (action) {
+    case 'send':
+    case 'typing': return admin || !st.admins_only_send
+    case 'edit_info': return admin || !st.admins_only_edit_info
+    case 'add_members':
+    case 'create_invite': return admin || !st.admins_only_add_members
+    case 'view_invite': return !!role
+    case 'revoke_invite':
+    case 'manage_requests':
+    case 'settings':
+    case 'mention_all':
+    case 'pin': return admin
+    case 'set_role':
+    case 'transfer':
+    case 'disband': return role === 'owner'
+    default: return false
+  }
+}
+export const canRename = (role, settings) => canDo(role, settings, 'edit_info')
+/* Thu hồi link mời: owner / admin mọi link; member chỉ link do mình tạo */
+export function canRevokeInvite(role, link, meId) {
+  if (!link) return false
+  return isGroupAdmin(role) || (!!meId && link.created_by === meId)
+}
+
+/* Nhóm đã giải tán: còn đọc được (disbanded: true, left: false), mọi thao tác ghi -> 410 GROUP_DISBANDED */
+export const isDisbanded = c => !!(c && c.disbanded)
+
+/* ---------- @nhắc tên ---------- */
+
+export const MENTION_ALL = 0
+export const MAX_MENTIONS = 50
+export const MAX_DESCRIPTION = 500
+
+/* Chuẩn hoá danh sách nhắc tên trước khi gửi: offset / length theo đơn vị UTF-16 trên content ĐÃ trim (nơi gọi trừ phần
+   khoảng trắng đầu nếu tính trên chuỗi chưa trim - xem shift). Bỏ phần tử sai (user_id < 0, length < 2, vượt độ dài,
+   ký tự tại offset không phải '@'), sắp theo offset, bỏ đoạn chồng nhau, trùng người thì giữ cả (máy chủ chấp nhận),
+   tối đa 50. Trả mảng (có thể rỗng). */
+export function normalizeMentions(content, mentions, shift = 0) {
+  if (!Array.isArray(mentions) || !mentions.length) return []
+  const s = String(content || '')
+  const out = []
+  for (const x of mentions) {
+    if (!x) continue
+    const user_id = Number(x.user_id)
+    const offset = Number(x.offset) - (Number(shift) || 0)
+    const length = Number(x.length)
+    if (!Number.isInteger(user_id) || user_id < 0 || !Number.isInteger(offset) || offset < 0 || !Number.isInteger(length) || length < 2) continue
+    if (offset + length > s.length || s[offset] !== '@') continue
+    out.push({ user_id, offset, length })
+  }
+  out.sort((a, b) => a.offset - b.offset)
+  const res = []
+  let end = -1
+  for (const m of out) {
+    if (m.offset < end) continue
+    res.push(m)
+    end = m.offset + m.length
+    if (res.length >= MAX_MENTIONS) break
+  }
+  return res
+}
+
+/* Tin có nhắc tới mình (tên riêng hoặc @Tất cả) và không phải tin của mình */
+export function mentionsMe(m, meId) {
+  if (!m || !Array.isArray(m.mentions) || !meId || m.sender_id === meId) return false
+  return m.mentions.some(x => x && (x.user_id === meId || x.user_id === MENTION_ALL))
+}
+
+/* Dấu '@' ở danh sách: last_mention_seq > con trỏ đã đọc (lấy max với bản đọc lạc quan ở máy này) */
+export function hasUnreadMention(c, localRead = 0) {
+  if (!c || c.disbanded || c.left) return false
+  return (c.last_mention_seq || 0) > Math.max(c.last_read_seq || 0, localRead || 0)
+}
+
+/* ---------- link mời ---------- */
+
+export const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/
+export const JOIN_TOKEN_KEY = 'chat_join_token' // sessionStorage: token chờ tham gia khi chưa đăng nhập chat
+export const inviteCacheKey = (uid, cid) => 'chat_invite:' + uid + ':' + cid
+/* /chat/join/<token> -> token (sai dạng -> chuỗi như cũ để trang báo link không hợp lệ), không khớp đường dẫn -> null */
+export function joinTokenFromPath(pathname) {
+  const m = /^\/chat\/join\/([^/?#]+)\/?$/.exec(String(pathname || ''))
+  if (!m) return null
+  try { return decodeURIComponent(m[1]) } catch (e) { return m[1] }
+}
+export const inviteUrl = (origin, link) => (link && link.url_path ? String(origin || '') + link.url_path : link && link.token ? String(origin || '') + '/chat/join/' + link.token : '')
 
 /* ---------- Thời gian (giờ địa phương của máy) ---------- */
 
@@ -374,11 +694,11 @@ export function typingText(names) {
   return `${list[0]} và ${list.length - 1} người khác đang soạn tin…`
 }
 
-/* Xem trước tin cuối ở danh sách: "Bạn: ...", nhóm thì "Lan: ..." */
+/* Xem trước tin cuối ở danh sách: "Bạn: ...", nhóm thì "Lan: ..."; tin tệp "[Hình ảnh] chú thích"... (mediaLabel) */
 export function previewText(m, meId, convType) {
   if (!m) return ''
-  const text = String(m.content || '').replace(/\s+/g, ' ').trim()
-  if (m.msg_type === 'system') return text
+  if (m.msg_type === 'system') return String(m.content || '').replace(/\s+/g, ' ').trim()
+  const text = m.recalled ? RECALLED_TEXT : mediaLabel(m)
   if (m.sender_id === meId) return 'Bạn: ' + text
   if (convType === 'group' && m.sender_name) return m.sender_name + ': ' + text
   return text
@@ -539,3 +859,89 @@ export function sameBytes(a, b) {
 /* 100 ký tự (rune) đầu - giống phần thân push của máy chủ */
 export function firstRunes(s, n = 100) { return Array.from(String(s || '')).slice(0, n).join('') }
 export function runeLength(s) { return Array.from(String(s || '')).length }
+
+/* ---------- Tệp đính kèm (ảnh / video / tệp / tin thoại) ---------- */
+
+export const MEDIA_TYPES = ['image', 'video', 'file', 'voice']
+export function isMediaType(t) { return MEDIA_TYPES.includes(t) }
+/* Các bước tải lên của tin tệp trong outbox: chuẩn bị (nén, ảnh bìa, sóng âm, băm) -> xin địa chỉ -> tải lên -> báo xong */
+export const PHASES = ['prepare', 'url', 'put', 'complete', 'done']
+export const MEDIA_EXPIRED = 'Tệp đã hết hạn, hãy chọn lại tệp'
+
+/* Tệp của tin: tin đã xác nhận có attachments[0] (MediaDTO), tin trong outbox có media */
+export function mediaOf(m) {
+  if (!m) return null
+  if (Array.isArray(m.attachments) && m.attachments.length) return m.attachments[0] || null
+  return m.media || null
+}
+
+/* Khoá so sánh tệp của tin: đổi địa chỉ ký / trạng thái thì coi là tin đã đổi */
+/* Khoá so sánh nhắc tên: bản của máy chủ luôn thắng bản ghi tạm ở máy */
+function mentionKey(m) {
+  const a = m && m.mentions
+  return Array.isArray(a) && a.length ? JSON.stringify(a) : ''
+}
+
+function attachKey(m) {
+  const a = m && m.attachments
+  if (!Array.isArray(a) || !a.length) return ''
+  return a.map(x => (x ? x.id + ':' + (x.status || '') + ':' + (x.url || '') + ':' + (x.thumb_url || '') : '')).join('|')
+}
+
+/* Thời lượng tin thoại m:ss, làm tròn lên theo giây (giống máy chủ) */
+export function voiceDuration(ms) {
+  const sec = Math.max(0, Math.ceil((Number(ms) || 0) / 1000))
+  return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0')
+}
+
+/* Nhãn một dòng của tin (giống previewBody ở máy chủ): văn bản -> nội dung; ảnh "[Hình ảnh] chú thích", video
+   "[Video] ...", tệp "[Tệp] tên tệp", thoại "[Tin nhắn thoại] m:ss"; tin tệp không kèm tệp (máy chủ tắt gửi tệp) -> "[Tệp đính kèm]".
+   Nhận cả tin đã xác nhận (attachments) lẫn tin trong outbox (media). */
+export function mediaLabel(m) {
+  if (!m) return ''
+  if (m.recalled) return RECALLED_TEXT
+  const text = String(m.content || '').replace(/\s+/g, ' ').trim()
+  if (!isMediaType(m.msg_type)) return text
+  const md = mediaOf(m)
+  if (!md) return '[Tệp đính kèm]'
+  const cap = text ? ' ' + text : ''
+  switch (m.msg_type) {
+    case 'image': return '[Hình ảnh]' + cap
+    case 'video': return '[Video]' + cap
+    case 'file': return ('[Tệp] ' + String(m.file_name || md.file_name || '').trim()).trim()
+    case 'voice': return '[Tin nhắn thoại] ' + voiceDuration(md.duration_ms)
+    default: return '[Tệp đính kèm]'
+  }
+}
+
+/* Xem trước tin chờ gửi ở danh sách: lỗi "Gửi lỗi: ...", tin tệp chưa có ack "Đang gửi: [Hình ảnh]", văn bản "Bạn: ..." */
+export function pendingPreview(item) {
+  if (!item) return ''
+  if (item.status === 'failed') return 'Gửi lỗi: ' + mediaLabel(item)
+  return (isMediaType(item.msg_type) ? 'Đang gửi: ' : 'Bạn: ') + mediaLabel(item)
+}
+
+/* Địa chỉ ký của tệp sắp hết hạn (còn dưới 5 phút) -> giao diện gọi refreshMedia */
+export function mediaExpiring(md, now = Date.now()) {
+  if (!md || !md.expires_at) return false
+  const t = Date.parse(md.expires_at)
+  return Number.isFinite(t) && t - now < 5 * 60 * 1000
+}
+
+/* Thay MediaDTO mới (cùng id) vào tin; giữ tên tệp riêng của tin (file_name của tin có thể khác tên trong kho tệp) */
+export function patchMessageMedia(m, md) {
+  if (!m || !md || !Array.isArray(m.attachments) || !m.attachments.some(a => a && a.id === md.id)) return m
+  return { ...m, attachments: m.attachments.map(a => (a && a.id === md.id ? { ...a, ...md, file_name: a.file_name || md.file_name } : a)) }
+}
+
+/* Lần thử lại tiếp theo của bước tải lên bị lỗi. code: mã lỗi; n: số lần đã thử lại vì đúng mã đó.
+   -> {action:'again', delay} (thử lại đúng bước) | {action:'url'} (xin địa chỉ mới) | {action:'put'} (tải lên lại)
+   | {action:'complete', delay} | {action:'stop'} (huỷ, không báo lỗi) | {action:'fail'} */
+export function uploadRetry(step, code, n) {
+  if (code === 'ABORTED') return { action: 'stop' }
+  if (code === 'NETWORK') return n < 3 ? { action: 'again', delay: [1000, 3000, 9000][n] } : { action: 'fail' }
+  if (code === 'UPLOAD_EXPIRED' && step === 'put') return n < 3 ? { action: 'url' } : { action: 'fail' }
+  if (code === 'MEDIA_NOT_UPLOADED' && step === 'complete') return n < 1 ? { action: 'put' } : { action: 'fail' }
+  if (code === 'MEDIA_NOT_READY' && (step === 'complete' || step === 'url')) return n < 5 ? { action: 'complete', delay: 3000 } : { action: 'fail' }
+  return { action: 'fail' }
+}

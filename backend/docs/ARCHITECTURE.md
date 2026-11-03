@@ -9,7 +9,8 @@ Ngoài ra bản Go mở thêm REST dưới `/api/v1`, dùng chung service.
 
 Module Go: `qspro-backend` - Go 1.25. Thư viện đã có sẵn trong `go.mod` (không cần sửa): gin, pgx/v5,
 excelize/v2, golang.org/x/crypto (bcrypt, scrypt), golang.org/x/text (norm, collate, language, cases), golang.org/x/net,
-go-redis/v9, swaggo/files/v2 (Swagger UI nhúng), github.com/coder/websocket v1.8 (WebSocket của chat, thêm cùng Chat MVP).
+go-redis/v9, swaggo/files/v2 (Swagger UI nhúng), github.com/coder/websocket v1.8 (WebSocket của chat, thêm cùng Chat MVP),
+github.com/minio/minio-go/v7 v7.3.0 (kho tệp chat, `platform/objstore`; v7.4 trở lên cần Go 1.26), golang.org/x/image (WebP + co ảnh nhỏ của tệp chat).
 File `.env` đọc bằng `config.LoadDotenv` - bản chuyển của gói dotenv 16 của Node (không dùng godotenv, vì hai bên đọc `#`, `$`, `\` khác nhau).
 
 ## 1. Sơ đồ thư mục
@@ -34,6 +35,7 @@ internal/platform/storage/       kho file trên đĩa (UPLOAD_DIR), URL công kh
 internal/platform/redis|logger/  Redis tuỳ chọn, log kiểu "[tag] nội dung"
 internal/platform/webpush/       gửi Web Push: mã hoá RFC 8291 (aes128gcm) + VAPID RFC 8292, chỉ thư viện chuẩn (chat dùng)
 internal/platform/mailer/        gửi email qua SMTP (STARTTLS / TLS cổng 465, AUTH PLAIN), chỉ thư viện chuẩn (mã OTP email của chat)
+internal/platform/objstore/      kho tệp chat trên MinIO / S3 (minio-go v7): ký PUT / GET, chép, đọc luồng; CHAT_S3_* trống = tắt tệp
 internal/platform/deps.go        import giữ chỗ để go.mod có sẵn thư viện cho các module
 internal/shared/omap/            object JSON có thứ tự khoá (JS value model)
 internal/shared/jsval/           ép kiểu / định dạng giống hệt JavaScript
@@ -957,8 +959,8 @@ materials:
     notifications - import chỉ trong test - và chạy 2 Service song song trên `qspro_gotest`), `jobs/worker_test.go`. Khoá golden mới: không có.
   - Migration 0012 (chú thích 2 cột nhắc gia hạn, bỏ `DEPRECATED`) và 0013 (chú thích `product_combos.note` - M10.2, `purchase_orders.send_result`
     - M9.1) chỉ đổi COMMENT; code không phụ thuộc hai migration này.
-- Chat MVP (module `chat` + gói con `realtime`, `platform/webpush`, `platform/mailer`, migration 0018, 0019; route ở `API.md` mục 2.1 "Chat";
-  quyết định `docs/02-ky-thuat/database/decisions.md` D-15, D-16). Tính năng chỉ bản Go, không có hàm `/api/:fn`, không đụng golden / fixture nào:
+- Chat MVP (module `chat` + gói con `realtime`, `platform/webpush`, `platform/mailer`, `platform/objstore`, migration 0018, 0019, 0020; route
+  ở `API.md` mục 2.1 "Chat"; quyết định `docs/02-ky-thuat/database/decisions.md` D-15, D-16, D-17). Tính năng chỉ bản Go, không có hàm `/api/:fn`, không đụng golden / fixture nào:
   - Tài khoản chat riêng (`chat_users`, danh tính = số điện thoại HOẶC email + OTP; hai loại là tài khoản riêng, chưa liên kết), KHÔNG phải
     `users` của QS, không theo công ty. Token riêng của
     module (access JWT HS256 + refresh xoay vòng) nên route dùng quyền mới `rpc.SelfAuth` (mục 3.8); 3 route đăng nhập là `rpc.Public`.
@@ -966,7 +968,7 @@ materials:
     TIẾNG ANH, transaction riêng (`pgx.BeginFunc`), khoá `pg_advisory_xact_lock`, `SELECT ... FOR UPDATE`. Lý do: lớp kiểu PostgREST không
     diễn đạt được `UPDATE ... SET last_seq = last_seq + 1 RETURNING` (cấp `seq` nguyên tử), `GREATEST(...)`, upsert `ON CONFLICT` và các câu
     nối của danh sách hội thoại; bảng chat không thuộc công ty nên không cần lọc tenant. Pool chạy simple protocol: mọi tham số mảng /
-    thời điểm / boolean ép kiểu tường minh trong SQL (`$1::bigint[]`...). `db-map.json` vẫn có 9 mục `chat_*` (quy tắc database 17), không
+    thời điểm / boolean ép kiểu tường minh trong SQL (`$1::bigint[]`...). `db-map.json` vẫn có 10 mục `chat_*` (quy tắc database 17), không
     khai `tenant`, không vào `TenantTables`. Module khác KHÔNG được bắt chước: dùng `database.DB` như mục 3.5.
   - Gateway WebSocket MỘT tiến trình (`realtime.Hub`, CHAT.md mục 16 "MVP: WebSocket một gateway"): kết nối, online, đang soạn trong bộ nhớ;
     phân phối tin qua `Hub.Submit(conversation_id, job)` (cùng khoá = cùng worker, giữ thứ tự) thay Kafka; tin commit trước rồi mới phân phối.
@@ -981,12 +983,36 @@ materials:
     (`chatPush` trong `routes.go`; thiếu / khoá sai -> tắt push, 1 dòng log). SMS: `logSender` ghi mã OTP vào log (chưa có nhà cung cấp SMS).
     Email: `platform/mailer` (SMTP, chỉ thư viện chuẩn) bật khi đặt `SMTP_HOST` (`chatMail` trong `routes.go`; chưa đặt / cấu hình sai ->
     `logMailer` ghi mã OTP email vào log, 1 dòng log lúc khởi động).
-  - Test: `go test ./internal/modules/chat/...` (test database cần `TEST_DATABASE_URL` trỏ database đã chạy 0019), `./internal/platform/webpush`
-    (vector RFC 8291 phụ lục A), `-race` cho `realtime` (mục Kiểm thử của `backend/README.md`).
+  - Tệp đính kèm (ảnh / video / tệp / tin thoại, `CHAT.md` mục 12, API ở `API.md` "Tệp đính kèm"): byte không đi qua server Go. Trình duyệt
+    PUT thẳng lên MinIO bằng presigned URL (ký `Content-Type` + `Content-Length`, khoá tạm `chat/in/...`), rồi `POST /chat/media/:id/complete`
+    chạy ĐỒNG BỘ trong request (tối đa 60 giây, thay media worker + sự kiện bucket): giành dòng `chat_media` bằng `status = processing` (không
+    giữ transaction), chép phía server sang khoá cuối `chat/m/...`, kiểm kích thước / dò loại / sha256 theo luồng / quét virus (`MediaScanner`,
+    mặc định `logScanner` coi là sạch), ảnh nhỏ 320 px + blurhash (`media_image.go`, `blurhash.go`; tối đa 2 ảnh giải mã cùng lúc). Không ghi
+    tệp tạm ra đĩa; không dùng `platform/storage` (`UPLOAD_DIR`). Đọc bằng presigned GET (mặc định 60 phút, cache URL trong tiến trình nửa hạn).
+  - Interface `chat.MediaStore` / `chat.MediaScanner` (`media.go`) chỉ dùng kiểu nguyên thuỷ nên `objstore` không import `chat`;
+    `var _ chat.MediaStore = (*objstore.Client)(nil)` trong `routes.go` là phép kiểm lúc biên dịch. `objstore` có hai client minio-go:
+    `internal` (`CHAT_S3_ENDPOINT`) đọc / ghi / chép / xoá, `signer` (`CHAT_S3_PUBLIC_URL`) chỉ ký URL, offline vì đã đặt region (SigV4 buộc
+    host: trình duyệt phải gọi đúng host đó). `objstore.New` không gọi mạng; `Start` kiểm / tạo bucket trong goroutine (backoff 1 -> 60 giây),
+    xong mới `Ready()`; trước đó route tệp trả 503 `UNAVAILABLE`.
+  - `chatMedia` trong `routes.go` (cạnh `chatPush` / `chatMail`): `CHAT_S3_ENDPOINT` trống -> nil, 1 dòng log `tệp chat tắt: ...`; thiếu
+    `CHAT_S3_ACCESS_KEY` / `CHAT_S3_SECRET_KEY` hoặc `New` lỗi -> nil + log lỗi. Nil = tắt tệp: route tệp + tin tệp trả 503 `MEDIA_DISABLED`,
+    `GET /chat/media/config` trả `{enabled: false}`, tin tệp cũ vẫn liệt kê (không có URL). Có kho thì `s.OnShutdown` huỷ context của `Start`.
+  - Janitor (`janitorOnce` trong `service_media.go`, 30 phút / lần, chỉ chạy khi có kho tệp; `Shutdown` đóng `mediaQuit` và chờ cùng worker
+    push): `processing` quá 10 phút -> `pending`; `pending` / `failed` không đổi quá 2 giờ -> `failed` + xoá object; xoá dòng `pending` /
+    `failed` tạo quá 24 giờ và tệp `ready` không tin nào dùng quá 24 giờ; `blocked` giữ lại. Khoá tạm `chat/in/` còn có ILM 1 ngày
+    (`infra/deploy/minio-init.sh`). Gửi tin khoá tệp `for share` nên janitor (`for update skip locked`) bỏ qua tệp đang được gửi.
+  - MinIO chạy cạnh app (`infra/deploy/docker-compose.yml` dịch vụ `minio` + `minio-init`, image tự build `infra/docker/minio.Dockerfile`),
+    Caddy phục vụ `{$S3_DOMAIN}`; sao lưu bucket bằng `mc mirror` trong `infra/scripts/backup-db.sh` (runbook `docs/04-van-hanh/trien-khai-vps-cloudfly.md`).
+  - Test: `go test ./internal/modules/chat/...` (test database cần `TEST_DATABASE_URL` trỏ database đã chạy 0020; phần tệp dùng kho giả trong
+    `helpers_db_test.go`), `./internal/platform/objstore` (MinIO thật khi đặt `TEST_S3_ENDPOINT` / `TEST_S3_ACCESS_KEY` / `TEST_S3_SECRET_KEY`,
+    không thì bỏ qua), `./internal/platform/webpush` (vector RFC 8291 phụ lục A), `-race` cho `realtime` (mục Kiểm thử của `backend/README.md`);
+    `backend/tests/chat-e2e/chat-e2e.js` bước `s16` (tự bỏ qua khi máy chủ tắt tệp).
 - Biến `REPORT_JOB` (tắt job báo cáo và job nhắc gia hạn), `STATIC_DIR`, `VENDOR_DIR`, `CORS_ORIGINS`, `RATE_LIMIT_RPS`, `TRUSTED_PROXIES`, `REDIS_URL`, `DEBUG`,
   `DB_POOL_MAX`, `DB_SORT_COLLATION`, `DOTENV`, `UPLOAD_DIR` (kho file trên đĩa, mục 3.6), `CHAT_JWT_SECRET`, `CHAT_ACCESS_TTL_MIN`,
   `CHAT_REFRESH_TTL_DAYS`, `CHAT_OTP_DEV`, `CHAT_VAPID_PUBLIC_KEY` / `CHAT_VAPID_PRIVATE_KEY` / `CHAT_VAPID_SUBJECT`, `SMTP_HOST` / `SMTP_PORT` /
-  `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` (chat, `backend/README.md`).
+  `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM`, `CHAT_S3_ENDPOINT` (trống = tắt tệp chat) / `CHAT_S3_PUBLIC_URL` (mặc định = endpoint) /
+  `CHAT_S3_ACCESS_KEY` / `CHAT_S3_SECRET_KEY` / `CHAT_S3_BUCKET` (`chat-media`) / `CHAT_S3_REGION` (`us-east-1`), `CHAT_MEDIA_MAX_IMAGE_MB` (25),
+  `CHAT_MEDIA_MAX_FILE_MB` (100, trên 200 ép về 200), `CHAT_MEDIA_DAILY_MB` (2048), `CHAT_MEDIA_URL_TTL_MIN` (60, ép 5..720) (chat, `backend/README.md`).
   CORS, giới hạn tần suất, Redis mặc định tắt; `CORS_ORIGINS` cũng là danh sách origin được mở WebSocket chat (bỏ scheme).
 - `TRUSTED_PROXIES` mặc định không tin proxy nào: đứng sau reverse proxy mà không đặt thì mọi client chung một giới hạn tần suất.
   Ảnh hưởng: không có khi `RATE_LIMIT_RPS` tắt (mặc định).
@@ -1152,7 +1178,7 @@ Hai trường tương ứng KHÔNG nằm trong `users.Deps`. Gọi cả hai tron
 | 12 | purchasing | notifications: `PurchaseNotifier`, `Notifier`; users: `UserReader`, `Auditor` |
 | 13 | reports | không có (đọc database trực tiếp, import `categories`) |
 | 14 | jobs | reports: `ReportRunner`; companies: `ExpiryReminder` (qua `Server.Reports()` / `Server.Expiry()` trong `cmd/api/main.go`) |
-| 15 | chat (dựng sau `delivery`, `sales`; đứng cuối danh sách `modules()`) | không có module nào; `Push` = `*webpush.Client` khi đủ `CHAT_VAPID_*` (`chatPush`), nil = tắt push; `SMS` nil = `logSender`; `Mail` = `*mailer.Client` khi đặt `SMTP_HOST` (`chatMail`), nil = `logMailer`. Rồi `chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(CORS_ORIGINS)})`, `chatSvc.SetGateway(chatHub)`, `s.OnShutdownFirst(chatHub.Drain)`, `s.OnShutdown(chatSvc.Shutdown)` |
+| 15 | chat (dựng sau `delivery`, `sales`; đứng cuối danh sách `modules()`) | không có module nào; `Push` = `*webpush.Client` khi đủ `CHAT_VAPID_*` (`chatPush`), nil = tắt push; `SMS` nil = `logSender`; `Mail` = `*mailer.Client` khi đặt `SMTP_HOST` (`chatMail`), nil = `logMailer`; `Media` = `*objstore.Client` khi đặt `CHAT_S3_ENDPOINT` + khoá (`chatMedia`, đăng ký `s.OnShutdown` huỷ `Start`), nil = tắt tệp; `Scan` nil = `logScanner`. Rồi `chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(CORS_ORIGINS)})`, `chatSvc.SetGateway(chatHub)`, `s.OnShutdownFirst(chatHub.Drain)`, `s.OnShutdown(chatSvc.Shutdown)` |
 
 Thứ tự dựng đổi ở M17.3 (notifications lên trước companies); thứ tự trả về của `modules()` không đổi.
 

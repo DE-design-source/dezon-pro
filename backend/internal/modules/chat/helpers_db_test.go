@@ -1,11 +1,15 @@
 package chat
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -24,7 +28,7 @@ import (
 )
 
 // Test có database: chỉ chạy khi đặt TEST_DATABASE_URL, và tên database phải chứa "test" hoặc "tmp"
-// (vd qspro_chattest, đã chạy migration 0018 + 0019). Mỗi test tự tạo tài khoản với số điện thoại / email ngẫu nhiên và
+// (vd qspro_chattest, đã chạy migration 0018 + 0019; test bật tệp cần thêm 0020). Mỗi test tự tạo tài khoản với số điện thoại / email ngẫu nhiên và
 // dọn khi xong.
 
 var (
@@ -63,24 +67,27 @@ func testDB(t *testing.T) *database.DB {
 
 // env: service + công cụ của một test.
 type env struct {
-	t    *testing.T
-	s    *Service
-	pool *pgxpool.Pool
-	gw   *fakeGW
-	push *fakePush
-	sms  *fakeSMS
-	mail *fakeMail
-	clk  *clock
-	mu   sync.Mutex
-	uids []int64
-	ph   []string
-	em   []string
+	t     *testing.T
+	s     *Service
+	pool  *pgxpool.Pool
+	gw    *fakeGW
+	media *fakeMediaStore // nil khi envOpt.media = false
+	push  *fakePush
+	sms   *fakeSMS
+	mail  *fakeMail
+	clk   *clock
+	mu    sync.Mutex
+	uids  []int64
+	ph    []string
+	em    []string
 }
 
 type envOpt struct {
-	noGateway bool
-	push      bool
-	otpDev    bool
+	noGateway    bool
+	push         bool
+	otpDev       bool
+	media        bool // bật tệp với kho giả fakeMediaStore (cần migration 0020)
+	scanInfected bool // bộ quét giả báo mọi tệp nhiễm virus
 }
 
 func newEnv(t *testing.T, o envOpt) *env {
@@ -92,6 +99,12 @@ func newEnv(t *testing.T, o envOpt) *env {
 	if o.push {
 		e.push = newFakePush()
 		d.Push = e.push
+	}
+	if o.media {
+		requireMediaSchema(t, p)
+		e.media = newFakeMediaStore()
+		d.Media = e.media
+		d.Scan = &fakeScanner{infected: o.scanInfected}
 	}
 	e.s = New(d)
 	e.s.pushRetry = []time.Duration{time.Millisecond, 2 * time.Millisecond}
@@ -113,16 +126,25 @@ func (e *env) cleanup() {
 	e.mu.Lock()
 	ids, phones, emails := e.uids, e.ph, e.em
 	e.mu.Unlock()
-	for _, q := range []struct {
+	type cleanQ struct {
 		sql string
 		arg any
-	}{
+	}
+	qs := []cleanQ{
 		{`delete from chat_conversations where created_by = any($1::bigint[])`, ids},
 		{`delete from chat_conversations c where exists (select 1 from chat_messages m where m.conversation_id = c.id and m.sender_id = any($1::bigint[]))`, ids},
-		{`delete from chat_users where id = any($1::bigint[])`, ids},
-		{`delete from chat_otp_codes where phone = any($1::text[])`, phones},
-		{`delete from chat_otp_codes where email = any($1::text[])`, emails},
-	} {
+	}
+	var hasMedia bool
+	_ = e.pool.QueryRow(ctx, `select to_regclass('public.chat_media') is not null`).Scan(&hasMedia)
+	if hasMedia { // 0020: tệp của người thử (sau khi tin dùng tệp đã xoá theo hội thoại; FK on delete restrict)
+		qs = append(qs, cleanQ{`delete from chat_media where uploader_id = any($1::bigint[])`, ids})
+	}
+	qs = append(qs,
+		cleanQ{`delete from chat_users where id = any($1::bigint[])`, ids},
+		cleanQ{`delete from chat_otp_codes where phone = any($1::text[])`, phones},
+		cleanQ{`delete from chat_otp_codes where email = any($1::text[])`, emails},
+	)
+	for _, q := range qs {
 		if _, err := e.pool.Exec(ctx, q.sql, q.arg); err != nil {
 			e.t.Errorf("dọn dữ liệu thử: %v", err)
 		}
@@ -453,4 +475,193 @@ func subJSON(tag string) string {
 	b, _ := json.Marshal(map[string]any{"endpoint": "https://fcm.googleapis.com/fcm/send/" + tag,
 		"keys": map[string]string{"p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", "auth": "tBHItJI5svbpez7KI4CCXg"}})
 	return string(b)
+}
+
+// ───────────── Kho tệp / bộ quét giả (tệp đính kèm, 0020) ─────────────
+
+// requireMediaSchema: database thử phải có bảng chat_media (migration 0020) - chỉ test bật tệp mới cần.
+func requireMediaSchema(t *testing.T, p *pgxpool.Pool) {
+	t.Helper()
+	var ok bool
+	if err := p.QueryRow(context.Background(), `select to_regclass('public.chat_media') is not null`).Scan(&ok); err != nil || !ok {
+		t.Fatalf("database thử chưa có bảng chat_media (chạy go run ./cmd/migrate --url=... để áp 0020_chat_media.sql): %v", err)
+	}
+}
+
+// fakeMediaStore: MediaStore giả trong bộ nhớ. URL ký có dạng http://fake/<khoá>?ttl=<giây>&...
+type fakeMediaStore struct {
+	mu       sync.Mutex
+	objects  map[string][]byte
+	types    map[string]string
+	notReady bool  // Ready() = false (kho đang khởi động)
+	failCopy error // != nil: Copy trả lỗi này
+}
+
+func newFakeMediaStore() *fakeMediaStore {
+	return &fakeMediaStore{objects: map[string][]byte{}, types: map[string]string{}}
+}
+
+// putObject: đặt thẳng object (như trình duyệt đã PUT xong).
+func (f *fakeMediaStore) putObject(key string, b []byte) {
+	f.mu.Lock()
+	f.objects[key] = append([]byte(nil), b...)
+	f.mu.Unlock()
+}
+
+func (f *fakeMediaStore) has(key string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.objects[key]
+	return ok
+}
+
+func (f *fakeMediaStore) Ready() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return !f.notReady
+}
+
+func (f *fakeMediaStore) PresignPut(_ context.Context, key, contentType string, size int64, ttl time.Duration) (string, map[string]string, error) {
+	return fmt.Sprintf("http://fake/%s?ttl=%d&method=PUT", key, int64(ttl/time.Second)),
+		map[string]string{"Content-Type": contentType, "Content-Length": fmt.Sprint(size)}, nil
+}
+
+func (f *fakeMediaStore) PresignGet(_ context.Context, key string, ttl time.Duration, contentType, disposition, cacheControl string) (string, error) {
+	q := url.Values{}
+	q.Set("ttl", fmt.Sprint(int64(ttl/time.Second)))
+	q.Set("response-content-type", contentType)
+	q.Set("response-content-disposition", disposition)
+	q.Set("response-cache-control", cacheControl)
+	return "http://fake/" + key + "?" + q.Encode(), nil
+}
+
+func (f *fakeMediaStore) Stat(_ context.Context, key string) (int64, string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.objects[key]
+	if !ok {
+		return 0, "", false, nil
+	}
+	return int64(len(b)), f.types[key], true, nil
+}
+
+func (f *fakeMediaStore) Copy(_ context.Context, src, dst string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.failCopy != nil {
+		return f.failCopy
+	}
+	b, ok := f.objects[src]
+	if !ok {
+		return fmt.Errorf("fake: không có object %s", src)
+	}
+	f.objects[dst] = append([]byte(nil), b...)
+	f.types[dst] = f.types[src]
+	return nil
+}
+
+func (f *fakeMediaStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("fake: không có object %s", key)
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+func (f *fakeMediaStore) ReadPrefix(_ context.Context, key string, n int64) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("fake: không có object %s", key)
+	}
+	return append([]byte(nil), b[:min(int64(len(b)), n)]...), nil
+}
+
+func (f *fakeMediaStore) Get(_ context.Context, key string, maxBytes int64) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("fake: không có object %s", key)
+	}
+	if int64(len(b)) > maxBytes {
+		return nil, fmt.Errorf("fake: object %s lớn hơn %d byte", key, maxBytes)
+	}
+	return append([]byte(nil), b...), nil
+}
+
+func (f *fakeMediaStore) Put(_ context.Context, key string, data []byte, contentType string) error {
+	f.mu.Lock()
+	f.objects[key] = append([]byte(nil), data...)
+	f.types[key] = contentType
+	f.mu.Unlock()
+	return nil
+}
+
+func (f *fakeMediaStore) Remove(_ context.Context, keys ...string) error {
+	f.mu.Lock()
+	for _, k := range keys {
+		delete(f.objects, k)
+		delete(f.types, k)
+	}
+	f.mu.Unlock()
+	return nil
+}
+
+var _ MediaStore = (*fakeMediaStore)(nil)
+
+// fakeScanner: bộ quét giả - đọc hết luồng (để TeeReader băm đủ), infected = true thì báo nhiễm.
+type fakeScanner struct{ infected bool }
+
+func (f *fakeScanner) Scan(_ context.Context, r io.Reader, _ int64) (bool, error) {
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return false, err
+	}
+	return !f.infected, nil
+}
+
+// readyMedia: tạo thẳng một tệp ready của uid (dòng chat_media + object trong kho giả), trả id.
+// typ: image / video / file / voice. Cần envOpt.media.
+func (e *env) readyMedia(uid int64, typ string) int64 {
+	e.t.Helper()
+	if e.media == nil {
+		e.t.Fatal("readyMedia cần envOpt{media: true}")
+	}
+	body := make([]byte, 64)
+	_, _ = rand.Read(body)
+	mt := map[string]string{MediaImage: "image/png", MediaVideo: "video/mp4", MediaFile: "application/pdf", MediaVoice: "audio/webm"}[typ]
+	if mt == "" {
+		e.t.Fatalf("readyMedia: loại %q sai", typ)
+	}
+	var (
+		name *string
+		dur  *int
+		wave []int16
+	)
+	if typ == MediaFile {
+		n := "tai-lieu.pdf"
+		name = &n
+	}
+	if typ == MediaVoice {
+		d := 12000
+		dur, wave = &d, []int16{0, 64, 128, 255}
+	}
+	key, err := objectKey(uid, e.clk.now())
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	now := e.clk.now()
+	var id int64
+	if err := e.pool.QueryRow(context.Background(), `insert into chat_media (uploader_id, media_type, mime_type, size_bytes, sha256, file_name,
+		object_key, status, duration_ms, waveform, created_at, updated_at)
+		values ($1::bigint, $2, $3, $4::bigint, $5, $6, $7, 'ready', $8::integer, $9::smallint[], $10::timestamptz, $10::timestamptz) returning id`,
+		uid, typ, mt, int64(len(body)), hex.EncodeToString(sum[:]), name, key, dur, wave, now).Scan(&id); err != nil {
+		e.t.Fatal(err)
+	}
+	e.media.putObject(key, body)
+	return id
 }

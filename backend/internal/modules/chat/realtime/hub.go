@@ -214,6 +214,17 @@ func (h *Hub) OnlineUsers(userIDs []int64) map[int64]bool {
 	return out
 }
 
+// OnlineDevices: true = thiết bị còn ít nhất một kết nối đã xác thực (danh sách thiết bị, cột "đang trực tuyến").
+func (h *Hub) OnlineDevices(deviceIDs []int64) map[int64]bool {
+	out := make(map[int64]bool, len(deviceIDs))
+	h.mu.RLock()
+	for _, id := range deviceIDs {
+		out[id] = len(h.byDevice[id]) > 0
+	}
+	h.mu.RUnlock()
+	return out
+}
+
 // revokedKeep: nhớ thiết bị vừa bị đóng chừng này - đủ để gói auth đang xử lý dở (Backend đã nhận token trước khi
 // thiết bị bị xoá) không lọt vào map sau CloseDevice. Mã thiết bị không bao giờ dùng lại nên nhớ lâu hơn cũng không sai.
 const revokedKeep = time.Minute

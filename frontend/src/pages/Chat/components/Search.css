@@ -1,0 +1,43 @@
+/* Tìm tin nhắn (giai đoạn 2): cột bên phải thay InfoPanel + dòng "Tìm tin nhắn chứa ..." ở danh sách hội thoại */
+
+.ch-sr-panel{width:300px; flex:none; border-left:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; min-height:0;}
+.ch-sr-head{padding:14px 14px 10px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:10px;}
+.ch-sr-title{display:flex; align-items:center; gap:8px;}
+.ch-sr-title-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; font-weight:700; font-size:14px;}
+.ch-sr-scope{font-weight:500; font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ch-sr-close{width:28px; height:28px;}
+.ch-sr-box input{padding-right:30px;}
+.ch-sr-clear{position:absolute; right:6px; top:50%; transform:translateY(-50%); width:22px; height:22px; border:none; border-radius:50%; background:transparent; color:var(--text-faint); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;}
+.ch-sr-clear:hover{color:var(--text); background:var(--surface);}
+.ch-search-box .ch-sr-clear svg{position:static; transform:none; opacity:1;}
+.ch-sr-busy{font-size:11px; color:var(--text-faint);}
+
+.ch-sr-list{flex:1; min-height:0; overflow-y:auto;}
+.ch-sr-note{padding:14px 16px; font-size:12.5px; color:var(--text-muted); text-align:center; line-height:1.45; display:flex; flex-direction:column; align-items:center; gap:8px;}
+.ch-sr-note.error{color:var(--danger);}
+.ch-sr-note.small{font-size:11px; color:var(--text-faint); padding:10px 16px 14px;}
+.ch-sr-err{color:var(--danger); font-size:12px;}
+.ch-sr-more{border:1px solid var(--border); background:var(--surface-alt); color:var(--primary); font-family:inherit; font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;}
+.ch-sr-more:hover{border-color:var(--primary);}
+
+.ch-sr-item{display:flex; gap:10px; width:100%; padding:11px 14px; border:none; border-bottom:1px solid var(--border); background:transparent; color:var(--text); text-align:left; font-family:inherit; cursor:pointer;}
+.ch-sr-item:hover{background:var(--surface-alt);}
+.ch-sr-item.active{background:var(--primary-tint);}
+.ch-sr-item:focus-visible{outline:2px solid var(--primary); outline-offset:-2px;}
+.ch-sr-item .ch-conv-avatar{font-size:13px;}
+.ch-sr-body{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px;}
+.ch-sr-top{display:flex; align-items:baseline; gap:8px;}
+.ch-sr-name{flex:1; min-width:0; font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ch-sr-time{font-size:11px; color:var(--text-faint); flex:none;}
+.ch-sr-text{font-size:12.5px; color:var(--text-muted); line-height:1.4; word-break:break-word; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+.ch-sr-sender{color:var(--text);}
+.ch-sr-type{color:var(--text-faint);}
+.ch-sr-hit{background:var(--primary-tint); color:var(--primary); font-weight:700; border-radius:2px; padding:0 1px;}
+
+/* Dòng "Tìm tin nhắn chứa ..." đầu danh sách hội thoại khi ô lọc có chữ */
+.ch-sr-conv-row{display:flex; align-items:center; gap:10px; width:100%; padding:12px 16px; border:none; border-bottom:1px solid var(--border); background:transparent; color:var(--primary); font-family:inherit; font-size:12.5px; font-weight:600; text-align:left; cursor:pointer;}
+.ch-sr-conv-row:hover{background:var(--surface-alt);}
+.ch-sr-conv-row .ch-sr-conv-icon{width:32px; height:32px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--primary-tint); color:var(--primary);}
+.ch-sr-conv-row span:last-child{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+@media (max-width:900px){ .ch-sr-panel{width:260px;} }

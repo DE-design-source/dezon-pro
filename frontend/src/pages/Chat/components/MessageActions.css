@@ -1,0 +1,63 @@
+/* Thao tác trên tin (giai đoạn 2): nút nổi khi rê chuột, menu tin, khung trích dẫn, tin thu hồi / đã sửa / chuyển tiếp,
+   thanh "Đang trả lời" / "Chỉnh sửa tin nhắn" trên ô soạn, hộp chuyển tiếp */
+
+.ch-msg-body{position:relative; display:flex; flex-direction:column; gap:5px; align-items:flex-start; max-width:100%; min-width:0;}
+.ch-msg-group.own .ch-msg-body{align-items:flex-end;}
+
+/* Nút nổi cạnh bong bóng: thả cảm xúc, trả lời, "⋯" */
+.ch-msg-hover{position:absolute; top:2px; left:100%; margin-left:6px; display:flex; gap:2px; opacity:0; pointer-events:none; transition:opacity .12s ease; z-index:5;}
+.ch-msg-group.own .ch-msg-hover{left:auto; right:100%; margin-left:0; margin-right:6px; flex-direction:row-reverse;}
+.ch-msg-group:hover .ch-msg-hover, .ch-msg-hover.show, .ch-msg-hover:focus-within{opacity:1; pointer-events:auto;}
+.ch-msg-hover-btn{width:26px; height:26px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;}
+.ch-msg-hover-btn:hover{color:var(--primary); border-color:var(--primary);}
+.ch-msg-hover-btn:focus-visible{outline:2px solid var(--primary); outline-offset:1px;}
+@media (hover:none){ .ch-msg-hover{display:none;} }
+
+/* Menu tin */
+.ch-msg-menu{position:absolute; top:calc(100% + 4px); left:0; z-index:45; min-width:184px; padding:4px; border-radius:10px; background:var(--surface); border:1px solid var(--border); box-shadow:0 10px 30px rgba(15,18,25,.18); display:flex; flex-direction:column;}
+.ch-msg-group.own .ch-msg-menu{left:auto; right:0;}
+.ch-msg-menu.up{top:auto; bottom:calc(100% + 4px);}
+.ch-msg-menu-item{display:flex; align-items:center; gap:10px; width:100%; padding:8px 12px; border:none; border-radius:7px; background:none; color:var(--text); font-size:13px; font-family:inherit; text-align:left; cursor:pointer; white-space:nowrap;}
+.ch-msg-menu-item:hover, .ch-msg-menu-item:focus-visible{background:var(--surface-alt); outline:none;}
+.ch-msg-menu-item svg{flex:none; color:var(--text-muted);}
+.ch-msg-menu-item.danger, .ch-msg-menu-item.danger svg{color:var(--danger);}
+.ch-msg-menu-empty{padding:8px 12px; font-size:12.5px; color:var(--text-muted);}
+
+/* Khung trích dẫn trong bong bóng (bấm -> nhảy tới tin gốc) */
+.ch-reply-quote{display:flex; flex-direction:column; gap:1px; max-width:100%; min-width:120px; padding:5px 10px; border:none; border-left:3px solid var(--primary); border-radius:8px; background:var(--surface-alt); color:var(--text); font-family:inherit; text-align:left; cursor:pointer;}
+.ch-reply-quote:hover{filter:brightness(.97);}
+.ch-reply-quote:disabled{cursor:default;}
+.ch-reply-quote-name{font-size:11.5px; font-weight:700; color:var(--primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ch-reply-quote-text{font-size:12px; color:var(--text-muted); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;}
+.ch-reply-quote-text.recalled, .ch-reply-bar-text.recalled{font-style:italic;}
+
+/* Tin thu hồi / nhãn nhỏ */
+.ch-bubble.ch-recalled, .ch-msg-group.own .ch-bubble.ch-recalled{background:transparent; color:var(--text-faint); border:1px dashed var(--border); font-style:italic;}
+.ch-fwd-label{font-size:11px; color:var(--text-faint); font-style:italic; padding:0 2px;}
+.ch-msg-edited{font-size:10.5px; color:var(--text-faint); margin-left:4px;}
+
+/* Tin được nhảy tới: tô sáng 2 giây */
+.ch-msg-focus{animation:ch-msg-focus 2s ease-out;}
+@keyframes ch-msg-focus{0%, 50%{background:rgba(37, 99, 235, .16);} 100%{background:transparent;}}
+@media (prefers-reduced-motion: reduce){ .ch-msg-focus{animation:none; outline:2px solid var(--primary); outline-offset:2px;} }
+
+/* Thanh "Đang trả lời" / "Chỉnh sửa tin nhắn" trên ô soạn */
+.ch-reply-bar{display:flex; align-items:center; gap:10px; padding:6px 8px 6px 10px; margin-bottom:8px; border-left:3px solid var(--primary); border-radius:8px; background:var(--surface-alt);}
+.ch-reply-bar-icon{flex:none; color:var(--primary); display:flex;}
+.ch-reply-bar-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
+.ch-reply-bar-title{font-size:12px; color:var(--text-muted);}
+.ch-reply-bar-title b{color:var(--text); font-weight:600;}
+.ch-reply-bar-text{font-size:12.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ch-reply-bar-x{flex:none; width:26px; height:26px; border:none; border-radius:50%; background:none; color:var(--text-muted); font-size:18px; line-height:1; cursor:pointer;}
+.ch-reply-bar-x:hover{background:var(--surface); color:var(--text);}
+.ch-reply-bar-x:disabled{opacity:.5; cursor:default;}
+.ch-edit-bar{border-left-color:var(--finance, var(--primary));}
+
+/* Hộp chuyển tiếp */
+.ch-fwd{width:460px;}
+.ch-fwd-preview{padding:8px 12px; border-radius:8px; background:var(--surface-alt); font-size:13px; color:var(--text-muted); white-space:pre-wrap; word-break:break-word; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+.ch-fwd-list.ch-pick-list{max-height:300px;}
+.ch-fwd-row.disabled{opacity:.55; cursor:default;}
+.ch-fwd-main{flex:1; min-width:0; display:flex; flex-direction:column;}
+.ch-fwd-note{font-size:11.5px; color:var(--text-muted);}
+.ch-fwd-note.err{color:var(--danger);}

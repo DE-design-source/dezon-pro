@@ -267,21 +267,50 @@ function buildUrl(path, query) {
   return url
 }
 
-async function raw(method, path, { body, query, token, signal } = {}) {
+/* timeoutMs: hết giờ thì huỷ yêu cầu và báo lỗi NETWORK; signal của người gọi huỷ thì vẫn ném AbortError như cũ */
+async function raw(method, path, { body, query, token, signal, timeoutMs } = {}) {
   if (!apiConfigured()) throw new ChatApiError('Chưa cấu hình địa chỉ máy chủ (VITE_API_URL)', 0, 'NOT_CONFIGURED')
   const headers = {}
   const hasBody = body !== undefined
   if (hasBody) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = 'Bearer ' + token
-  let res
-  try {
-    res = await fetch(buildUrl(path, query), { method, headers, body: hasBody ? JSON.stringify(body) : undefined, signal })
-  } catch (e) {
-    if (e && e.name === 'AbortError') throw e
-    throw new ChatApiError('Không kết nối được máy chủ chat', 0, 'NETWORK')
+  let sig = signal
+  let timer = null
+  let timedOut = false
+  let unlink = null
+  if (timeoutMs > 0) {
+    const ac = new AbortController()
+    if (signal) {
+      if (signal.aborted) ac.abort()
+      else {
+        const onAbort = () => ac.abort()
+        signal.addEventListener('abort', onAbort, { once: true })
+        unlink = () => signal.removeEventListener('abort', onAbort)
+      }
+    }
+    timer = setTimeout(() => { timedOut = true; ac.abort() }, timeoutMs)
+    sig = ac.signal
   }
+  const slow = () => new ChatApiError('Máy chủ chat không phản hồi kịp, thử lại sau', 0, 'NETWORK')
+  let res
   let d = null
-  try { d = await res.json() } catch (e) { d = null }
+  try {
+    try {
+      res = await fetch(buildUrl(path, query), { method, headers, body: hasBody ? JSON.stringify(body) : undefined, signal: sig })
+    } catch (e) {
+      if (timedOut) throw slow()
+      if (e && e.name === 'AbortError') throw e
+      throw new ChatApiError('Không kết nối được máy chủ chat', 0, 'NETWORK')
+    }
+    try { d = await res.json() } catch (e) {
+      if (timedOut) throw slow()
+      if (e && e.name === 'AbortError') throw e
+      d = null
+    }
+  } finally {
+    if (timer) clearTimeout(timer)
+    if (unlink) unlink()
+  }
   if (d && typeof d === 'object' && d.error) throw new ChatApiError(String(d.error), res.status, d.code || '')
   if (!res.ok || !d || typeof d !== 'object') {
     throw new ChatApiError('Lỗi máy chủ chat (HTTP ' + res.status + ')', res.status, res.status === 401 ? 'CHAT_NOAUTH' : '')
@@ -464,13 +493,93 @@ export const addMembers = (id, userIds) => call('POST', '/conversations/' + id +
 export const removeMember = (id, userId) => call('DELETE', '/conversations/' + id + '/members/' + userId)
 export const setMemberRole = (id, userId, role) => call('PATCH', '/conversations/' + id + '/members/' + userId, { body: { role } })
 export const muteConversation = (id, until) => call('PUT', '/conversations/' + id + '/mute', { body: { until } })
-export const messages = (id, { before_seq, after_seq, limit } = {}) => call('GET', '/conversations/' + id + '/messages', { query: { before_seq, after_seq, limit } })
+/* Một trong before_seq / after_seq / around_seq (around_seq: tin quanh seq đó, kết quả có thêm has_newer) */
+export const messages = (id, { before_seq, after_seq, around_seq, limit } = {}) =>
+  call('GET', '/conversations/' + id + '/messages', { query: { before_seq, after_seq, around_seq, limit } })
+/* Tin đã sửa / thu hồi / đổi reaction sau mốc since (sync_cursor đã dùng cho /sync) hoặc cursor (next_cursor trang trước)
+   -> {messages, next_cursor} */
+export const messageChanges = (id, { since, cursor, limit } = {}) =>
+  call('GET', '/conversations/' + id + '/messages/changes', { query: { since, cursor, limit } })
 export const sync = cursor => call('GET', '/sync', { query: { cursor } })
+
+/* ---- Thao tác trên tin (giai đoạn 2) ---- */
+/* -> Message sau khi sửa */
+export const editMessage = (messageId, { content, mentions } = {}) =>
+  call('PATCH', '/messages/' + messageId, { body: mentions && mentions.length ? { content, mentions } : { content } })
+/* -> Message đã thu hồi (idempotent) */
+export const recallMessage = messageId => call('POST', '/messages/' + messageId + '/recall', { body: {} })
+/* targets [{conversation_id, client_msg_id}] -> {results: [{conversation_id, ok, ack?, error?: {code, message}}]} */
+export const forwardMessage = (messageId, targets) => call('POST', '/messages/' + messageId + '/forward', { body: { targets } })
+/* -> ReactionSummary {counts, total, mine} */
+export const setReaction = (messageId, reaction) => call('PUT', '/messages/' + messageId + '/reaction', { body: { reaction } })
+export const removeReaction = messageId => call('DELETE', '/messages/' + messageId + '/reaction')
+/* -> {message_id, reactions: [{user_id, display_name, reaction, created_at}]} */
+export const listReactions = messageId => call('GET', '/messages/' + messageId + '/reactions')
+
+/* ---- Tìm tin -> {hits: [SearchHit], next_cursor} ---- */
+export const searchMessages = ({ q, cursor, limit } = {}) => call('GET', '/search/messages', { query: { q, cursor, limit } })
+export const searchConversationMessages = (id, { q, cursor, limit } = {}) =>
+  call('GET', '/conversations/' + id + '/messages/search', { query: { q, cursor, limit } })
+
+/* ---- Thiết bị đăng nhập ---- */
+/* -> {devices: [Device]} */
+export const devices = () => call('GET', '/devices')
+export const revokeDevice = deviceId => call('DELETE', '/devices/' + deviceId)
+/* -> {revoked: n} */
+export const revokeOtherDevices = () => call('POST', '/devices/logout-others', { body: {} })
+
+/* ---- Đăng nhập bằng QR ---- */
+/* Máy mới (công khai) -> {qr_id, code, poll_token, expires_in, poll_interval} */
+export const qrStart = () => raw('POST', '/auth/qr/start', { body: { device: device() } })
+/* -> {status, expires_in, approver?: {display_name}, auth?: AuthResult} */
+export const qrPoll = (qrId, pollToken) => raw('POST', '/auth/qr/poll', { body: { qr_id: qrId, poll_token: pollToken } })
+/* Máy đã đăng nhập: quét -> QRSession; duyệt / từ chối -> {status} */
+export const qrScan = code => call('POST', '/auth/qr/scan', { body: { code } })
+export const qrApprove = code => call('POST', '/auth/qr/approve', { body: { code } })
+export const qrReject = code => call('POST', '/auth/qr/reject', { body: { code } })
+/* Ghim tin nhắn: trả {conversation_id, pins[]} (mới ghim trước, tối đa 5) */
+export const pins = id => call('GET', '/conversations/' + id + '/pins')
+export const pinMessage = (id, messageId) => call('POST', '/conversations/' + id + '/pins', { body: { message_id: messageId } })
+export const unpinMessage = (id, messageId) => call('DELETE', '/conversations/' + id + '/pins/' + messageId)
+
+/* ---- Quản trị nhóm (API.md mục "Quản trị nhóm") ---- */
+/* patch {name?, description?, avatar_media_id?}: khoá vắng = giữ nguyên; description ''/null = xoá; avatar_media_id null = xoá ảnh
+   -> ConversationDetail */
+export const updateGroupInfo = (id, patch) => call('PATCH', '/conversations/' + id, { body: patch || {} })
+/* settings {admins_only_send?, admins_only_edit_info?, admins_only_add_members?} -> ConversationDetail */
+export const updateGroupSettings = (id, settings) => call('PATCH', '/conversations/' + id + '/settings', { body: settings || {} })
+export const transferOwnership = (id, userId) => call('POST', '/conversations/' + id + '/owner', { body: { user_id: userId } })
+export const disbandGroup = id => call('POST', '/conversations/' + id + '/disband', { body: {} })
+/* -> {invite_link: InviteLink | null} (không có token) */
+export const getInviteLink = id => call('GET', '/conversations/' + id + '/invite-link')
+/* body {requires_approval?, expires_in?: giây | null} -> {invite_link} CÓ token + url_path */
+export const createInviteLink = (id, body) => call('POST', '/conversations/' + id + '/invite-link', { body: body || {} })
+export const revokeInviteLink = id => call('DELETE', '/conversations/' + id + '/invite-link')
+/* -> InvitePreview {group, requires_approval, expires_at, membership, conversation_id} */
+export const invitePreview = token => call('GET', '/invites/' + encodeURIComponent(token))
+/* -> {status: joined | pending | already_member, conversation_id, request_id} */
+export const joinByInvite = token => call('POST', '/invites/' + encodeURIComponent(token) + '/join', { body: {} })
+/* -> {requests: [JoinRequest]} */
+export const joinRequests = id => call('GET', '/conversations/' + id + '/join-requests')
+export const approveJoinRequest = (id, reqId) => call('POST', '/conversations/' + id + '/join-requests/' + reqId + '/approve', { body: {} })
+export const rejectJoinRequest = (id, reqId) => call('POST', '/conversations/' + id + '/join-requests/' + reqId + '/reject', { body: {} })
 
 /* ---- Thông báo đẩy (uid: tài khoản, mặc định của tab) ---- */
 export const pushConfig = () => call('GET', '/push/config')
 export const registerPush = (subscriptionJson, uid) => call('POST', '/devices/push', { body: { push_kind: 'webpush', push_token: subscriptionJson }, uid })
 export const unregisterPush = uid => call('DELETE', '/devices/push', { uid })
+
+/* ---- Tệp đính kèm (ảnh / video / tệp / tin thoại) ---- */
+/* -> {enabled, max_bytes:{image,video,file,voice}, max_voice_ms, max_poster_bytes, mimes:{image,video,voice}, denied_ext} */
+export const mediaConfig = () => call('GET', '/media/config')
+/* body {type, mime, size, sha256, file_name?, width?, height?, duration_ms?, waveform?, poster?:{mime, size}}
+   -> {media_id, dedup, upload?:{url, method, headers | fields, expires_at}, poster_upload?, media?} */
+export const mediaUploadUrl = body => call('POST', '/media/upload-url', { body })
+/* Báo đã tải lên xong: máy chủ kiểm, quét, làm ảnh thu nhỏ (tối đa 60 giây) -> MediaDTO */
+export const mediaComplete = id => call('POST', '/media/' + id + '/complete', { timeoutMs: 65000 })
+/* -> {media: MediaDTO}, url / thumb_url có hạn; download: tải về dạng tệp; messageId: lấy tên tệp theo tin nhắn đó */
+export const mediaGet = (id, { download, messageId } = {}) =>
+  call('GET', '/media/' + id, { query: { download: download ? 1 : undefined, message_id: messageId } })
 
 /* Địa chỉ WebSocket: API_BASE (http/https, tuyệt đối hoặc tương đối) -> ws/wss + /api/v1/chat/ws */
 export function wsUrl() {

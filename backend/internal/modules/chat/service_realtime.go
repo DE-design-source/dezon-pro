@@ -64,6 +64,13 @@ func (s *Service) HandleMessage(ctx context.Context, c realtime.Client, typ stri
 			return nil, wsError(typ, err)
 		}
 		ack, err := s.MarkReceipt(ctx, c.UserID, in.ConversationID, in.Seq, typ == "message.read")
+		if errors.Is(err, errNotMember) { // nhóm đã giải tán (dòng chỉ đọc): 410 thay vì 403
+			if p, perr := s.pool(); perr == nil {
+				if ro, rerr := readonlyDisbanded(ctx, p, c.UserID, in.ConversationID); rerr == nil && ro {
+					err = errGroupDisbanded
+				}
+			}
+		}
 		if err != nil {
 			return nil, wsError(typ, err)
 		}
@@ -83,8 +90,9 @@ func decodeData(data json.RawMessage, dst any) error {
 	return nil
 }
 
-// TypingTargets: thành viên đang hoạt động trừ userID; userID không còn trong hội thoại -> lỗi. Chat 1-1 mà một trong
-// hai bên đã chặn bên kia -> không ai (không báo lỗi: người bị chặn không biết mình bị chặn).
+// TypingTargets: thành viên đang hoạt động trừ userID; userID không còn trong hội thoại -> lỗi. Không ai nhận (không
+// báo lỗi): chat 1-1 mà một trong hai bên đã chặn bên kia (người bị chặn không biết mình bị chặn), nhóm đã giải tán
+// (dòng chỉ đọc), member của nhóm bật admins_only_send.
 func (s *Service) TypingTargets(ctx context.Context, userID, conversationID int64) ([]int64, error) {
 	e, err := s.convMembers(ctx, conversationID)
 	if err != nil {
@@ -100,9 +108,21 @@ func (s *Service) TypingTargets(ctx context.Context, userID, conversationID int6
 		}
 	}
 	if !in {
+		if p, perr := s.pool(); perr == nil {
+			if ro, rerr := readonlyDisbanded(ctx, p, userID, conversationID); rerr == nil && ro {
+				return nil, nil
+			}
+		}
 		return nil, wsError("typing", errNotMember)
 	}
-	if e.blocked {
+	if e.blocked || len(out) == 0 {
+		return nil, nil
+	}
+	ok, err := s.typingAllowed(ctx, conversationID, userID)
+	if err != nil {
+		return nil, wsError("typing", err)
+	}
+	if !ok {
 		return nil, nil
 	}
 	return out, nil

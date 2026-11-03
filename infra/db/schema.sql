@@ -3,6 +3,7 @@
 --
 
 
+
 -- Dumped from database version 17.11
 -- Dumped by pg_dump version 17.11
 
@@ -23,6 +24,27 @@ SET row_security = off;
 --
 
 CREATE SCHEMA quarantine;
+
+
+--
+-- Name: chat_search_fold(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.chat_search_fold(t text) RETURNS text
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select btrim(regexp_replace(translate(regexp_replace(lower(t), '[' || chr(768) || '-' || chr(879) || ']', '', 'g'),
+    'áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ',
+    'aaaaaaaaaaaaaaaaadeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyy'),
+    '[^[:alnum:]]+', ' ', 'g'))
+$$;
+
+
+--
+-- Name: FUNCTION chat_search_fold(t text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.chat_search_fold(t text) IS 'Search normalization for chat messages: lowercase, strip Vietnamese diacritics (NFD combining marks and precomposed letters, đ -> d), every run of non letter / digit characters -> one space, trimmed. IMMUTABLE so it can back idx_chat_messages_content_file_name; mirrored by foldVN in Go.';
 
 
 SET default_tablespace = '';
@@ -121,7 +143,9 @@ CREATE TABLE public.chat_conversation_members (
     left_at timestamp with time zone,
     joined_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_mention_seq bigint DEFAULT 0 NOT NULL,
     CONSTRAINT ck_chat_conversation_members_last_delivered_seq CHECK ((last_delivered_seq >= 0)),
+    CONSTRAINT ck_chat_conversation_members_last_mention_seq CHECK ((last_mention_seq >= 0)),
     CONSTRAINT ck_chat_conversation_members_last_read_seq CHECK ((last_read_seq >= 0)),
     CONSTRAINT ck_chat_conversation_members_member_role CHECK ((member_role = ANY (ARRAY['owner'::text, 'admin'::text, 'member'::text])))
 );
@@ -198,6 +222,13 @@ COMMENT ON COLUMN public.chat_conversation_members.updated_at IS 'Bumped when th
 
 
 --
+-- Name: COLUMN chat_conversation_members.last_mention_seq; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversation_members.last_mention_seq IS 'Derived: seq of the newest message of the conversation that mentions this member (explicitly or @all); 0 = none. Written only by the send path; unread mention = last_mention_seq > last_read_seq.';
+
+
+--
 -- Name: chat_conversations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -210,7 +241,16 @@ CREATE TABLE public.chat_conversations (
     created_by bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    description text,
+    avatar_media_id bigint,
+    is_admin_only_send boolean DEFAULT false NOT NULL,
+    is_admin_only_info boolean DEFAULT true NOT NULL,
+    is_admin_only_add boolean DEFAULT false NOT NULL,
+    disbanded_at timestamp with time zone,
+    CONSTRAINT ck_chat_conversations_avatar_media_id CHECK (((avatar_media_id IS NULL) OR (conversation_type = 'group'::text))),
     CONSTRAINT ck_chat_conversations_conversation_type CHECK ((conversation_type = ANY (ARRAY['direct'::text, 'group'::text]))),
+    CONSTRAINT ck_chat_conversations_description CHECK (((description IS NULL) OR ((conversation_type = 'group'::text) AND (btrim(description) <> ''::text) AND (char_length(description) <= 500)))),
+    CONSTRAINT ck_chat_conversations_disbanded_at CHECK (((disbanded_at IS NULL) OR (conversation_type = 'group'::text))),
     CONSTRAINT ck_chat_conversations_last_seq CHECK ((last_seq >= 0)),
     CONSTRAINT ck_chat_conversations_name CHECK ((((conversation_type = 'group'::text) = (name IS NOT NULL)) AND ((name IS NULL) OR ((btrim(name) <> ''::text) AND (char_length(name) <= 100)))))
 );
@@ -280,6 +320,48 @@ COMMENT ON COLUMN public.chat_conversations.updated_at IS 'Bumped on every messa
 
 
 --
+-- Name: COLUMN chat_conversations.description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.description IS 'Group description, 1..500 characters (blank -> null); null = none / direct conversation.';
+
+
+--
+-- Name: COLUMN chat_conversations.avatar_media_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.avatar_media_id IS 'Group avatar: a ready image chat_media uploaded by the member who set it (checked by the service); null = default avatar. Restrict: the media janitor skips rows referenced here.';
+
+
+--
+-- Name: COLUMN chat_conversations.is_admin_only_send; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.is_admin_only_send IS 'Group setting: true = only owner / admins may send messages (members still read and send receipts).';
+
+
+--
+-- Name: COLUMN chat_conversations.is_admin_only_info; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.is_admin_only_info IS 'Group setting: true = only owner / admins may change name / avatar / description (default true = MVP behaviour).';
+
+
+--
+-- Name: COLUMN chat_conversations.is_admin_only_add; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.is_admin_only_add IS 'Group setting: true = only owner / admins may add members and create invite links.';
+
+
+--
+-- Name: COLUMN chat_conversations.disbanded_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_conversations.disbanded_at IS 'Set once when the owner disbands the group; every member active at that moment gets left_at = disbanded_at (read-only history). Null = not disbanded.';
+
+
+--
 -- Name: chat_conversations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -306,10 +388,16 @@ CREATE TABLE public.chat_devices (
     push_token text,
     last_seen_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_agent text DEFAULT ''::text NOT NULL,
+    last_ip text DEFAULT ''::text NOT NULL,
+    login_method text DEFAULT 'otp'::text NOT NULL,
     CONSTRAINT ck_chat_devices_device_name CHECK ((char_length(device_name) <= 200)),
+    CONSTRAINT ck_chat_devices_last_ip CHECK ((char_length(last_ip) <= 64)),
+    CONSTRAINT ck_chat_devices_login_method CHECK ((login_method = ANY (ARRAY['otp'::text, 'qr'::text]))),
     CONSTRAINT ck_chat_devices_platform CHECK ((platform = ANY (ARRAY['ios'::text, 'android'::text, 'web'::text, 'desktop'::text]))),
     CONSTRAINT ck_chat_devices_push_kind CHECK ((push_kind = ANY (ARRAY['webpush'::text, 'fcm'::text, 'apns'::text]))),
-    CONSTRAINT ck_chat_devices_push_token CHECK (((push_kind IS NULL) = (push_token IS NULL)))
+    CONSTRAINT ck_chat_devices_push_token CHECK (((push_kind IS NULL) = (push_token IS NULL))),
+    CONSTRAINT ck_chat_devices_user_agent CHECK ((char_length(user_agent) <= 500))
 );
 
 
@@ -374,6 +462,27 @@ COMMENT ON COLUMN public.chat_devices.last_seen_at IS 'Last token refresh or Web
 --
 
 COMMENT ON COLUMN public.chat_devices.created_at IS 'Login time.';
+
+
+--
+-- Name: COLUMN chat_devices.user_agent; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_devices.user_agent IS 'User-Agent header at login (truncated to 500 characters); empty when unknown / logged in before 0023. Shown in the device list.';
+
+
+--
+-- Name: COLUMN chat_devices.last_ip; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_devices.last_ip IS 'Client IP at login (OTP / QR) or at the latest token refresh; empty when unknown. Shown in the device list.';
+
+
+--
+-- Name: COLUMN chat_devices.login_method; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_devices.login_method IS 'otp = SMS / email code; qr = approved by another signed-in device (chat_qr_login_sessions).';
 
 
 --
@@ -488,6 +597,432 @@ COMMENT ON COLUMN public.chat_friendships.updated_at IS 'Last status change (set
 
 
 --
+-- Name: chat_group_invite_links; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_group_invite_links (
+    id bigint NOT NULL,
+    conversation_id bigint NOT NULL,
+    token_hash text NOT NULL,
+    created_by bigint NOT NULL,
+    requires_approval boolean DEFAULT false NOT NULL,
+    expires_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    use_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_chat_group_invite_links_expires_at CHECK (((expires_at IS NULL) OR (expires_at > created_at))),
+    CONSTRAINT ck_chat_group_invite_links_token_hash CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ck_chat_group_invite_links_use_count CHECK ((use_count >= 0))
+);
+
+
+--
+-- Name: TABLE chat_group_invite_links; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_group_invite_links IS 'Invite links of groups. Only the SHA-256 of the random token is stored (the token is shown once, at creation). At most one non-revoked link per group.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.id IS 'Primary key.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.conversation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.conversation_id IS 'Group the link joins (conversation_type = group, checked by the service).';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.token_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.token_hash IS 'Lowercase hex SHA-256 of the base64url token (32 random bytes); the token itself is never stored.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.created_by IS 'Member who created the link.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.requires_approval; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.requires_approval IS 'True = joining creates a pending chat_group_join_requests row that an owner / admin approves.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.expires_at IS 'Link stops working after this time; null = never expires.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.revoked_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.revoked_at IS 'Set when revoked (explicitly, by creating a new link, or when the group is disbanded); null = active.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.use_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.use_count IS 'Derived: number of joins (direct joins + approved requests) made through this link. Shown to admins only.';
+
+
+--
+-- Name: COLUMN chat_group_invite_links.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_invite_links.created_at IS 'Creation time.';
+
+
+--
+-- Name: chat_group_invite_links_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.chat_group_invite_links ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.chat_group_invite_links_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: chat_group_join_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_group_join_requests (
+    id bigint NOT NULL,
+    conversation_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    invite_link_id bigint NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    resolved_by bigint,
+    resolved_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_chat_group_join_requests_resolved_at CHECK (((status = 'pending'::text) = (resolved_at IS NULL))),
+    CONSTRAINT ck_chat_group_join_requests_resolved_by CHECK (((resolved_by IS NULL) OR (status = ANY (ARRAY['approved'::text, 'rejected'::text])))),
+    CONSTRAINT ck_chat_group_join_requests_status CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: TABLE chat_group_join_requests; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_group_join_requests IS 'Requests to join a group through an invite link with requires_approval. One pending row per (group, user); resolved rows are kept as history.';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.id IS 'Primary key (request_id in the chat API).';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.conversation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.conversation_id IS 'Group asked to join.';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.user_id IS 'Account asking to join.';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.invite_link_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.invite_link_id IS 'Link used (pending requests stay valid after the link is revoked).';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.status IS 'pending / approved / rejected / cancelled (user was added another way, or the group was disbanded).';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.resolved_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.resolved_by IS 'Owner / admin who approved or rejected; null while pending or when cancelled by the system.';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.resolved_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.resolved_at IS 'Time the request left pending; null exactly while pending.';
+
+
+--
+-- Name: COLUMN chat_group_join_requests.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_group_join_requests.created_at IS 'Request time.';
+
+
+--
+-- Name: chat_group_join_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.chat_group_join_requests ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.chat_group_join_requests_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: chat_media; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_media (
+    id bigint NOT NULL,
+    uploader_id bigint NOT NULL,
+    media_type text NOT NULL,
+    mime_type text NOT NULL,
+    size_bytes bigint NOT NULL,
+    sha256 text NOT NULL,
+    file_name text,
+    object_key text NOT NULL,
+    thumb_key text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    width integer,
+    height integer,
+    duration_ms integer,
+    waveform smallint[],
+    blurhash text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_chat_media_blurhash CHECK (((blurhash IS NULL) OR ((media_type = ANY (ARRAY['image'::text, 'video'::text])) AND ((char_length(blurhash) >= 6) AND (char_length(blurhash) <= 100))))),
+    CONSTRAINT ck_chat_media_duration_ms CHECK (((duration_ms IS NULL) OR ((duration_ms >= 1) AND (duration_ms <= 86400000)))),
+    CONSTRAINT ck_chat_media_file_name CHECK (((file_name IS NULL) OR ((char_length(file_name) >= 1) AND (char_length(file_name) <= 255) AND (file_name !~ '[/\\[:cntrl:]]'::text)))),
+    CONSTRAINT ck_chat_media_media_type CHECK ((media_type = ANY (ARRAY['image'::text, 'video'::text, 'file'::text, 'voice'::text]))),
+    CONSTRAINT ck_chat_media_mime_type CHECK (((char_length(mime_type) <= 100) AND (mime_type ~ '^[a-z0-9.+-]+/[a-z0-9.+-]+$'::text) AND ((media_type = 'file'::text) OR ((media_type = 'image'::text) AND (mime_type ~~ 'image/%'::text)) OR ((media_type = 'video'::text) AND (mime_type ~~ 'video/%'::text)) OR ((media_type = 'voice'::text) AND (mime_type ~~ 'audio/%'::text))))),
+    CONSTRAINT ck_chat_media_object_key CHECK ((object_key ~~ 'chat/m/%'::text)),
+    CONSTRAINT ck_chat_media_sha256 CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ck_chat_media_size_bytes CHECK (((size_bytes > 0) AND (size_bytes <= 209715200))),
+    CONSTRAINT ck_chat_media_status CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'ready'::text, 'failed'::text, 'blocked'::text]))),
+    CONSTRAINT ck_chat_media_thumb_key CHECK (((thumb_key IS NULL) OR (media_type = ANY (ARRAY['image'::text, 'video'::text])))),
+    CONSTRAINT ck_chat_media_voice CHECK (((media_type <> 'voice'::text) OR ((duration_ms IS NOT NULL) AND (waveform IS NOT NULL)))),
+    CONSTRAINT ck_chat_media_waveform CHECK (((waveform IS NULL) OR ((media_type = 'voice'::text) AND ((cardinality(waveform) >= 1) AND (cardinality(waveform) <= 128)) AND (array_position(waveform, NULL::smallint) IS NULL) AND (0 <= ALL (waveform)) AND (255 >= ALL (waveform))))),
+    CONSTRAINT ck_chat_media_width_height CHECK ((((width IS NULL) = (height IS NULL)) AND ((width IS NULL) OR ((width >= 1) AND (width <= 100000) AND ((height >= 1) AND (height <= 100000))))))
+);
+
+
+--
+-- Name: TABLE chat_media; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_media IS 'Chat attachments stored on S3/MinIO (bytes never pass through the API). One row per uploader + verified content hash + type; a message references at most one row via chat_messages.media_id.';
+
+
+--
+-- Name: COLUMN chat_media.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.id IS 'Primary key (media_id in the chat API, sent as attachments[] of a message).';
+
+
+--
+-- Name: COLUMN chat_media.uploader_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.uploader_id IS 'Account that requested the upload; only this account can attach it to a message.';
+
+
+--
+-- Name: COLUMN chat_media.media_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.media_type IS 'image / video / file / voice; must equal chat_messages.message_type of every message using it (checked by the service).';
+
+
+--
+-- Name: COLUMN chat_media.mime_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.mime_type IS 'Lowercase MIME without parameters. Image: overwritten with the sniffed type at complete. File: informational only, always served as application/octet-stream.';
+
+
+--
+-- Name: COLUMN chat_media.size_bytes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.size_bytes IS 'Declared size, signed into the presigned PUT (Content-Length) and re-checked by Stat at complete.';
+
+
+--
+-- Name: COLUMN chat_media.sha256; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.sha256 IS 'Lowercase hex SHA-256 declared by the client and re-computed by the server at complete (mismatch -> failed); per-uploader dedup key.';
+
+
+--
+-- Name: COLUMN chat_media.file_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.file_name IS 'Sanitized file name of the first upload (no path, no control characters). Each message carries its own chat_messages.file_name.';
+
+
+--
+-- Name: COLUMN chat_media.object_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.object_key IS 'Final object key chat/m/u<uploader_id>/<yyyymm>/<32 hex random>; never presigned for PUT. Staging key = same path under chat/in/.';
+
+
+--
+-- Name: COLUMN chat_media.thumb_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.thumb_key IS 'Image: server-made 320 px JPEG (<object_key>.t.jpg), null when the original is a JPEG of at most 320 px. Video: client poster copied to <object_key>.p.jpg.';
+
+
+--
+-- Name: COLUMN chat_media.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.status IS 'pending (URL issued) / processing (complete running) / ready / failed (size, type or hash mismatch, or expired) / blocked (virus scan).';
+
+
+--
+-- Name: COLUMN chat_media.width; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.width IS 'Pixel width as displayed (EXIF orientation applied). Image: measured by the server; video: client hint.';
+
+
+--
+-- Name: COLUMN chat_media.height; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.height IS 'Pixel height as displayed, see width.';
+
+
+--
+-- Name: COLUMN chat_media.duration_ms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.duration_ms IS 'Video / voice length in milliseconds (client-provided).';
+
+
+--
+-- Name: COLUMN chat_media.waveform; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.waveform IS 'Voice only: 1..128 amplitude buckets 0..255, no nulls, for the waveform drawing.';
+
+
+--
+-- Name: COLUMN chat_media.blurhash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.blurhash IS 'Blurhash (4x3 components) of the image / poster, computed by the server.';
+
+
+--
+-- Name: COLUMN chat_media.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.created_at IS 'Time the upload URL was first issued (service clock); never reset on re-issue; basis of the 24 h quota.';
+
+
+--
+-- Name: COLUMN chat_media.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_media.updated_at IS 'Last state change or dedup reuse (service clock). Janitor: objects of pending/failed removed after 2 h, processing reset after 10 min, failed/pending rows deleted after 24 h, unreferenced ready rows after 24 h.';
+
+
+--
+-- Name: chat_media_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.chat_media ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.chat_media_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: chat_message_reactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_message_reactions (
+    message_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    reaction text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_chat_message_reactions_reaction CHECK ((reaction = ANY (ARRAY['like'::text, 'love'::text, 'haha'::text, 'wow'::text, 'sad'::text, 'angry'::text])))
+);
+
+
+--
+-- Name: TABLE chat_message_reactions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_message_reactions IS 'Emoji reactions on messages: at most one per (message, user); setting another reaction replaces it. Not allowed on system / recalled messages (checked by the service; recall deletes the rows).';
+
+
+--
+-- Name: COLUMN chat_message_reactions.message_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_message_reactions.message_id IS 'Message reacted to (primary key part 1).';
+
+
+--
+-- Name: COLUMN chat_message_reactions.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_message_reactions.user_id IS 'Member who reacted (primary key part 2); must be an active member of the conversation when reacting.';
+
+
+--
+-- Name: COLUMN chat_message_reactions.reaction; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_message_reactions.reaction IS 'like / love / haha / wow / sad / angry (client shows 👍 ❤️ 😆 😮 😢 😡).';
+
+
+--
+-- Name: COLUMN chat_message_reactions.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_message_reactions.created_at IS 'Time the current reaction was set (reset when replaced).';
+
+
+--
 -- Name: chat_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -500,9 +1035,35 @@ CREATE TABLE public.chat_messages (
     message_type text NOT NULL,
     content text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    media_id bigint,
+    file_name text,
+    mentions jsonb,
+    reply_to_message_id bigint,
+    is_forwarded boolean DEFAULT false NOT NULL,
+    edited_at timestamp with time zone,
+    recalled_at timestamp with time zone,
+    recalled_by bigint,
+    updated_at timestamp with time zone,
     CONSTRAINT ck_chat_messages_client_msg_id CHECK (((message_type = 'system'::text) = (client_msg_id IS NULL))),
-    CONSTRAINT ck_chat_messages_content CHECK (((btrim(content) <> ''::text) AND (char_length(content) <= 4000))),
-    CONSTRAINT ck_chat_messages_message_type CHECK ((message_type = ANY (ARRAY['text'::text, 'system'::text]))),
+    CONSTRAINT ck_chat_messages_content CHECK (((char_length(content) <= 4000) AND
+CASE
+    WHEN (recalled_at IS NOT NULL) THEN (content = ''::text)
+    WHEN (message_type = ANY (ARRAY['text'::text, 'system'::text])) THEN (btrim(content) <> ''::text)
+    WHEN (message_type = 'voice'::text) THEN (content = ''::text)
+    ELSE true
+END)),
+    CONSTRAINT ck_chat_messages_edited_at CHECK (((edited_at IS NULL) OR (message_type = 'text'::text))),
+    CONSTRAINT ck_chat_messages_file_name CHECK (((file_name IS NULL) OR ((message_type = 'file'::text) AND ((char_length(file_name) >= 1) AND (char_length(file_name) <= 255)) AND (file_name !~ '[/\\[:cntrl:]]'::text)))),
+    CONSTRAINT ck_chat_messages_is_forwarded CHECK (((NOT is_forwarded) OR (message_type <> 'system'::text))),
+    CONSTRAINT ck_chat_messages_media_id CHECK (
+CASE
+    WHEN (recalled_at IS NOT NULL) THEN (media_id IS NULL)
+    ELSE ((message_type = ANY (ARRAY['image'::text, 'video'::text, 'file'::text, 'voice'::text])) = (media_id IS NOT NULL))
+END),
+    CONSTRAINT ck_chat_messages_mentions CHECK (((mentions IS NULL) OR ((jsonb_typeof(mentions) = 'array'::text) AND ((jsonb_array_length(mentions) >= 1) AND (jsonb_array_length(mentions) <= 50)) AND (message_type = ANY (ARRAY['text'::text, 'image'::text, 'video'::text, 'file'::text]))))),
+    CONSTRAINT ck_chat_messages_message_type CHECK ((message_type = ANY (ARRAY['text'::text, 'system'::text, 'image'::text, 'video'::text, 'file'::text, 'voice'::text]))),
+    CONSTRAINT ck_chat_messages_recalled CHECK ((((recalled_at IS NULL) = (recalled_by IS NULL)) AND ((recalled_at IS NULL) OR ((message_type <> 'system'::text) AND (content = ''::text) AND (media_id IS NULL) AND (file_name IS NULL) AND (mentions IS NULL))))),
+    CONSTRAINT ck_chat_messages_reply_to_message_id CHECK (((reply_to_message_id IS NULL) OR ((reply_to_message_id <> id) AND (message_type <> 'system'::text)))),
     CONSTRAINT ck_chat_messages_seq CHECK ((seq > 0))
 );
 
@@ -553,14 +1114,14 @@ COMMENT ON COLUMN public.chat_messages.sender_id IS 'Sender (for system messages
 -- Name: COLUMN chat_messages.message_type; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.chat_messages.message_type IS 'text / system (group created, members added / removed / left, renamed, role changed).';
+COMMENT ON COLUMN public.chat_messages.message_type IS 'text / system / image / video / file / voice (system: group created, members added / removed / left, renamed, role changed, pinned...). Kept after recall.';
 
 
 --
 -- Name: COLUMN chat_messages.content; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.chat_messages.content IS 'Message text, 1..4000 characters, not blank.';
+COMMENT ON COLUMN public.chat_messages.content IS 'text/system: 1..4000 characters, not blank. image/video/file: optional caption 0..4000. voice: empty. Recalled: empty.';
 
 
 --
@@ -568,6 +1129,69 @@ COMMENT ON COLUMN public.chat_messages.content IS 'Message text, 1..4000 charact
 --
 
 COMMENT ON COLUMN public.chat_messages.created_at IS 'Time the message was stored (the "sent" time).';
+
+
+--
+-- Name: COLUMN chat_messages.media_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.media_id IS 'Attachment (chat_media) of an image / video / file / voice message; null for text / system and after recall. A forwarded message reuses the media_id of the source message.';
+
+
+--
+-- Name: COLUMN chat_messages.file_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.file_name IS 'Type file only: display / download name for this message (a dedup hit reuses the object but keeps the new name). Null after recall.';
+
+
+--
+-- Name: COLUMN chat_messages.mentions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.mentions IS 'Mentions in content, read / written with the message as a whole: [{"user_id": <id, 0 = @all>, "offset": <UTF-16 index>, "length": <UTF-16 units>}] sorted by offset, non-overlapping, 1..50 items; null = none / recalled. Group messages only (checked by the service); re-validated on edit.';
+
+
+--
+-- Name: COLUMN chat_messages.reply_to_message_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.reply_to_message_id IS 'Message this one replies to: same conversation, not a system message (checked by the service); null = not a reply. The quoted preview is built at read time (recalled target -> "recalled").';
+
+
+--
+-- Name: COLUMN chat_messages.is_forwarded; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.is_forwarded IS 'True = created by forwarding another message (content / media copied, mentions and reply dropped); shown as "Đã chuyển tiếp". The source is not recorded.';
+
+
+--
+-- Name: COLUMN chat_messages.edited_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.edited_at IS 'Last edit time (text messages only, by the sender within 24 h); null = never edited.';
+
+
+--
+-- Name: COLUMN chat_messages.recalled_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.recalled_at IS 'Recall time; content, mentions, media_id, file_name are wiped in the same statement. Null = not recalled. Set together with recalled_by.';
+
+
+--
+-- Name: COLUMN chat_messages.recalled_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.recalled_by IS 'Who recalled: the sender, or the group owner / admin moderating; null = not recalled.';
+
+
+--
+-- Name: COLUMN chat_messages.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_messages.updated_at IS 'Derived: time of the last change after sending (edit, recall, reaction set / removed); null = never changed. Drives GET /conversations/:id/messages/changes.';
 
 
 --
@@ -689,6 +1313,206 @@ COMMENT ON COLUMN public.chat_otp_codes.email IS 'Lowercase email the code was s
 
 ALTER TABLE public.chat_otp_codes ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME public.chat_otp_codes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: chat_pinned_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_pinned_messages (
+    conversation_id bigint NOT NULL,
+    message_id bigint NOT NULL,
+    pinned_by bigint NOT NULL,
+    pinned_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE chat_pinned_messages; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_pinned_messages IS 'Messages pinned in a conversation (at most 5 per conversation, enforced by the service under the chat_conversations row lock). The message must belong to the same conversation and must not be a system message (checked by the service).';
+
+
+--
+-- Name: COLUMN chat_pinned_messages.conversation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_pinned_messages.conversation_id IS 'Conversation (primary key part 1; list order = pinned_at desc).';
+
+
+--
+-- Name: COLUMN chat_pinned_messages.message_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_pinned_messages.message_id IS 'Pinned message of that conversation (primary key part 2).';
+
+
+--
+-- Name: COLUMN chat_pinned_messages.pinned_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_pinned_messages.pinned_by IS 'Member who pinned it (group: owner / admin; direct: either member).';
+
+
+--
+-- Name: COLUMN chat_pinned_messages.pinned_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_pinned_messages.pinned_at IS 'Time the message was pinned.';
+
+
+--
+-- Name: chat_qr_login_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.chat_qr_login_sessions (
+    id bigint NOT NULL,
+    code_hash text NOT NULL,
+    poll_token_hash text NOT NULL,
+    platform text NOT NULL,
+    device_name text DEFAULT ''::text NOT NULL,
+    user_agent text DEFAULT ''::text NOT NULL,
+    request_ip text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    user_id bigint,
+    scanned_at timestamp with time zone,
+    resolved_at timestamp with time zone,
+    consumed_at timestamp with time zone,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_chat_qr_login_sessions_code_hash CHECK ((code_hash ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ck_chat_qr_login_sessions_consumed_at CHECK (((status = 'consumed'::text) = (consumed_at IS NOT NULL))),
+    CONSTRAINT ck_chat_qr_login_sessions_device_name CHECK ((char_length(device_name) <= 200)),
+    CONSTRAINT ck_chat_qr_login_sessions_expires_at CHECK ((expires_at > created_at)),
+    CONSTRAINT ck_chat_qr_login_sessions_platform CHECK ((platform = ANY (ARRAY['ios'::text, 'android'::text, 'web'::text, 'desktop'::text]))),
+    CONSTRAINT ck_chat_qr_login_sessions_poll_token_hash CHECK ((poll_token_hash ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ck_chat_qr_login_sessions_request_ip CHECK ((char_length(request_ip) <= 64)),
+    CONSTRAINT ck_chat_qr_login_sessions_resolved_at CHECK (((status = ANY (ARRAY['approved'::text, 'rejected'::text, 'consumed'::text])) = (resolved_at IS NOT NULL))),
+    CONSTRAINT ck_chat_qr_login_sessions_scanned_at CHECK (((status = 'pending'::text) = (scanned_at IS NULL))),
+    CONSTRAINT ck_chat_qr_login_sessions_status CHECK ((status = ANY (ARRAY['pending'::text, 'scanned'::text, 'approved'::text, 'rejected'::text, 'consumed'::text]))),
+    CONSTRAINT ck_chat_qr_login_sessions_user_agent CHECK ((char_length(user_agent) <= 500)),
+    CONSTRAINT ck_chat_qr_login_sessions_user_id CHECK (((status = 'pending'::text) = (user_id IS NULL)))
+);
+
+
+--
+-- Name: TABLE chat_qr_login_sessions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.chat_qr_login_sessions IS 'QR login of a web / desktop device (CHAT.md section 11 step 3): the new device shows a short code (in a QR), a signed-in device scans it, sees the new device info and approves; the new device then polls with its secret poll token and receives tokens once. Lives 2 minutes (+60 s after approval); rows older than 24 h are deleted on the next start.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.id IS 'Primary key (qr_id in the chat API).';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.code_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.code_hash IS 'Lowercase hex HMAC-SHA256(server key, normalized 10-character code); the code itself (shown in the QR / typed) is never stored.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.poll_token_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.poll_token_hash IS 'Lowercase hex SHA-256 of the 32-byte poll token kept only by the waiting device (never in the QR); required to read the result.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.platform; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.platform IS 'Platform of the waiting device: ios / android / web / desktop (copied to chat_devices on success).';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.device_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.device_name IS 'Label sent by the waiting device (browser / OS), at most 200 characters; shown on the confirm screen.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.user_agent; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.user_agent IS 'User-Agent header of the start request (truncated to 500 characters); shown on the confirm screen.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.request_ip; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.request_ip IS 'Client IP of the start request (rate limit per IP + shown on the confirm screen); empty when unknown.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.status IS 'pending (shown) -> scanned (a user opened the confirm screen) -> approved / rejected -> consumed (tokens handed to the waiting device). Expiry is expires_at, not a status.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.user_id IS 'Account that scanned (and approves / rejects); the new device logs into this account. Null exactly while pending.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.scanned_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.scanned_at IS 'Time the code was scanned / typed; null exactly while pending.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.resolved_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.resolved_at IS 'Time it was approved or rejected; null while pending / scanned.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.consumed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.consumed_at IS 'Time the waiting device received its tokens (chat_devices row created with login_method = qr); null until then.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.expires_at IS 'created_at + 2 minutes; approval extends it to at least approval time + 60 seconds so the waiting device can claim.';
+
+
+--
+-- Name: COLUMN chat_qr_login_sessions.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_qr_login_sessions.created_at IS 'Start time.';
+
+
+--
+-- Name: chat_qr_login_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.chat_qr_login_sessions ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.chat_qr_login_sessions_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -6577,6 +7401,38 @@ ALTER TABLE ONLY public.chat_friendships
 
 
 --
+-- Name: chat_group_invite_links pk_chat_group_invite_links; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_invite_links
+    ADD CONSTRAINT pk_chat_group_invite_links PRIMARY KEY (id);
+
+
+--
+-- Name: chat_group_join_requests pk_chat_group_join_requests; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_join_requests
+    ADD CONSTRAINT pk_chat_group_join_requests PRIMARY KEY (id);
+
+
+--
+-- Name: chat_media pk_chat_media; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_media
+    ADD CONSTRAINT pk_chat_media PRIMARY KEY (id);
+
+
+--
+-- Name: chat_message_reactions pk_chat_message_reactions; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT pk_chat_message_reactions PRIMARY KEY (message_id, user_id);
+
+
+--
 -- Name: chat_messages pk_chat_messages; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6590,6 +7446,22 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chat_otp_codes
     ADD CONSTRAINT pk_chat_otp_codes PRIMARY KEY (id);
+
+
+--
+-- Name: chat_pinned_messages pk_chat_pinned_messages; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_pinned_messages
+    ADD CONSTRAINT pk_chat_pinned_messages PRIMARY KEY (conversation_id, message_id);
+
+
+--
+-- Name: chat_qr_login_sessions pk_chat_qr_login_sessions; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_qr_login_sessions
+    ADD CONSTRAINT pk_chat_qr_login_sessions PRIMARY KEY (id);
 
 
 --
@@ -6897,6 +7769,30 @@ ALTER TABLE ONLY public.chat_direct_pairs
 
 
 --
+-- Name: chat_group_invite_links uq_chat_group_invite_links_token_hash; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_invite_links
+    ADD CONSTRAINT uq_chat_group_invite_links_token_hash UNIQUE (token_hash);
+
+
+--
+-- Name: chat_media uq_chat_media_object_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_media
+    ADD CONSTRAINT uq_chat_media_object_key UNIQUE (object_key);
+
+
+--
+-- Name: chat_media uq_chat_media_uploader_id_sha256_media_type; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_media
+    ADD CONSTRAINT uq_chat_media_uploader_id_sha256_media_type UNIQUE (uploader_id, sha256, media_type);
+
+
+--
 -- Name: chat_messages uq_chat_messages_conversation_id_sender_id_client_msg_id; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6910,6 +7806,14 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chat_messages
     ADD CONSTRAINT uq_chat_messages_conversation_id_seq UNIQUE (conversation_id, seq);
+
+
+--
+-- Name: chat_qr_login_sessions uq_chat_qr_login_sessions_code_hash; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_qr_login_sessions
+    ADD CONSTRAINT uq_chat_qr_login_sessions_code_hash UNIQUE (code_hash);
 
 
 --
@@ -7036,6 +7940,13 @@ CREATE INDEX idx_chat_conversation_members_user_id ON public.chat_conversation_m
 
 
 --
+-- Name: idx_chat_conversations_avatar_media_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_conversations_avatar_media_id ON public.chat_conversations USING btree (avatar_media_id) WHERE (avatar_media_id IS NOT NULL);
+
+
+--
 -- Name: idx_chat_devices_push_token; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7057,6 +7968,55 @@ CREATE INDEX idx_chat_friendships_friend_id_status ON public.chat_friendships US
 
 
 --
+-- Name: idx_chat_media_status_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_media_status_updated_at ON public.chat_media USING btree (status, updated_at);
+
+
+--
+-- Name: idx_chat_media_uploader_id_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_media_uploader_id_created_at ON public.chat_media USING btree (uploader_id, created_at);
+
+
+--
+-- Name: idx_chat_message_reactions_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_message_reactions_user_id ON public.chat_message_reactions USING btree (user_id);
+
+
+--
+-- Name: idx_chat_messages_content_file_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_messages_content_file_name ON public.chat_messages USING gin (to_tsvector('simple'::regconfig, public.chat_search_fold(((content || ' '::text) || COALESCE(file_name, ''::text))))) WHERE ((message_type <> 'system'::text) AND (recalled_at IS NULL));
+
+
+--
+-- Name: idx_chat_messages_conversation_id_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_messages_conversation_id_updated_at ON public.chat_messages USING btree (conversation_id, updated_at, id) WHERE (updated_at IS NOT NULL);
+
+
+--
+-- Name: idx_chat_messages_media_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_messages_media_id ON public.chat_messages USING btree (media_id) WHERE (media_id IS NOT NULL);
+
+
+--
+-- Name: idx_chat_messages_reply_to_message_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_messages_reply_to_message_id ON public.chat_messages USING btree (reply_to_message_id) WHERE (reply_to_message_id IS NOT NULL);
+
+
+--
 -- Name: idx_chat_otp_codes_email_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7075,6 +8035,20 @@ CREATE INDEX idx_chat_otp_codes_phone_created_at ON public.chat_otp_codes USING 
 --
 
 CREATE INDEX idx_chat_otp_codes_request_ip_created_at ON public.chat_otp_codes USING btree (request_ip, created_at DESC);
+
+
+--
+-- Name: idx_chat_pinned_messages_message_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_pinned_messages_message_id ON public.chat_pinned_messages USING btree (message_id);
+
+
+--
+-- Name: idx_chat_qr_login_sessions_request_ip_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_chat_qr_login_sessions_request_ip_created_at ON public.chat_qr_login_sessions USING btree (request_ip, created_at DESC);
 
 
 --
@@ -7379,6 +8353,20 @@ CREATE INDEX idx_work_items_company_id_quotation_type_sort_order_created_at ON p
 
 
 --
+-- Name: uq_chat_group_invite_links_conversation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_chat_group_invite_links_conversation_id ON public.chat_group_invite_links USING btree (conversation_id) WHERE (revoked_at IS NULL);
+
+
+--
+-- Name: uq_chat_group_join_requests_conversation_id_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_chat_group_join_requests_conversation_id_user_id ON public.chat_group_join_requests USING btree (conversation_id, user_id) WHERE (status = 'pending'::text);
+
+
+--
 -- Name: uq_delivery_projects_lead_id_kind; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7434,6 +8422,14 @@ ALTER TABLE ONLY public.chat_conversation_members
 
 ALTER TABLE ONLY public.chat_conversation_members
     ADD CONSTRAINT fk_chat_conversation_members_user_id FOREIGN KEY (user_id) REFERENCES public.chat_users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_conversations fk_chat_conversations_avatar_media_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_conversations
+    ADD CONSTRAINT fk_chat_conversations_avatar_media_id FOREIGN KEY (avatar_media_id) REFERENCES public.chat_media(id) ON DELETE RESTRICT;
 
 
 --
@@ -7493,6 +8489,78 @@ ALTER TABLE ONLY public.chat_friendships
 
 
 --
+-- Name: chat_group_invite_links fk_chat_group_invite_links_conversation_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_invite_links
+    ADD CONSTRAINT fk_chat_group_invite_links_conversation_id FOREIGN KEY (conversation_id) REFERENCES public.chat_conversations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_group_invite_links fk_chat_group_invite_links_created_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_invite_links
+    ADD CONSTRAINT fk_chat_group_invite_links_created_by FOREIGN KEY (created_by) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_group_join_requests fk_chat_group_join_requests_conversation_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_join_requests
+    ADD CONSTRAINT fk_chat_group_join_requests_conversation_id FOREIGN KEY (conversation_id) REFERENCES public.chat_conversations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_group_join_requests fk_chat_group_join_requests_invite_link_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_join_requests
+    ADD CONSTRAINT fk_chat_group_join_requests_invite_link_id FOREIGN KEY (invite_link_id) REFERENCES public.chat_group_invite_links(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_group_join_requests fk_chat_group_join_requests_resolved_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_join_requests
+    ADD CONSTRAINT fk_chat_group_join_requests_resolved_by FOREIGN KEY (resolved_by) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_group_join_requests fk_chat_group_join_requests_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_group_join_requests
+    ADD CONSTRAINT fk_chat_group_join_requests_user_id FOREIGN KEY (user_id) REFERENCES public.chat_users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_media fk_chat_media_uploader_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_media
+    ADD CONSTRAINT fk_chat_media_uploader_id FOREIGN KEY (uploader_id) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_message_reactions fk_chat_message_reactions_message_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT fk_chat_message_reactions_message_id FOREIGN KEY (message_id) REFERENCES public.chat_messages(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_message_reactions fk_chat_message_reactions_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT fk_chat_message_reactions_user_id FOREIGN KEY (user_id) REFERENCES public.chat_users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: chat_messages fk_chat_messages_conversation_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7501,11 +8569,67 @@ ALTER TABLE ONLY public.chat_messages
 
 
 --
+-- Name: chat_messages fk_chat_messages_media_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_messages
+    ADD CONSTRAINT fk_chat_messages_media_id FOREIGN KEY (media_id) REFERENCES public.chat_media(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_messages fk_chat_messages_recalled_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_messages
+    ADD CONSTRAINT fk_chat_messages_recalled_by FOREIGN KEY (recalled_by) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_messages fk_chat_messages_reply_to_message_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_messages
+    ADD CONSTRAINT fk_chat_messages_reply_to_message_id FOREIGN KEY (reply_to_message_id) REFERENCES public.chat_messages(id) ON DELETE SET NULL;
+
+
+--
 -- Name: chat_messages fk_chat_messages_sender_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.chat_messages
     ADD CONSTRAINT fk_chat_messages_sender_id FOREIGN KEY (sender_id) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_pinned_messages fk_chat_pinned_messages_conversation_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_pinned_messages
+    ADD CONSTRAINT fk_chat_pinned_messages_conversation_id FOREIGN KEY (conversation_id) REFERENCES public.chat_conversations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_pinned_messages fk_chat_pinned_messages_message_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_pinned_messages
+    ADD CONSTRAINT fk_chat_pinned_messages_message_id FOREIGN KEY (message_id) REFERENCES public.chat_messages(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_pinned_messages fk_chat_pinned_messages_pinned_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_pinned_messages
+    ADD CONSTRAINT fk_chat_pinned_messages_pinned_by FOREIGN KEY (pinned_by) REFERENCES public.chat_users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: chat_qr_login_sessions fk_chat_qr_login_sessions_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_qr_login_sessions
+    ADD CONSTRAINT fk_chat_qr_login_sessions_user_id FOREIGN KEY (user_id) REFERENCES public.chat_users(id) ON DELETE CASCADE;
 
 
 --
@@ -7943,3 +9067,7 @@ insert into public.schema_migrations (version, name, checksum) values ('0016', '
 insert into public.schema_migrations (version, name, checksum) values ('0017', '0017_product_hvac_specs', 'ccb5d84fe53050f96e9ddb538a47ff9140ba0cf97b6c4e468dfe92f833fa423f');
 insert into public.schema_migrations (version, name, checksum) values ('0018', '0018_chat', 'c5364284703972ace647b9fab25de761a944d1109ad6e6e9f09432a42a6ed50e');
 insert into public.schema_migrations (version, name, checksum) values ('0019', '0019_chat_email', '4f2d4f28bceef1fba76e951f1c6422edf75c626c960623fb49275d73f2ffde0d');
+insert into public.schema_migrations (version, name, checksum) values ('0020', '0020_chat_media', 'fbdd47a025e5b8972f6fbdfc6d2a639e73fedd142066da5e3408679e2f09daaf');
+insert into public.schema_migrations (version, name, checksum) values ('0021', '0021_chat_pins', 'fbf5325e049840a28a7c141267cd0b8debad2ec3bc3d8488bc5e48c5b067b9c6');
+insert into public.schema_migrations (version, name, checksum) values ('0022', '0022_chat_group_admin', '66db777ee84240db0599f18518e3f3705a75327874a2cbab9a31a19fed11e65f');
+insert into public.schema_migrations (version, name, checksum) values ('0023', '0023_chat_phase2', '8dd1f18de195c5ddb95aec1e4f41e9110867e0e67b830c4e3355be4cdfd1dd95');

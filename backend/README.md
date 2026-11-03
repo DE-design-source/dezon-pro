@@ -71,8 +71,19 @@ webhook Lark thật ghi sẵn trong code):
 | `SMTP_PORT` | 587 | trống / sai / ≤ 0 = 587. Cổng `465` = TLS ngay; cổng khác = kết nối thường rồi STARTTLS nếu máy chủ hỗ trợ |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | trống = không đăng nhập | tài khoản AUTH PLAIN; có `SMTP_USERNAME` thì bắt buộc kết nối đã TLS (trừ `localhost` / `127.0.0.1`). Mật khẩu là bí mật |
 | `SMTP_FROM` | trống | địa chỉ người gửi, vd `Dezon Chat <no-reply@dezon.vn>`; phải hợp lệ (sai -> tắt email, ghi log lúc khởi động) |
+| `CHAT_S3_ENDPOINT` | trống = tắt tệp chat | địa chỉ MinIO / S3 mà backend gọi, có scheme (`http://minio:9000` trong compose, `http://qspro-minio:9000` ở máy); scheme quyết định SSL (`platform/objstore`, minio-go v7) |
+| `CHAT_S3_PUBLIC_URL` | = `CHAT_S3_ENDPOINT` | host trình duyệt dùng cho URL ký sẵn (`https://<S3_DOMAIN>`, ở máy `http://127.0.0.1:9000`). Chữ ký SigV4 gắn host: phải đúng y hệt host trình duyệt gọi |
+| `CHAT_S3_ACCESS_KEY` / `CHAT_S3_SECRET_KEY` | bắt buộc khi có endpoint | user ứng dụng (production: `minio-init` tạo, chỉ có quyền trên bucket), không dùng user root. Khoá bí mật |
+| `CHAT_S3_BUCKET` / `CHAT_S3_REGION` | `chat-media` / `us-east-1` | bucket riêng tư (không policy ẩn danh), region dùng để ký offline |
+| `CHAT_MEDIA_MAX_IMAGE_MB` | 25 | giới hạn 1 ảnh (MB) |
+| `CHAT_MEDIA_MAX_FILE_MB` | 100 | giới hạn 1 video / tệp (MB); trên 200 thì hạ về 200 (giới hạn băm SHA-256 ở trình duyệt, khớp `ck_chat_media_size_bytes`) |
+| `CHAT_MEDIA_DAILY_MB` | 2048 | tổng MB một người được khai tải lên trong 24 giờ trượt |
+| `CHAT_MEDIA_URL_TTL_MIN` | 60 | hạn URL xem / tải tệp (phút), kẹp trong 5..720 |
 
 - Thiếu một trong ba biến `CHAT_VAPID_*` thì push tắt (1 dòng log lúc khởi động), chat realtime vẫn chạy.
+- Không đặt `CHAT_S3_ENDPOINT` thì tệp chat (ảnh / video / tệp / thoại) tắt: route `/chat/media/*` và tin nhắn có tệp trả 503 `MEDIA_DISABLED`,
+  `GET /chat/media/config` trả `{enabled:false}`, chat chữ vẫn chạy (1 dòng log lúc khởi động `tệp chat tắt: chưa đặt CHAT_S3_ENDPOINT`).
+  Cần migration 0020. Bucket cần CORS cho origin của app (`MINIO_API_CORS_ALLOW_ORIGIN` của MinIO) và ILM xoá `chat/in/` sau 1 ngày.
 - Chưa có nhà cung cấp SMS: mã OTP được GHI VÀO LOG server (`[chat] OTP cho +84...: 123456`, `logSender`). Server thật chưa gửi được OTP cho
   người dùng cho tới khi nối SMS (roadmap N8.1).
 - Không đặt `SMTP_HOST` (hoặc cấu hình SMTP sai) thì mã OTP email cũng GHI VÀO LOG server (`OTP email cho <email>: 123456`, `logMailer`;
@@ -146,6 +157,33 @@ Dùng database thử RIÊNG `qspro_chattest` (container `qspro-postgres`), KHÔN
 5. Thử push (tuỳ chọn): đặt thêm 3 biến `CHAT_VAPID_*` (`go run ./cmd/vapid`), bấm bật thông báo trong trang Chat. Người nhận chỉ nhận push khi
    KHÔNG có kết nối WebSocket (đã rời trang Chat quá 3 giây hoặc đóng tab). Nhiều tài khoản trong một trình duyệt: mỗi tài khoản bật
    thông báo riêng (cùng một subscription của trình duyệt), thông báo mở đúng tài khoản nhận.
+6. Thử tệp chat (ảnh / video / tệp / thoại, tuỳ chọn) với MinIO ở máy. Image chính thức `minio/minio`, `minio/mc` không còn phát hành:
+   dựng image `qspro-minio` từ mã nguồn (có cả `minio` lẫn `mc`). Lệnh Git Bash, từ gốc repo, mạng Docker `qspro-net`
+   (`MSYS_NO_PATHCONV=1` để Git Bash không đổi đường dẫn `/data`, `/init.sh`):
+
+   ```
+   docker build -f infra/docker/minio.Dockerfile -t qspro-minio .
+   # trình duyệt dùng 127.0.0.1:9000, backend dùng qspro-minio:9000; console quản trị ở http://127.0.0.1:9001
+   # MINIO_API_CORS_ALLOW_ORIGIN phải liệt kê MỌI origin mở giao diện chat (vd thêm http://localhost:5199 nếu dùng cổng đó),
+   # thiếu origin thì preflight của PUT từ trình duyệt bị chặn; đổi = docker rm -f qspro-minio rồi chạy lại lệnh dưới (dữ liệu ở volume)
+   MSYS_NO_PATHCONV=1 docker run -d --name qspro-minio --network qspro-net -p 127.0.0.1:9000:9000 -p 127.0.0.1:9001:9001 \
+     -e MINIO_ROOT_USER=qsprominio -e MINIO_ROOT_PASSWORD=<mật khẩu root, >= 8 ký tự> \
+     -e MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:5173,http://127.0.0.1:5173 \
+     -v qspro-minio-data:/data qspro-minio
+   # bucket + user ứng dụng + ILM chat/in/ (chạy lại được)
+   MSYS_NO_PATHCONV=1 docker run --rm --network qspro-net -v "$PWD/infra/deploy/minio-init.sh:/init.sh:ro" --entrypoint sh \
+     -e MINIO_URL=http://qspro-minio:9000 -e MINIO_ROOT_USER=qsprominio -e MINIO_ROOT_PASSWORD=<mật khẩu root> \
+     -e CHAT_S3_ACCESS_KEY=qspro-chat -e CHAT_S3_SECRET_KEY=<khoá ứng dụng, >= 8 ký tự> qspro-minio /init.sh
+   ```
+
+   Rồi chạy server với thêm `CHAT_S3_ENDPOINT=http://qspro-minio:9000` (server chạy NGOÀI Docker: `http://127.0.0.1:9000`),
+   `CHAT_S3_PUBLIC_URL=http://127.0.0.1:9000`, `CHAT_S3_ACCESS_KEY=qspro-chat`, `CHAT_S3_SECRET_KEY=<khoá ứng dụng>`, và database đã chạy
+   migration 0020 (`go run ./cmd/migrate --url=...`, luôn ghi rõ `--url`, không để mặc định đọc `.env`).
+   Container `qspro-api` (image `qspro-backend`) KHÔNG đọc `backend/.env`, chỉ nhận biến `-e`: muốn bật tệp chat thì build lại image,
+   xem biến / cổng đang dùng bằng `docker inspect qspro-api` (`.Config.Env`, `.HostConfig.PortBindings`), `docker rm -f qspro-api`, rồi
+   `docker run -d --name qspro-api --network qspro-net <đủ -e cũ> -e CHAT_S3_ENDPOINT=... -e CHAT_S3_PUBLIC_URL=... -e CHAT_S3_ACCESS_KEY=...
+   -e CHAT_S3_SECRET_KEY=... -v qspro-uploads:/app/uploads <-p cũ> qspro-backend`.
+   Trang phải mở từ `localhost` / `127.0.0.1` (hoặc HTTPS): mở bằng IP LAN qua HTTP thì trình duyệt không có `crypto.subtle`, nút đính kèm hiện mờ với chú thích "Cần HTTPS để gửi tệp" (chỉ khi máy chủ đã bật tệp), nút ghi âm ẩn.
 
 ## Chạy bằng Docker
 
@@ -164,7 +202,8 @@ docker run --rm -e DATABASE_URL=postgresql://user:pass@host:5432/db qspro-backen
   `.env*`, `.git`, `node_modules`, kết quả test không được gửi vào build.
 - Biến cần cho triển khai thật: `DATABASE_URL`, `AUTH_SECRET`, `PURCHASE_WEBHOOK` / `REPORT_WEBHOOK` (trống = webhook thật trong code),
   `UPLOAD_DIR` (kho ảnh / tài liệu trên đĩa, phục vụ công khai tại `/files/<path>`; image đặt `/app/uploads`, gắn volume để giữ file),
-  `LARK_APP_ID` / `LARK_APP_SECRET` (ảnh cũ qua `/media`),
+  `LARK_APP_ID` / `LARK_APP_SECRET` (ảnh cũ qua `/media`), `CHAT_S3_*` (tệp chat trên MinIO, trống = tắt; compose production
+  tự đặt, xem `infra/deploy/docker-compose.yml`),
   `REPORT_JOB=0` nếu còn một server khác gửi báo cáo. Danh sách đầy đủ: `.env.example`.
 - Chạy image trên database thử: thêm bộ biến an toàn ở mục Cấu hình (image không có `.env` nhưng webhook mặc định trong code vẫn là webhook thật).
 
@@ -217,6 +256,12 @@ Hai bộ kiểm tra dùng ở lượt nghiệm thu, theo đúng thứ tự (mỗ
   (hoặc chạy trong container `golang:1.25` như trên).
 - Test có database của chat (`internal/modules/chat`) cần database đã chạy migration 0018: đặt `DOTENV=0` và
   `TEST_DATABASE_URL=postgresql://qspro:<mật khẩu>@localhost:5434/qspro_chattest` (hoặc `qspro_gotest` sau khi migrate tới 0018); test tự dọn dòng thử.
+  Test tệp chat cần thêm migration 0020 (`go run ./cmd/migrate --url=<TEST_DATABASE_URL>`).
+- Test `platform/objstore` nói chuyện với MinIO thật, chỉ chạy khi có `TEST_S3_ENDPOINT` / `TEST_S3_ACCESS_KEY` / `TEST_S3_SECRET_KEY`
+  (không có thì bỏ qua). Chạy trong container cùng mạng `qspro-net` (Go không cài trên máy):
+  `MSYS_NO_PATHCONV=1 docker run --rm --network qspro-net -v <gốc repo>:/src -w /src/backend -v qspro-gomod:/go/pkg/mod -e DOTENV=0
+  -e TEST_DATABASE_URL=postgresql://qspro:<mật khẩu>@qspro-db:5432/qspro_chattest -e TEST_S3_ENDPOINT=http://qspro-minio:9000
+  -e TEST_S3_ACCESS_KEY=<user> -e TEST_S3_SECRET_KEY=<khoá> golang:1.25-alpine go test -count=1 -p 1 ./internal/modules/chat/... ./internal/server/ ./internal/platform/... ./internal/config/`.
 - `./...` gồm cả `tests/integration/server_test.go`; `./internal/...` thì bỏ sót gói này.
 - `TEST_DATABASE_URL` chỉ được trỏ tới database THỬ: test có ghi và xoá dữ liệu đánh dấu.
 - Mật khẩu database thử: `docker exec qspro-postgres printenv POSTGRES_PASSWORD`.
@@ -260,7 +305,8 @@ cmd/vapid                in cặp khoá VAPID cho Web Push của chat (CHAT_VAPI
 internal/config          biến môi trường, đọc file .env
 internal/server          gin engine, route, file tĩnh, bảng route REST (rest.go), Swagger, cổng /api/:fn (rpc)
 internal/middleware      auth, tenant, rbac, cors, rate limit, đọc thân JSON
-internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger, webpush (Web Push của chat)
+internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger, webpush (Web Push của chat), mailer (email OTP),
+                         objstore (MinIO / S3 cho tệp chat, CHAT_S3_*)
 internal/shared          omap, jsval, tenant, actor, response, errors, validator, contracts, qscore, specs, httpx
 internal/modules         nghiệp vụ theo module (17 gói kể cả system; chat có gói con realtime = gateway WebSocket)
 internal/jobs            job nền (báo cáo nhập sản phẩm)

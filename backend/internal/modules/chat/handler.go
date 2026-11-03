@@ -2,6 +2,7 @@ package chat
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"strconv"
@@ -24,8 +25,20 @@ const (
 )
 
 var (
-	userPath = rpc.GoField{Name: "user_id", In: "path", Type: "integer", Desc: "Mã người dùng chat"}
-	convPath = rpc.GoField{Name: "id", In: "path", Type: "integer", Desc: "Mã hội thoại (conversation_id)"}
+	userPath  = rpc.GoField{Name: "user_id", In: "path", Type: "integer", Desc: "Mã người dùng chat"}
+	convPath  = rpc.GoField{Name: "id", In: "path", Type: "integer", Desc: "Mã hội thoại (conversation_id)"}
+	mediaPath = rpc.GoField{Name: "id", In: "path", Type: "integer", Desc: "Mã tệp (media_id)"}
+	// invitePath: token link mời 43 ký tự base64url; requestPath: mã yêu cầu vào nhóm.
+	invitePath  = rpc.GoField{Name: "token", In: "path", Type: "string", Desc: "Token link mời (43 ký tự, trong url_path /chat/join/<token>)"}
+	requestPath = rpc.GoField{Name: "request_id", In: "path", Type: "integer", Desc: "Mã yêu cầu vào nhóm"}
+	// Giai đoạn 2: tin theo mã toàn hệ thống, thiết bị, mã QR, tìm tin.
+	msgPath    = rpc.GoField{Name: "message_id", In: "path", Type: "integer", Desc: "Mã tin nhắn (duy nhất toàn hệ thống)"}
+	devicePath = rpc.GoField{Name: "device_id", In: "path", Type: "integer", Desc: "Mã thiết bị"}
+	qrCode     = rpc.GoField{Name: "code", In: "body", Type: "string", Required: true,
+		Desc: "Mã 10 ký tự (ABCDE-FGHJK; nhận chữ thường, gạch nối, khoảng trắng, O -> 0, I / L -> 1, hoặc cả URL <origin>/chat/qr#<code>)"}
+	searchQ      = rpc.GoField{Name: "q", In: "query", Type: "string", Required: true, Desc: "Từ khoá 2..100 ký tự, không phân biệt dấu / hoa thường, mỗi từ khớp tiền tố"}
+	searchCursor = rpc.GoField{Name: "cursor", In: "query", Type: "string", Desc: "next_cursor của trang trước"}
+	searchLimit  = rpc.GoField{Name: "limit", In: "query", Type: "integer", Desc: "Mặc định 20, tối đa 50"}
 )
 
 // RegisterRPC: chỉ khai route REST "chỉ bản Go" (không có hàm /api/:fn). otp/request, otp/verify, refresh công khai;
@@ -84,8 +97,39 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		rpc.GoField{Name: "name", In: "body", Type: "string", Desc: "group: tên nhóm 1..100 ký tự"},
 		rpc.GoField{Name: "member_ids", In: "body", Type: "array", Desc: "group: mã các thành viên khác"})
 	r("chatGetConversation", "GET", "/conversations/:id", rpc.SelfAuth, "Chi tiết hội thoại + thành viên", convPath)
-	r("chatRenameConversation", "PATCH", "/conversations/:id", rpc.SelfAuth, "Đổi tên nhóm (trưởng / phó nhóm)", convPath,
-		rpc.GoField{Name: "name", In: "body", Type: "string", Required: true})
+	r("chatRenameConversation", "PATCH", "/conversations/:id", rpc.SelfAuth,
+		"Đổi tên / mô tả / ảnh nhóm (trưởng / phó nhóm; thành viên khi tắt admins_only_edit_info). Khoá vắng = giữ nguyên", convPath,
+		rpc.GoField{Name: "name", In: "body", Type: "string", Desc: "1..100 ký tự"},
+		rpc.GoField{Name: "description", In: "body", Type: "string", Desc: `Tối đa 500 ký tự; "" / null = xoá mô tả`},
+		rpc.GoField{Name: "avatar_media_id", In: "body", Type: "integer", Desc: "Tệp ảnh ready của chính mình; null = xoá ảnh nhóm"})
+	r("chatUpdateGroupSettings", "PATCH", "/conversations/:id/settings", rpc.SelfAuth,
+		"Đổi cài đặt quyền của nhóm (trưởng / phó nhóm). Khoá vắng = giữ nguyên", convPath,
+		rpc.GoField{Name: "admins_only_send", In: "body", Type: "boolean", Desc: "Chỉ trưởng / phó nhóm được gửi tin"},
+		rpc.GoField{Name: "admins_only_edit_info", In: "body", Type: "boolean", Desc: "Chỉ trưởng / phó nhóm được đổi tên / ảnh / mô tả"},
+		rpc.GoField{Name: "admins_only_add_members", In: "body", Type: "boolean", Desc: "Chỉ trưởng / phó nhóm được thêm thành viên / tạo link mời"})
+	r("chatTransferOwnership", "POST", "/conversations/:id/owner", rpc.SelfAuth,
+		"Chuyển quyền trưởng nhóm (chỉ trưởng nhóm); trưởng nhóm cũ thành phó nhóm", convPath,
+		rpc.GoField{Name: "user_id", In: "body", Type: "integer", Required: true, Desc: "Thành viên đang hoạt động nhận quyền"})
+	r("chatDisbandGroup", "POST", "/conversations/:id/disband", rpc.SelfAuth,
+		"Giải tán nhóm (chỉ trưởng nhóm): tin cũ giữ lại chỉ đọc, mọi thao tác ghi sau đó -> 410 GROUP_DISBANDED", convPath)
+	r("chatGetInviteLink", "GET", "/conversations/:id/invite-link", rpc.SelfAuth,
+		"Link mời đang hiệu lực của nhóm (không có token); null khi chưa có hoặc nhóm đã giải tán", convPath)
+	r("chatCreateInviteLink", "POST", "/conversations/:id/invite-link", rpc.SelfAuth,
+		"Tạo (lại) link mời: thu hồi link cũ, trả token + url_path một lần duy nhất (30 lần / giờ)", convPath,
+		rpc.GoField{Name: "requires_approval", In: "body", Type: "boolean", Desc: "Vào nhóm phải chờ trưởng / phó nhóm duyệt (mặc định false)"},
+		rpc.GoField{Name: "expires_in", In: "body", Type: "integer", Desc: "Số giây 3600..2592000; null / vắng = không hết hạn"})
+	r("chatRevokeInviteLink", "DELETE", "/conversations/:id/invite-link", rpc.SelfAuth,
+		"Thu hồi link mời hiện hành (trưởng / phó nhóm; thành viên chỉ link do mình tạo); không có link -> {}", convPath)
+	r("chatInvitePreview", "GET", "/invites/:token", rpc.SelfAuth,
+		"Xem trước nhóm qua link mời: tên, mô tả, ảnh, số thành viên, trạng thái của tôi (60 lần / phút)", invitePath)
+	r("chatJoinByInvite", "POST", "/invites/:token/join", rpc.SelfAuth,
+		"Vào nhóm qua link mời: joined / pending (chờ duyệt) / already_member (20 lần / giờ)", invitePath)
+	r("chatListJoinRequests", "GET", "/conversations/:id/join-requests", rpc.SelfAuth,
+		"Yêu cầu vào nhóm đang chờ duyệt, cũ trước, tối đa 500 (trưởng / phó nhóm)", convPath)
+	r("chatApproveJoinRequest", "POST", "/conversations/:id/join-requests/:request_id/approve", rpc.SelfAuth,
+		"Duyệt yêu cầu vào nhóm (trưởng / phó nhóm)", convPath, requestPath)
+	r("chatRejectJoinRequest", "POST", "/conversations/:id/join-requests/:request_id/reject", rpc.SelfAuth,
+		"Từ chối yêu cầu vào nhóm (trưởng / phó nhóm; người xin không được báo)", convPath, requestPath)
 	r("chatAddMembers", "POST", "/conversations/:id/members", rpc.SelfAuth, "Thêm bạn bè vào nhóm (tối đa 1000 thành viên)", convPath,
 		rpc.GoField{Name: "user_ids", In: "body", Type: "array", Required: true})
 	r("chatRemoveMember", "DELETE", "/conversations/:id/members/:user_id", rpc.SelfAuth,
@@ -97,7 +141,37 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	r("chatListMessages", "GET", "/conversations/:id/messages", rpc.SelfAuth, "Lịch sử tin nhắn (tăng dần theo seq)", convPath,
 		rpc.GoField{Name: "before_seq", In: "query", Type: "integer", Desc: "Các tin ngay trước seq này (cuộn lên)"},
 		rpc.GoField{Name: "after_seq", In: "query", Type: "integer", Desc: "Các tin sau seq này (đồng bộ)"},
+		rpc.GoField{Name: "around_seq", In: "query", Type: "integer", Desc: "Các tin quanh seq này (nhảy tới tin; trả thêm has_newer). Không dùng cùng before_seq / after_seq"},
 		rpc.GoField{Name: "limit", In: "query", Type: "integer", Desc: "Mặc định 50, tối đa 100"})
+	r("chatMessageChanges", "GET", "/conversations/:id/messages/changes", rpc.SelfAuth,
+		"Tin đã sửa / thu hồi / đổi reaction sau mốc (cũ trước theo updated_at); gọi sau mỗi /sync cho hội thoại đang giữ tin", convPath,
+		rpc.GoField{Name: "since", In: "query", Type: "string", Desc: "sync_cursor (mili giây) của lần /sync trước"},
+		rpc.GoField{Name: "cursor", In: "query", Type: "string", Desc: "next_cursor của trang trước (thắng since)"},
+		rpc.GoField{Name: "limit", In: "query", Type: "integer", Desc: "Mặc định 100, tối đa 200"})
+	r("chatSearchConversationMessages", "GET", "/conversations/:id/messages/search", rpc.SelfAuth,
+		"Tìm tin trong một hội thoại (không dấu, mới trước, 30 lần / phút)", convPath, searchQ, searchCursor, searchLimit)
+	r("chatSearchMessages", "GET", "/search/messages", rpc.SelfAuth,
+		"Tìm tin trong mọi hội thoại tôi xem được (không dấu, mới trước, 30 lần / phút)", searchQ, searchCursor, searchLimit)
+	r("chatEditMessage", "PATCH", "/messages/:message_id", rpc.SelfAuth,
+		"Sửa tin văn bản của mình (trong 24 giờ; kiểm lại mentions; không push)", msgPath,
+		rpc.GoField{Name: "content", In: "body", Type: "string", Required: true, Desc: "1..4000 ký tự"},
+		rpc.GoField{Name: "mentions", In: "body", Type: "array", Desc: "Như message.send (chỉ nhóm), offset trên content mới"})
+	r("chatRecallMessage", "POST", "/messages/:message_id/recall", rpc.SelfAuth,
+		"Thu hồi tin (của mình trong 24 giờ; trưởng / phó nhóm thu hồi tin người khác trong nhóm): xoá hẳn nội dung, reaction, ghim", msgPath)
+	r("chatForwardMessage", "POST", "/messages/:message_id/forward", rpc.SelfAuth,
+		"Chuyển tiếp tin tới 1..20 hội thoại (mỗi đích một tin mới, dùng lại tệp; kết quả theo từng đích)", msgPath,
+		rpc.GoField{Name: "targets", In: "body", Type: "array", Required: true, Desc: `[{"conversation_id":1,"client_msg_id":"<uuid>"}]`})
+	r("chatSetReaction", "PUT", "/messages/:message_id/reaction", rpc.SelfAuth,
+		"Thả / đổi cảm xúc của tôi cho tin (1 cảm xúc / người / tin; 60 lần / phút)", msgPath,
+		rpc.GoField{Name: "reaction", In: "body", Type: "string", Required: true, Desc: "like / love / haha / wow / sad / angry"})
+	r("chatRemoveReaction", "DELETE", "/messages/:message_id/reaction", rpc.SelfAuth, "Bỏ cảm xúc của tôi khỏi tin", msgPath)
+	r("chatListReactions", "GET", "/messages/:message_id/reactions", rpc.SelfAuth, "Ai đã thả cảm xúc cho tin (mới trước)", msgPath)
+	r("chatListPins", "GET", "/conversations/:id/pins", rpc.SelfAuth, "Tin đang ghim của hội thoại (mới ghim trước, tối đa 5)", convPath)
+	r("chatPinMessage", "POST", "/conversations/:id/pins", rpc.SelfAuth,
+		"Ghim tin (nhóm: trưởng / phó nhóm; chat 1-1: cả hai bên; tối đa 5; không ghim tin hệ thống)", convPath,
+		rpc.GoField{Name: "message_id", In: "body", Type: "integer", Required: true})
+	r("chatUnpinMessage", "DELETE", "/conversations/:id/pins/:message_id", rpc.SelfAuth, "Bỏ ghim tin", convPath,
+		rpc.GoField{Name: "message_id", In: "path", Type: "integer", Desc: "Mã tin nhắn"})
 	r("chatSync", "GET", "/sync", rpc.SelfAuth, "Hội thoại thay đổi từ lần đồng bộ trước (kể cả bị xoá khỏi nhóm: left = true)",
 		rpc.GoField{Name: "cursor", In: "query", Type: "string", Required: true, Desc: "sync_cursor (mili giây) của lần trước"})
 	r("chatPushConfig", "GET", "/push/config", rpc.SelfAuth, "Push có bật không + khoá công khai VAPID")
@@ -105,6 +179,41 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		rpc.GoField{Name: "push_kind", In: "body", Type: "string", Required: true, Desc: "webpush"},
 		rpc.GoField{Name: "push_token", In: "body", Type: "string", Required: true, Desc: "JSON.stringify(PushSubscription)"})
 	r("chatClearPushToken", "DELETE", "/devices/push", rpc.SelfAuth, "Thiết bị hiện tại thôi nhận push")
+	r("chatListDevices", "GET", "/devices", rpc.SelfAuth, "Thiết bị đang đăng nhập của tôi (thiết bị hiện tại trước)")
+	r("chatRevokeDevice", "DELETE", "/devices/:device_id", rpc.SelfAuth,
+		"Đăng xuất từ xa một thiết bị khác của tôi (force_logout + đóng WebSocket của thiết bị đó)", devicePath)
+	r("chatRevokeOtherDevices", "POST", "/devices/logout-others", rpc.SelfAuth, "Đăng xuất mọi thiết bị khác của tôi")
+	r("chatQrStart", "POST", "/auth/qr/start", rpc.Public,
+		"Máy mới xin mã QR đăng nhập (sống 2 phút; 20 phiên / 10 phút / IP)",
+		rpc.GoField{Name: "device", In: "body", Type: "object", Desc: `{"platform":"web|ios|android|desktop","name":"Chrome Windows"}`})
+	r("chatQrPoll", "POST", "/auth/qr/poll", rpc.Public,
+		"Máy mới hỏi trạng thái phiên QR (mỗi 2 giây); approved -> auth (một lần duy nhất)",
+		rpc.GoField{Name: "qr_id", In: "body", Type: "integer", Required: true},
+		rpc.GoField{Name: "poll_token", In: "body", Type: "string", Required: true, Desc: "poll_token của qr/start (không nằm trong QR)"})
+	r("chatQrScan", "POST", "/auth/qr/scan", rpc.SelfAuth,
+		"Máy đã đăng nhập quét mã QR: xem thông tin máy đang chờ (20 lần / phút)", qrCode)
+	r("chatQrApprove", "POST", "/auth/qr/approve", rpc.SelfAuth, "Xác nhận đăng nhập máy mới (chỉ người đã quét)", qrCode)
+	r("chatQrReject", "POST", "/auth/qr/reject", rpc.SelfAuth, "Từ chối đăng nhập máy mới (chỉ người đã quét)", qrCode)
+	r("chatMediaConfig", "GET", "/media/config", rpc.SelfAuth,
+		"Gửi tệp có bật không + giới hạn (kích thước theo loại, MIME, đuôi tệp bị chặn); client không tự đặt giới hạn")
+	r("chatMediaUploadURL", "POST", "/media/upload-url", rpc.SelfAuth,
+		"Xin presigned PUT (15 phút) để tải tệp thẳng lên kho S3; cùng nội dung đã ready -> dedup = true, không cần tải (60 lần / phút)",
+		rpc.GoField{Name: "type", In: "body", Type: "string", Required: true, Desc: "image / video / file / voice"},
+		rpc.GoField{Name: "mime", In: "body", Type: "string", Required: true, Desc: "MIME của tệp (ảnh: jpeg / png / webp / gif; file: trống = application/octet-stream)"},
+		rpc.GoField{Name: "size", In: "body", Type: "integer", Required: true, Desc: "Số byte (ký vào URL, phải đúng khi PUT)"},
+		rpc.GoField{Name: "sha256", In: "body", Type: "string", Required: true, Desc: "SHA-256 hex chữ thường của nội dung (server tính lại khi complete)"},
+		rpc.GoField{Name: "file_name", In: "body", Type: "string", Desc: "Bắt buộc với file; .exe .msi .bat .cmd .com .scr .ps1 .vbs .js .jar bị chặn"},
+		rpc.GoField{Name: "width", In: "body", Type: "integer", Desc: "Video: gợi ý chiều rộng"},
+		rpc.GoField{Name: "height", In: "body", Type: "integer", Desc: "Video: gợi ý chiều cao"},
+		rpc.GoField{Name: "duration_ms", In: "body", Type: "integer", Desc: "Bắt buộc với voice (1..600000); video: tuỳ chọn"},
+		rpc.GoField{Name: "waveform", In: "body", Type: "array", Desc: "Bắt buộc với voice: 1..128 số 0..255"},
+		rpc.GoField{Name: "poster", In: "body", Type: "object", Desc: `Video: ảnh bìa {"mime":"image/jpeg|image/webp","size":...} (<= 512 KB, cạnh dài <= 640 px)`})
+	r("chatMediaComplete", "POST", "/media/:id/complete", rpc.SelfAuth,
+		"Báo đã PUT xong: server chép sang khoá cuối, kiểm kích thước / loại / sha256 / virus, làm ảnh nhỏ; trả media (ready)", mediaPath)
+	r("chatMediaGet", "GET", "/media/:id", rpc.SelfAuth,
+		"URL đọc tệp (presigned GET, mặc định 60 phút) cho người tải hoặc thành viên hội thoại có tin dùng tệp", mediaPath,
+		rpc.GoField{Name: "download", In: "query", Type: "integer", Desc: "1 = tải về (attachment)"},
+		rpc.GoField{Name: "message_id", In: "query", Type: "integer", Desc: "Tin dùng tệp: lấy tên tải về của tin đó"})
 	r("chatWebSocket", "GET", "/ws", rpc.SelfAuth,
 		"WebSocket thời gian thực: gói đầu tiên phải là {\"type\":\"auth\",\"data\":{\"access_token\",\"device_id\"}} (CHAT.md mục 5)")
 }
@@ -223,6 +332,8 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 			fail(c, err)
 			return
 		}
+		in.ClientIP = c.ClientIP()
+		in.UserAgent = c.Request.UserAgent()
 		r, err := s.VerifyOTP(c.Request.Context(), in)
 		reply(c, r, err)
 	})
@@ -232,7 +343,31 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 			fail(c, err)
 			return
 		}
-		r, err := s.Refresh(c.Request.Context(), in.RefreshToken)
+		r, err := s.RefreshFrom(c.Request.Context(), in.RefreshToken, c.ClientIP())
+		reply(c, r, err)
+	})
+	// Đăng nhập bằng QR - phía máy mới (chưa có phiên): start + poll công khai, poll_token chỉ máy mới giữ.
+	g.POST("/auth/qr/start", func(c *gin.Context) {
+		var in QRStartInput
+		if err := bindJSON(c, &in); err != nil {
+			fail(c, err)
+			return
+		}
+		r, err := s.QRStart(c.Request.Context(), in, c.ClientIP(), c.Request.UserAgent())
+		reply(c, r, err)
+	})
+	g.POST("/auth/qr/poll", func(c *gin.Context) {
+		var in QRPollInput
+		if err := bindJSON(c, &in); err != nil {
+			fail(c, err)
+			return
+		}
+		// Thiếu hẳn tham số = request hỏng (400); có mà sai mới là 404 QR_INVALID.
+		if in.QRID <= 0 || strings.TrimSpace(in.PollToken) == "" {
+			fail(c, errBad("Thiếu qr_id hoặc poll_token"))
+			return
+		}
+		r, err := s.QRPoll(c.Request.Context(), in)
 		reply(c, r, err)
 	})
 	g.GET("/ws", func(c *gin.Context) {
@@ -389,12 +524,68 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		return s.Conversation(c.Request.Context(), uidOf(c), conv)
 	}))
 	a.PATCH("/conversations/:id", withConv(func(c *gin.Context, conv int64) (any, error) {
-		var in renameBody
+		var in GroupInfoPatch
 		if err := bindJSON(c, &in); err != nil {
 			return nil, err
 		}
-		return s.RenameGroup(c.Request.Context(), uidOf(c), conv, in.Name)
+		return s.UpdateGroupInfo(c.Request.Context(), uidOf(c), conv, in)
 	}))
+	a.PATCH("/conversations/:id/settings", withConv(func(c *gin.Context, conv int64) (any, error) {
+		var in GroupSettingsPatch
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.UpdateGroupSettings(c.Request.Context(), uidOf(c), conv, in)
+	}))
+	a.POST("/conversations/:id/owner", withConv(func(c *gin.Context, conv int64) (any, error) {
+		var in transferOwnerBody
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.TransferOwnership(c.Request.Context(), uidOf(c), conv, in.UserID)
+	}))
+	a.POST("/conversations/:id/disband", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return empty{}, s.DisbandGroup(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.GET("/conversations/:id/invite-link", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return s.GetInviteLink(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.POST("/conversations/:id/invite-link", withConv(func(c *gin.Context, conv int64) (any, error) {
+		var in InviteCreateInput
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.CreateInviteLink(c.Request.Context(), uidOf(c), conv, in)
+	}))
+	a.DELETE("/conversations/:id/invite-link", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return empty{}, s.RevokeInviteLink(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.GET("/conversations/:id/join-requests", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return s.ListJoinRequests(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.POST("/conversations/:id/join-requests/:request_id/approve", withConv(func(c *gin.Context, conv int64) (any, error) {
+		rid, err := pathID(c, "request_id")
+		if err != nil {
+			return nil, err
+		}
+		return s.ApproveJoinRequest(c.Request.Context(), uidOf(c), conv, rid)
+	}))
+	a.POST("/conversations/:id/join-requests/:request_id/reject", withConv(func(c *gin.Context, conv int64) (any, error) {
+		rid, err := pathID(c, "request_id")
+		if err != nil {
+			return nil, err
+		}
+		return s.RejectJoinRequest(c.Request.Context(), uidOf(c), conv, rid)
+	}))
+	// Token kiểm định dạng trong service (sai -> 404 INVITE_INVALID, không đọc DB). join: thân rỗng.
+	a.GET("/invites/:token", func(c *gin.Context) {
+		r, err := s.InvitePreview(c.Request.Context(), uidOf(c), c.Param("token"))
+		reply(c, r, err)
+	})
+	a.POST("/invites/:token/join", func(c *gin.Context) {
+		r, err := s.JoinByInvite(c.Request.Context(), uidOf(c), c.Param("token"))
+		reply(c, r, err)
+	})
 	a.POST("/conversations/:id/members", withConv(func(c *gin.Context, conv int64) (any, error) {
 		var in addMembersBody
 		if err := bindJSON(c, &in); err != nil {
@@ -436,11 +627,101 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		if err != nil {
 			return nil, err
 		}
+		around, err := queryInt(c, "around_seq")
+		if err != nil {
+			return nil, err
+		}
 		limit, err := queryLimit(c)
 		if err != nil {
 			return nil, err
 		}
+		if around != nil {
+			if before != nil || after != nil {
+				return nil, errBad("Chỉ dùng một trong before_seq / after_seq / around_seq")
+			}
+			return s.MessagesAround(c.Request.Context(), uidOf(c), conv, *around, limit)
+		}
 		return s.Messages(c.Request.Context(), uidOf(c), conv, before, after, limit)
+	}))
+	a.GET("/conversations/:id/messages/changes", withConv(func(c *gin.Context, conv int64) (any, error) {
+		limit, err := queryLimit(c)
+		if err != nil {
+			return nil, err
+		}
+		return s.MessageChanges(c.Request.Context(), uidOf(c), conv, c.Query("since"), c.Query("cursor"), limit)
+	}))
+	// search: q / cursor / limit của hai route tìm tin (conv = 0: mọi hội thoại).
+	search := func(c *gin.Context, conv int64) (any, error) {
+		limit, err := queryLimit(c)
+		if err != nil {
+			return nil, err
+		}
+		return s.SearchMessages(c.Request.Context(), uidOf(c), SearchInput{ConversationID: conv, Query: c.Query("q"),
+			Cursor: c.Query("cursor"), Limit: limit})
+	}
+	a.GET("/conversations/:id/messages/search", withConv(search))
+	a.GET("/search/messages", func(c *gin.Context) {
+		r, err := search(c, 0)
+		reply(c, r, err)
+	})
+	// withMsg: handler có :message_id (mã tin toàn hệ thống).
+	withMsg := func(fn func(c *gin.Context, mid int64) (any, error)) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			mid, err := pathID(c, "message_id")
+			if err != nil {
+				fail(c, err)
+				return
+			}
+			r, err := fn(c, mid)
+			reply(c, r, err)
+		}
+	}
+	a.PATCH("/messages/:message_id", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		var in EditInput
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.EditMessage(c.Request.Context(), uidOf(c), mid, in)
+	}))
+	a.POST("/messages/:message_id/recall", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		return s.RecallMessage(c.Request.Context(), uidOf(c), mid)
+	}))
+	a.POST("/messages/:message_id/forward", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		var in ForwardInput
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.ForwardMessage(c.Request.Context(), uidOf(c), mid, in)
+	}))
+	a.PUT("/messages/:message_id/reaction", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		var in reactionBody
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.SetReaction(c.Request.Context(), uidOf(c), mid, in.Reaction)
+	}))
+	a.DELETE("/messages/:message_id/reaction", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		return s.RemoveReaction(c.Request.Context(), uidOf(c), mid)
+	}))
+	a.GET("/messages/:message_id/reactions", withMsg(func(c *gin.Context, mid int64) (any, error) {
+		return s.Reactions(c.Request.Context(), uidOf(c), mid)
+	}))
+	a.GET("/conversations/:id/pins", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return s.Pins(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.POST("/conversations/:id/pins", withConv(func(c *gin.Context, conv int64) (any, error) {
+		var in pinBody
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.PinMessage(c.Request.Context(), uidOf(c), conv, in.MessageID)
+	}))
+	a.DELETE("/conversations/:id/pins/:message_id", withConv(func(c *gin.Context, conv int64) (any, error) {
+		mid, err := pathID(c, "message_id")
+		if err != nil {
+			return nil, err
+		}
+		return s.UnpinMessage(c.Request.Context(), uidOf(c), conv, mid)
 	}))
 	a.GET("/sync", func(c *gin.Context) {
 		r, err := s.Sync(c.Request.Context(), uidOf(c), c.Query("cursor"))
@@ -457,5 +738,91 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	})
 	a.DELETE("/devices/push", func(c *gin.Context) {
 		done(c, s.ClearPushToken(c.Request.Context(), uidOf(c), didOf(c)))
+	})
+	a.GET("/devices", func(c *gin.Context) {
+		r, err := s.Devices(c.Request.Context(), uidOf(c), didOf(c))
+		reply(c, r, err)
+	})
+	a.DELETE("/devices/:device_id", func(c *gin.Context) {
+		target, err := pathID(c, "device_id")
+		if err == nil {
+			err = s.RevokeDevice(c.Request.Context(), uidOf(c), didOf(c), target)
+		}
+		done(c, err)
+	})
+	a.POST("/devices/logout-others", func(c *gin.Context) {
+		r, err := s.RevokeOtherDevices(c.Request.Context(), uidOf(c), didOf(c))
+		reply(c, r, err)
+	})
+	// Đăng nhập bằng QR - phía máy đã đăng nhập: quét, rồi duyệt / từ chối (chỉ người đã quét).
+	withQR := func(fn func(ctx context.Context, uid, did int64, code string) (any, error)) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			var in QRCodeInput
+			if err := bindJSON(c, &in); err != nil {
+				fail(c, err)
+				return
+			}
+			r, err := fn(c.Request.Context(), uidOf(c), didOf(c), in.Code)
+			reply(c, r, err)
+		}
+	}
+	a.POST("/auth/qr/scan", withQR(func(ctx context.Context, uid, did int64, code string) (any, error) {
+		return s.QRScan(ctx, uid, did, code)
+	}))
+	a.POST("/auth/qr/approve", withQR(func(ctx context.Context, uid, did int64, code string) (any, error) {
+		return s.QRApprove(ctx, uid, did, code)
+	}))
+	a.POST("/auth/qr/reject", withQR(func(ctx context.Context, uid, did int64, code string) (any, error) {
+		return s.QRReject(ctx, uid, did, code)
+	}))
+
+	a.GET("/media/config", func(c *gin.Context) {
+		r, err := s.MediaConfig(c.Request.Context(), uidOf(c))
+		reply(c, r, err)
+	})
+	a.POST("/media/upload-url", func(c *gin.Context) {
+		var in MediaUploadInput
+		if err := bindJSON(c, &in); err != nil {
+			fail(c, err)
+			return
+		}
+		r, err := s.MediaUploadURL(c.Request.Context(), uidOf(c), in)
+		reply(c, r, err)
+	})
+	a.POST("/media/:id/complete", func(c *gin.Context) {
+		id, err := pathID(c, "id")
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		md, err := s.MediaComplete(c.Request.Context(), uidOf(c), id)
+		reply(c, struct {
+			Media *MediaDTO `json:"media"`
+		}{md}, err)
+	})
+	a.GET("/media/:id", func(c *gin.Context) {
+		id, err := pathID(c, "id")
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		dl := strings.TrimSpace(c.Query("download"))
+		if dl != "" && dl != "0" && dl != "1" {
+			fail(c, errBad("download phải là 0 hoặc 1"))
+			return
+		}
+		msg, err := queryInt(c, "message_id")
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		var mid int64
+		if msg != nil {
+			mid = *msg
+		}
+		md, err := s.MediaGet(c.Request.Context(), uidOf(c), id, dl == "1", mid)
+		reply(c, struct {
+			Media *MediaDTO `json:"media"`
+		}{md}, err)
 	})
 }

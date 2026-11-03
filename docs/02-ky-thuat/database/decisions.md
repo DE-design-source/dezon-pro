@@ -26,6 +26,7 @@
 | D-14 | Vị trí tài liệu | `docs/02-ky-thuat/database/` | - | Không |
 | D-15 | Chat MVP (2026-10-30): danh tính riêng, SQL thô, chỉ PostgreSQL | Bảng `chat_*` không theo công ty; SQL qua `DB.Pool()`; chưa dùng Redis / Cassandra / Kafka | - | Không (đã chốt) |
 | D-16 | Chat đăng nhập bằng email (2026-11-02) | Danh tính = số HOẶC email, tài khoản riêng, chưa liên kết; OTP email qua SMTP | - | Không (đã chốt) |
+| D-17 | Chat gửi ảnh / video / tệp / tin thoại (2026-11-02) | MinIO + presigned PUT vào khoá tạm, server chép + kiểm; presigned GET 60 phút; chống trùng theo người tải | - | Không (đã chốt) |
 
 ---
 
@@ -215,3 +216,51 @@ Yêu cầu ghi `docs/database/*.md`; quy tắc bắt buộc của repo (`.claude
   `SMTP_PASSWORD`, `SMTP_FROM`). Chưa đặt `SMTP_HOST` thì mã OTP email ghi vào log server (giống SMS).
 - **Lộ thông tin:** email chỉ trả cho chính mình, bạn bè và kết quả tra đúng email; tra theo email không lộ số và ngược lại.
 - **Phương án bị loại:** liên kết email vào tài khoản số ngay đợt này - cần luồng xác minh cả hai đích và gộp dữ liệu hai tài khoản đã có.
+
+## D-17. Chat gửi ảnh / video / tệp / tin nhắn thoại qua MinIO (2026-11-02)
+
+- **Bối cảnh:** `backend/CHAT.md` mục 12 thiết kế media theo kiểu S3 + sự kiện bucket kích worker + CDN + chống trùng sha256 toàn hệ thống +
+  tệp tới 1 GB (multipart) + nén video 720p + chuyển lưu trữ lạnh sau 90 ngày. Production chỉ có một VPS (PostgreSQL, Caddy), không Kafka, không
+  CDN, không ffmpeg; kho file QS (`UPLOAD_DIR`, `platform/storage`) là ổ đĩa máy chủ, không dùng cho chat.
+- **Quyết định 1 - MinIO, file không đi qua server Go:** gói mới `backend/internal/platform/objstore` (minio-go v7.3.0, cạnh `mailer` / `webpush`,
+  không đụng `platform/storage`). Luồng: client xin URL (`POST /chat/media/upload-url`) -> PUT thẳng lên khoá tạm `chat/in/...` bằng presigned
+  URL (sống 15 phút) -> gọi `POST /chat/media/:id/complete` -> server nhận dòng (trạng thái `processing`), chép phía server sang khoá cuối
+  `chat/m/...` (khoá cuối không bao giờ được ký PUT), xoá khoá tạm, rồi kiểm trên khoá cuối -> `message.send` chỉ mang `attachments:[media_id]`.
+  Server dùng hai client: `internal` (`CHAT_S3_ENDPOINT`) để đọc / chép / xoá, `signer` (`CHAT_S3_PUBLIC_URL`) chỉ để ký (SigV4 ràng buộc host,
+  trình duyệt phải gọi đúng host đó). Chưa đặt `CHAT_S3_ENDPOINT` thì media tắt, API media trả 503.
+- **Quyết định 2 - ký cả `Content-Type` và `Content-Length` vào URL PUT:** MinIO tự chặn tệp khác loại / khác kích thước đã khai, nên giới hạn
+  kích thước áp được trước khi dữ liệu vào kho. Kết quả thử trên MinIO thật: xem mục "Kết quả thử (spike)" dưới đây.
+- **Quyết định 3 - server tự tính lại sha256, chống trùng theo TỪNG người tải:** khoá chống trùng `(uploader_id, sha256, media_type)`; client khai
+  sha256, `complete` đọc luồng khoá cuối tính lại, lệch thì dòng thành `failed`. Đã có tệp `ready` cùng khoá thì `upload-url` trả `dedup:true` và
+  cùng `media_id`, không tải lại; tên hiển thị nằm ở `chat_messages.file_name` của từng tin. Loại bỏ chống trùng toàn hệ thống: ai biết hash là lấy
+  được tệp của người khác; chống trùng giữa người dùng để làm cùng chức năng chuyển tiếp (chưa làm).
+- **Quyết định 4 - giới hạn kích thước:** ảnh mặc định 25 MB (`CHAT_MEDIA_MAX_IMAGE_MB`), video / tệp mặc định 100 MB (`CHAT_MEDIA_MAX_FILE_MB`,
+  đặt quá 200 thì ép về 200 và ghi log), tin thoại 10 MB / 10 phút, ảnh bìa video 512 KB (cạnh dài 640 px), tổng khai báo 2048 MB / người / 24 giờ
+  (`CHAT_MEDIA_DAILY_MB`). Trần cứng 200 MB khớp CHECK `ck_chat_media_size_bytes`: trình duyệt băm bằng `crypto.subtle.digest` cần cả tệp trong bộ
+  nhớ, 1 GB làm treo tab. Một lần PUT, chưa có multipart / tải tiếp.
+- **Quyết định 5 - xử lý đồng bộ trong `complete`, không worker, không ổ đĩa local:** sự kiện bucket cần hàng đợi / webhook mà hệ thống chưa có.
+  `complete` (tối đa 60 giây) kiểm kích thước, đoán loại theo nội dung, sha256, quét virus qua interface `MediaScanner` (mặc định `logScanner`
+  luôn sạch, ghi log 1 lần lúc khởi động; ClamAV để sau), làm ảnh thu nhỏ 320 px cho ảnh (tối đa 2 ảnh giải mã cùng lúc, chặn ảnh trên 40 triệu
+  điểm ảnh). Mọi thứ đọc / ghi qua luồng MinIO, không ghi tệp tạm ra đĩa. Dòng `processing` treo quá 10 phút được trả lại; janitor (30 phút / lần)
+  xoá object `pending` / `failed` sau 2 giờ, dòng `pending` / `failed` và dòng `ready` không tin nào dùng sau 24 giờ; khoá tạm `chat/in/` còn có
+  ILM hết hạn 1 ngày.
+- **Quyết định 6 - đọc bằng presigned GET sống 60 phút:** `CHAT_MEDIA_URL_TTL_MIN` (mặc định 60, ép trong 5..720), URL ký kèm
+  `response-content-type`, `response-content-disposition`, `response-cache-control=private, max-age=<ttl>`; URL được cache trong tiến trình nửa
+  TTL để chuỗi không đổi và trình duyệt dùng lại cache. **Chấp nhận:** URL là link mang quyền (bearer) - thành viên rời nhóm vẫn mở được URL đã nhận
+  tới khi hết hạn (tối đa TTL).
+- **Để sau (không làm đợt này):** CDN (MinIO phục vụ thẳng qua Caddy ở `{$S3_DOMAIN}`), chuyển lưu trữ lạnh / chính sách lưu giữ sau 90 ngày (MinIO
+  một tầng; lưu giữ là quyết định sản phẩm), nén / chuyển mã video (không ffmpeg; `<video>` lỗi codec thì hiện chip tải về), quét virus thật,
+  tệp trên 200 MB (băm từng phần + multipart tải tiếp), chuyển tiếp tin.
+- **Kết quả thử (spike) trên MinIO thật** (`qspro-minio`, minio-go v7.3.0):
+  1. `PresignHeader` có trong minio-go v7.3.0: CÓ. URL ký `content-length;content-type;host`, ký không cần gọi mạng khi đã đặt region.
+  2. MinIO từ chối PUT khác `Content-Type` đã ký: CÓ (`image/jpeg` với URL ký `image/png` -> 403).
+  3. MinIO từ chối thân lớn hơn / nhỏ hơn `Content-Length` đã ký: CÓ (thừa hoặc thiếu 1 byte -> 403, không tạo object). Vì vậy KHÔNG cần
+     phương án dự phòng presigned POST policy (`content-length-range`); `chatUpload.js` vẫn đọc `upload.method` nên đổi sau được.
+  4. MinIO trả lời CORS preflight trên đường dẫn presigned: CÓ (204, `Access-Control-Allow-Origin` = origin trong `MINIO_API_CORS_ALLOW_ORIGIN`,
+     `Allow-Methods: PUT`, `Allow-Headers: content-type`; origin ngoài danh sách không nhận header CORS). Thử cả qua Caddy với khối `{$S3_DOMAIN}`
+     thật: preflight 204 + `nosniff`, PUT đúng 200, sai loại / sai độ dài 403, GET presigned giữ `Content-Disposition`, không nén lại.
+  Thêm: chép phía server giữ `Content-Type`; presigned GET trả đúng `Content-Type` / `Content-Disposition` / `Cache-Control` đã ký. Object
+  khôi phục từ bản sao lưu mà không có đuôi tệp về `application/octet-stream`, nên mọi presigned GET luôn đặt `response-content-type`.
+- **Tác động code:** `infra/db/migrations/0020_chat_media.sql` (bảng `chat_media`, cột `chat_messages.media_id` / `file_name`),
+  `backend/internal/platform/objstore`, `backend/internal/modules/chat` (`media.go`, `dto_media.go`, `service_media.go`), biến `CHAT_S3_*` /
+  `CHAT_MEDIA_*` trong `config.go`, MinIO trong `infra/deploy` + ảnh `infra/docker/minio.Dockerfile`. Không đổi bảng, hàm hay route nào của QS.

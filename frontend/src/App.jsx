@@ -33,6 +33,10 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
           <Route path="chat" element={<Chat />} />
+          {/* link mời vào nhóm chat (API.md "Quản trị nhóm" - đường dẫn tham gia) */}
+          <Route path="chat/join/:token" element={<Chat />} />
+          {/* xác nhận đăng nhập bằng mã QR: /chat/qr#<mã> (API.md "Đăng nhập bằng QR") */}
+          <Route path="chat/qr" element={<Chat />} />
           <Route path="marketing" element={<Marketing />} />
           <Route path="kinh-doanh" element={<KinhDoanh />} />
           <Route path="du-an" element={<DuAn />} />

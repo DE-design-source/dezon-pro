@@ -1,4 +1,5 @@
 /* Phần dùng chung của trang Chat: initials(), iconSvg(), convAvatarHTML() trong chat.html */
+import { useState } from 'react'
 import { COLORS } from '../../../data/chatData'
 
 export function initials(name) {
@@ -27,8 +28,9 @@ export function IconSvg({ kind }) {
 }
 
 /* convAvatarHTML(c, size) — extraClass dùng cho đầu thread ("conv-avatar t-avatar").
-   conv: {type: 'dm' | 'group' | 'bot', name, color, icon, online} */
+   conv: {type: 'dm' | 'group' | 'bot', name, color, icon, online, avatar?} */
 export function ConvAvatar({ conv, size = 42, extraClass = '' }) {
+  const [broken, setBroken] = useState('')
   const style = { width: size, height: size, background: conv.color }
   const cls = 'ch-conv-avatar' + (extraClass ? ' ' + extraClass : '')
   if (conv.type === 'dm') {
@@ -36,6 +38,16 @@ export function ConvAvatar({ conv, size = 42, extraClass = '' }) {
       <div className={cls + ' round'} style={style}>
         {initials(conv.name)}
         {conv.online && <span className="ch-dot-online" />}
+      </div>
+    )
+  }
+  /* nhóm có ảnh (ready): ảnh thu nhỏ, lỗi tải thì quay về icon nhóm */
+  const a = conv.type === 'group' ? conv.avatar : null
+  const src = a ? (a.thumb_url || a.url || '') : ''
+  if (src && broken !== src) {
+    return (
+      <div className={cls} style={{ ...style, overflow: 'hidden' }}>
+        <img src={src} alt="" onError={() => setBroken(src)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       </div>
     )
   }
@@ -48,7 +60,7 @@ export function avatarConv(c, online) {
     const peer = c.peer || {}
     return { type: 'dm', name: peer.display_name || c.name || '', color: colorFor(peer.id || c.id), online: !!online }
   }
-  return { type: 'group', name: c.name || '', color: colorFor(c.id), icon: 'group' }
+  return { type: 'group', name: c.name || '', color: colorFor(c.id), icon: 'group', avatar: c.avatar || null }
 }
 
 /* Đường path của icon ghim (dùng ở danh sách hội thoại, bubble, thanh ghim) */
