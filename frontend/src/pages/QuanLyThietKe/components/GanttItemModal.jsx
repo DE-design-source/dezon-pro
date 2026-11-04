@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { INITIAL_HR_EMPLOYEES, DEPTS, deptOf } from '../../../data/hrData'
+import { CORE_PHASES } from '../delivery'
 
 const HR_PEOPLE = INITIAL_HR_EMPLOYEES.filter(e => e.status !== 'left').map(e => ({ value: e.name, sub: `${e.position} · ${deptOf(e.dept).name}` }))
 const HR_DEPTS = DEPTS.map(d => d.name)
@@ -85,13 +86,13 @@ export default function GanttItemModal({ state, phases, assignees, onClose, onSa
         <div className="tk-gm-body">
           <label className="tk-gm-field full">
             <span>{isTask ? 'Tên công việc *' : 'Tên đề mục (giai đoạn) *'}</span>
-            <input autoFocus value={f.name} placeholder={isTask ? 'VD: Đổ bê tông sàn tầng 6' : 'VD: Thi công phần mái'} onChange={e => set({ name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') save() }} />
+            <input autoFocus value={f.name} readOnly={!isTask && CORE_PHASES.includes(state.phase?.name)} placeholder={isTask ? 'VD: Đổ bê tông sàn tầng 6' : 'VD: Thi công phần mái'} onChange={e => set({ name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') save() }} />
           </label>
           {isTask && (
             <>
               <label className="tk-gm-field">
                 <span>Đề mục</span>
-                <select value={f.phaseId} onChange={e => set({ phaseId: e.target.value })}>{phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                <select value={f.phaseId} onChange={e => set({ phaseId: Number(e.target.value) })}>{phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               </label>
               <div className="tk-gm-field">
                 <span>Loại</span>
@@ -142,7 +143,7 @@ export default function GanttItemModal({ state, phases, assignees, onClose, onSa
           {!isTask && editing && <p className="tk-gm-note full">Đề mục có {state.phase?.tasks.length || 0} công việc.</p>}
         </div>
         <div className="tk-gm-foot">
-          {editing && (
+          {editing && !(!isTask && CORE_PHASES.includes(state.phase?.name)) && (
             <button className="tk-gm-del" onClick={() => (isTask ? onDeleteTask(state.task.id) : onDeletePhase(state.phase.id))}>
               Xoá {isTask ? 'công việc' : 'đề mục'}
             </button>

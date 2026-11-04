@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { MONTHS, monthlySummary, deptOf, isFieldSite } from '../../../data/hrData'
+import { MONTHS, monthlySummary, deptOf } from '../../../data/hrData'
 import { PAYROLL_STATUS } from '../../../data/hrData2'
 import { Avatar, Pill, Seg, Modal, Field, Empty, downloadCsv } from './shared'
 import { useAccess, NoAccess } from './access'
@@ -46,8 +46,8 @@ export function calcPay(emp, att, adj = [], cfg, conc = []) {
   const basePay = base * ratio
   const lunch = att.worked > 0 ? cfg.lunch : 0
   const phone = cfg.phoneByLevel[emp.level] || 0
-  const site = isFieldSite(emp.site) ? cfg.siteAllowance : 0 // phụ cấp công trường theo địa điểm (Ca & lịch làm việc)
-  const otPay = att.std ? att.ot * (base / att.std / 8) * cfg.otRate : 0 // không có ngày công chuẩn (lịch toàn nghỉ) -> không tính được đơn giá giờ
+  const site = emp.site !== 'Văn phòng HCM' ? cfg.siteAllowance : 0
+  const otPay = att.ot * (base / att.std / 8) * cfg.otRate
   const bonus = adj.filter(a => a.kind === 'bonus').reduce((s, a) => s + a.amount, 0)
   const penalty = adj.filter(a => a.kind === 'penalty').reduce((s, a) => s + a.amount, 0)
   const sales = adj.filter(a => a.kind === 'sales').reduce((s, a) => s + a.amount, 0)
@@ -163,11 +163,8 @@ const TABS = [
 ]
 
 /* Phân hệ "Lương & bảo hiểm" */
-/* payroll = { config, adjustments, runs, fixed } từ máy chủ; pay = thao tác ghi (ChamCong.jsx):
-   addAdj(empId, tháng, {kind, label, amount}), removeAdj(id), run(tháng, action, payslips, okMsg), setCfg(patch), setFixed(unitKey, {fund, items}).
-   Kỳ lương đã duyệt hiển thị bản chụp phiếu lương lưu lúc duyệt, không tính lại. */
-export default function PayrollModule({ employees, units = [], concurrentOf = () => [], payroll, pay, maskDefault }) {
-  const { can, canAll, user, role, log } = useAccess()
+export default function PayrollModule({ employees, units = [], concurrentOf = () => [], payroll, setPayroll, toast, maskDefault }) {
+  const { can, user, role, log } = useAccess()
   const [tab, setTab] = useState('run')
   const [month, setMonth] = useState(MONTHS[0].key)
   const [q, setQ] = useState('')
@@ -175,16 +172,16 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
   const [adjFor, setAdjFor] = useState(null)
   const [newAdj, setNewAdj] = useState({ kind: 'bonus', label: '', amount: '' })
   const [show, setShow] = useState(!maskDefault)
+  const [sending, setSending] = useState(null)
   const { config: cfg, adjustments, runs } = payroll
-  const run = runs[month] || { status: 'draft' }
+  const run = runs[month] || { status: 'draft', sent: [] }
   const monthLabel = MONTHS.find(m => m.key === month).label
 
-  const rows = useMemo(() => (run.payslips
-    ? Object.entries(run.payslips).map(([id, x]) => { const emp = employees.find(e => e.id === Number(id)); return emp && { emp, att: { ...x.att, emp }, adj: x.adj || [], p: x.p } }).filter(Boolean)
-    : monthlySummary(employees, month).map(att => {
-      const adj = adjustments[month]?.[att.emp.id] || []
-      return { emp: att.emp, att, adj, p: calcPay(att.emp, att, adj, cfg, concurrentOf(att.emp.id)) }
-    })), [employees, month, adjustments, cfg, concurrentOf, run.payslips])
+  // kỳ đã duyệt: bản chụp phiếu lương lưu lúc duyệt (run.payslips {empId: {att, adj, p}})
+  const rows = useMemo(() => (run.payslips && Object.keys(run.payslips).length ? employees.filter(e => run.payslips[e.id]).map(emp => ({ ...run.payslips[emp.id], emp, att: { ...run.payslips[emp.id].att, emp } })) : monthlySummary(employees, month).map(att => {
+    const adj = adjustments[month]?.[att.emp.id] || []
+    return { emp: att.emp, att, adj, p: calcPay(att.emp, att, adj, cfg, concurrentOf(att.emp.id)) }
+  })), [employees, month, adjustments, cfg, concurrentOf, run.payslips])
 
   if (!can('payroll', 'view')) return <NoAccess />
 
@@ -208,20 +205,27 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
   const shown = rows.filter(r => !t || r.emp.name.toLowerCase().includes(t))
   const sum = k => rows.reduce((s, r) => s + r.p[k], 0)
   const money = v => (show ? vnd(v) : '••••••')
+  const setRun = patch => setPayroll(p => ({ ...p, runs: { ...p.runs, [month]: { ...run, ...patch } } }))
 
-  /* Duyệt: lưu bản chụp phiếu lương (công, các khoản) + chốt công tháng đó */
   function approve() {
-    if (!confirm(`Duyệt bảng lương ${monthLabel}? Tổng chi ${vnd(sum('net'))} đ. Số liệu được chụp lại và chốt công tháng này.`)) return
-    const payslips = Object.fromEntries(rows.map(({ emp, att, adj, p }) => {
-      const { emp: _e, ...a } = att
-      return [emp.id, { emp: { id: emp.id, code: emp.code, name: emp.name, dept: emp.dept, position: emp.position }, att: a, adj, p }]
-    }))
-    pay.run(month, 'approve', payslips, `Đã duyệt bảng lương ${monthLabel}`).then(ok => ok && log('payroll', 'approve', `Duyệt bảng lương ${monthLabel}`))
+    if (!confirm(`Duyệt bảng lương ${monthLabel}? Tổng chi ${vnd(sum('net'))} đ.`)) return
+    setRun({ status: 'approved' }); log('payroll', 'approve', `Duyệt bảng lương ${monthLabel}`); toast(`Đã duyệt bảng lương ${monthLabel}`)
   }
-  /* Chưa có gửi email / chuyển khoản: chỉ ghi nhận đã chi trả */
-  function markPaid() {
-    if (!confirm(`Đánh dấu đã chi trả bảng lương ${monthLabel} (${rows.length} người)?`)) return
-    pay.run(month, 'pay', null, `Đã đánh dấu chi trả bảng lương ${monthLabel}`).then(ok => ok && log('payroll', 'edit', `Chi trả bảng lương ${monthLabel}`))
+  function sendSlips() {
+    const ids = rows.map(r => r.emp.id)
+    setSending(0)
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setSending(i / ids.length)
+      if (i >= ids.length) {
+        clearInterval(timer)
+        setRun({ status: 'paid', sent: ids })
+        setSending(null)
+        log('payroll', 'create', `Gửi ${ids.length} phiếu lương ${monthLabel} qua email`)
+        toast(`Đã gửi ${ids.length} phiếu lương qua email & đánh dấu đã chi trả`)
+      }
+    }, 90)
   }
   function exportCsv() {
     downloadCsv(`bang-luong-${month}.csv`, [
@@ -233,15 +237,21 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
   function addAdj() {
     const amount = Number(String(newAdj.amount).replace(/\D/g, ''))
     if (!newAdj.label.trim() || !amount) return
-    pay.addAdj(adjFor.id, month, { kind: newAdj.kind, label: newAdj.label.trim(), amount }).then(ok => {
-      if (!ok) return
-      log('payroll', 'edit', `${newAdj.kind === 'penalty' ? 'Phạt' : newAdj.kind === 'sales' ? 'Doanh số' : 'Thưởng'} ${vnd(amount)} — ${adjFor.name}`)
-      setNewAdj({ kind: 'bonus', label: '', amount: '' })
+    setPayroll(p => {
+      const m = { ...(p.adjustments[month] || {}) }
+      m[adjFor.id] = [...(m[adjFor.id] || []), { kind: newAdj.kind, label: newAdj.label.trim(), amount }]
+      return { ...p, adjustments: { ...p.adjustments, [month]: m } }
     })
+    log('payroll', 'edit', `${newAdj.kind === 'penalty' ? 'Phạt' : newAdj.kind === 'sales' ? 'Doanh số' : 'Thưởng'} ${vnd(amount)} — ${adjFor.name}`)
+    setNewAdj({ kind: 'bonus', label: '', amount: '' })
   }
-  const removeAdj = i => pay.removeAdj(adjList[i].id)
-  const setCfg = pay.setCfg
-  const editable = canAll('payroll', 'edit') && run.status === 'draft'
+  const removeAdj = i => setPayroll(p => {
+    const m = { ...(p.adjustments[month] || {}) }
+    m[adjFor.id] = m[adjFor.id].filter((_, j) => j !== i)
+    return { ...p, adjustments: { ...p.adjustments, [month]: m } }
+  })
+  const setCfg = patch => { setPayroll(p => ({ ...p, config: { ...p.config, ...patch } })) }
+  const editable = can('payroll', 'edit') && run.status === 'draft'
   const slipRow = slip && rows.find(r => r.emp.id === slip)
   const adjList = adjFor ? adjustments[month]?.[adjFor.id] || [] : []
 
@@ -266,13 +276,14 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
           <div className="cc-steps-bar">
             {['draft', 'approved', 'paid'].map((s, i) => {
               const idx = ['draft', 'approved', 'paid'].indexOf(run.status)
-              return <div key={s} className={`cc-step-item${i < idx ? ' done' : i === idx ? ' current' : ''}`}><span>{i < idx ? <Icon name="check" size={11} stroke={3} /> : i + 1}</span>{['Tính lương (nháp)', 'Duyệt bảng lương', 'Chi trả'][i]}</div>
+              return <div key={s} className={`cc-step-item${i < idx ? ' done' : i === idx ? ' current' : ''}`}><span>{i < idx ? <Icon name="check" size={11} stroke={3} /> : i + 1}</span>{['Tính lương (nháp)', 'Duyệt bảng lương', 'Gửi phiếu lương & chi trả'][i]}</div>
             })}
             <span className="cc-grow" />
+            {sending != null && <div className="cc-sendbar"><div className="cc-bar"><span style={{ width: sending * 100 + '%' }} /></div><span className="cc-sub">Đang gửi email phiếu lương… {Math.round(sending * 100)}%</span></div>}
             {can('payroll', 'export') && <button className="cc-btn ghost" onClick={exportCsv}><Icon name="download" size={14} />Xuất CSV</button>}
-            {run.status === 'draft' && canAll('payroll', 'approve') && <button className="cc-btn" onClick={approve}><Icon name="check" size={14} stroke={2.6} />Duyệt bảng lương</button>}
-            {run.status === 'approved' && canAll('payroll', 'approve') && <button className="cc-btn" onClick={markPaid}><Icon name="check" size={14} />Đánh dấu đã chi trả</button>}
-            {run.status !== 'draft' && canAll('payroll', 'edit') && <button className="cc-link-btn" onClick={() => pay.run(month, 'reopen', null, `Đã mở lại bảng lương ${monthLabel}`).then(ok => ok && log('payroll', 'edit', `Mở lại bảng lương ${monthLabel}`))}>Mở lại</button>}
+            {run.status === 'draft' && can('payroll', 'approve') && <button className="cc-btn" onClick={approve}><Icon name="check" size={14} stroke={2.6} />Duyệt bảng lương</button>}
+            {run.status === 'approved' && can('payroll', 'approve') && sending == null && <button className="cc-btn" onClick={sendSlips}><Icon name="mail" size={14} />Gửi phiếu lương</button>}
+            {run.status !== 'draft' && can('payroll', 'edit') && <button className="cc-link-btn" onClick={() => { setRun({ status: 'draft', sent: [] }); log('payroll', 'edit', `Mở lại bảng lương ${monthLabel}`) }}>Mở lại</button>}
           </div>
           <div className="cc-toolbar" style={{ marginTop: 12 }}>
             <label className="cc-search"><Icon name="search" size={14} /><input placeholder="Tìm nhân viên..." value={q} onChange={e => setQ(e.target.value)} /></label>
@@ -304,7 +315,7 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
                           </div>
                         </td>
                         <td className="r" onClick={e => e.stopPropagation()}>
-                          {run.status === 'paid' ? <span className="cc-gps ok"><Icon name="check" size={12} />Đã chi trả</span>
+                          {run.sent.includes(emp.id) ? <span className="cc-gps ok"><Icon name="mail" size={12} />Đã gửi</span>
                             : editable && <button className="cc-link-btn" onClick={() => setAdjFor(emp)}>± Điều chỉnh</button>}
                         </td>
                       </tr>
@@ -348,8 +359,8 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
 
       {tab === 'fixed' && (
         <FixedCostTab
-          rows={rows} units={units} fixed={payroll.fixed || {}} editable={canAll('payroll', 'edit')} money={money} monthLabel={monthLabel} log={log} employees={employees} cfg={cfg} adjustments={adjustments} runs={runs} concurrentOf={concurrentOf} month={month}
-          setFixed={pay.setFixed}
+          rows={rows} units={units} fixed={payroll.fixed || {}} editable={can('payroll', 'edit')} money={money} monthLabel={monthLabel} log={log} employees={employees} cfg={cfg} adjustments={adjustments} runs={runs} concurrentOf={concurrentOf} month={month}
+          setFixed={(key, val) => setPayroll(p => ({ ...p, fixed: { ...(p.fixed || {}), [key]: val } }))}
         />
       )}
 
@@ -397,15 +408,15 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
               <code>Thực nhận = Gross − BH người lao động − Thuế TNCN</code>
             </div>
             <div className="cc-form" style={{ marginTop: 12 }}>
-              <Field label="Phụ cấp ăn trưa (đ)"><input inputMode="numeric" disabled={!canAll('payroll', 'edit')} value={vnd(cfg.lunch)} onChange={e => setCfg({ lunch: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
-              <Field label="Phụ cấp công trường (đ)"><input inputMode="numeric" disabled={!canAll('payroll', 'edit')} value={vnd(cfg.siteAllowance)} onChange={e => setCfg({ siteAllowance: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
-              <Field label="Hệ số OT ngày thường"><input type="number" step="0.1" min="1" disabled={!canAll('payroll', 'edit')} value={cfg.otRate} onChange={e => setCfg({ otRate: Number(e.target.value) })} /></Field>
-              <Field label="Hoa hồng kinh doanh (% doanh số)"><input type="number" step="0.1" min="0" disabled={!canAll('payroll', 'edit')} value={+(cfg.commissionRate * 100).toFixed(2)} onChange={e => setCfg({ commissionRate: Number(e.target.value) / 100 })} /></Field>
+              <Field label="Phụ cấp ăn trưa (đ)"><input inputMode="numeric" disabled={!can('payroll', 'edit')} value={vnd(cfg.lunch)} onChange={e => setCfg({ lunch: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
+              <Field label="Phụ cấp công trường (đ)"><input inputMode="numeric" disabled={!can('payroll', 'edit')} value={vnd(cfg.siteAllowance)} onChange={e => setCfg({ siteAllowance: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
+              <Field label="Hệ số OT ngày thường"><input type="number" step="0.1" min="1" disabled={!can('payroll', 'edit')} value={cfg.otRate} onChange={e => setCfg({ otRate: Number(e.target.value) })} /></Field>
+              <Field label="Hoa hồng kinh doanh (% doanh số)"><input type="number" step="0.1" min="0" disabled={!can('payroll', 'edit')} value={+(cfg.commissionRate * 100).toFixed(2)} onChange={e => setCfg({ commissionRate: Number(e.target.value) / 100 })} /></Field>
             </div>
             <h3 className="cc-h3" style={{ marginTop: 16 }}>Phụ cấp điện thoại / xăng xe theo cấp bậc</h3>
             {Object.entries(cfg.phoneByLevel).map(([lv, v]) => (
               <div key={lv} className="cc-kv"><span>{lv}</span>
-                <input className="cc-inline-num" inputMode="numeric" disabled={!canAll('payroll', 'edit')} value={vnd(v)} onChange={e => setCfg({ phoneByLevel: { ...cfg.phoneByLevel, [lv]: Number(e.target.value.replace(/\D/g, '')) } })} />
+                <input className="cc-inline-num" inputMode="numeric" disabled={!can('payroll', 'edit')} value={vnd(v)} onChange={e => setCfg({ phoneByLevel: { ...cfg.phoneByLevel, [lv]: Number(e.target.value.replace(/\D/g, '')) } })} />
               </div>
             ))}
           </div>
@@ -414,10 +425,10 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
             <table className="cc-table2 compact"><thead><tr><th>Loại</th><th className="r">Người lao động</th><th className="r">Công ty</th></tr></thead>
               <tbody>{[['BHXH', 'bhxh'], ['BHYT', 'bhyt'], ['BHTN', 'bhtn']].map(([lb, k]) => <tr key={k}><td>{lb}</td><td className="r mono">{pct(cfg.emp[k])}</td><td className="r mono">{pct(cfg.com[k])}</td></tr>)}</tbody>
             </table>
-            <div className="cc-kv"><span>Trần mức đóng BHXH/BHYT</span><input className="cc-inline-num" disabled={!canAll('payroll', 'edit')} value={vnd(cfg.insCap)} onChange={e => setCfg({ insCap: Number(e.target.value.replace(/\D/g, '')) })} /></div>
+            <div className="cc-kv"><span>Trần mức đóng BHXH/BHYT</span><input className="cc-inline-num" disabled={!can('payroll', 'edit')} value={vnd(cfg.insCap)} onChange={e => setCfg({ insCap: Number(e.target.value.replace(/\D/g, '')) })} /></div>
             <h3 className="cc-h3" style={{ marginTop: 16 }}>Thuế TNCN</h3>
-            <div className="cc-kv"><span>Giảm trừ bản thân</span><input className="cc-inline-num" disabled={!canAll('payroll', 'edit')} value={vnd(cfg.personalDeduction)} onChange={e => setCfg({ personalDeduction: Number(e.target.value.replace(/\D/g, '')) })} /></div>
-            <div className="cc-kv"><span>Giảm trừ mỗi người phụ thuộc</span><input className="cc-inline-num" disabled={!canAll('payroll', 'edit')} value={vnd(cfg.dependentDeduction)} onChange={e => setCfg({ dependentDeduction: Number(e.target.value.replace(/\D/g, '')) })} /></div>
+            <div className="cc-kv"><span>Giảm trừ bản thân</span><input className="cc-inline-num" disabled={!can('payroll', 'edit')} value={vnd(cfg.personalDeduction)} onChange={e => setCfg({ personalDeduction: Number(e.target.value.replace(/\D/g, '')) })} /></div>
+            <div className="cc-kv"><span>Giảm trừ mỗi người phụ thuộc</span><input className="cc-inline-num" disabled={!can('payroll', 'edit')} value={vnd(cfg.dependentDeduction)} onChange={e => setCfg({ dependentDeduction: Number(e.target.value.replace(/\D/g, '')) })} /></div>
             <table className="cc-table2 compact" style={{ marginTop: 8 }}><thead><tr><th>Bậc</th><th>Thu nhập tính thuế / tháng</th><th className="r">Thuế suất</th></tr></thead>
               <tbody>{cfg.brackets.map((b, i) => <tr key={i}><td>{i + 1}</td><td>{i === 0 ? 'Đến ' : `Trên ${vnd(cfg.brackets[i - 1].upTo)} `}{b.upTo ? (i === 0 ? vnd(b.upTo) : `đến ${vnd(b.upTo)}`) : ''}</td><td className="r mono">{pct(b.rate)}</td></tr>)}</tbody>
             </table>
@@ -427,7 +438,7 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
       )}
 
       <Modal open={!!slipRow} onClose={() => setSlip(null)} width={780} icon="file" title="Phiếu lương" sub={slipRow ? `${slipRow.emp.name} · ${monthLabel}` : ''}
-        footer={<><span className="cc-grow cc-sub">{run.status === 'paid' ? 'Đã chi trả' : run.status === 'approved' ? 'Đã duyệt, chưa chi trả' : 'Bảng lương nháp'}</span>
+        footer={<><span className="cc-grow cc-sub">{slipRow && run.sent.includes(slipRow.emp.id) ? `Đã gửi tới ${slipRow.emp.email}` : 'Chưa gửi cho nhân viên'}</span>
           <button className="cc-btn ghost" onClick={() => window.print()}><Icon name="download" size={14} />In / lưu PDF</button></>}>
         {slipRow && <div className="cc-print"><Payslip emp={slipRow.emp} att={slipRow.att} p={slipRow.p} adj={slipRow.adj} monthLabel={monthLabel} /></div>}
       </Modal>

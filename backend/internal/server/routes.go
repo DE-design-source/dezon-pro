@@ -125,7 +125,7 @@ func (s *Server) modules() []Module {
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
 		Users: usersSvc, Auditor: usersSvc})
 	reportsSvc := reports.New(reports.Deps{DB: d.DB, Cfg: d.Cfg})
-	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: kéo khách sang thiet-ke / thi-cong tự tạo dự án triển khai (DeliveryFromLead)
+	// Kinh doanh -> Quản lý thiết kế + Quản lý dự án: khách ở tu-van / dam-phan / thiet-ke có dự án triển khai ở cả 2 trang (DeliveryFromLead)
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
 		Delivery: delivSvc})

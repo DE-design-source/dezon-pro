@@ -43,6 +43,22 @@ func TestTuyenDungHieuSuat(t *testing.T) {
 		t.Fatal(err)
 	}
 	eid := id(s.CreateEmployee(ctx, a, omap.Of("code", "ZZ_hrT", "name", "Người TL", "dept", "zzhrtl")))
+	// tự đánh giá chỉ cho hồ sơ của mình: gắn tài khoản admin thử với hồ sơ này
+	pool, err := db.Pool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bg, uid := context.Background(), ""
+	_, _ = pool.Exec(bg, `delete from users where username = 'zz_hrt_admin'`)
+	t.Cleanup(func() { _, _ = pool.Exec(bg, `delete from users where username = 'zz_hrt_admin'`) })
+	if err := pool.QueryRow(bg, `insert into users (username, full_name, password_hash, role, is_active, company_id, permissions)
+		values ('zz_hrt_admin', 'zz', 'x', 'admin', true, $1, 'hr') returning id::text`, cts[0]).Scan(&uid); err != nil {
+		t.Fatal(err)
+	}
+	a.UID = uid
+	if _, err := s.SetUserRole(ctx, a, omap.Of("empId", eid, "userId", a.UID, "role", "hradmin")); err != nil {
+		t.Fatal(err)
+	}
 
 	jd := id(s.SaveJD(ctx, a, omap.Of("title", "ZZ_tl KS", "dept", "zzhrtl", "duties", []any{"Giám sát", " ", "Nghiệm thu"})))
 	job := id(s.SaveJob(ctx, a, omap.Of("jdId", jd, "qty", 2.0, "channels", []any{"TopCV"}, "deadline", "2026-12-31")))

@@ -90,7 +90,7 @@ func (s *Service) PayrollState(ctx context.Context, a *actor.Actor) (any, error)
 			slips = f
 		}
 		runOut.Set(monthOf(r.Val("thang")), omap.Of("status", r.Val("trang_thai"), "closed", jsval.Truthy(r.Val("chot_cong")),
-			"payslips", slips, "approvedAt", jsval.Or(r.Val("ngay_duyet"), nil), "paidAt", jsval.Or(r.Val("ngay_chi"), nil)))
+			"payslips", slips, "sent", orArr(r.Val("da_gui")), "approvedAt", jsval.Or(r.Val("ngay_duyet"), nil), "paidAt", jsval.Or(r.Val("ngay_chi"), nil)))
 	}
 	units, err := s.db.Select(ctx, "hr_don_vi", database.SelectOpt{Select: "id,ma", Limit: 2000})
 	if err != nil {
@@ -167,7 +167,7 @@ func (s *Service) adjOpen(ctx context.Context, month string) error {
 	return nil
 }
 
-// AddAdjustment: {empId, month (yyyy-mm), kind: bonus|penalty|sales, label, amount}.
+// AddAdjustment: {empId, month (yyyy-mm), kind: bonus|penalty|sales, label, amount}. Trả {ok, id}.
 func (s *Service) AddAdjustment(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
 	x, err := s.gateAll(ctx, a, "payroll", "edit")
 	if err != nil {
@@ -197,12 +197,13 @@ func (s *Service) AddAdjustment(ctx context.Context, a *actor.Actor, b *omap.Map
 	if err := s.adjOpen(ctx, month); err != nil {
 		return nil, err
 	}
-	if _, err := s.db.InsertOne(ctx, "hr_dieu_chinh_luong", omap.Of("nhan_vien_id", emp.Val("id"), "thang", month+"-01", "loai", kind,
-		"noi_dung", label, "so_tien", jsval.Round(amt), "nguoi_tao", a.UID)); err != nil {
+	out, err := s.db.InsertOne(ctx, "hr_dieu_chinh_luong", omap.Of("nhan_vien_id", emp.Val("id"), "thang", month+"-01", "loai", kind,
+		"noi_dung", label, "so_tien", jsval.Round(amt), "nguoi_tao", a.UID))
+	if err != nil {
 		return nil, err
 	}
 	s.audit(ctx, x, "payroll", "edit", kind+" "+jsval.NumberToString(jsval.Round(amt))+" — "+jsval.Str(emp.Val("ho_ten"))+" ("+month+")")
-	return okRes, nil
+	return omap.Of("ok", true, "id", out[0].Val("id")), nil // id: giao diện gắn ngay vào khoản vừa thêm (xoá theo id, không gửi lại)
 }
 
 // DeleteAdjustment: xoá 1 điều chỉnh (kỳ lương của tháng phải còn nháp).
@@ -229,7 +230,7 @@ func (s *Service) DeleteAdjustment(ctx context.Context, a *actor.Actor, id float
 }
 
 // RunAction: {month, action, payslips?}. action: close / open (chốt / mở chốt công, khi còn nháp), approve (nháp -> đã duyệt,
-// kèm payslips bản chụp {empId: {emp, att, p}}), pay (đã duyệt -> đã chi trả), reopen (về nháp, bỏ bản chụp).
+// kèm payslips bản chụp {empId: {emp, att, p}}), pay (đã duyệt -> đã chi trả, kèm sent [empId] đã gửi phiếu), reopen (về nháp, bỏ bản chụp).
 func (s *Service) RunAction(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
 	x, err := s.gate(ctx, a, "", "")
 	if err != nil {
@@ -263,16 +264,10 @@ func (s *Service) RunAction(ctx context.Context, a *actor.Actor, b *omap.Map) (a
 			if st != "draft" {
 				return apperr.BadRequest("Bảng lương đã duyệt - mở lại bảng lương trước")
 			}
-			if action == "close" && s.now().In(vn).Format("2006-01-02") < lastDay(month) {
-				return apperr.BadRequest("Chỉ chốt công từ ngày cuối tháng " + month + " (chốt sớm sẽ chặn chấm công các ngày còn lại)")
-			}
 			p.Set("chot_cong", action == "close")
 		case "approve":
 			if st != "draft" {
 				return apperr.BadRequest("Bảng lương tháng " + month + " đã duyệt")
-			}
-			if s.now().In(vn).Format("2006-01-02") < lastDay(month) {
-				return apperr.BadRequest("Chỉ duyệt lương từ ngày cuối tháng " + month + " (duyệt sẽ chốt công cả tháng)")
 			}
 			slips, ok := b.Val("payslips").(*omap.Map)
 			if !ok {
@@ -286,12 +281,19 @@ func (s *Service) RunAction(ctx context.Context, a *actor.Actor, b *omap.Map) (a
 			if st != "approved" {
 				return apperr.BadRequest("Chỉ đánh dấu chi trả được bảng lương đã duyệt")
 			}
-			p.Set("trang_thai", "paid").Set("ngay_chi", now)
+			// sent: nhân sự đã gửi phiếu lương (bước "Gửi phiếu lương" của giao diện)
+			sent := []any{}
+			for _, v := range orArr(b.Val("sent")) {
+				if n := jsval.ToNumber(v); n == n {
+					sent = append(sent, n)
+				}
+			}
+			p.Set("trang_thai", "paid").Set("ngay_chi", now).Set("da_gui", sent)
 		case "reopen":
 			if st == "draft" {
 				return apperr.BadRequest("Bảng lương đang là nháp")
 			}
-			p.Set("trang_thai", "draft").Set("phieu_luong", nil).Set("ngay_duyet", nil).Set("nguoi_duyet", nil).Set("ngay_chi", nil)
+			p.Set("trang_thai", "draft").Set("phieu_luong", nil).Set("ngay_duyet", nil).Set("nguoi_duyet", nil).Set("ngay_chi", nil).Set("da_gui", []any{})
 		default:
 			return apperr.BadRequest("Thao tác không hợp lệ (close / open / approve / pay / reopen)")
 		}
@@ -334,12 +336,6 @@ func (s *Service) attClosedRange(ctx context.Context, from, to string) error {
 func nextMonth(m string) string {
 	t, _ := time.Parse("2006-01", m)
 	return t.AddDate(0, 1, 0).Format("2006-01")
-}
-
-// lastDay: ngày cuối của tháng yyyy-mm.
-func lastDay(m string) string {
-	t, _ := time.Parse("2006-01", m)
-	return t.AddDate(0, 1, -1).Format("2006-01-02")
 }
 
 // openPatternMonth: lịch tuần không có ngày hiệu lực -> đổi lịch làm đổi công chuẩn của tháng đã chốt mà chưa duyệt lương.

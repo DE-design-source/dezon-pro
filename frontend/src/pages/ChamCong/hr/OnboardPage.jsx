@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, deptOf, WORK_SITES, siteOptions, LEVELS } from '../../../data/hrData'
+import { DEPTS, deptOf, WORK_SITES, LEVELS } from '../../../data/hrData'
 import { Field } from './shared'
 import { uploadRaw } from '../../QS/api/files'
 
@@ -48,7 +48,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
     mst: '', taxOffice: '', dependents: [], bankName: 'Vietcombank', bankAccount: '', bankBranch: '', bankHolder: c.name.toUpperCase(),
     degree: 'Đại học', school: '', major: '', gradYear: '', languages: '', computer: '',
     experience: [{ company: '', role: '', from: '', to: '' }],
-    docs: Object.fromEntries(DOCS.map(d => [d.key, d.key === 'cv' && c.cv ? [{ name: c.cv, url: c.cvUrl || null }] : []])),
+    docs: Object.fromEntries(DOCS.map(d => [d.key, d.key === 'cv' && c.cv ? [{ name: c.cv, url: null }] : []])),
   }))
   const set = p => setF(x => ({ ...x, ...p }))
   const inp = (k, props = {}) => <input value={f[k] ?? ''} onChange={e => set({ [k]: e.target.value })} {...props} />
@@ -71,30 +71,32 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
   const deptStaff = employees.filter(e => e.status !== 'left' && ['Giám đốc', 'Trưởng phòng', 'Phó phòng', 'Quản lý', 'Trưởng nhóm'].includes(e.level))
 
   const fileRef = useRef({})
-  const addFiles = (key, files) => set({ docs: { ...f.docs, [key]: [...f.docs[key], ...[...files].map(x => ({ name: x.name, url: URL.createObjectURL(x), size: x.size, file: x }))] } })
+  /* File chọn: hiện ngay bằng blob:, đồng thời tải lên máy chủ (/upload/file); lúc hoàn tất thay bằng đường dẫn /files/... */
+  const uploads = useRef({})
+  const busy = useRef(false)
+  const upload = x => {
+    const url = URL.createObjectURL(x)
+    uploads.current[url] = uploadRaw(x).then(r => r.url)
+    uploads.current[url].catch(() => {})
+    return url
+  }
+  const addFiles = (key, files) => set({ docs: { ...f.docs, [key]: [...f.docs[key], ...[...files].map(x => ({ name: x.name, url: upload(x), size: x.size }))] } })
   const removeFile = (key, i) => set({ docs: { ...f.docs, [key]: f.docs[key].filter((_, j) => j !== i) } })
   useEffect(() => { const k = e => { if (e.key === 'Escape') onCancel() }; document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k) }, [onCancel])
 
-  const [busy, setBusy] = useState('')
-  /* Giấy tờ chọn từ máy (link blob: tạm của trình duyệt) tải lên kho file (/files/...) trước khi tạo hồ sơ */
-  async function upload(x) {
-    if (!x.file) return x.url
-    return (await uploadRaw(x.file)).url
-  }
   async function submit() {
     setTried(true)
     if (total) { setTab(TABS.find(t => errs[t.key].length).key); return }
-    if (busy) return
+    if (busy.current) return
+    busy.current = true
     let attachments
     try {
-      setBusy('Đang tải giấy tờ lên…')
-      const docs = DOCS.flatMap(d => f.docs[d.key].map(x => ({ x, type: d.label }))).concat(f.photo ? [{ x: f.photo, type: 'Ảnh 3×4' }] : [])
-      attachments = []
-      for (const { x, type } of docs) attachments.push({ name: x.name, url: await upload(x), type })
+      attachments = await Promise.all(DOCS.flatMap(d => f.docs[d.key].map(x => ({ name: x.name, url: x.url, type: d.label }))).concat(f.photo ? [{ name: f.photo.name, url: f.photo.url, type: 'Ảnh 3×4' }] : [])
+        .map(async a => ({ ...a, url: (await uploads.current[a.url]?.catch(e => { throw new Error(`"${a.name}": ${e.message}`) })) || a.url })))
     } catch (e) {
-      alert('Tải giấy tờ lỗi: ' + e.message + ' - hồ sơ chưa được tạo')
+      alert('Tải giấy tờ lên máy chủ lỗi: ' + (e.message || e) + '\nBỏ file lỗi rồi tải lại.')
       return
-    } finally { setBusy('') }
+    } finally { busy.current = false }
     onConfirm({
       code: f.code, dept: f.dept, position: f.position.trim(), level: f.level, managerId: f.managerId, site: f.site, joinDate: f.joinDate,
       probationMonths: Number(f.probationMonths) || 2, probationRate: Number(f.probationRate) || 85, salary: Number(f.salary),
@@ -126,7 +128,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
         <span className="cc-grow" />
         {tried && total > 0 && <span className="cc-ob-miss"><Icon name="alert" size={13} />Còn {total} mục bắt buộc</span>}
         <button className="cc-btn ghost" onClick={onCancel}>Hủy</button>
-        <button className="cc-btn" onClick={submit} disabled={!!busy}><Icon name="checkCircle" size={14} />{busy || 'Hoàn tất nhận việc'}</button>
+        <button className="cc-btn" onClick={submit}><Icon name="checkCircle" size={14} />Hoàn tất nhận việc</button>
       </div>
 
       <div className="cc-ob-body">
@@ -147,7 +149,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
             <div className="cc-form">
               <div className="cc-ob-photo full">
                 <label className="cc-ob-photo-box">{f.photo ? <img src={f.photo.url} alt="Ảnh 3x4" /> : <><Icon name="users" size={20} /><span>Ảnh 3×4</span></>}
-                  <input type="file" accept="image/*" hidden onChange={e => { const x = e.target.files[0]; if (x) set({ photo: { name: x.name, url: URL.createObjectURL(x), file: x } }) }} />
+                  <input type="file" accept="image/*" hidden onChange={e => { const x = e.target.files[0]; if (x) set({ photo: { name: x.name, url: upload(x) } }) }} />
                 </label>
                 <div className="cc-sub">Ảnh chân dung nền trắng, chụp trong 6 tháng — dùng cho thẻ nhân viên & hồ sơ BHXH.</div>
               </div>
@@ -190,7 +192,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
               <Field label="Chức danh *">{inp('position')}</Field>
               <Field label="Cấp bậc"><select value={f.level} onChange={e => set({ level: e.target.value })}>{LEVELS.map(l => <option key={l}>{l}</option>)}</select></Field>
               <Field label="Quản lý trực tiếp"><select value={f.managerId} onChange={e => set({ managerId: e.target.value })}><option value="">— Chưa chọn —</option>{deptStaff.map(e => <option key={e.id} value={e.id}>{e.name} · {e.position}</option>)}</select></Field>
-              <Field label="Nơi làm việc"><select value={f.site} onChange={e => set({ site: e.target.value })}><option value="">— Chọn địa điểm —</option>{siteOptions(f.site).map(s => <option key={s}>{s}</option>)}</select></Field>
+              <Field label="Nơi làm việc"><select value={f.site} onChange={e => set({ site: e.target.value })}>{WORK_SITES.map(s => <option key={s}>{s}</option>)}</select></Field>
               <Field label="Loại hợp đồng sau thử việc"><select value={f.contractType} onChange={e => set({ contractType: e.target.value })}>{CONTRACTS.map(x => <option key={x}>{x}</option>)}</select></Field>
               <div className="cc-ob-sep full">Thử việc & lương</div>
               <Field label="Thời gian thử việc (tháng)"><select value={f.probationMonths} onChange={e => set({ probationMonths: e.target.value })}>{[1, 2].map(m => <option key={m} value={m}>{m} tháng</option>)}</select></Field>
@@ -298,7 +300,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
             <span className="cc-grow" />
             {curIdx < TABS.length - 1
               ? <button className="cc-btn" onClick={() => setTab(TABS[curIdx + 1].key)}>Tiếp: {TABS[curIdx + 1].label}<Icon name="arrowRight" size={14} /></button>
-              : <button className="cc-btn" onClick={submit} disabled={!!busy}><Icon name="checkCircle" size={14} />{busy || 'Hoàn tất nhận việc'}</button>}
+              : <button className="cc-btn" onClick={submit}><Icon name="checkCircle" size={14} />Hoàn tất nhận việc</button>}
           </div>
         </section>
       </div>

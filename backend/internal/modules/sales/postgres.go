@@ -37,7 +37,7 @@ func (r *pgRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
 }
 
 func (r *pgRepo) ListLeads(ctx context.Context) ([]*omap.Map, error) {
-	return r.db.Select(ctx, "kd_khach_hang", database.SelectOpt{Order: "ngay_tao.desc", Limit: 5000})
+	return r.db.Select(ctx, "kd_khach_hang", database.SelectOpt{Order: "id.asc", Limit: 5000}) // thứ tự thêm vào, như mảng leads cũ (thẻ mới nối cuối)
 }
 
 func (r *pgRepo) GetLead(ctx context.Context, id float64) (*omap.Map, error) {

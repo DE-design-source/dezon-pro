@@ -684,6 +684,10 @@
    "gia_tri_hd": "contract_value_vnd",
    "ngan_sach": "approved_budget_vnd",
    "ghi_chu": "note",
+   "tien_do": "progress_pct",
+   "mau_thanh": "bar_color",
+   "so_do_to_chuc": "org_chart",
+   "tach_khach_hang": "is_lead_detached",
    "nguoi_tao": "created_by",
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
@@ -760,6 +764,8 @@
    "so_tien": "amount_vnd",
    "da_xac_nhan": "is_confirmed",
    "thu_tu": "sort_order",
+   "don_mua": "purchase_orders",
+   "quy_trinh_mua": "purchase_flow",
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
   },
@@ -965,6 +971,7 @@
    "trang_thai": "run_status",
    "chot_cong": "is_attendance_closed",
    "phieu_luong": "payslips",
+   "da_gui": "sent_employee_ids",
    "ngay_duyet": "approved_at",
    "nguoi_duyet": "approved_by",
    "ngay_chi": "paid_at",
@@ -1106,6 +1113,7 @@
    "cong_ty_id": "company_id",
    "quyen": "perms",
    "an_luong": "mask_salary",
+   "giao_dien": "ui_settings",
    "nguoi_sua": "updated_by",
    "cap_nhat": "updated_at"
   }

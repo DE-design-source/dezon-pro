@@ -72,7 +72,7 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "hrSavePayrollConfig", Method: "POST", Path: "/hr/payroll/config", Perm: rpc.Login, Tag: tag,
 		Summary: "Ghi đè cấu hình công thức lương", Fields: []rpc.GoField{{Name: "config", In: "body", Type: "object", Desc: "Tài liệu cấu hình (tối đa 64 KB)"}}})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "hrAddAdjustment", Method: "POST", Path: "/hr/payroll/adjustments", Perm: rpc.Login, Tag: tag,
-		Summary: "Thêm thưởng / phạt / doanh số (bảng lương của tháng phải còn nháp)", Fields: []rpc.GoField{
+		Summary: "Thêm thưởng / phạt / doanh số (bảng lương của tháng phải còn nháp); trả {ok, id}", Fields: []rpc.GoField{
 			{Name: "empId", In: "body", Type: "number", Desc: "Nhân sự"}, {Name: "month", In: "body", Desc: "yyyy-mm"},
 			{Name: "kind", In: "body", Desc: "bonus / penalty / sales"}, {Name: "label", In: "body", Desc: "Nội dung"}, {Name: "amount", In: "body", Type: "number", Desc: "Số tiền (> 0)"}}})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "hrDeleteAdjustment", Method: "DELETE", Path: "/hr/payroll/adjustments/:id", Perm: rpc.Login, Tag: tag,
@@ -80,7 +80,8 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "hrRunAction", Method: "POST", Path: "/hr/payroll/runs", Perm: rpc.Login, Tag: tag,
 		Summary: "Kỳ lương: close / open (chốt công), approve (kèm payslips), pay, reopen", Fields: []rpc.GoField{
 			{Name: "month", In: "body", Desc: "yyyy-mm"}, {Name: "action", In: "body", Desc: "close / open / approve / pay / reopen"},
-			{Name: "payslips", In: "body", Type: "object", Desc: "approve: bản chụp {empId: {emp, att, p}} (tối đa 4 MB)"}}})
+			{Name: "payslips", In: "body", Type: "object", Desc: "approve: bản chụp {empId: {emp, att, p}} (tối đa 4 MB)"},
+			{Name: "sent", In: "body", Type: "array", Desc: "pay: id nhân sự đã gửi phiếu lương"}}})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "hrSaveBudget", Method: "POST", Path: "/hr/payroll/budgets", Perm: rpc.Login, Tag: tag,
 		Summary: "Định phí của 1 đơn vị (chỉ khoá gửi lên)", Fields: []rpc.GoField{
 			{Name: "unit", In: "body", Desc: "Khoá đơn vị"}, {Name: "fund", In: "body", Type: "number", Desc: "Quỹ lương / tháng"},
@@ -117,9 +118,13 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	tr("hrSavePath", "POST", "/hr/paths", "Thêm / sửa lộ trình học; trả {ok, id}", body("id", "number", "Có = sửa"), body("title", "", "Tên (bắt buộc)"),
 		body("for", "", "Đối tượng"), body("courses", "array", "Id khoá học theo thứ tự"))
 	tr("hrDeletePath", "DELETE", "/hr/paths/:id", "Xoá lộ trình", pathID)
-	tr("hrSecurity", "GET", "/hr/security", "Phân quyền HR: perms (ma trận), maskSalary, accounts (tài khoản của công ty), audit (500 dòng nhật ký hr.* mới nhất)")
-	tr("hrSaveSecurity", "POST", "/hr/security", "Lưu ma trận quyền / ẩn lương (System Admin)", body("perms", "object", "{hradmin|manager|employee: {phân hệ: [thao tác]}}"),
-		body("maskSalary", "boolean", "Ẩn lương mặc định"))
+	tr("hrSecurity", "GET", "/hr/security", "Phân quyền HR: perms (ma trận), maskSalary, accounts (tài khoản của công ty), audit (500 dòng nhật ký hr.* mới nhất), ui (cài đặt bảo mật của giao diện), uiAudit (nhật ký do giao diện ghi)")
+	tr("hrSaveSecurity", "POST", "/hr/security", "Lưu ma trận quyền / ẩn lương / cài đặt bảo mật của giao diện (System Admin)", body("perms", "object", "{hradmin|manager|employee: {phân hệ: [thao tác]}}"),
+		body("maskSalary", "boolean", "Ẩn lương mặc định"), body("ui", "object", "{settings, session, branches {empId: [chi nhánh]}, roleUsers {vai trò: empId}} (tối đa 64 KB)"))
+	tr("hrAddAudit", "POST", "/hr/audit", "Ghi nhật ký thao tác của giao diện HR (audit_logs, action hr.ui); đọc lại ở GET /hr/security -> uiAudit",
+		body("entries", "array", "[{time, user, role, module, action, target, ip, warn?}] (1-200 dòng)"))
+	tr("hrReset", "POST", "/hr/reset", "Xoá toàn bộ dữ liệu HR của công ty đang đăng nhập (admin công ty; nạp lại dữ liệu mẫu)",
+		body("confirm", "", "Phải là XOA_DU_LIEU_HR"))
 	tr("hrSetUserRole", "POST", "/hr/security/user", "Gắn tài khoản với hồ sơ / đặt vai trò HR (System Admin)", body("empId", "number", "Hồ sơ nhân sự"),
 		body("role", "", "sysadmin / hradmin / manager / employee"), body("userId", "", "Tài khoản (uuid); rỗng = bỏ gắn"))
 }
@@ -167,6 +172,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		"/payroll/config": s.SavePayrollConfig, "/payroll/adjustments": s.AddAdjustment, "/payroll/runs": s.RunAction, "/payroll/budgets": s.SaveBudget,
 		"/jds": s.SaveJD, "/jobs": s.SaveJob, "/candidates": s.CreateCandidate, "/okrs": s.CreateOKR, "/reviews": s.ReviewAction, "/enroll": s.Enroll,
 		"/security": s.SaveSecurity, "/security/user": s.SetUserRole, "/courses": s.SaveCourse, "/paths": s.SavePath,
+		"/audit": s.AddAudit, "/reset": s.ResetData,
 	} {
 		fn := fn
 		g.POST(path, withBody(func(ctx context.Context, a *actor.Actor, c *gin.Context) (any, error) {

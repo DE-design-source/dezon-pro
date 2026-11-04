@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { deptOf } from '../../../data/hrData'
-import { PERIODS, REVIEW_PERIOD, REVIEW_SKILLS, REVIEW_STATES } from '../../../data/hrData2'
+import { PERIODS, REVIEW_PERIOD, REVIEW_SKILLS, REVIEW_STATES, COURSES, LEARNING_PATHS } from '../../../data/hrData2'
 import { Avatar, Pill, Seg, Modal, Field, Empty } from './shared'
 import { useAccess, NoAccess } from './access'
 
@@ -17,48 +17,38 @@ const GRADE_TONE = { A: 'success', B: 'primary', C: 'finance', D: 'danger', '—
 const progTone = p => (p >= 0.8 ? 'success' : p >= 0.5 ? 'finance' : 'danger')
 
 /* Phân hệ "Hiệu suất & đào tạo" */
-/* perf = { okrs, reviewsAll {kỳ: {empId: đánh giá}}, enroll, courses, paths } từ máy chủ; kỳ đánh giá chọn được (mặc định quý hiện tại)
-   để việc còn dở của quý trước vẫn làm tiếp được; tal = thao tác ghi (ChamCong.jsx), trả Promise kết quả hoặc null khi lỗi.
-   perf.courses / perf.paths = danh mục khoá học / lộ trình của công ty (sửa được bởi HR Admin; trống thì khởi tạo từ mẫu). */
-export default function PerformanceModule({ employees, perf, tal }) {
-  const { can, canAll, user, role, log, inScope } = useAccess()
+export default function PerformanceModule({ employees, perf, setPerf, toast }) {
+  const { can, user, role, log, inScope } = useAccess()
   const [tab, setTab] = useState('okr')
   const [period, setPeriod] = useState(PERIODS[0])
   const [okrForm, setOkrForm] = useState(null)
   const [reviewOf, setReviewOf] = useState(null)
   const [draft, setDraft] = useState(null)
   const [enrollFor, setEnrollFor] = useState(null)
-  const { okrs, reviewsAll = {}, enroll, courses: COURSES = [], paths: LEARNING_PATHS = [] } = perf
-  const [rvPeriod, setRvPeriod] = useState(REVIEW_PERIOD)
-  const reviews = reviewsAll[rvPeriod] || {}
-  const rvPeriods = [...new Set([REVIEW_PERIOD, ...Object.keys(reviewsAll)])].sort((a, b) => b.slice(-4).localeCompare(a.slice(-4)) || b.localeCompare(a))
-  const okrPeriods = [...new Set([...PERIODS, ...okrs.map(o => o.period)])]
-  const [courseForm, setCourseForm] = useState(null)
-  const [pathForm, setPathForm] = useState(null)
+  const { okrs, reviews, enroll } = perf
 
   if (!can('performance', 'view')) return <NoAccess />
 
   const empOf = id => employees.find(e => e.id === id)
   const staff = employees.filter(e => e.status !== 'left' && inScope(e))
   const list = okrs.filter(o => o.period === period && (role !== 'employee' || o.krs.some(k => k.owner === user.id)) && (role !== 'manager' || o.dept === user.dept || o.krs.some(k => empOf(k.owner)?.dept === user.dept)))
-  const setKr = tal.setKr
+  const setKr = (oid, kid, current) => setPerf(p => ({ ...p, okrs: p.okrs.map(o => (o.id === oid ? { ...o, krs: o.krs.map(k => (k.id === kid ? { ...k, current } : k)) } : o)) }))
   const canEditKr = kr => can('performance', 'edit') && (role !== 'employee' || kr.owner === user.id)
 
   function saveOkr() {
     const f = okrForm
     if (!f.title.trim() || !f.krs.some(k => k.title.trim())) return
-    const rec = { period, title: f.title.trim(), owner: Number(f.owner), krs: f.krs.filter(k => k.title.trim()).map(k => ({ ...k, target: Number(k.target), owner: Number(k.owner) })) }
-    tal.createOkr(rec, 'Đã tạo mục tiêu mới').then(r => {
-      if (!r) return
-      log('performance', 'create', `Mục tiêu ${period}: ${rec.title}`)
-      setOkrForm(null)
-    })
+    const id = Math.max(0, ...okrs.map(o => o.id)) + 1
+    const rec = { id, period, title: f.title.trim(), owner: Number(f.owner), dept: empOf(Number(f.owner)).dept, krs: f.krs.filter(k => k.title.trim()).map((k, i) => ({ ...k, id: id * 10 + i, target: Number(k.target), current: 0, owner: Number(k.owner) })) }
+    setPerf(p => ({ ...p, okrs: [...p.okrs, rec] }))
+    log('performance', 'create', `Mục tiêu ${period}: ${rec.title}`)
+    toast('Đã tạo mục tiêu mới')
+    setOkrForm(null)
   }
 
   /* Đánh giá: nhân viên tự đánh giá (self) → quản lý đánh giá (mgr) */
   const rv = id => reviews[id] || { state: 'todo' }
-  // chấm điểm quản lý: cần quyền duyệt hiệu suất, người trong phạm vi, không phải chính mình (máy chủ cũng chặn)
-  const isManagerOf = e => e.id !== user.id && can('performance', 'approve') && inScope(e)
+  const isManagerOf = e => role === 'hradmin' || role === 'sysadmin' || (role === 'manager' && e.managerId === user.id) || (role === 'manager' && e.dept === user.dept && e.id !== user.id)
   function openReview(e) {
     const r = rv(e.id)
     const mode = e.id === user.id && ['todo', 'self'].includes(r.state) ? 'self' : r.state === 'manager' && isManagerOf(e) ? 'mgr' : 'view'
@@ -67,42 +57,34 @@ export default function PerformanceModule({ employees, perf, tal }) {
   }
   function submitReview() {
     const { emp, mode } = reviewOf
-    tal.review({ period: rvPeriod, action: mode === 'self' ? 'self' : 'mgr', empId: emp.id, scores: draft.scores, note: draft.note },
-      mode === 'self' ? 'Đã gửi tự đánh giá cho quản lý' : `Đã hoàn tất đánh giá ${emp.name}`).then(r => {
-      if (!r) return
-      log('performance', mode === 'self' ? 'edit' : 'approve', `${mode === 'self' ? 'Tự đánh giá' : 'Quản lý đánh giá'} ${rvPeriod} — ${emp.name}`)
-      setReviewOf(null)
+    setPerf(p => {
+      const r = p.reviews[emp.id] || { state: 'todo' }
+      const next = mode === 'self' ? { ...r, state: 'manager', self: draft.scores, selfNote: draft.note } : { ...r, state: 'done', mgr: draft.scores, mgrNote: draft.note }
+      return { ...p, reviews: { ...p.reviews, [emp.id]: next } }
     })
+    log('performance', mode === 'self' ? 'edit' : 'approve', `${mode === 'self' ? 'Tự đánh giá' : 'Quản lý đánh giá'} ${REVIEW_PERIOD} — ${emp.name}`)
+    toast(mode === 'self' ? 'Đã gửi tự đánh giá cho quản lý' : `Đã hoàn tất đánh giá ${emp.name}`)
+    setReviewOf(null)
   }
   function launchCycle() {
-    const empIds = staff.filter(e => !reviews[e.id]).map(e => e.id)
-    if (!empIds.length) return
-    tal.review({ period: rvPeriod, action: 'launch', empIds }, `Đã mở đợt đánh giá ${rvPeriod} cho ${empIds.length} nhân sự`)
-      .then(r => r && log('performance', 'create', `Mở đợt đánh giá ${rvPeriod} cho toàn bộ nhân sự`))
+    setPerf(p => {
+      const r = { ...p.reviews }
+      staff.forEach(e => { if (!r[e.id]) r[e.id] = { state: 'self' } })
+      return { ...p, reviews: r }
+    })
+    log('performance', 'create', `Mở đợt đánh giá ${REVIEW_PERIOD} cho toàn bộ nhân sự`)
+    toast('Đã gửi yêu cầu tự đánh giá tới nhân sự')
   }
 
   /* Đào tạo */
   const enrolled = id => enroll[id] || {}
-  const setProgress = tal.setProgress
+  const setProgress = (eid, cid, v) => setPerf(p => ({ ...p, enroll: { ...p.enroll, [eid]: { ...(p.enroll[eid] || {}), [cid]: v } } }))
   const enrollPath = (eid, path) => {
-    const add = Object.fromEntries(path.courses.filter(c => enrolled(eid)[c] == null).map(c => [c, 0]))
-    if (!Object.keys(add).length) return
-    tal.enroll(eid, add, `Đã ghi danh ${empOf(eid).name} vào lộ trình "${path.title}"`)
-      .then(r => r && log('performance', 'create', `Ghi danh lộ trình "${path.title}" — ${empOf(eid).name}`))
+    setPerf(p => ({ ...p, enroll: { ...p.enroll, [eid]: { ...Object.fromEntries(path.courses.map(c => [c, 0])), ...(p.enroll[eid] || {}) } } }))
+    log('performance', 'create', `Ghi danh lộ trình "${path.title}" — ${empOf(eid).name}`)
+    toast(`Đã ghi danh ${empOf(eid).name} vào lộ trình "${path.title}"`)
   }
   const mandatory = COURSES.filter(c => c.mandatory)
-  const canCatalog = canAll('performance', 'edit')
-  const courseTitle = id => COURSES.find(c => c.id === id)?.title || '—'
-  function saveCourse() {
-    const f = courseForm
-    if (!f.title.trim()) return
-    tal.saveCourse({ ...f, title: f.title.trim(), hours: Number(f.hours) || 0 }, f.id ? 'Đã cập nhật khoá học' : `Đã thêm khoá "${f.title.trim()}"`).then(r => r && setCourseForm(null))
-  }
-  function savePath() {
-    const f = pathForm
-    if (!f.title.trim() || !f.courses.length) return
-    tal.savePath({ ...f, title: f.title.trim() }, f.id ? 'Đã cập nhật lộ trình' : `Đã thêm lộ trình "${f.title.trim()}"`).then(r => r && setPathForm(null))
-  }
   const compliance = staff.length ? staff.filter(e => mandatory.every(c => enrolled(e.id)[c.id] === 100)).length / staff.length : 0
   const reviewStaff = staff
   const doneReviews = reviewStaff.filter(e => rv(e.id).state === 'done')
@@ -112,7 +94,7 @@ export default function PerformanceModule({ employees, perf, tal }) {
     <div className="cc-stack">
       <div className="cc-kpis">
         <div className="cc-card cc-kpi2 cc-tone-primary"><span className="cc-ico"><Icon name="target" size={15} /></span><div><span>Tiến độ OKR {period}</span><b>{list.length ? Math.round(list.reduce((s, o) => s + okrProgress(o), 0) / list.length * 100) : 0}%</b><em>{list.length} mục tiêu</em></div></div>
-        <div className="cc-card cc-kpi2 cc-tone-attendance"><span className="cc-ico"><Icon name="award" size={15} /></span><div><span>Đánh giá {rvPeriod} hoàn tất</span><b>{doneReviews.length}<small>/{reviewStaff.length}</small></b><em>{reviewStaff.filter(e => rv(e.id).state === 'manager').length} chờ quản lý chấm</em></div></div>
+        <div className="cc-card cc-kpi2 cc-tone-attendance"><span className="cc-ico"><Icon name="award" size={15} /></span><div><span>Đánh giá {REVIEW_PERIOD.split('/')[0]} hoàn tất</span><b>{doneReviews.length}<small>/{reviewStaff.length}</small></b><em>{reviewStaff.filter(e => rv(e.id).state === 'manager').length} chờ quản lý chấm</em></div></div>
         <div className="cc-card cc-kpi2 cc-tone-success"><span className="cc-ico"><Icon name="trending" size={15} /></span><div><span>Điểm trung bình</span><b>{avgScore ? avgScore.toFixed(2) : '—'}</b><em>xếp loại {grade(avgScore)}</em></div></div>
         <div className="cc-card cc-kpi2 cc-tone-danger"><span className="cc-ico"><Icon name="graduation" size={15} /></span><div><span>Hoàn thành đào tạo bắt buộc</span><b>{Math.round(compliance * 100)}%</b><em>{mandatory.map(c => c.title).join(' · ')}</em></div></div>
       </div>
@@ -120,10 +102,9 @@ export default function PerformanceModule({ employees, perf, tal }) {
       <div className="cc-toolbar" style={{ marginBottom: 0 }}>
         <Seg value={tab} onChange={setTab} options={[{ value: 'okr', label: 'Mục tiêu KPI / OKR', icon: 'target' }, { value: 'review', label: 'Đánh giá định kỳ', icon: 'award' }, { value: 'training', label: 'Đào tạo', icon: 'graduation' }]} />
         <span className="cc-grow" />
-        {tab === 'okr' && <Seg value={period} onChange={setPeriod} options={okrPeriods.map(p => ({ value: p, label: p }))} />}
-        {tab === 'review' && rvPeriods.length > 1 && <select className="cc-select" value={rvPeriod} onChange={e => setRvPeriod(e.target.value)}>{rvPeriods.map(p => <option key={p}>{p}</option>)}</select>}
+        {tab === 'okr' && <Seg value={period} onChange={setPeriod} options={PERIODS.map(p => ({ value: p, label: p }))} />}
         {tab === 'okr' && can('performance', 'create') && <button className="cc-btn" onClick={() => setOkrForm({ title: '', owner: user.id, krs: [{ title: '', target: '', unit: '%', owner: user.id }] })}><Icon name="plus" size={14} stroke={2.4} />Thêm mục tiêu</button>}
-        {tab === 'review' && rvPeriod === REVIEW_PERIOD && can('performance', 'create') && role !== 'employee' && <button className="cc-btn" onClick={launchCycle}><Icon name="send" size={14} />Mở đợt đánh giá</button>}
+        {tab === 'review' && (role === 'hradmin' || role === 'sysadmin') && <button className="cc-btn" onClick={launchCycle}><Icon name="send" size={14} />Mở đợt đánh giá</button>}
       </div>
 
       {tab === 'okr' && (
@@ -164,7 +145,7 @@ export default function PerformanceModule({ employees, perf, tal }) {
 
       {tab === 'review' && (
         <div className="cc-card cc-pad">
-          <div className="cc-toolbar"><div><h3 className="cc-h3" style={{ margin: 0 }}>Đợt đánh giá {rvPeriod}</h3><span className="cc-sub">Quy trình: nhân viên tự đánh giá → quản lý trực tiếp đánh giá → chốt xếp loại (A ≥ 4,5 · B ≥ 3,75 · C ≥ 3 · D)</span></div></div>
+          <div className="cc-toolbar"><div><h3 className="cc-h3" style={{ margin: 0 }}>Đợt đánh giá {REVIEW_PERIOD}</h3><span className="cc-sub">Quy trình: nhân viên tự đánh giá → quản lý trực tiếp đánh giá → chốt xếp loại (A ≥ 4,5 · B ≥ 3,75 · C ≥ 3 · D)</span></div></div>
           {reviewStaff.length === 0 && <Empty text="Không có nhân sự" />}
           <div className="cc-table-wrap">
             <table className="cc-table2 hover">
@@ -192,14 +173,6 @@ export default function PerformanceModule({ employees, perf, tal }) {
 
       {tab === 'training' && (
         <div className="cc-stack">
-          {canCatalog && (
-            <div className="cc-toolbar" style={{ marginBottom: 0 }}>
-              <span className="cc-grow" />
-              {!COURSES.length && <button className="cc-btn ghost" onClick={tal.seedCatalog}><Icon name="graduation" size={14} />Khởi tạo danh mục mẫu</button>}
-              <button className="cc-btn" onClick={() => setCourseForm({ title: '', category: '', hours: 8, format: 'Trực tiếp', mandatory: false, tone: 'primary' })}><Icon name="plus" size={14} stroke={2.4} />Thêm khoá học</button>
-            </div>
-          )}
-          {!COURSES.length && <Empty icon="graduation" text="Công ty chưa có khoá học nào" />}
           <div className="cc-course-grid">
             {COURSES.map(c => {
               const learners = staff.filter(e => enrolled(e.id)[c.id] != null)
@@ -208,8 +181,6 @@ export default function PerformanceModule({ employees, perf, tal }) {
                 <div key={c.id} className={`cc-card cc-course cc-tone-${c.tone}`}>
                   <div className="cc-course-top"><span className="cc-ico"><Icon name="graduation" size={15} /></span>{c.mandatory && <Pill tone="danger">Bắt buộc</Pill>}<span className="cc-grow" /><span className="cc-sub">{c.hours} giờ · {c.format}</span></div>
                   <b>{c.title}</b><span className="cc-sub">{c.category}</span>
-                  {canCatalog && <div style={{ display: 'flex', gap: 12 }}><button className="cc-link-btn" onClick={() => setCourseForm({ ...c })}>Sửa</button>
-                    <button className="cc-link-btn danger" onClick={() => { if (confirm(`Xoá khoá "${c.title}"? Khoá sẽ bị bỏ khỏi các lộ trình.`)) tal.deleteCourse(c.id, `Đã xoá khoá ${c.title}`) }}>Xoá</button></div>}
                   <div className="cc-course-foot"><div className="cc-bar"><span style={{ width: (learners.length ? done / learners.length : 0) * 100 + '%', background: 'var(--c)' }} /></div><span className="cc-sub">{done}/{learners.length} hoàn thành</span></div>
                 </div>
               )
@@ -217,15 +188,11 @@ export default function PerformanceModule({ employees, perf, tal }) {
           </div>
           <div className="cc-grid2">
             <div className="cc-card cc-pad">
-              <div className="cc-toolbar"><h3 className="cc-h3" style={{ margin: 0 }}>Lộ trình học tập</h3><span className="cc-grow" />
-                {canCatalog && COURSES.length > 0 && <button className="cc-link-btn" onClick={() => setPathForm({ title: '', for: '', courses: [] })}>+ Thêm lộ trình</button>}</div>
-              {!LEARNING_PATHS.length && <Empty text="Chưa có lộ trình" />}
+              <h3 className="cc-h3">Lộ trình học tập</h3>
               {LEARNING_PATHS.map(p => (
                 <div key={p.id} className="cc-path">
-                  <div className="cc-path-head"><b>{p.title}</b><span className="cc-sub">{p.for}</span>
-                    {canCatalog && <><button className="cc-link-btn" onClick={() => setPathForm({ ...p })}>Sửa</button>
-                      <button className="cc-link-btn danger" onClick={() => { if (confirm(`Xoá lộ trình "${p.title}"?`)) tal.deletePath(p.id, `Đã xoá lộ trình ${p.title}`) }}>Xoá</button></>}</div>
-                  <ol className="cc-path-steps">{p.courses.map((cid, i) => <li key={cid}><span>{i + 1}</span>{courseTitle(cid)}</li>)}</ol>
+                  <div className="cc-path-head"><b>{p.title}</b><span className="cc-sub">{p.for}</span></div>
+                  <ol className="cc-path-steps">{p.courses.map((cid, i) => <li key={cid}><span>{i + 1}</span>{COURSES.find(c => c.id === cid).title}</li>)}</ol>
                 </div>
               ))}
             </div>
@@ -278,7 +245,7 @@ export default function PerformanceModule({ employees, perf, tal }) {
       </Modal>
 
       <Modal open={!!reviewOf} onClose={() => setReviewOf(null)} width={640} icon="award"
-        title={reviewOf ? (reviewOf.mode === 'self' ? `Tự đánh giá ${rvPeriod}` : reviewOf.mode === 'mgr' ? `Đánh giá ${reviewOf.emp.name}` : `Kết quả đánh giá — ${reviewOf.emp.name}`) : ''}
+        title={reviewOf ? (reviewOf.mode === 'self' ? `Tự đánh giá ${REVIEW_PERIOD}` : reviewOf.mode === 'mgr' ? `Đánh giá ${reviewOf.emp.name}` : `Kết quả đánh giá — ${reviewOf.emp.name}`) : ''}
         sub={reviewOf ? `${reviewOf.emp.position} · ${deptOf(reviewOf.emp.dept).name}` : ''}
         footer={reviewOf && <><span className="cc-grow cc-sub">{reviewOf.mode !== 'view' && draft ? `Điểm có trọng số: ${weighted(draft.scores).toFixed(2)} · xếp loại ${grade(weighted(draft.scores))}` : ''}</span>
           <button className="cc-btn ghost" onClick={() => setReviewOf(null)}>{reviewOf.mode === 'view' ? 'Đóng' : 'Hủy'}</button>
@@ -324,33 +291,6 @@ export default function PerformanceModule({ employees, perf, tal }) {
             <div className="cc-checks">{LEARNING_PATHS.map(p => <button key={p.id} className="cc-btn ghost" onClick={() => enrollPath(enrollFor.id, p)}><Icon name="plus" size={13} />{p.title}</button>)}</div>
           </>}
         </div>}
-      </Modal>
-      <Modal open={!!courseForm} onClose={() => setCourseForm(null)} icon="graduation" width={520} title={courseForm?.id ? 'Sửa khoá học' : 'Thêm khoá học'}
-        footer={<><span className="cc-grow" /><button className="cc-btn ghost" onClick={() => setCourseForm(null)}>Hủy</button><button className="cc-btn" onClick={saveCourse}><Icon name="check" size={14} stroke={2.6} />Lưu</button></>}>
-        {courseForm && (
-          <div className="cc-form">
-            <Field label="Tên khoá học *" full><input value={courseForm.title} onChange={e => setCourseForm({ ...courseForm, title: e.target.value })} /></Field>
-            <Field label="Nhóm"><input value={courseForm.category} placeholder="VD: Chuyên môn" onChange={e => setCourseForm({ ...courseForm, category: e.target.value })} /></Field>
-            <Field label="Số giờ"><input type="number" min="0" step="0.5" value={courseForm.hours} onChange={e => setCourseForm({ ...courseForm, hours: e.target.value })} /></Field>
-            <Field label="Hình thức"><select value={courseForm.format} onChange={e => setCourseForm({ ...courseForm, format: e.target.value })}>{['Trực tiếp', 'E-learning', 'Blended'].map(f => <option key={f}>{f}</option>)}</select></Field>
-            <label className="cc-check-line"><input type="checkbox" checked={courseForm.mandatory} onChange={e => setCourseForm({ ...courseForm, mandatory: e.target.checked })} />Bắt buộc (tính vào tỉ lệ hoàn thành đào tạo bắt buộc)</label>
-          </div>
-        )}
-      </Modal>
-      <Modal open={!!pathForm} onClose={() => setPathForm(null)} icon="graduation" width={560} title={pathForm?.id ? 'Sửa lộ trình' : 'Thêm lộ trình'} sub="Chọn khoá theo thứ tự học"
-        footer={<><span className="cc-grow" /><button className="cc-btn ghost" onClick={() => setPathForm(null)}>Hủy</button><button className="cc-btn" onClick={savePath}><Icon name="check" size={14} stroke={2.6} />Lưu</button></>}>
-        {pathForm && (
-          <div className="cc-form">
-            <Field label="Tên lộ trình *"><input value={pathForm.title} onChange={e => setPathForm({ ...pathForm, title: e.target.value })} /></Field>
-            <Field label="Đối tượng"><input value={pathForm.for} placeholder="VD: Thi công · 0–6 tháng" onChange={e => setPathForm({ ...pathForm, for: e.target.value })} /></Field>
-            <Field label="Khoá học (theo thứ tự đã chọn)" full>
-              <div className="cc-checks">{COURSES.map(c => {
-                const i = pathForm.courses.indexOf(c.id)
-                return <label key={c.id}><input type="checkbox" checked={i >= 0} onChange={e => setPathForm({ ...pathForm, courses: e.target.checked ? [...pathForm.courses, c.id] : pathForm.courses.filter(x => x !== c.id) })} />{i >= 0 ? `${i + 1}. ` : ''}{c.title}</label>
-              })}</div>
-            </Field>
-          </div>
-        )}
       </Modal>
     </div>
   )

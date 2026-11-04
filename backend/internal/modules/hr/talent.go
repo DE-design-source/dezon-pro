@@ -167,12 +167,7 @@ func (s *Service) TalentState(ctx context.Context, a *actor.Actor) (any, error) 
 	// trưởng phòng (phạm vi phòng ban): chỉ JD / tin / ứng viên / lịch phỏng vấn của phòng mình
 	if x.scope != "all" {
 		keepJob := map[string]bool{}
-		fJD, fJob, fCand, fIv := []any{}, []any{}, []any{}, []any{}
-		for _, v := range jdOut {
-			if x.deptOK(v.(*omap.Map).Val("dept")) {
-				fJD = append(fJD, v)
-			}
-		}
+		fJob, fCand, fIv := []any{}, []any{}, []any{}
 		for _, v := range jobOut {
 			if m := v.(*omap.Map); x.deptOK(m.Val("dept")) {
 				keepJob[jsval.Str(m.Val("id"))] = true
@@ -191,7 +186,7 @@ func (s *Service) TalentState(ctx context.Context, a *actor.Actor) (any, error) 
 				fIv = append(fIv, v)
 			}
 		}
-		jdOut, jobOut, cOut, ivOut = fJD, fJob, fCand, fIv
+		jobOut, cOut, ivOut = fJob, fCand, fIv
 	}
 	// không có quyền xem phân hệ -> trả rỗng; đánh giá / ghi danh chỉ của người trong phạm vi
 	if !x.can("recruit", "view") {
@@ -275,9 +270,6 @@ func (s *Service) SaveJD(ctx context.Context, a *actor.Actor, b *omap.Map) (any,
 	if title == "" {
 		return nil, apperr.BadRequest("Thiếu tên vị trí")
 	}
-	if err := s.jdAllowed(ctx, x, b.Val("id"), str(b, "dept")); err != nil {
-		return nil, err
-	}
 	row := omap.Of("ma", str(b, "code"), "ten", title, "phong_ban", str(b, "dept"), "cap_bac", str(b, "level"), "luong", str(b, "salary"),
 		"tom_tat", str(b, "summary"), "nhiem_vu", strArr(b, "duties"), "yeu_cau", strArr(b, "requirements"), "quyen_loi", strArr(b, "benefits"))
 	var id any
@@ -300,9 +292,6 @@ func (s *Service) SaveJD(ctx context.Context, a *actor.Actor, b *omap.Map) (any,
 func (s *Service) DeleteJD(ctx context.Context, a *actor.Actor, id float64) (any, error) {
 	x, err := s.gate(ctx, a, "recruit", "delete")
 	if err != nil {
-		return nil, err
-	}
-	if err := s.jdAllowed(ctx, x, id, ""); err != nil {
 		return nil, err
 	}
 	rows, err := s.db.Remove(ctx, "hr_jd", database.Eq("id", id))
@@ -394,8 +383,13 @@ func (s *Service) CreateCandidate(ctx context.Context, a *actor.Actor, b *omap.M
 	if cvURL != "" && !strings.HasPrefix(cvURL, "/files/") && !strings.HasPrefix(cvURL, "https://") {
 		return nil, apperr.BadRequest("Link CV phải là file trong kho (/files/...) hoặc https://")
 	}
+	today := s.now().In(vn).Format("2006-01-02")
+	applied := jsval.StrOr(str(b, "applied"), today) // ngày nộp hồ sơ (nhập lại hồ sơ cũ); mặc định hôm nay
+	if !isoDate.MatchString(applied) || applied > today {
+		return nil, apperr.BadRequest("Ngày nộp hồ sơ không hợp lệ")
+	}
 	out, err := s.db.InsertOne(ctx, "hr_ung_vien", omap.Of("tin_id", job.Val("id"), "ho_ten", name, "email", str(b, "email"), "sdt", str(b, "phone"),
-		"nguon", str(b, "source"), "cv", str(b, "cv"), "cv_url", cvURL, "kinh_nghiem", str(b, "exp"), "ngay_nop", s.now().In(vn).Format("2006-01-02"),
+		"nguon", str(b, "source"), "cv", str(b, "cv"), "cv_url", cvURL, "kinh_nghiem", str(b, "exp"), "ngay_nop", applied,
 		"nguoi_tao", a.UID, "ngay_tao", s.nowISO(), "cap_nhat", s.nowISO()))
 	if err != nil {
 		return nil, err
@@ -461,8 +455,12 @@ func (s *Service) UpdateCandidate(ctx context.Context, a *actor.Actor, id float6
 			if sc, ok := r.Val("scores").(*omap.Map); ok {
 				sc.Each(func(k string, v any) { scores.Set(k, numOr0(v)) })
 			}
+			date := s.now().In(vn).Format("2006-01-02")
+			if d := str(r, "date"); isoDate.MatchString(d) && d < date {
+				date = d // đánh giá ghi lại từ trước
+			}
 			p.Set("danh_gia", append(orArr(c.Val("danh_gia")), omap.Of("by", jsval.StrOr(str(r, "by"), a.U), "round", str(r, "round"),
-				"scores", scores, "note", str(r, "note"), "date", s.now().In(vn).Format("2006-01-02"))))
+				"scores", scores, "note", str(r, "note"), "date", date)))
 		}
 		if v, ok := b.Val("interview").(*omap.Map); ok {
 			d := str(v, "date")
@@ -544,10 +542,13 @@ func (s *Service) SetKR(ctx context.Context, a *actor.Actor, id float64, b *omap
 		if o == nil {
 			return apperr.NotFound("Không tìm thấy mục tiêu")
 		}
-		// ngoài phạm vi toàn công ty: chỉ cập nhật KR do người trong phạm vi phụ trách (nhân viên: KR của mình)
+		// nhân viên: chỉ KR của mình; trưởng phòng: KR trong mục tiêu của phòng mình (hoặc do người trong phòng phụ trách)
 		if x.scope != "all" {
 			for _, k := range orArr(o.Val("ket_qua")) {
 				if m, ok := k.(*omap.Map); ok && jsval.ToNumber(m.Val("id")) == jsval.ToNumber(b.Val("krId")) {
+					if x.scope == "dept" && x.deptOK(o.Val("phong_ban")) {
+						continue
+					}
 					if _, err := s.target(ctx, x, m.Val("owner")); err != nil {
 						return err
 					}
@@ -615,8 +616,8 @@ func (s *Service) ReviewAction(ctx context.Context, a *actor.Actor, b *omap.Map)
 		}
 		switch action {
 		case "launch":
-			if err := x.need("performance", "create"); err != nil {
-				return err
+			if x.role != "hradmin" && x.role != "sysadmin" {
+				return apperr.Forbidden("Chỉ HR Admin / System Admin mở đợt đánh giá")
 			}
 			ids, _ := b.Val("empIds").([]any)
 			for _, v := range ids {
@@ -637,19 +638,31 @@ func (s *Service) ReviewAction(ctx context.Context, a *actor.Actor, b *omap.Map)
 			return nil
 		case "self", "mgr":
 			eid := jsval.ToNumber(b.Val("empId"))
-			if _, err := s.target(ctx, x, eid); err != nil {
-				return err
-			}
-			// tự đánh giá: chỉ chính mình (admin chưa gắn hồ sơ nhập thay được); quản lý chấm: cần quyền duyệt, không tự chấm mình
-			if action == "self" && x.role != "sysadmin" && eid != x.meID() {
-				return apperr.Forbidden("Chỉ nhân sự tự đánh giá cho mình")
-			}
-			if action == "mgr" {
-				if err := x.need("performance", "approve"); err != nil {
+			if action == "self" {
+				if _, err := s.target(ctx, x, eid); err != nil {
 					return err
 				}
-				if eid == x.meID() {
-					return apperr.Forbidden("Không tự chấm đánh giá quản lý cho mình")
+				// System Admin (admin công ty) làm thay được - giao diện mô phỏng đăng nhập theo vai trò
+				if eid != x.meID() && x.role != "sysadmin" {
+					return apperr.Forbidden("Chỉ nhân sự tự đánh giá cho mình")
+				}
+			}
+			if action == "mgr" {
+				// HR Admin / System Admin chấm mọi người; trưởng phòng: cấp dưới trực tiếp + người khác cùng phòng
+				e, err := s.getEmp(ctx, eid)
+				if err != nil {
+					return err
+				}
+				if e == nil {
+					return apperr.NotFound("Không tìm thấy nhân sự")
+				}
+				ok := x.role == "hradmin" || x.role == "sysadmin"
+				if x.role == "manager" && x.me != nil {
+					ok = jsval.ToNumber(e.Val("quan_ly_id")) == x.meID() ||
+						(eid != x.meID() && jsval.Str(e.Val("phong_ban")) == jsval.Str(x.me.Val("phong_ban")))
+				}
+				if !ok {
+					return apperr.Forbidden("Bạn không chấm đánh giá cho nhân sự này")
 				}
 			}
 			sc, err := scoresOf()
@@ -879,7 +892,7 @@ func (s *Service) hireFree(ctx context.Context, empID any, candID float64) error
 
 // markHired: ứng viên -> Nhận việc, gắn hồ sơ vừa tạo (gọi trong transaction của CreateEmployee).
 func (s *Service) markHired(ctx context.Context, x *access, candID float64, empID any) error {
-	if err := x.need("recruit", "edit"); err != nil {
+	if err := x.need("recruit", "approve"); err != nil {
 		return err
 	}
 	c, err := s.one(ctx, "hr_ung_vien", candID)
@@ -895,26 +908,4 @@ func (s *Service) markHired(ctx context.Context, x *access, candID float64, empI
 	_, err = s.db.Update(ctx, "hr_ung_vien", database.Eq("id", candID), omap.Of("giai_doan", "hired", "nhan_vien_id", empID,
 		"ngay_nhan_viec", s.now().In(vn).Format("2006-01-02"), "cap_nhat", s.nowISO()))
 	return err
-}
-
-// jdAllowed: sửa / xoá JD ngoài phạm vi toàn công ty chỉ với JD của phòng mình (cả phòng cũ khi sửa).
-func (s *Service) jdAllowed(ctx context.Context, x *access, id any, dept string) error {
-	if x.scope == "all" {
-		return nil
-	}
-	if validID(id) {
-		old, err := s.one(ctx, "hr_jd", id)
-		if err != nil {
-			return err
-		}
-		if old != nil {
-			if err := x.deptNeed(old.Val("phong_ban")); err != nil {
-				return err
-			}
-			if dept == "" {
-				return nil
-			}
-		}
-	}
-	return x.deptNeed(dept)
 }

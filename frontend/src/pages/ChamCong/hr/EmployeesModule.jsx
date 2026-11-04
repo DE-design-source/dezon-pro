@@ -183,12 +183,12 @@ function Allocation({ emp, concurrent, boardUnits = [], editable, onSave, pay, s
 }
 
 function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveConcurrent, pay, onBack, onEdit, onDelete, onOffboard, onOpen }) {
-  const { can, canAll, role } = useAccess()
+  const { can, role } = useAccess()
   const [tab, setTab] = useState('info')
   const [editSignal, setEditSignal] = useState(0)
   const manager = employees.find(e => e.id === emp.managerId)
   const reports = employees.filter(e => e.managerId === emp.id && e.status !== 'left')
-  const activeContract = emp.contracts.find(c => c.status === 'active')
+  const activeContract = (emp.contracts || []).find(c => c.status === 'active')
   const d = deptOf(emp.dept)
 
   return (
@@ -212,8 +212,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
           <StatusPill status={emp.status} />
           <div className="cc-actions">
             {can('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onEdit(emp)}><Icon name="edit" size={14} />Sửa</button>}
-            {emp.status !== 'left' && canAll('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onOffboard(emp)}><Icon name="logIn" size={14} />Cho nghỉ việc</button>}
-            {canAll('employees', 'delete') && <button className="cc-icon-btn danger" title="Xoá hồ sơ" onClick={() => onDelete(emp)}><Icon name="trash" size={15} /></button>}
+            {emp.status !== 'left' && can('employees', 'edit') && <button className="cc-btn ghost" onClick={() => onOffboard(emp)}><Icon name="logIn" size={14} />Cho nghỉ việc</button>}
+            {can('employees', 'delete') && <button className="cc-icon-btn danger" title="Xoá hồ sơ" onClick={() => onDelete(emp)}><Icon name="trash" size={15} /></button>}
           </div>
         </div>
       </div>
@@ -224,7 +224,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div><span>Quản lý trực tiếp</span>{manager ? <button className="cc-link-btn" onClick={() => onOpen(manager.id)}>{manager.name}</button> : <b>—</b>}</div>
         <div><span>Cấp dưới trực tiếp</span><b>{reports.length} người</b></div>
         <div className="cc-mini-edit">
-          <span>Kiêm nhiệm {canAll('employees', 'edit') && emp.status !== 'left' && <button className="cc-link-btn" onClick={() => { setTab('info'); setEditSignal(n => n + 1) }}><Icon name="edit" size={11} />Sửa</button>}</span>
+          <span>Kiêm nhiệm {can('employees', 'edit') && emp.status !== 'left' && <button className="cc-link-btn" onClick={() => { setTab('info'); setEditSignal(n => n + 1) }}><Icon name="edit" size={11} />Sửa</button>}</span>
           <b>{concurrent.length ? concurrent.map(c => `${c.unit.label} ${c.pct}%`).join(' · ') : 'Không'}</b>
           {pay && can('payroll', 'view') && <em>100% = {Math.round(pay.cost).toLocaleString('vi-VN')} đ/tháng{concurrent.length ? ` · phòng chính ${+(100 - concurrent.reduce((t, c) => t + c.pct, 0)).toFixed(1)}%` : ''}</em>}
         </div>
@@ -232,7 +232,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
 
       <Seg value={tab} onChange={setTab} options={DETAIL_TABS} />
 
-      {tab === 'info' && (concurrent.length > 0 || canAll('employees', 'edit')) && emp.status !== 'left' && (
+      {tab === 'info' && (concurrent.length > 0 || can('employees', 'edit')) && emp.status !== 'left' && (
         <Allocation key={emp.id} emp={emp} concurrent={concurrent} boardUnits={boardUnits} editable={can('employees', 'edit')} onSave={list => onSaveConcurrent(emp, list)} pay={pay} showMoney={can('payroll', 'view')} editSignal={editSignal} />
       )}
       {tab === 'info' && (
@@ -264,8 +264,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div className="cc-grid2">
           <div className="cc-card cc-pad">
             <h3 className="cc-h3">Học vấn</h3>
-            {emp.education.length === 0 && <Empty icon="graduation" text="Chưa cập nhật" />}
-            {emp.education.map((e, i) => <div key={i} className="cc-tl"><b>{e.school}</b><span>{e.major} · {e.degree}</span><em>{e.from}–{e.to}</em></div>)}
+            {(emp.education || []).length === 0 && <Empty icon="graduation" text="Chưa cập nhật" />}
+            {(emp.education || []).map((e, i) => <div key={i} className="cc-tl"><b>{e.school}</b><span>{e.major} · {e.degree}</span><em>{e.from}–{e.to}</em></div>)}
             <h3 className="cc-h3" style={{ marginTop: 18 }}>Kinh nghiệm</h3>
             {emp.experience.length === 0 && <Empty icon="briefcase" text="Chưa có kinh nghiệm trước đây" />}
             {emp.experience.map((e, i) => <div key={i} className="cc-tl"><b>{e.company}</b><span>{e.role}</span><em>{e.from}–{e.to}</em></div>)}
@@ -287,8 +287,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
             </div>
             <div className="cc-card cc-pad">
               <h3 className="cc-h3">Tài liệu đính kèm</h3>
-              {emp.attachments.length === 0 && <Empty icon="file" text="Chưa có tài liệu" />}
-              {emp.attachments.map((a, i) => (
+              {(emp.attachments || []).length === 0 && <Empty icon="file" text="Chưa có tài liệu" />}
+              {(emp.attachments || []).map((a, i) => (
                 <div key={i} className="cc-doc"><span className="cc-ico sm cc-tone-primary"><Icon name="file" size={13} /></span><div className="cc-grow"><b>{a.name}</b></div><Icon name="download" size={15} /></div>
               ))}
             </div>
@@ -303,8 +303,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
             <table className="cc-table2">
               <thead><tr><th>Số hợp đồng</th><th>Loại</th><th>Hiệu lực</th><th>Hết hạn</th><th className="r">Lương</th><th>Trạng thái</th></tr></thead>
               <tbody>
-                {emp.contracts.length === 0 && <tr><td colSpan={6}><Empty icon="file" text="Chưa có hợp đồng" /></td></tr>}
-                {[...emp.contracts].reverse().map(c => {
+                {(emp.contracts || []).length === 0 && <tr><td colSpan={6}><Empty icon="file" text="Chưa có hợp đồng" /></td></tr>}
+                {[...(emp.contracts || [])].reverse().map(c => {
                   const left = c.end ? daysBetween(HR_TODAY, c.end) : null
                   return (
                     <tr key={c.no}>
@@ -343,7 +343,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div className="cc-card cc-pad">
           <h3 className="cc-h3">Quá trình công tác</h3>
           <ol className="cc-flow">
-            {[...emp.promotions].reverse().map((p, i) => (
+            {[...(emp.promotions || [])].reverse().map((p, i) => (
               <li key={i} className="done"><span className="cc-flow-dot"><Icon name="trending" size={12} /></span><div><b>{p.note}</b><span>{fmtDate(p.date)}</span></div></li>
             ))}
           </ol>
@@ -355,7 +355,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
 
 /* Phân hệ "Hồ sơ nhân sự" — danh sách + lọc + CRUD + chi tiết */
 export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEdit, onDelete, onOffboard, concurrentOf = () => [], boardUnits = [], onSaveConcurrent, payOf = () => null }) {
-  const { can, canAll } = useAccess()
+  const { can } = useAccess()
   const [q, setQ] = useState('')
   const [dept, setDept] = useState('all')
   const [level, setLevel] = useState('all')
@@ -371,7 +371,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
     left: employees.filter(e => e.status === 'left').length,
   }), [employees])
 
-  const expiring = employees.filter(e => e.status !== 'left' && e.contracts.some(c => c.status === 'active' && c.end && daysBetween(HR_TODAY, c.end) >= 0 && daysBetween(HR_TODAY, c.end) <= 30))
+  const expiring = employees.filter(e => e.status !== 'left' && (e.contracts || []).some(c => c.status === 'active' && c.end && daysBetween(HR_TODAY, c.end) >= 0 && daysBetween(HR_TODAY, c.end) <= 30))
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -425,7 +425,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
             <button className={view === 'grid' ? 'active' : ''} title="Dạng thẻ" onClick={() => setView('grid')}><Icon name="grid" size={14} /></button>
           </div>
           {can('employees', 'export') && <button className="cc-btn ghost" onClick={exportCsv}><Icon name="download" size={14} />Xuất CSV</button>}
-          {canAll('employees', 'create') && <button className="cc-btn" onClick={() => onAdd()}><Icon name="userPlus" size={14} />Thêm nhân viên</button>}
+          {can('employees', 'create') && <button className="cc-btn" onClick={() => onAdd()}><Icon name="userPlus" size={14} />Thêm nhân viên</button>}
         </div>
         <Seg value={status} onChange={setStatus} options={[
           { value: 'current', label: 'Đang làm việc', count: counts.current },
@@ -453,7 +453,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
                     <td className="r" onClick={ev => ev.stopPropagation()}>
                       <div className="cc-row-actions">
                         {can('employees', 'edit') && <button className="cc-icon-btn sm" title="Sửa" onClick={() => onEdit(e)}><Icon name="edit" size={14} /></button>}
-                        {canAll('employees', 'delete') && <button className="cc-icon-btn sm danger" title="Xoá" onClick={() => onDelete(e)}><Icon name="trash" size={14} /></button>}
+                        {can('employees', 'delete') && <button className="cc-icon-btn sm danger" title="Xoá" onClick={() => onDelete(e)}><Icon name="trash" size={14} /></button>}
                       </div>
                     </td>
                   </tr>

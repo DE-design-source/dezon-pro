@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-03 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-04 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -76,7 +76,7 @@
 |---|---|---|---|
 | <a id="n8"></a>N8 | HR: còn gửi phiếu lương qua email / chuyển khoản lương, gửi thư mời phỏng vấn, tự đăng tin lên kênh tuyển dụng (cần SMTP / tài khoản kênh 🔑); 2FA, SSO, giới hạn IP; tích hợp máy chấm công (cần API thiết bị 🔑); triển khai migration 0020-0026 lên dezon.tech (nhánh `src_N` đã có 0018-0019 của Chat nên HR đánh số từ 0020) | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
-| <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; sơ đồ tổ chức, bảng mua hàng PO, nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot vẫn là dữ liệu mẫu | User | 🟡 |
+| <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt | User | 🟡 |
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
@@ -507,8 +507,9 @@
 
 - Migration 0015 (`sales_leads`, `sales_lead_activities`) và 0016 (`delivery_projects` + thành viên, thầu phụ, đề mục, công việc, bình luận); module Go `sales`, `delivery` (REST chỉ bản Go `/api/v1/sales/...`, `/api/v1/delivery/...`)
 - Kinh doanh: khách hàng, kéo-thả giai đoạn, bảng con Thiết kế / Thi công, người phụ trách, lịch sử chăm sóc lưu trên máy chủ; gắn dự án QS (giá trị lấy theo tổng báo giá); Tổng quan tính từ dữ liệu thật (doanh số theo ngày chốt)
-- Kéo khách sang "Dự án (Thiết kế)" / "Dự án (Thi công)" tự tạo dự án ở Quản lý thiết kế / Quản lý dự án (1 lần / khách / loại, cùng transaction)
+- Khách ở Tư vấn / Đàm phán / Dự án (Thiết kế) tự có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án (tạo / cập nhật tên, khách, giá trị ước tính; rời giai đoạn hoặc xoá khách thì gỡ, dự án đã có dữ liệu chỉ bỏ liên kết; cùng transaction) - như logic bản tĩnh cũ
 - Quản lý thiết kế / Quản lý dự án dùng chung component: danh sách dự án, thiết lập chung, nhân sự, thầu phụ, tiến độ Gantt (đề mục, công việc, mốc thu chi, kéo giãn, khung mẫu dời về hôm nay), bình luận; "hôm nay" là ngày thật
+- 2026-11-04: giao diện 2 trang trả về đúng bản 8686a37 (component riêng của Quản lý dự án, chọn dự án "Chung cư Riverside / Giai đoạn 2", chip lọc giai đoạn, kanban mua hàng, KPI), chỉ thay dữ liệu mẫu bằng API; migration 0028 (trạng thái "Thiết kế", tiến độ nhập tay + màu thanh ở danh sách, sơ đồ tổ chức theo dự án, đơn mua hàng của công việc); `infra/scripts/seed-demo-delivery.mjs` nạp dữ liệu mẫu bản cũ vào công ty demo - 🟡 chưa thử trên trình duyệt
 - Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
 - Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
 - Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)

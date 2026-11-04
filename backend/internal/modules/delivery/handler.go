@@ -27,17 +27,20 @@ func body(fields ...[2]string) []rpc.GoField {
 }
 
 var (
-	projectBody = body([2]string{"name", "Tên dự án"}, [2]string{"status", "nhap / dang-lam / tam-dung / hoan-tat"},
+	projectBody = body([2]string{"name", "Tên dự án"}, [2]string{"status", "nhap / thiet-ke / dang-lam / tam-dung / hoan-tat"},
 		[2]string{"client", "Khách hàng"}, [2]string{"contact", "Người liên hệ"}, [2]string{"phone", "Điện thoại"}, [2]string{"email", "Email"},
 		[2]string{"address", "Địa chỉ công trình"}, [2]string{"projectType", "Loại công trình"},
 		[2]string{"startDate", "Ngày bắt đầu yyyy-mm-dd"}, [2]string{"handoverDate", "Ngày bàn giao yyyy-mm-dd"},
 		[2]string{"contractValueVnd", "Giá trị hợp đồng (đồng)"}, [2]string{"approvedBudgetVnd", "Ngân sách duyệt (đồng)"},
-		[2]string{"note", "Ghi chú"}, [2]string{"maDA", "Mã dự án QS; rỗng = bỏ gắn"})
+		[2]string{"note", "Ghi chú"}, [2]string{"maDA", "Mã dự án QS; rỗng = bỏ gắn"},
+		[2]string{"progress", "Tiến độ nhập tay 0-100 (dùng khi chưa có công việc); null = 0"}, [2]string{"barColor", "Màu thanh tiến độ ở danh sách (var(--x) / #hex)"},
+		[2]string{"orgChart", "Sơ đồ tổ chức {parallel: [...], children: [...]}: dept, label, color, icon (tên khoá), dashed, caption, removable"})
 	taskBody = body([2]string{"name", "Tên công việc"}, [2]string{"phaseId", "Giai đoạn"}, [2]string{"start", "Ngày bắt đầu yyyy-mm-dd"},
 		[2]string{"end", "Ngày kết thúc yyyy-mm-dd"}, [2]string{"progress", "Tiến độ 0-100"}, [2]string{"critical", "Đường găng"},
 		[2]string{"milestone", "Cột mốc"}, [2]string{"desc", "Mô tả"}, [2]string{"depts", "Bộ phận phụ trách (mảng)"},
 		[2]string{"owners", "Người phụ trách (mảng)"}, [2]string{"finType", "thu / chi / rỗng"}, [2]string{"planStart", "Ngày kế hoạch thu/chi"},
-		[2]string{"amountVnd", "Số tiền thu/chi (đồng)"}, [2]string{"confirmed", "Đã xác nhận thu/chi"}, [2]string{"sortOrder", "Thứ tự"})
+		[2]string{"amountVnd", "Số tiền thu/chi (đồng)"}, [2]string{"confirmed", "Đã xác nhận thu/chi"}, [2]string{"sortOrder", "Thứ tự"},
+		[2]string{"purchaseItems", "Đơn mua hàng (kanban) [{id, code, item, supplier, qty, value (triệu), due, owner, stage, assignees, dept}]"})
 	subBody   = body([2]string{"name", "Tên thầu phụ"}, [2]string{"scope", "Phạm vi"}, [2]string{"contact", "Liên hệ"}, [2]string{"phone", "Điện thoại"}, [2]string{"valueVnd", "Giá trị (đồng)"}, [2]string{"status", "active / pending / done"})
 	phaseBody = body([2]string{"name", "Tên giai đoạn"}, [2]string{"sortOrder", "Thứ tự"}, [2]string{"members", "Người phụ trách [{name, role}]"})
 )

@@ -4,6 +4,9 @@
 /* Hôm nay theo giờ Việt Nam (yyyy-mm-dd) */
 export const HR_TODAY = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 const dmy = iso => iso.split('-').reverse().join('/')
+/* Ngày "hôm nay" của dữ liệu mẫu (bản giao diện tĩnh 8686a37). Dữ liệu mẫu chỉ dùng để nạp vào máy chủ
+   (infra/scripts/seed-demo-hr.mjs dời mọi ngày theo khoảng cách SAMPLE_TODAY -> hôm nay thật) */
+export const SAMPLE_TODAY = '2026-09-23'
 export const HR_TODAY_LABEL = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(HR_TODAY + 'T12:00:00').getDay()] + ', ' + dmy(HR_TODAY)
 
 /* ---------- Cơ cấu tổ chức (theo sơ đồ "Cơ cấu tổ chức.pdf") ----------
@@ -40,6 +43,13 @@ export const INITIAL_ORG_UNITS = [
   { key: 'dxbasic', label: 'Decox Basic', name: 'Decox Basic', type: 'subsidiary', parent: '__mother', tone: 'qs', desc: 'Dòng dịch vụ xây dựng cơ bản của Decox' },
   { key: 'icc', label: 'ICC', name: 'ICC', type: 'subsidiary', parent: null, tone: 'primary', desc: 'Công ty liên kết — không trực thuộc tập đoàn' },
 ]
+/* Thành viên kiêm nhiệm mẫu của HĐQT & các ban: pct = tỉ lệ thời gian dành cho ban, allowance = phụ cấp kiêm nhiệm / tháng */
+export const INITIAL_EXTRA_MEMBERS = {
+  hdqt: [{ id: 1, pct: 10, title: 'Chủ tịch HĐQT', allowance: 0 }, { id: 22, pct: 5, title: 'Thành viên HĐQT', allowance: 3000000 }, { id: 2, pct: 5, title: 'Thành viên HĐQT', allowance: 3000000 }],
+  bod: [{ id: 1, pct: 10, title: 'Chủ trì', allowance: 0 }, { id: 22, pct: 10, title: 'Thành viên', allowance: 0 }, { id: 2, pct: 10, title: 'Thành viên', allowance: 0 }, { id: 3, pct: 10, title: 'Thành viên', allowance: 2000000 }],
+  bks: [{ id: 3, pct: 15, title: 'Trưởng ban kiểm soát', allowance: 3000000 }, { id: 19, pct: 20, title: 'Kiểm soát viên', allowance: 2000000 }],
+  bcl: [{ id: 1, pct: 10, title: 'Chủ trì', allowance: 0 }, { id: 22, pct: 10, title: 'Thành viên', allowance: 0 }, { id: 23, pct: 15, title: 'Thành viên', allowance: 2000000 }, { id: 26, pct: 20, title: 'Thành viên', allowance: 2000000 }],
+}
 /* Trưởng đơn vị mặc định (id nhân viên) */
 export const INITIAL_UNIT_HEADS = { ceo: 1, coo: 22, cco: 2, kddd: 23, marketing: 5, rnd: 26, hcns: 4, tckt: 3, thietke: 24, muahang: 8, qs: 25, it: 17, kdda: 7, thicong: 6, haumai: 27, xuong: 47, bod: 1, bks: 3, bcl: 1, hdqt: 1, dzvn: 38, dzvn_op: 39, dzapp: 41, dzag: 42, dzag_ct: 43, dxbasic: 45, icc: 46 }
 export const UNIT_TYPE_LABEL = { governance: 'Quản trị', board: 'Ban trực thuộc', exec: 'Khối điều hành', dept: 'Phòng ban', subsidiary: 'Công ty con' }
@@ -55,7 +65,7 @@ export function syncCompanyName(name) { if (name) { PARENT_COMPANY.name = name; 
 /* parent = MOTHER_KEY: trực thuộc trực tiếp công ty mẹ (ngang hàng HĐQT dưới nút Decox) */
 export const MOTHER_KEY = '__mother'
 /* Tập đoàn (holding) đứng trên Decox — parent = HOLDING_KEY: công ty thành viên trực thuộc tập đoàn */
-export const HOLDING = { name: 'Tập đoàn', fullName: 'Tập đoàn' }
+export const HOLDING = { name: 'D Holdings', fullName: 'Tập đoàn D Holdings' }
 export const HOLDING_KEY = '__holding'
 export const isHoldingCo = u => u.type === 'subsidiary' && u.parent === HOLDING_KEY
 /* Nhãn cấp trên của 1 đơn vị (kể cả công ty mẹ / độc lập) */
@@ -192,7 +202,7 @@ function buildEmployee(row) {
       let start = s2, n = 1
       for (;;) {
         const end = id === 8 && n === 2 ? '2026-10-09' : addYears(start, 2)
-        const current = end >= HR_TODAY || status === 'left'
+        const current = end >= SAMPLE_TODAY || status === 'left'
         contracts.push({ no: `HĐLĐ-${code}-${pad(n)}`, type: 'Xác định thời hạn', start, end, salary: current ? salary : Math.round(salary * 0.92), status: current && status !== 'left' ? 'active' : 'expired' })
         if (current) break
         start = end; n++
@@ -224,7 +234,7 @@ function buildEmployee(row) {
 export const INITIAL_HR_EMPLOYEES = BASE.map(buildEmployee)
 export const EMPTY_EMPLOYEE = {
   code: '', name: '', gender: 'Nam', dob: '', dept: 'thicong', position: '', level: 'Nhân viên', status: 'probation', joinDate: HR_TODAY, managerId: null,
-  site: '', contractType: 'Thử việc', salary: '', phone: '', email: '', hometown: '', address: '', marital: 'Độc thân',
+  site: 'Văn phòng HCM', contractType: 'Thử việc', salary: '', phone: '', email: '', hometown: '', address: '', marital: 'Độc thân',
   cccd: '', cccdDate: '', cccdPlace: '', emergencyName: '', emergencyPhone: '', bankName: '', bankAccount: '',
   education: [], experience: [], contracts: [], certificates: [], tax: { mst: '', dependents: 0, taxOffice: '' },
   insurance: { bhxhNo: '', hospital: '', base: '', since: null }, promotions: [], attachments: [],
@@ -256,11 +266,17 @@ export function syncSites(list) {
 }
 /* Công trường: phụ cấp công trường, lịch mẫu T2–T7 */
 export const isFieldSite = name => !!SITES.find(s => s.name === name)?.isField
-/* Lựa chọn cho ô "Nơi làm việc": địa điểm của công ty + giá trị đang có (dữ liệu cũ) */
-export const siteOptions = cur => [...new Set([...(cur ? [cur] : []), ...WORK_SITES])]
-/* Ca mẫu cho nút "Khởi tạo ca & lịch mẫu" */
+/* Địa điểm mẫu (seed) */
+export const SAMPLE_SITES = [
+  { name: 'Văn phòng HCM', lat: 10.8411, lng: 106.8099, radius: 150 },
+  { name: 'Riverside — Tòa A', lat: 10.8023, lng: 106.7425, radius: 250, isField: true },
+  { name: 'Riverside — Tòa B', lat: 10.8031, lng: 106.7441, radius: 250, isField: true },
+  { name: 'Kho vật tư Bình Chánh', lat: 10.6869, lng: 106.5938, radius: 300, isField: true },
+]
+/* Ca mẫu (seed) */
 export const INITIAL_SHIFTS = [
   { id: 'HC', name: 'Hành chính', start: '08:00', end: '17:00', breakMin: 60, tone: 'primary', note: 'Văn phòng, T2–T6' },
+  { id: 'HC7', name: 'Sáng thứ 7', start: '08:00', end: '12:00', breakMin: 0, tone: 'primary', note: 'Văn phòng, thứ 7 nửa ngày' },
   { id: 'CT', name: 'Công trường', start: '07:00', end: '16:30', breakMin: 90, tone: 'attendance', note: 'Thi công, T2–T7' },
   { id: 'SA', name: 'Ca sáng', start: '06:00', end: '14:00', breakMin: 30, tone: 'finance', note: 'Đổ bê tông / bảo vệ' },
   { id: 'TO', name: 'Ca tối', start: '18:00', end: '22:00', breakMin: 0, tone: 'qs', note: 'Tăng ca theo kế hoạch' },
@@ -272,12 +288,16 @@ export const weekdayIdx = iso => { const [y, m, d] = iso.split('-').map(Number);
 export const TODAY_IDX = weekdayIdx(HR_TODAY)
 /* Tuần hiện tại (T2 -> CN) - lịch tuần lặp lại nên ngày chỉ để hiển thị */
 export const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((key, i) => ({ key, date: dmy(addDays(HR_TODAY, i - TODAY_IDX)).slice(0, 5) }))
-/* Lịch mẫu: văn phòng T2–T6 ca HC, công trường T2–T7 ca CT */
+/* Lịch mẫu (seed, id mẫu): văn phòng T2–T6 ca HC + sáng thứ 7 (HC7), công trường T2–T7 ca CT */
 export function initialSchedule(employees) {
   const s = {}
   employees.filter(e => e.status !== 'left').forEach(e => {
     const site = isFieldSite(e.site)
-    s[e.id] = WEEK_DAYS.map((d, i) => (i === 6 || (i === 5 && !site) ? 'off' : site ? 'CT' : 'HC'))
+    s[e.id] = WEEK_DAYS.map((d, i) => {
+      if (i === 6) return 'off'
+      if (site) return e.id === 10 && i === 3 ? 'SA' : (e.id === 11 && i === 4 ? 'TO' : 'CT')
+      return i === 5 ? 'HC7' : 'HC'
+    })
   })
   return s
 }
@@ -288,8 +308,61 @@ export const REQUEST_TYPES = {
   late: { label: 'Đi muộn / về sớm', icon: 'logIn', tone: 'finance' },
   ot: { label: 'Làm thêm giờ (OT)', icon: 'moon', tone: 'qs' },
 }
-/* annual trừ phép năm; annual / sick / other tính là nghỉ có lương; unpaid là nghỉ không lương */
-export const LEAVE_KINDS = { annual: 'Nghỉ phép năm', sick: 'Nghỉ ốm', other: 'Nghỉ việc riêng (có lương)', unpaid: 'Nghỉ không lương' }
+/* Chấm công mẫu ngày SAMPLE_TODAY (seed) — source: machine (máy chấm công) | gps | import | manual */
+export const TODAY_LOGS = [
+  { empId: 1, in: '07:58', out: null, source: 'machine', gps: null },
+  { empId: 2, in: '07:52', out: null, source: 'gps', gps: 'in', dist: 42 },
+  { empId: 3, in: '08:05', out: null, source: 'machine', gps: null },
+  { empId: 4, in: '07:55', out: null, source: 'machine', gps: null },
+  { empId: 5, in: '08:21', out: null, source: 'machine', gps: null },
+  { empId: 6, in: '06:48', out: null, source: 'gps', gps: 'in', dist: 61 },
+  { empId: 7, in: '08:02', out: null, source: 'gps', gps: 'in', dist: 23 },
+  { empId: 8, in: '07:10', out: null, source: 'gps', gps: 'out', dist: 1240 },
+  { empId: 9, in: '06:55', out: null, source: 'gps', gps: 'in', dist: 88 },
+  { empId: 10, in: '06:05', out: null, source: 'gps', gps: 'in', dist: 110 },
+  { empId: 11, in: '07:15', out: null, source: 'import', gps: null },
+  { empId: 12, in: '06:57', out: null, source: 'import', gps: null },
+  { empId: 13, in: null, out: null, source: null, gps: null, leave: 'Nghỉ phép năm' },
+  { empId: 14, in: '08:00', out: null, source: 'machine', gps: null },
+  { empId: 15, in: '08:34', out: null, source: 'machine', gps: null },
+  { empId: 16, in: null, out: null, source: null, gps: null },
+  { empId: 17, in: '07:49', out: null, source: 'machine', gps: null },
+  { empId: 18, in: '07:05', out: null, source: 'gps', gps: 'in', dist: 140 },
+  { empId: 19, in: '07:59', out: null, source: 'machine', gps: null },
+  { empId: 20, in: '08:00', out: null, source: 'manual', gps: null, note: 'Quên chấm — HR bổ sung' },
+  { empId: 22, in: '07:45', out: null, source: 'machine', gps: null },
+  { empId: 23, in: '08:03', out: null, source: 'machine', gps: null },
+  { empId: 24, in: '07:58', out: null, source: 'machine', gps: null },
+  { empId: 25, in: '08:12', out: null, source: 'machine', gps: null },
+  { empId: 26, in: '08:00', out: null, source: 'machine', gps: null },
+  { empId: 27, in: '07:56', out: null, source: 'gps', gps: 'in', dist: 35 },
+  { empId: 28, in: '06:59', out: null, source: 'gps', gps: 'in', dist: 72 },
+  { empId: 29, in: '07:52', out: null, source: 'machine', gps: null },
+  { empId: 30, in: null, out: null, source: null, gps: null },
+  { empId: 31, in: '06:52', out: null, source: 'import', gps: null },
+  { empId: 32, in: '07:03', out: null, source: 'import', gps: null },
+  { empId: 33, in: '07:57', out: null, source: 'machine', gps: null },
+  { empId: 34, in: '08:01', out: null, source: 'machine', gps: null },
+  { empId: 35, in: '08:09', out: null, source: 'gps', gps: 'in', dist: 18 },
+  { empId: 36, in: '07:41', out: null, source: 'machine', gps: null },
+  { empId: 37, in: '07:59', out: null, source: 'machine', gps: null },
+]
+
+/* Đơn từ mẫu (seed) - steps: trạng thái các bước duyệt cần đạt; leaveKind / from / to / hours để tạo đơn qua máy chủ */
+export const INITIAL_HR_REQUESTS = [
+  { id: 1, empId: 13, type: 'leave', leaveKind: 'annual', from: '2026-09-23', to: '2026-09-24', title: 'Nghỉ phép năm — 23/09 đến 24/09', days: 2, createdAt: '20/09/2026 · 09:10', reason: 'Về quê dự đám cưới người thân',
+    steps: [{ name: 'Đỗ Thảo Vy', role: 'Quản lý trực tiếp', state: 'done', time: '20/09/2026 · 10:02' }, { name: 'Ngô Mỹ Duyên', role: 'Nhân sự (HR)', state: 'done', time: '20/09/2026 · 14:15' }] },
+  { id: 2, empId: 11, type: 'ot', from: '2026-09-25', title: 'OT — 25/09, 18:00–22:00 (4 giờ)', hours: 4, createdAt: '22/09/2026 · 16:40', reason: 'Đổ bê tông sàn tầng 3 Tòa A, cần hoàn thành trước mưa',
+    steps: [{ name: 'Nguyễn Đức Anh', role: 'Quản lý trực tiếp', state: 'done', time: '22/09/2026 · 17:05', note: 'Đồng ý, đăng ký thêm 6 công nhân.' }, { name: 'Ngô Mỹ Duyên', role: 'Nhân sự (HR)', state: 'active' }] },
+  { id: 3, empId: 15, type: 'late', from: '2026-09-23', title: 'Đi muộn — 23/09, dự kiến 08:30', createdAt: '23/09/2026 · 07:12', reason: 'Xe hỏng giữa đường',
+    steps: [{ name: 'Đỗ Thảo Vy', role: 'Quản lý trực tiếp', state: 'active' }] },
+  { id: 4, empId: 16, type: 'leave', leaveKind: 'sick', from: '2026-09-23', to: '2026-09-23', title: 'Nghỉ ốm — 23/09', days: 1, createdAt: '23/09/2026 · 06:30', reason: 'Sốt cao, có giấy khám bệnh',
+    steps: [{ name: 'Đặng Quốc Cường', role: 'Quản lý trực tiếp', state: 'active' }, { name: 'Ngô Mỹ Duyên', role: 'Nhân sự (HR)', state: 'waiting' }] },
+  { id: 5, empId: 9, type: 'ot', from: '2026-09-20', title: 'OT — 20/09 (Chủ nhật), 07:00–12:00 (5 giờ)', hours: 5, createdAt: '19/09/2026 · 15:20', reason: 'Nghiệm thu cốt thép cùng tư vấn',
+    steps: [{ name: 'Nguyễn Đức Anh', role: 'Quản lý trực tiếp', state: 'done', time: '19/09/2026 · 16:00' }, { name: 'Ngô Mỹ Duyên', role: 'Nhân sự (HR)', state: 'done', time: '19/09/2026 · 17:30' }] },
+  { id: 6, empId: 17, type: 'leave', leaveKind: 'unpaid', from: '2026-09-30', to: '2026-10-02', title: 'Nghỉ không lương — 30/09 đến 02/10', days: 3, createdAt: '18/09/2026 · 11:00', reason: 'Việc gia đình',
+    steps: [{ name: 'Cao Nhật Tân', role: 'Quản lý trực tiếp', state: 'rejected', time: '18/09/2026 · 13:45', note: 'Trùng đợt triển khai phần mềm kho, dời sang tuần sau nhé.' }, { name: 'Ngô Mỹ Duyên', role: 'Nhân sự (HR)', state: 'waiting' }] },
+]
 export function reqStatus(r) {
   if (r.steps.some(s => s.state === 'rejected')) return 'rejected'
   if (r.steps.every(s => s.state === 'done')) return 'approved'
@@ -311,67 +384,77 @@ export const MONTHS = [0, 1, 2].map(i => {
   const d = new Date(y, m - 1 - i, 1)
   return { key: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, label: `Tháng ${d.getMonth() + 1}/${d.getFullYear()}` }
 })
+/* Công của 1 ngày: công ty làm thứ 7 nửa ngày (0,5 công), Chủ nhật nghỉ */
+export const dayWeight = iso => [1, 1, 1, 1, 1, 0.5, 0][weekdayIdx(iso)]
+/* Công chuẩn (chung cả công ty): tổng công các ngày từ ngày `from` (mặc định ngày 1) tới cuối tháng (T2–T6 = 1, T7 = 0,5) */
+export function monthStd(monthKey, from = 1) {
+  const [y, m] = monthKey.split('-').map(Number)
+  let n = 0
+  for (let d = from; d <= new Date(y, m, 0).getDate(); d++) n += dayWeight(`${monthKey}-${pad(d)}`)
+  return n
+}
 
 /* Ca (object, hoặc true khi chưa có danh mục ca) của 1 người vào 1 ngày; null = nghỉ.
-   Chưa có lịch tuần: coi như làm T2–T6 (trừ ngày có lịch riêng). */
+   Chưa có lịch tuần: coi như làm T2–T7 (thứ 7 nửa ngày, trừ ngày có lịch riêng). */
 function shiftAtFor(empId, iso) {
   const v = !ATT.schedule[empId] && ATT.overrides?.[empId]?.[iso] === undefined
-    ? (weekdayIdx(iso) < 5 ? true : 'off')
+    ? (weekdayIdx(iso) < 6 ? true : 'off')
     : shiftCodeOn(empId, iso, ATT.schedule, ATT.overrides)
   return v && v !== 'off' ? (ATT.shifts.find(s => s.id === v) || true) : null
 }
 /* Số ngày phép 1 đơn trên từng ngày có ca: nửa ngày chỉ khi đơn 1 ngày ghi 0,5 */
 const leaveDayValue = r => (r.from === r.to && r.days === 0.5 ? 0.5 : 1)
-/* Gợi ý số ngày nghỉ khi tạo đơn: số ngày có ca theo lịch của người đó trong khoảng */
+/* Gợi ý số ngày nghỉ khi tạo đơn: tổng công các ngày có ca theo lịch của người đó trong khoảng (thứ 7 = 0,5) */
 export function leaveDaysOf(empId, from, to) {
   let n = 0
-  for (let d = from; d <= to; d = addDays(d, 1)) if (shiftAtFor(empId, d)) n++
+  for (let d = from; d <= to; d = addDays(d, 1)) if (shiftAtFor(empId, d)) n += dayWeight(d)
   return n
 }
 
 /* Tổng hợp công & phép 1 tháng, tính từ dữ liệu thật:
-   - công chuẩn (std) = số ngày có ca trong CẢ tháng -> người vào / nghỉ giữa tháng nhận lương theo tỉ lệ total / std;
-   - chỉ tính ngày trong thời gian làm việc (ngày vào .. ngày nghỉ); người đã nghỉ vẫn có mặt ở các tháng còn làm;
+   - công chuẩn (std) = monthStd (cả công ty: T2–T6 = 1 công, T7 = 0,5, CN nghỉ); tháng vào làm: chỉ đếm từ ngày vào (gần như đủ lương tháng);
+   - công thực tế / phép của 1 ngày tối đa bằng công của ngày đó (thứ 7 = 0,5);
+   - người đã nghỉ việc không có trong bảng tổng hợp (và bảng lương); chỉ tính ngày từ ngày vào làm;
    - mỗi ngày có ca: phép (1 hoặc 0,5 theo đơn đã duyệt) + công thực tế (có giờ vào thì phần còn lại của ngày) -> không đếm trùng;
    - giờ vào ngày không có ca KHÔNG tính công (extra = số ngày đó; làm thêm phải có đơn OT);
    - muộn = vào sau giờ vào ca quá 5 phút; về sớm = ra trước giờ ra ca; OT = giờ của đơn OT đã duyệt;
-   - phép năm: 12 ngày/năm (+1 mỗi 5 năm thâm niên), tích luỹ theo tháng kể từ tháng vào làm (năm vào làm), thử việc chưa tích luỹ;
-     đã dùng = ngày phép năm đã duyệt (đếm theo ngày có ca như trên) từ đầu năm tới hết tháng. */
+   - phép năm: 12 ngày/năm (+1 mỗi 5 năm thâm niên), cộng dồn theo tháng trong năm, thử việc chưa tích luỹ;
+     đã dùng = ngày phép năm đã duyệt (đếm theo ngày có ca như trên) từ đầu năm tới hết tháng, tối đa bằng phép đã tích luỹ. */
 export function monthlySummary(employees, monthKey) {
   const [y, mo] = monthKey.split('-').map(Number)
   const first = monthKey + '-01'
   const last = isoOf(new Date(y, mo, 0))
   const approved = ATT.requests.filter(r => reqStatus(r) === 'approved')
-  return employees.filter(e => e.joinDate <= last && (e.status !== 'left' ? true : !!e.leaveDate && e.leaveDate >= first)).map(e => {
+  return employees.filter(e => e.status !== 'left' && e.joinDate <= last).map(e => {
     const start = e.joinDate > first ? e.joinDate : first
-    const end = e.leaveDate && e.leaveDate < last ? e.leaveDate : last
+    const end = last
     const leaves = approved.filter(r => r.empId === e.id && r.type === 'leave')
     const logOf = {}
     ATT.logs.forEach(l => { if (l.empId === e.id && l.in) logOf[l.date] = l })
-    let std = 0, worked = 0, paidLeave = 0, unpaid = 0, late = 0, early = 0, extra = 0
-    for (let d = first; d <= last; d = addDays(d, 1)) {
+    const std = Math.max(1, monthStd(monthKey, e.joinDate.slice(0, 7) === monthKey ? Number(e.joinDate.slice(8)) : 1))
+    let worked = 0, paidLeave = 0, unpaid = 0, late = 0, early = 0, extra = 0
+    for (let d = start; d <= end; d = addDays(d, 1)) {
       const s = shiftAtFor(e.id, d)
-      if (s) std++
-      if (d < start || d > end) continue
       const log = logOf[d]
       if (!s) { if (log) extra++; continue }
       const lv = leaves.find(r => r.from <= d && d <= r.to)
-      const v = lv ? leaveDayValue(lv) : 0
+      const w = dayWeight(d)
+      const v = lv ? Math.min(w, leaveDayValue(lv)) : 0
       if (lv) { if (lv.leaveKind === 'unpaid') unpaid += v; else paidLeave += v }
       if (log) {
-        worked += 1 - v
+        worked += w - v
         if (s.start && lateMinutes(log.in, s.start) > 5) late++
         if (s.end && log.out && s.end > s.start && lateMinutes(log.out, s.end) < 0) early++
       }
     }
     const ot = approved.filter(r => r.empId === e.id && r.type === 'ot' && r.from >= start && r.from <= end && r.from.slice(0, 7) === monthKey).reduce((n, r) => n + (r.hours || 0), 0)
-    const yearQuota = 12 + Math.floor(yearsBetween(e.joinDate, last) / 5)
-    const fromMonth = e.joinDate.slice(0, 4) === String(y) ? Number(e.joinDate.slice(5, 7)) : 1
-    const accrued = e.status === 'probation' || mo < fromMonth ? 0 : Math.min(yearQuota, Math.round(yearQuota / 12 * (mo - fromMonth + 1) * 10) / 10)
+    const yearQuota = 12 + Math.floor(yearsBetween(e.joinDate) / 5)
+    const accrued = e.status === 'probation' ? 0 : Math.min(yearQuota, Math.round(yearQuota / 12 * mo * 10) / 10)
     let used = 0
     approved.filter(r => r.empId === e.id && r.type === 'leave' && r.leaveKind === 'annual').forEach(r => {
-      for (let d = r.from; d <= r.to && d <= last; d = addDays(d, 1)) if (d.slice(0, 4) === String(y) && shiftAtFor(e.id, d)) used += leaveDayValue(r)
+      for (let d = r.from; d <= r.to && d <= last; d = addDays(d, 1)) if (d.slice(0, 4) === String(y) && shiftAtFor(e.id, d)) used += Math.min(dayWeight(d), leaveDayValue(r))
     })
+    used = Math.min(accrued, used)
     return { emp: e, std, worked, paidLeave, unpaid, late, early, extra, ot, total: worked + paidLeave, yearQuota, accrued, used, remain: Math.round((accrued - used) * 10) / 10 }
   })
 }

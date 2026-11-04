@@ -1,23 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { PROJ_DEPTS, AUTO_INCLUDE_DEPTS, avatarColor, initials } from '../../../data/quanLyThietKeData'
-import { ORG_CHILDREN_STORAGE_KEY, ORG_PARALLEL_STORAGE_KEY, readStoredArray } from './storage'
 import { useDelivery } from '../delivery'
 
-/* Bộ phận tuỳ biến đã lưu trong sơ đồ tổ chức → bổ sung vào danh sách phòng ban của popover nhân sự */
-function loadExtraDepts() {
-  const known = new Set(PROJ_DEPTS.map(d => d.value))
-  return [...readStoredArray(ORG_PARALLEL_STORAGE_KEY, []), ...readStoredArray(ORG_CHILDREN_STORAGE_KEY, [])]
-    .filter(x => x && typeof x.dept === 'string' && typeof x.label === 'string' && !known.has(x.dept))
-    .map(x => ({ value: x.dept, label: x.label }))
-}
-
 /* Nhân sự tham gia dự án — dùng chung cho danh sách dự án, header "Sơ đồ tổ chức"
-   và các node phòng ban. Lưu trên máy chủ theo dự án (khoá `project` = id dự án). Chỉ một popover được mở tại một thời điểm. */
+   và các node phòng ban. Chỉ một popover được mở tại một thời điểm. */
 const MembersContext = createContext(null)
 
 export function MembersProvider({ children }) {
   const dv = useDelivery()
-  const [extraDepts, setExtraDepts] = useState(loadExtraDepts)
   const [openPop, setOpenPop] = useState(null) // { project, anchor }
 
   useEffect(() => {
@@ -27,11 +17,11 @@ export function MembersProvider({ children }) {
     return () => document.removeEventListener('click', close)
   }, [openPop])
 
-  function membersOf(project) {
-    if (!project) return []
-    if (dv.detail && String(dv.detail.project.id) === String(project)) return dv.detail.members
-    return (dv.projects.find(p => String(p.id) === String(project)) || {}).members || []
-  }
+  /* Nhân sự lưu trên máy chủ theo dự án (khoá `project` = id dự án); bộ phận tuỳ biến lấy từ sơ đồ tổ chức của dự án đang chọn */
+  const known = new Set(PROJ_DEPTS.map(d => d.value))
+  const oc = dv.detail && dv.detail.project.orgChart
+  const extraDepts = oc ? [...(oc.parallel || []), ...(oc.children || [])].filter(x => !known.has(x.dept)).map(x => ({ value: x.dept, label: x.label })) : []
+  const membersOf = project => (dv.detail && String(dv.detail.project.id) === String(project) ? dv.detail.members : (dv.projects.find(p => String(p.id) === String(project)) || {}).members) || []
   const depts = [...PROJ_DEPTS, ...extraDepts]
   const deptLabel = Object.fromEntries(depts.map(d => [d.value, d.label]))
 
@@ -42,7 +32,7 @@ export function MembersProvider({ children }) {
     nameOf: project => (dv.projects.find(p => String(p.id) === String(project)) || {}).name || '',
     addMember: (project, member) => dv.addMember(project, member),
     removeMember: (project, idx) => { const m = membersOf(project)[idx]; if (m) dv.removeMember(project, m.id) },
-    addDept: dept => setExtraDepts(prev => [...prev, dept]),
+    addDept: () => {}, // bộ phận mới nằm trong sơ đồ tổ chức (lưu máy chủ) nên tự có trong danh sách sau khi lưu
     openPop,
     togglePop: (project, anchor) =>
       setOpenPop(prev => (prev && prev.project === project && prev.anchor === anchor) ? null : { project, anchor }),

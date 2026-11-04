@@ -57,11 +57,12 @@ type Service struct {
 	users   contracts.UserReader
 	userFmt contracts.UserFormatter
 	now     func() time.Time
+	prod    bool // NODE_ENV=production: tắt ResetData
 }
 
 // New tạo service.
 func New(d Deps) *Service {
-	return &Service{db: d.DB, users: d.Users, userFmt: d.UserFmt, now: time.Now}
+	return &Service{db: d.DB, users: d.Users, userFmt: d.UserFmt, now: time.Now, prod: d.Cfg != nil && d.Cfg.NodeEnv == "production"}
 }
 
 // allow: giống canTab('hr') của giao diện (xem sales.allow).
@@ -165,18 +166,18 @@ func (s *Service) state(ctx context.Context, x *access) (*omap.Map, error) {
 		}
 		members.Set(k, append(list, mo))
 	}
+	// như giao diện gốc: danh sách đủ người cho sơ đồ tổ chức; ngoài phạm vi (hoặc không có quyền xem hồ sơ) chỉ thông tin công khai
 	eOut := []any{}
-	if x.can("employees", "view") {
-		for _, e := range emps {
-			if !x.sees(e) {
-				continue
-			}
-			o := empOut(e)
-			if !x.can("payroll", "view") {
-				hidePay(o)
-			}
-			eOut = append(eOut, o)
+	for _, e := range emps {
+		o := empOut(e)
+		if !x.can("employees", "view") || !x.sees(e) {
+			o = omap.Of("id", o.Val("id"), "code", o.Val("code"), "name", o.Val("name"), "dept", o.Val("dept"), "position", o.Val("position"),
+				"level", o.Val("level"), "status", o.Val("status"), "managerId", o.Val("managerId"), "site", o.Val("site"),
+				"joinDate", o.Val("joinDate"), "leaveDate", o.Val("leaveDate"), "gender", o.Val("gender"))
+		} else if !x.can("payroll", "view") {
+			hidePay(o)
 		}
+		eOut = append(eOut, o)
 	}
 	return omap.Of("units", uOut, "heads", heads, "members", members, "employees", eOut, "me", x.meOut()), nil
 }
@@ -220,9 +221,18 @@ func empOut(e *omap.Map) *omap.Map {
 
 // CreateEmployee: thêm hồ sơ. Trả {id, ...state}.
 func (s *Service) CreateEmployee(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	x, err := s.gateAll(ctx, a, "employees", "create")
+	module, action := "employees", "create"
+	if body.Has("candidateId") {
+		module, action = "recruit", "approve" // Nhận việc từ Tuyển dụng
+	}
+	x, err := s.gate(ctx, a, module, action)
 	if err != nil {
 		return nil, err
+	}
+	if body.Has("candidateId") {
+		if err := x.deptNeed(body.Val("dept")); err != nil {
+			return nil, err
+		}
 	}
 	for _, k := range []string{"code", "name", "dept"} {
 		if str(body, k) == "" {
@@ -240,6 +250,9 @@ func (s *Service) CreateEmployee(ctx context.Context, a *actor.Actor, body *omap
 		}
 		now := s.nowISO()
 		row.Set("nguoi_tao", a.UID).Set("ngay_tao", now).Set("cap_nhat", now)
+		if lv := str(body, "level"); lv == "Trưởng phòng" || lv == "Giám đốc" {
+			row.Set("vai_tro_hr", "manager") // như giao diện gốc: cấp trưởng phòng / giám đốc mặc định là Trưởng phòng
+		}
 		out, err := s.db.InsertOne(ctx, "hr_nhan_vien", row)
 		if err != nil {
 			return dupCode(err)
@@ -274,13 +287,6 @@ func (s *Service) UpdateEmployee(ctx context.Context, a *actor.Actor, id float64
 			return nil, apperr.NotFound("Không tìm thấy nhân sự")
 		}
 		return nil, err
-	}
-	if x.scope != "all" {
-		// ngoài HR Admin: chỉ sửa thông tin hồ sơ, không đổi lương / phòng ban / trạng thái / quản lý / hợp đồng
-		body = body.Clone()
-		for _, k := range []string{"code", "salary", "status", "dept", "managerId", "joinDate", "leaveDate", "contractType", "level", "position", "contracts", "promotions"} {
-			body.Delete(k)
-		}
 	}
 	if err := s.db.Tx(ctx, func(ctx context.Context) error { return s.patchEmployee(ctx, x, id, body) }); err != nil {
 		return nil, err
@@ -360,16 +366,9 @@ func (s *Service) getEmp(ctx context.Context, id any) (*omap.Map, error) {
 	return rows[0], nil
 }
 
-// offboard: nghỉ việc -> cấp dưới chuyển lên quản lý cấp trên, bỏ chức trưởng đơn vị, gỡ mọi kiêm nhiệm (hết phụ cấp).
+// offboard: nghỉ việc -> cấp dưới chuyển lên quản lý cấp trên (trưởng đơn vị, kiêm nhiệm giữ nguyên).
 func (s *Service) offboard(ctx context.Context, emp *omap.Map) error {
-	if err := s.reassignReports(ctx, emp); err != nil {
-		return err
-	}
-	if _, err := s.db.Update(ctx, "hr_don_vi", database.Eq("truong_don_vi", emp.Val("id")), omap.Of("truong_don_vi", nil, "cap_nhat", s.nowISO())); err != nil {
-		return err
-	}
-	_, err := s.db.Remove(ctx, "hr_kiem_nhiem", database.Eq("nhan_vien_id", emp.Val("id")))
-	return err
+	return s.reassignReports(ctx, emp)
 }
 
 func (s *Service) reassignReports(ctx context.Context, emp *omap.Map) error {

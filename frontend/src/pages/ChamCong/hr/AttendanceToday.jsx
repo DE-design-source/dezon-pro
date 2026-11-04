@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { SITES, HR_TODAY, HR_TODAY_LABEL, shiftCodeOn, attendanceStatus, lateMinutes } from '../../../data/hrData'
+import { SITES, HR_TODAY_LABEL, TODAY_IDX, attendanceStatus, lateMinutes } from '../../../data/hrData'
 import { Avatar, Pill, Seg, Empty, downloadCsv } from './shared'
 import { useAccess } from './access'
 
@@ -27,24 +27,25 @@ function distance(a, b) {
   return Math.round(2 * R * Math.asin(Math.sqrt(h)))
 }
 
-/* Bảng công hôm nay + các nguồn dữ liệu chấm công (GPS / import / HR bổ sung).
-   logs: chấm công hôm nay (+ dòng nghỉ phép đã duyệt); onSaveLogs(list, okMsg) ghi lên máy chủ, trả Promise<boolean> */
-export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, schedule, overrides, toast, meId }) {
+/* Bảng công hôm nay + các nguồn dữ liệu chấm công (máy chấm công / GPS / import) */
+export default function AttendanceToday({ employees, logs, setLogs, shifts, schedule, toast, meId }) {
   const { can, log: audit } = useAccess()
   const hr = can('attendance', 'edit')
   const [filter, setFilter] = useState('all')
   const [site, setSite] = useState('all')
   const [q, setQ] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState('07:30')
   const [gpsBusy, setGpsBusy] = useState(false)
   const fileRef = useRef(null)
 
   const rows = useMemo(() => employees.filter(e => e.status !== 'left').map(e => {
-    const shiftId = shiftCodeOn(e.id, HR_TODAY, schedule, overrides) || 'off'
+    const shiftId = schedule[e.id]?.[TODAY_IDX] || 'off'
     const shift = shifts.find(s => s.id === shiftId)
     const log = logs.find(l => l.empId === e.id)
     const st = shiftId === 'off' && !log?.in ? 'off' : attendanceStatus(log, shift)
     return { e, shift, log, st }
-  }), [employees, logs, shifts, schedule, overrides])
+  }), [employees, logs, shifts, schedule])
 
   const counts = rows.reduce((c, r) => { c[r.st] = (c[r.st] || 0) + 1; return c }, {})
   const outZone = rows.filter(r => r.log?.gps === 'out').length
@@ -56,6 +57,18 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
     (filter === 'all' || (filter === 'outzone' ? r.log?.gps === 'out' : r.st === filter)) &&
     (site === 'all' || r.e.site === site) && (!t || (r.e.name + ' ' + r.e.code).toLowerCase().includes(t)))
 
+  function sync() {
+    setSyncing(true)
+    setTimeout(() => {
+      // Giả lập: máy chấm công trả về lượt chấm của nhân sự đang "chưa chấm"
+      const missing = rows.filter(r => r.st === 'absent' && r.e.site === 'Văn phòng HCM' && !r.log?.leave)
+      setLogs(prev => prev.map(l => (missing.some(m => m.e.id === l.empId) ? { ...l, in: '08:12', source: 'machine' } : l)))
+      setSyncing(false)
+      setLastSync(nowHM())
+      toast(missing.length ? `Đã đồng bộ ${missing.length} lượt chấm công mới từ máy chấm công` : 'Đã đồng bộ — không có lượt chấm mới')
+    }, 1200)
+  }
+
   /* Import CSV: mã NV, giờ vào, giờ ra */
   function onFile(ev) {
     const file = ev.target.files[0]
@@ -65,14 +78,18 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
     const reader = new FileReader()
     reader.onload = () => {
       const lines = String(reader.result).replace(/^﻿/, '').split(/\r?\n/).map(l => l.split(/[,;]/).map(c => c.replace(/"/g, '').trim())).filter(c => c[0])
-      const list = []
+      let n = 0
+      const next = [...logs]
       lines.forEach(([code, inT, outT]) => {
-        const emp = employees.find(e => String(e.code).toLowerCase() === code.toLowerCase())
+        const emp = employees.find(e => e.code.toLowerCase() === code.toLowerCase())
         if (!emp || !/^\d{1,2}:\d{2}$/.test(inT || '')) return
-        list.push({ empId: emp.id, date: HR_TODAY, in: inT.padStart(5, '0'), out: /^\d{1,2}:\d{2}$/.test(outT || '') ? outT.padStart(5, '0') : '', source: 'import' })
+        n++
+        const i = next.findIndex(l => l.empId === emp.id)
+        const rec = { empId: emp.id, in: inT.padStart(5, '0'), out: /^\d{1,2}:\d{2}$/.test(outT || '') ? outT.padStart(5, '0') : null, source: 'import', gps: null }
+        if (i >= 0) next[i] = { ...next[i], ...rec, leave: undefined }; else next.push(rec)
       })
-      if (!list.length) { toast('Không tìm thấy dòng hợp lệ (cần: Mã NV, Giờ vào, Giờ ra)', 'danger'); return }
-      onSaveLogs(list, `Đã import ${list.length} dòng chấm công từ ${file.name}`)
+      setLogs(next)
+      toast(n ? `Đã import ${n} dòng chấm công từ ${file.name}` : 'Không tìm thấy dòng hợp lệ (cần: Mã NV, Giờ vào, Giờ ra)', n ? 'success' : 'danger')
     }
     reader.readAsText(file, 'utf-8')
   }
@@ -80,22 +97,24 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
   /* Chấm công GPS cho chính mình: lấy vị trí, so với địa điểm làm việc */
   function gpsCheck() {
     const me = employees.find(e => e.id === meId)
-    if (!me) { toast('Tài khoản chưa gắn với hồ sơ nhân sự nên chưa chấm công GPS được', 'danger'); return }
-    const target = SITES.find(s => s.name === me.site)
-    if (!target || target.lat == null) { toast(`Địa điểm "${me.site || 'chưa chọn'}" chưa có toạ độ GPS - khai báo ở Ca & lịch làm việc`, 'danger'); return }
+    const target = SITES.find(s => s.name === me.site) || SITES[0]
     const mine = logs.find(l => l.empId === meId)
-    const apply = dist => {
+    const apply = (dist, real) => {
       const inZone = dist <= target.radius
-      const t = nowHM()
-      onSaveLogs([{ empId: meId, date: HR_TODAY, ...(mine?.in ? { out: t } : { in: t }), source: 'gps', gps: inZone ? 'in' : 'out', dist }],
-        `${mine?.in ? 'Chấm ra' : 'Chấm vào'} lúc ${t} · ${inZone ? 'trong' : 'NGOÀI'} vùng ${target.name} (${dist.toLocaleString('vi-VN')} m)`)
-        .finally(() => setGpsBusy(false))
+      setLogs(prev => {
+        const has = prev.some(l => l.empId === meId)
+        const patch = mine?.in ? { out: nowHM() } : { in: nowHM() }
+        const rec = { ...patch, source: 'gps', gps: inZone ? 'in' : 'out', dist }
+        return has ? prev.map(l => (l.empId === meId ? { ...l, ...rec } : l)) : [...prev, { empId: meId, out: null, ...rec }]
+      })
+      setGpsBusy(false)
+      toast(`${mine?.in ? 'Chấm ra' : 'Chấm vào'} lúc ${nowHM()} · ${inZone ? 'trong' : 'NGOÀI'} vùng ${target.name} (${dist.toLocaleString('vi-VN')} m${real ? '' : ', vị trí mô phỏng'})`, inZone ? 'success' : 'danger')
     }
     setGpsBusy(true)
-    if (!navigator.geolocation) { setGpsBusy(false); toast('Trình duyệt không hỗ trợ định vị', 'danger'); return }
+    if (!navigator.geolocation) { apply(48, false); return }
     navigator.geolocation.getCurrentPosition(
-      p => apply(distance({ lat: p.coords.latitude, lng: p.coords.longitude }, target)),
-      () => { setGpsBusy(false); toast('Không lấy được vị trí - hãy cho phép trình duyệt truy cập vị trí', 'danger') },
+      p => apply(distance({ lat: p.coords.latitude, lng: p.coords.longitude }, target), true),
+      () => apply(48, false),
       { timeout: 6000, maximumAge: 60000 },
     )
   }
@@ -103,8 +122,12 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
   function manualFix(r) {
     const v = prompt(`Bổ sung giờ vào cho ${r.e.name} (HH:MM):`, r.shift?.start || '08:00')
     if (!v || !/^\d{1,2}:\d{2}$/.test(v)) return
-    onSaveLogs([{ empId: r.e.id, date: HR_TODAY, in: v.padStart(5, '0'), source: 'manual', note: 'HR bổ sung' }], `Đã bổ sung chấm công cho ${r.e.name}`)
-      .then(ok => ok && audit('attendance', 'edit', `Bổ sung chấm công ${v} — ${r.e.name}`))
+    setLogs(prev => {
+      const rec = { in: v.padStart(5, '0'), source: 'manual', gps: null, leave: undefined, note: 'HR bổ sung' }
+      return prev.some(l => l.empId === r.e.id) ? prev.map(l => (l.empId === r.e.id ? { ...l, ...rec } : l)) : [...prev, { empId: r.e.id, out: null, ...rec }]
+    })
+    audit('attendance', 'edit', `Bổ sung chấm công ${v} — ${r.e.name}`)
+    toast(`Đã bổ sung chấm công cho ${r.e.name}`)
   }
 
   const myLog = logs.find(l => l.empId === meId)
@@ -122,8 +145,8 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
       <div className="cc-sources">
         <div className="cc-card cc-source">
           <span className="cc-ico cc-tone-primary"><Icon name="fingerprint" size={16} /></span>
-          <div className="cc-grow"><b>Máy chấm công (API)</b><span>Chưa kết nối thiết bị · dùng Import CSV hoặc GPS</span></div>
-          <button className="cc-btn ghost" disabled title="Chưa tích hợp máy chấm công"><Icon name="refresh" size={14} />Đồng bộ</button>
+          <div className="cc-grow"><b>Máy chấm công (API)</b><span>3 thiết bị · đồng bộ lần cuối {lastSync}</span></div>
+          <button className="cc-btn ghost" onClick={sync} disabled={syncing || !hr} title={hr ? '' : 'Cần quyền sửa chấm công'}><Icon name="refresh" size={14} className={syncing ? 'spin' : ''} />{syncing ? 'Đang đồng bộ...' : 'Đồng bộ'}</button>
         </div>
         <div className="cc-card cc-source">
           <span className="cc-ico cc-tone-qs"><Icon name="upload" size={16} /></span>
@@ -134,7 +157,7 @@ export default function AttendanceToday({ employees, logs, onSaveLogs, shifts, s
         <div className="cc-card cc-source">
           <span className="cc-ico cc-tone-attendance"><Icon name="mapPin" size={16} /></span>
           <div className="cc-grow"><b>Chấm công GPS (của bạn)</b><span>{myLog?.in ? `Đã vào ${myLog.in}${myLog.out ? ' · ra ' + myLog.out : ''}` : 'Chưa chấm công hôm nay'}</span></div>
-          <button className="cc-btn" onClick={gpsCheck} disabled={gpsBusy || !employees.some(e => e.id === meId)} title={employees.some(e => e.id === meId) ? '' : 'Tài khoản chưa gắn với hồ sơ nhân sự'}><Icon name="mapPin" size={14} />{gpsBusy ? 'Đang định vị...' : myLog?.in ? 'Chấm ra' : 'Chấm vào'}</button>
+          <button className="cc-btn" onClick={gpsCheck} disabled={gpsBusy}><Icon name="mapPin" size={14} />{gpsBusy ? 'Đang định vị...' : myLog?.in ? 'Chấm ra' : 'Chấm vào'}</button>
         </div>
       </div>
 

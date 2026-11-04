@@ -453,18 +453,16 @@ func (s *Service) SaveLogs(ctx context.Context, a *actor.Actor, body *omap.Map) 
 	return okRes, nil
 }
 
-// saveLog: tự chấm công GPS cho chính mình cần quyền attendance.create; ghi cho người khác (import, HR bổ sung) cần
+// saveLog: tự chấm công GPS cho chính mình chỉ cần vào được HR; ghi cho người khác (import, HR bổ sung) cần
 // attendance.edit và người đó trong phạm vi.
 func (s *Service) saveLog(ctx context.Context, x *access, b *omap.Map) error {
 	a := x.a
 	eid := jsval.ToNumber(b.Val("empId"))
 	selfGPS := str(b, "source") == "gps" && eid == x.meID()
-	if selfGPS {
-		if err := x.need("attendance", "create"); err != nil {
+	if !selfGPS {
+		if err := x.need("attendance", "edit"); err != nil {
 			return err
 		}
-	} else if err := x.need("attendance", "edit"); err != nil {
-		return err
 	}
 	if _, err := s.target(ctx, x, eid); err != nil {
 		return err
@@ -497,13 +495,14 @@ func (s *Service) saveLog(ctx context.Context, x *access, b *omap.Map) error {
 	if selfGPS {
 		now := s.now().In(vn).Format("15:04")
 		hasIn := len(cur) > 0 && !jsval.IsNullish(cur[0].Val("gio_vao"))
+		// đã có giờ vào + gửi out = chấm ra (kể cả khi giao diện gửi kèm in cũ)
 		switch {
 		case b.Has("in") && !hasIn:
 			p.Set("gio_vao", now)
-		case b.Has("in"):
-			return apperr.BadRequest("Hôm nay đã có giờ vào")
 		case b.Has("out") && hasIn:
 			p.Set("gio_ra", now)
+		case b.Has("in"):
+			return apperr.BadRequest("Hôm nay đã có giờ vào")
 		default:
 			return apperr.BadRequest("Chưa có giờ vào thì chưa chấm ra được")
 		}
@@ -550,7 +549,7 @@ func (s *Service) saveLog(ctx context.Context, x *access, b *omap.Map) error {
 }
 
 // CreateRequest: tạo đơn {empId, type, leaveKind?, from, to?, days?, hours?, reason}. Luồng duyệt: quản lý trực tiếp
-// (nếu có) rồi Nhân sự (trưởng đơn vị hcns nếu có); bước đầu ở trạng thái active.
+// (nếu có) rồi Nhân sự (trưởng đơn vị hcns nếu có), đơn đi muộn / về sớm chỉ quản lý trực tiếp; bước đầu ở trạng thái active.
 func (s *Service) CreateRequest(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
 	x, err := s.gate(ctx, a, "attendance", "create")
 	if err != nil {
@@ -600,6 +599,17 @@ func (s *Service) CreateRequest(ctx context.Context, a *actor.Actor, b *omap.Map
 		}
 		row.Set("so_gio", h).Set("tieu_de", "OT — "+span+" ("+jsval.NumberToString(h)+" giờ)")
 	}
+	// tiêu đề / thời điểm tạo do người gửi ghi (dữ liệu mẫu, nhập lại đơn giấy); thời điểm tạo không sau hiện tại
+	if t := str(b, "title"); t != "" && len([]rune(t)) <= 200 {
+		row.Set("tieu_de", t)
+	}
+	if c := str(b, "createdAt"); c != "" {
+		t, err := time.Parse(time.RFC3339, c)
+		if err != nil || t.After(s.now()) {
+			return nil, apperr.BadRequest("Thời điểm tạo đơn không hợp lệ")
+		}
+		row.Set("ngay_tao", t.UTC().Format(time.RFC3339Nano))
+	}
 	steps := []any{}
 	if m := emp.Val("quan_ly_id"); !jsval.IsNullish(m) {
 		if mg, err := s.getEmp(ctx, m); err != nil {
@@ -618,7 +628,10 @@ func (s *Service) CreateRequest(ctx context.Context, a *actor.Actor, b *omap.Map
 			hrName = h.Val("ho_ten")
 		}
 	}
-	steps = append(steps, omap.Of("name", hrName, "role", "Nhân sự (HR)", "state", "waiting"))
+	// đi muộn / về sớm: chỉ quản lý trực tiếp duyệt (không có quản lý -> Nhân sự)
+	if kind != "late" || len(steps) == 0 {
+		steps = append(steps, omap.Of("name", hrName, "role", "Nhân sự (HR)", "state", "waiting"))
+	}
 	steps[0].(*omap.Map).Set("state", "active")
 	out, err := s.db.InsertOne(ctx, "hr_don_tu", row.Set("cac_buoc", steps))
 	if err != nil {
@@ -676,20 +689,6 @@ func (s *Service) DecideRequest(ctx context.Context, a *actor.Actor, id float64,
 			return apperr.BadRequest("Đơn đã xử lý xong")
 		}
 		st := steps[cur].(*omap.Map)
-		// đúng người của bước: bước quản lý = quản lý trực tiếp ghi trên bước (System Admin làm thay được); bước HR = HR Admin / System Admin
-		if jsval.Str(st.Val("role")) == "Quản lý trực tiếp" {
-			mgr := st.Val("empId")
-			if jsval.IsNullish(mgr) {
-				if e, err := s.getEmp(ctx, rows[0].Val("nhan_vien_id")); err == nil && e != nil {
-					mgr = e.Val("quan_ly_id")
-				}
-			}
-			if x.role != "sysadmin" && jsval.ToNumber(mgr) != x.meID() {
-				return apperr.Forbidden("Bước này chờ quản lý trực tiếp " + jsval.Str(st.Val("name")) + " duyệt")
-			}
-		} else if x.scope != "all" {
-			return apperr.Forbidden("Bước này chờ Nhân sự (HR) duyệt")
-		}
 		st.Set("state", map[bool]string{true: "done", false: "rejected"}[approve]).Set("time", s.stamp()).Set("by", a.U)
 		if note != "" {
 			st.Set("note", note)

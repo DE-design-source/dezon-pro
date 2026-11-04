@@ -45,23 +45,28 @@ func TestQuyTacNghiepVu(t *testing.T) {
 	sh, _, ah := svcAs(db, "user", "hr", cts[0])
 	ah.UID, sh.now = uH, now
 
-	// chốt / duyệt chỉ từ ngày cuối tháng
-	if _, err := sa.RunAction(ctx, adm, omap.Of("month", "2031-06", "action", "close")); status(err) != 400 {
-		t.Errorf("chốt công giữa tháng phải 400: %v", err)
+	// chốt công không giới hạn ngày (như giao diện gốc)
+	if _, err := sa.RunAction(ctx, adm, omap.Of("month", "2031-06", "action", "close")); err != nil {
+		t.Errorf("chốt công giữa tháng: %v", err)
 	}
-	if _, err := sa.RunAction(ctx, adm, omap.Of("month", "2031-06", "action", "approve", "payslips", omap.Of())); status(err) != 400 {
-		t.Errorf("duyệt lương giữa tháng phải 400: %v", err)
+	if _, err := sa.RunAction(ctx, adm, omap.Of("month", "2031-06", "action", "open")); err != nil {
+		t.Fatal(err)
 	}
-	// đơn: bước quản lý chỉ quản lý trực tiếp (hoặc System Admin); bước HR chỉ phạm vi toàn công ty
-	rq := id(sa.CreateRequest(ctx, adm, omap.Of("empId", e, "type", "late", "from", "2031-05-20")))
-	if _, err := sh.DecideRequest(ctx, ah, rq, omap.Of("approve", true)); status(err) != 403 {
-		t.Errorf("HR Admin duyệt bước quản lý trực tiếp phải 403: %v", err)
-	}
-	if _, err := sa.DecideRequest(ctx, adm, rq, omap.Of("approve", true)); err != nil {
-		t.Errorf("System Admin duyệt thay bước quản lý: %v", err)
+	// đơn: ai có quyền duyệt (trong phạm vi) duyệt bước đang chờ; đi muộn / về sớm chỉ 1 bước quản lý trực tiếp
+	rq := id(sa.CreateRequest(ctx, adm, omap.Of("empId", e, "type", "leave", "leaveKind", "annual", "from", "2031-05-20", "days", 1.0)))
+	if _, err := sh.DecideRequest(ctx, ah, rq, omap.Of("approve", true)); err != nil {
+		t.Errorf("HR Admin duyệt bước quản lý trực tiếp: %v", err)
 	}
 	if _, err := sh.DecideRequest(ctx, ah, rq, omap.Of("approve", true)); err != nil {
 		t.Errorf("HR Admin duyệt bước HR: %v", err)
+	}
+	late := id(sa.CreateRequest(ctx, adm, omap.Of("empId", e, "type", "late", "from", "2031-05-19")))
+	if r, _ := sa.AttState(ctx, adm, "2031-05-19", "2031-05-19"); r != nil {
+		for _, x := range r.(*omap.Map).Val("requests").([]any) {
+			if q := x.(*omap.Map); q.Val("id") == late && len(q.Val("steps").([]any)) != 1 {
+				t.Errorf("đơn đi muộn phải 1 bước: %v", q.Val("steps"))
+			}
+		}
 	}
 	// chốt công tháng 5 -> chặn đơn, duyệt đơn, lịch riêng ngày; tháng chốt mà chưa duyệt lương -> chặn đổi lịch tuần
 	pending := id(sa.CreateRequest(ctx, adm, omap.Of("empId", e, "type", "late", "from", "2031-05-21")))
@@ -94,7 +99,7 @@ func TestQuyTacNghiepVu(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// nghỉ việc: bỏ chức trưởng đơn vị + kiêm nhiệm; không chọn lại người đã nghỉ làm quản lý / trưởng đơn vị / kiêm nhiệm
+	// nghỉ việc: giữ trưởng đơn vị + kiêm nhiệm (như giao diện gốc); không chọn lại người đã nghỉ làm quản lý / trưởng đơn vị / kiêm nhiệm
 	if _, err := sa.SaveOrg(ctx, adm, omap.Of("units", []any{omap.Of("key", "zzhrra", "headId", boss)},
 		"members", []any{omap.Of("unit", "zzhrrb", "id", boss, "pct", 10.0)})); err != nil {
 		t.Fatal(err)
@@ -104,11 +109,8 @@ func TestQuyTacNghiepVu(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := full.(*omap.Map)
-	if m.Val("heads").(*omap.Map).Has("zzhrra") {
-		t.Error("người nghỉ việc vẫn là trưởng đơn vị")
-	}
-	if m.Val("members").(*omap.Map).Has("zzhrrb") {
-		t.Error("người nghỉ việc vẫn còn kiêm nhiệm")
+	if !m.Val("heads").(*omap.Map).Has("zzhrra") || !m.Val("members").(*omap.Map).Has("zzhrrb") {
+		t.Error("nghỉ việc không được gỡ trưởng đơn vị / kiêm nhiệm")
 	}
 	if _, err := sa.UpdateEmployee(ctx, adm, e, omap.Of("managerId", boss)); status(err) != 400 {
 		t.Errorf("chọn quản lý đã nghỉ việc phải 400: %v", err)

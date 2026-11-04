@@ -21,9 +21,11 @@ import (
 
 var (
 	tabOf       = map[string]string{"design": "thietke", "construction": "thicong"}
-	statuses    = map[string]bool{"nhap": true, "dang-lam": true, "tam-dung": true, "hoan-tat": true}
+	statuses    = map[string]bool{"nhap": true, "thiet-ke": true, "dang-lam": true, "tam-dung": true, "hoan-tat": true}
 	subStatuses = map[string]bool{"active": true, "pending": true, "done": true}
 	isoDate     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	cssColor    = regexp.MustCompile(`^(var\(--[a-z0-9-]+\)|#[0-9a-fA-F]{3,8})?$`)
+	slug        = regexp.MustCompile(`^[a-z0-9-]{0,40}$`)
 )
 
 var _ contracts.DeliveryFromLead = (*Service)(nil)
@@ -175,7 +177,7 @@ func (s *Service) ListProjects(ctx context.Context, a *actor.Actor, kind any) (a
 			return nil, err
 		}
 		for _, t := range tasks {
-			if jsval.Truthy(t.Val("loai_tien")) {
+			if jsval.Truthy(t.Val("cot_moc")) || jsval.Truthy(t.Val("loai_tien")) { // như KPI "TB" của Gantt: bỏ mốc và dòng thu / chi
 				continue
 			}
 			id := jsval.ToNumber(t.Val("du_an_id"))
@@ -186,7 +188,10 @@ func (s *Service) ListProjects(ctx context.Context, a *actor.Actor, kind any) (a
 	out := make([]any, len(rows))
 	for i, r := range rows {
 		id := jsval.ToNumber(r.Val("id"))
-		prog := 0.0
+		prog := jsval.ToNumber(r.Val("tien_do")) // chưa có công việc: tiến độ nhập tay (bản cũ ghi sẵn ở danh sách), null = 0
+		if prog != prog {
+			prog = 0
+		}
 		if cnt[id] > 0 {
 			prog = jsval.Round(sum[id] / cnt[id])
 		}
@@ -216,6 +221,9 @@ func (s *Service) CreateProject(ctx context.Context, a *actor.Actor, body *omap.
 	row.Set("loai", k).Set("nguoi_tao", a.UID).Set("ngay_tao", now).Set("cap_nhat", now)
 	out, err := s.repo.InsertProject(ctx, row)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCorePhases(ctx, jsval.ToNumber(out.Val("id"))); err != nil {
 		return nil, err
 	}
 	return projectOut(out).Set("progress", 0.0).Set("taskCount", 0.0).Set("members", []any{}), nil
@@ -301,31 +309,138 @@ func (s *Service) DeleteProject(ctx context.Context, a *actor.Actor, id float64)
 	return omap.Of("ok", true), nil
 }
 
-// EnsureFromLead: cài contracts.DeliveryFromLead (module sales gọi khi khách sang giai đoạn thiet-ke / thi-cong).
+// leadProjectName: tên dự án sinh từ khách, như pushSyncedProject cũ: type (loại công trình + quy mô) có "—" thì lấy type,
+// không thì "tên — type".
+func leadProjectName(lead *omap.Map) string {
+	typ := jsval.Str(lead.Val("loai_cong_trinh"))
+	if typ == "" {
+		typ = "Chưa xác định"
+	}
+	if qm := jsval.Str(lead.Val("quy_mo")); qm != "" {
+		typ += " (" + qm + ")"
+	}
+	if strings.Contains(typ, "—") {
+		return typ
+	}
+	return jsval.Str(lead.Val("ten_khach")) + " — " + typ
+}
+
+// EnsureFromLead: cài contracts.DeliveryFromLead (module sales gọi khi khách VÀO tu-van / dam-phan / thiet-ke).
+// Đã có dự án gắn khách -> chỉ hiện lại nếu đang ẩn, không ghi đè thông tin đội thiết kế / thi công đã sửa.
 // Không kiểm quyền tab: người kéo thẻ ở Kinh doanh không cần quyền vào trang thiết kế / thi công.
 func (s *Service) EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, valueVnd float64, kind string) (bool, error) {
 	if _, ok := tabOf[kind]; !ok || lead == nil {
 		return false, nil
 	}
 	have, err := s.repo.ProjectOfLead(ctx, lead.Val("id"), kind)
-	if err != nil || have != nil {
+	if err != nil {
 		return false, err
 	}
-	ten, loai := jsval.Str(lead.Val("ten_khach")), jsval.Str(lead.Val("loai_cong_trinh"))
-	name := ten
-	if loai != "" {
-		name = ten + " — " + loai
+	if have != nil {
+		if jsval.Truthy(have.Val("tach_khach_hang")) {
+			// không đổi cap_nhat: ẩn / hiện tự động không tính là người dùng sửa dự án (xem pristine)
+			_, err = s.repo.UpdateProject(ctx, jsval.ToNumber(have.Val("id")), omap.Of("tach_khach_hang", false))
+		}
+		return false, err
 	}
-	now := s.nowISO()
 	var uid any
 	if a != nil {
 		uid = a.UID
 	}
-	row := omap.Of("loai", kind, "khach_hang_id", lead.Val("id"), "ma_da", jsval.Or(lead.Val("ma_da"), nil), "ten", name,
-		"khach", ten, "sdt", lead.Val("sdt"), "email", lead.Val("email"), "dia_chi", lead.Val("dia_chi"), "loai_cong_trinh", loai,
-		"gia_tri_hd", jsval.Round(valueVnd), "ghi_chu", "Tạo tự động từ Kinh doanh", "nguoi_tao", uid, "ngay_tao", now, "cap_nhat", now)
-	if _, err := s.repo.InsertProject(ctx, row); err != nil {
+	now, ten := s.nowISO(), jsval.Str(lead.Val("ten_khach"))
+	row := omap.Of("loai", kind, "khach_hang_id", lead.Val("id"), "ma_da", jsval.Or(lead.Val("ma_da"), nil), "ten", leadProjectName(lead),
+		"khach", ten, "sdt", lead.Val("sdt"), "email", lead.Val("email"), "dia_chi", lead.Val("dia_chi"), "loai_cong_trinh", jsval.Str(lead.Val("loai_cong_trinh")),
+		"gia_tri_hd", jsval.Round(valueVnd), "ghi_chu", "Tạo tự động từ Kinh doanh", "trang_thai", "thiet-ke", "nguoi_tao", uid, "ngay_tao", now, "cap_nhat", now)
+	out, err := s.repo.InsertProject(ctx, row)
+	if err != nil {
 		return false, err
+	}
+	return true, s.ensureCorePhases(ctx, jsval.ToNumber(out.Val("id")))
+}
+
+// RenameFromLead: cài contracts.DeliveryFromLead - khách đổi tên / loại công trình / quy mô khi vẫn ở giai đoạn bàn giao.
+// Chỉ đổi chỗ còn đúng giá trị sinh từ khách cũ (đội chưa tự đổi); không đổi cap_nhat (dự án còn nguyên vẫn coi là nguyên).
+func (s *Service) RenameFromLead(ctx context.Context, old, lead *omap.Map) error {
+	if old == nil || lead == nil {
+		return nil
+	}
+	oldName, name := leadProjectName(old), leadProjectName(lead)
+	oldTen, ten := jsval.Str(old.Val("ten_khach")), jsval.Str(lead.Val("ten_khach"))
+	if oldName == name && oldTen == ten {
+		return nil
+	}
+	ps, err := s.repo.ProjectsOfLead(ctx, lead.Val("id"))
+	if err != nil {
+		return err
+	}
+	for _, p := range ps {
+		patch := omap.New()
+		if jsval.Str(p.Val("ten")) == oldName {
+			patch.Set("ten", name)
+		}
+		if jsval.Str(p.Val("khach")) == oldTen {
+			patch.Set("khach", ten)
+		}
+		if patch.Len() > 0 {
+			if _, err := s.repo.UpdateProject(ctx, jsval.ToNumber(p.Val("id")), patch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// DetachFromLead: cài contracts.DeliveryFromLead - khách rời tu-van / dam-phan / thiet-ke (leadDeleted = false) hoặc bị xoá.
+// Chỉ xoá dự án còn nguyên như lúc tạo; còn lại: rời giai đoạn -> ẩn, giữ liên kết; khách bị xoá -> bỏ liên kết, hiện lại.
+func (s *Service) DetachFromLead(ctx context.Context, leadID any, leadDeleted bool) error {
+	ps, err := s.repo.ProjectsOfLead(ctx, leadID)
+	if err != nil {
+		return err
+	}
+	for _, p := range ps {
+		id := jsval.ToNumber(p.Val("id"))
+		clean, err := s.pristine(ctx, p)
+		if err != nil {
+			return err
+		}
+		switch {
+		case clean:
+			_, err = s.repo.Remove(ctx, "tk_du_an", id, 0)
+		case leadDeleted:
+			_, err = s.repo.UpdateProject(ctx, id, omap.Of("khach_hang_id", nil, "tach_khach_hang", false))
+		default:
+			_, err = s.repo.UpdateProject(ctx, id, omap.Of("tach_khach_hang", true))
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// pristine: dự án tạo từ khách còn nguyên - chưa ai sửa thông tin (UpdateProject luôn đổi cap_nhat; vẫn soát các ô cài đặt),
+// chỉ có các đề mục cốt lõi chưa gán người, không có công việc / thành viên / thầu phụ / bình luận. Xoá được mà không mất gì.
+func (s *Service) pristine(ctx context.Context, p *omap.Map) (bool, error) {
+	if jsval.Str(p.Val("cap_nhat")) != jsval.Str(p.Val("ngay_tao")) || jsval.ToNumber(p.Val("ngan_sach")) != 0 || jsval.Str(p.Val("mau_thanh")) != "" {
+		return false, nil
+	}
+	for _, k := range []string{"ngay_bat_dau", "ngay_ban_giao", "tien_do", "so_do_to_chuc"} {
+		if !jsval.IsNullish(p.Val(k)) {
+			return false, nil
+		}
+	}
+	id := jsval.ToNumber(p.Val("id"))
+	for _, t := range []string{"tk_cong_viec", "tk_thanh_vien", "tk_thau_phu", "tk_binh_luan", "tk_giai_doan"} {
+		// ponytail: đọc cả bảng con của dự án để biết có dòng không; cần truy vấn limit 1 riêng nếu dự án rất lớn
+		rows, err := s.repo.Children(ctx, t, id, "id.asc")
+		if err != nil {
+			return false, err
+		}
+		for _, r := range rows {
+			if mem, _ := r.Val("thanh_vien").([]any); t != "tk_giai_doan" || !isCorePhase(r.Val("ten")) || len(mem) > 0 {
+				return false, nil
+			}
+		}
 	}
 	return true, nil
 }
@@ -371,6 +486,29 @@ func (s *Service) projectFields(ctx context.Context, b *omap.Map) (*omap.Map, er
 			}
 			p.Set(kv[1], v)
 		}
+	}
+	if b.Has("progress") {
+		if jsval.IsNullish(b.Val("progress")) || b.Val("progress") == "" {
+			p.Set("tien_do", nil)
+		} else if v := jsval.ToNumber(b.Val("progress")); v != v || v < 0 || v > 100 {
+			return nil, apperr.BadRequest("Tiến độ phải từ 0 đến 100")
+		} else {
+			p.Set("tien_do", v)
+		}
+	}
+	if b.Has("barColor") {
+		c := str(b, "barColor")
+		if !cssColor.MatchString(c) {
+			return nil, apperr.BadRequest("Màu thanh tiến độ không hợp lệ")
+		}
+		p.Set("mau_thanh", c)
+	}
+	if b.Has("orgChart") {
+		oc, err := orgChart(b.Val("orgChart"))
+		if err != nil {
+			return nil, err
+		}
+		p.Set("so_do_to_chuc", oc)
 	}
 	if b.Has("maDA") {
 		ma := str(b, "maDA")
@@ -482,6 +620,13 @@ func (s *Service) RemoveItem(ctx context.Context, a *actor.Actor, table string, 
 	if _, err := s.project(ctx, a, id); err != nil {
 		return nil, err
 	}
+	if table == "tk_giai_doan" {
+		if ph, err := s.repo.Get(ctx, table, id, item); err != nil {
+			return nil, err
+		} else if ph != nil && isCorePhase(ph.Val("ten")) {
+			return nil, apperr.BadRequest("Không xoá được đề mục \"" + jsval.Str(ph.Val("ten")) + "\" (dự án luôn có đề mục này)")
+		}
+	}
 	n, err := s.repo.Remove(ctx, table, id, item)
 	if err != nil {
 		return nil, err
@@ -494,12 +639,50 @@ func (s *Service) RemoveItem(ctx context.Context, a *actor.Actor, table string, 
 
 // ---------- tiến độ ----------
 
+// corePhases: 2 đề mục mọi dự án luôn có (kanban mua hàng, dòng tiền thu / chi): tạo cùng dự án, không xoá / đổi tên được.
+var corePhases = []struct {
+	name  string
+	order float64
+}{{"Mua hàng & cung ứng", 5}, {"Tài chính — dòng tiền", 6}}
+
+func isCorePhase(name any) bool {
+	for _, c := range corePhases {
+		if jsval.Str(name) == c.name {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureCorePhases: thêm đề mục cốt lõi còn thiếu cho dự án.
+func (s *Service) ensureCorePhases(ctx context.Context, project float64) error {
+	rows, err := s.repo.Children(ctx, "tk_giai_doan", project, "thu_tu.asc")
+	if err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for _, r := range rows {
+		have[jsval.Str(r.Val("ten"))] = true
+	}
+	for _, c := range corePhases {
+		if !have[c.name] {
+			if _, err := s.repo.Insert(ctx, "tk_giai_doan", omap.Of("du_an_id", project, "ten", c.name, "thu_tu", c.order, "thanh_vien", []any{})); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Service) AddPhase(ctx context.Context, a *actor.Actor, id float64, b *omap.Map) (any, error) {
 	if _, err := s.project(ctx, a, id); err != nil {
 		return nil, err
 	}
 	if str(b, "name") == "" {
 		return nil, apperr.BadRequest("Thiếu tên giai đoạn")
+	}
+	if isCorePhase(str(b, "name")) {
+		return nil, apperr.BadRequest("Dự án đã có sẵn đề mục \"" + str(b, "name") + "\"")
 	}
 	row := phaseFields(b).Set("du_an_id", id)
 	out, err := s.repo.Insert(ctx, "tk_giai_doan", row)
@@ -516,6 +699,15 @@ func (s *Service) UpdatePhase(ctx context.Context, a *actor.Actor, id, item floa
 	patch := phaseFields(b)
 	if patch.Has("ten") && patch.Val("ten") == "" {
 		return nil, apperr.BadRequest("Thiếu tên giai đoạn")
+	}
+	if patch.Has("ten") {
+		if ph, err := s.repo.Get(ctx, "tk_giai_doan", id, item); err != nil {
+			return nil, err
+		} else if ph != nil && isCorePhase(ph.Val("ten")) && patch.Val("ten") != ph.Val("ten") {
+			return nil, apperr.BadRequest("Không đổi tên được đề mục \"" + jsval.Str(ph.Val("ten")) + "\" (dự án luôn có đề mục này)")
+		} else if ph != nil && !isCorePhase(ph.Val("ten")) && isCorePhase(patch.Val("ten")) {
+			return nil, apperr.BadRequest("Dự án đã có sẵn đề mục \"" + jsval.Str(patch.Val("ten")) + "\"")
+		}
 	}
 	out, err := s.repo.Update(ctx, "tk_giai_doan", id, item, patch)
 	if err != nil {
@@ -680,6 +872,20 @@ func (s *Service) taskFields(ctx context.Context, project float64, b *omap.Map, 
 	if b.Has("sortOrder") {
 		p.Set("thu_tu", jsval.Round(jsval.ToNumber(b.Val("sortOrder"))))
 	}
+	if b.Has("purchaseItems") {
+		po, err := purchaseItems(b.Val("purchaseItems"))
+		if err != nil {
+			return nil, err
+		}
+		p.Set("don_mua", po)
+	}
+	if b.Has("purchaseFlow") {
+		pf, err := purchaseFlow(b.Val("purchaseFlow"))
+		if err != nil {
+			return nil, err
+		}
+		p.Set("quy_trinh_mua", pf)
+	}
 	return p, nil
 }
 
@@ -763,6 +969,105 @@ func people(v any) []any {
 	return out
 }
 
+// orgChart: sơ đồ tổ chức {parallel, children} - mỗi bộ phận chỉ giữ khoá đã biết; icon là tên khoá (không phải SVG).
+func orgChart(v any) (any, error) {
+	if jsval.IsNullish(v) {
+		return nil, nil
+	}
+	m, ok := v.(*omap.Map)
+	if !ok {
+		return nil, apperr.BadRequest("Sơ đồ tổ chức không hợp lệ")
+	}
+	out := omap.New()
+	for _, row := range []string{"parallel", "children"} {
+		arr, _ := m.Val(row).([]any)
+		list := []any{}
+		for _, x := range arr {
+			it, ok := x.(*omap.Map)
+			if !ok || str(it, "label") == "" || len(list) >= 50 {
+				return nil, apperr.BadRequest("Sơ đồ tổ chức không hợp lệ")
+			}
+			if !slug.MatchString(str(it, "color")) || !slug.MatchString(str(it, "icon")) || len(str(it, "dept")) > 80 {
+				return nil, apperr.BadRequest("Sơ đồ tổ chức không hợp lệ")
+			}
+			o := omap.Of("dept", str(it, "dept"), "label", str(it, "label"), "color", str(it, "color"), "icon", str(it, "icon"),
+				"dashed", jsval.Truthy(it.Val("dashed")), "removable", jsval.Truthy(it.Val("removable")))
+			if c := str(it, "caption"); c != "" {
+				o.Set("caption", c)
+			}
+			list = append(list, o)
+		}
+		out.Set(row, list)
+	}
+	return out, nil
+}
+
+// purchaseItems: đơn mua hàng của 1 công việc (bảng kanban). value = triệu đồng, due = yyyy-mm-dd.
+func purchaseItems(v any) ([]any, error) {
+	arr, ok := v.([]any)
+	if !ok && !jsval.IsNullish(v) {
+		return nil, apperr.BadRequest("Danh sách đơn mua hàng không hợp lệ")
+	}
+	out := []any{}
+	for _, x := range arr {
+		it, ok := x.(*omap.Map)
+		if !ok || str(it, "id") == "" || len(out) >= 500 {
+			return nil, apperr.BadRequest("Đơn mua hàng không hợp lệ")
+		}
+		if d := str(it, "due"); d != "" && !isoDate.MatchString(d) {
+			return nil, apperr.BadRequest("Ngày cần hàng không hợp lệ")
+		}
+		val := jsval.ToNumber(it.Val("value"))
+		if val != val || val < 0 {
+			return nil, apperr.BadRequest("Giá trị đơn mua hàng không hợp lệ")
+		}
+		o := omap.Of("id", str(it, "id"), "code", str(it, "code"), "item", str(it, "item"), "supplier", str(it, "supplier"),
+			"qty", str(it, "qty"), "value", val, "due", str(it, "due"), "owner", str(it, "owner"), "stage", str(it, "stage"))
+		if it.Has("assignees") {
+			o.Set("assignees", strList(it.Val("assignees")))
+		}
+		if it.Has("dept") {
+			o.Set("dept", str(it, "dept"))
+		}
+		out = append(out, o)
+	}
+	return out, nil
+}
+
+// purchaseFlow: các bước (cột) bảng kanban mua hàng của 1 công việc; null = quy trình mặc định của giao diện.
+func purchaseFlow(v any) (any, error) {
+	if jsval.IsNullish(v) {
+		return nil, nil
+	}
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 || len(arr) > 30 {
+		return nil, apperr.BadRequest("Quy trình mua hàng không hợp lệ")
+	}
+	out := []any{}
+	seen := map[string]bool{}
+	for _, x := range arr {
+		it, ok := x.(*omap.Map)
+		if !ok {
+			return nil, apperr.BadRequest("Bước quy trình mua hàng không hợp lệ")
+		}
+		key, label := str(it, "key"), str(it, "label")
+		if key == "" || label == "" || len(key) > 60 || len(label) > 120 || seen[key] || !cssColor.MatchString(str(it, "color")) {
+			return nil, apperr.BadRequest("Bước quy trình mua hàng không hợp lệ")
+		}
+		seen[key] = true
+		depts, owners := strList(it.Val("depts")), strList(it.Val("owners"))
+		if d := str(it, "dept"); d != "" && len(depts) == 0 { // dạng cũ PO_STAGES: 1 phòng ban / 1 người
+			depts = []any{d}
+		}
+		if o := str(it, "owner"); o != "" && len(owners) == 0 {
+			owners = []any{o}
+		}
+		out = append(out, omap.Of("key", key, "label", label, "color", str(it, "color"), "depts", depts, "owners", owners,
+			"received", jsval.Truthy(it.Val("received")), "closed", jsval.Truthy(it.Val("closed"))))
+	}
+	return out, nil
+}
+
 func orArr(v any) any {
 	if _, ok := v.([]any); ok {
 		return v
@@ -784,7 +1089,8 @@ func projectOut(r *omap.Map) *omap.Map {
 		"address", r.Val("dia_chi"), "projectType", r.Val("loai_cong_trinh"), "status", r.Val("trang_thai"),
 		"startDate", jsval.Or(r.Val("ngay_bat_dau"), ""), "handoverDate", jsval.Or(r.Val("ngay_ban_giao"), ""),
 		"contractValueVnd", jsval.ToNumber(r.Val("gia_tri_hd")), "approvedBudgetVnd", jsval.ToNumber(r.Val("ngan_sach")),
-		"note", r.Val("ghi_chu"), "createdAt", r.Val("ngay_tao"), "updatedAt", r.Val("cap_nhat"))
+		"note", r.Val("ghi_chu"), "barColor", jsval.Or(r.Val("mau_thanh"), ""), "orgChart", r.Val("so_do_to_chuc"),
+		"createdAt", r.Val("ngay_tao"), "updatedAt", r.Val("cap_nhat"))
 }
 
 func memberOut(r *omap.Map) *omap.Map {
@@ -809,7 +1115,8 @@ func taskOut(r *omap.Map) *omap.Map {
 		"progress", jsval.ToNumber(r.Val("tien_do")), "critical", jsval.Truthy(r.Val("quan_trong")), "milestone", jsval.Truthy(r.Val("cot_moc")),
 		"desc", r.Val("mo_ta"), "depts", orArr(r.Val("bo_phan")), "owners", orArr(r.Val("phu_trach")),
 		"finType", jsval.Or(r.Val("loai_tien"), ""), "planStart", jsval.Or(r.Val("ngay_ke_hoach"), ""), "amountVnd", amount,
-		"confirmed", jsval.Truthy(r.Val("da_xac_nhan")), "sortOrder", r.Val("thu_tu"))
+		"confirmed", jsval.Truthy(r.Val("da_xac_nhan")), "sortOrder", r.Val("thu_tu"), "purchaseItems", orArr(r.Val("don_mua")),
+		"purchaseFlow", r.Val("quy_trinh_mua"))
 }
 
 func commentOut(r *omap.Map) *omap.Map {

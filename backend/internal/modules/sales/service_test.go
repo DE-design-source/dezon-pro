@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,6 +102,27 @@ func (p fakeProjects) GetProject(ctx context.Context, ma any) (*omap.Map, error)
 	return nil, nil
 }
 
+// fakeDelivery: ghi lại lời gọi sang module delivery ("ensure:<kind>:<giá trị>" / "rename:<tên cũ>><tên mới>" /
+// "detach:<id>" / "delete:<id>")
+type fakeDelivery struct{ calls []string }
+
+func (d *fakeDelivery) EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, v float64, kind string) (bool, error) {
+	d.calls = append(d.calls, "ensure:"+kind+":"+jsval.Str(v))
+	return true, nil
+}
+func (d *fakeDelivery) RenameFromLead(ctx context.Context, old, lead *omap.Map) error {
+	d.calls = append(d.calls, "rename:"+jsval.Str(old.Val("ten_khach"))+">"+jsval.Str(lead.Val("ten_khach")))
+	return nil
+}
+func (d *fakeDelivery) DetachFromLead(ctx context.Context, leadID any, deleted bool) error {
+	if deleted {
+		d.calls = append(d.calls, "delete:"+jsval.Str(leadID))
+	} else {
+		d.calls = append(d.calls, "detach:"+jsval.Str(leadID))
+	}
+	return nil
+}
+
 func newSvc(f *fakeRepo, perms string) *Service {
 	s := New(Deps{Repo: f, Users: fakeUsers{perms}, UserFmt: fakeUsers{perms},
 		Lines:    fakeLines{"DA-1": {omap.Of("thanhTienBan", 1000.0, "thanhTienVon", 600.0), omap.Of("thanhTienBan", 500.0, "thanhTienVon", 300.0)}},
@@ -178,6 +200,15 @@ func TestTaoSuaKhachHang(t *testing.T) {
 	}
 	id := m.Val("id").(float64)
 
+	// ngày tạo / ngày chốt cho trước (nạp dữ liệu mẫu)
+	if _, err := s.CreateLead(ctx, a, omap.Of("name", "B", "createdAt", "27/09/2026")); status(err) != 400 {
+		t.Errorf("createdAt sai định dạng phải 400: %v", err)
+	}
+	l2, err := s.CreateLead(ctx, a, omap.Of("name", "B", "stage", "thi-cong", "createdAt", "2026-09-27", "wonAt", "2026-10-15"))
+	if m2 := l2.(*omap.Map); err != nil || m2.Val("createdAt") != "2026-09-27" || m2.Val("wonAt") != "2026-10-15" {
+		t.Errorf("ngày cho trước: %v %s", err, mustJSON(t, m2))
+	}
+
 	// kéo sang chốt hợp đồng -> có ngày chốt (giờ VN); sang bảng thiết kế vẫn giữ ngày chốt; trượt thầu -> xoá
 	l, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "chot-hd"))
 	if l.(*omap.Map).Val("wonAt") != "2026-10-29" {
@@ -209,6 +240,55 @@ func TestTaoSuaKhachHang(t *testing.T) {
 	}
 	if _, err := s.DeleteLead(ctx, a, id); status(err) != 404 {
 		t.Errorf("xoá lần 2 phải 404: %v", err)
+	}
+}
+
+// Bàn giao: tu-van / dam-phan / thiet-ke -> dự án ở cả 2 trang (giá trị = giá trị ước tính lúc tạo, kể cả khi gắn dự án QS).
+// Chỉ gọi delivery khi giai đoạn qua ranh giới đó hoặc tên / loại công trình đổi - sửa thứ khác không đụng dự án (không ghi
+// đè giá trị HĐ, không tạo lại dự án người dùng đã xoá). Rời -> detach (ẩn), quay lại -> ensure (hiện lại), xoá khách -> delete.
+func TestBanGiaoDuAn(t *testing.T) {
+	f, d := newFake(), &fakeDelivery{}
+	s := newSvc(f, "")
+	s.delivery = d
+	ctx, a := ctxAs("admin", "ct-1")
+	want := func(step string, calls ...string) {
+		t.Helper()
+		if strings.Join(d.calls, " ") != strings.Join(calls, " ") {
+			t.Errorf("%s: %v, mong %v", step, d.calls, calls)
+		}
+		d.calls = nil
+	}
+	l, err := s.CreateLead(ctx, a, omap.Of("name", "Chị Hoa", "stage", "tu-van", "valueVnd", 2e9, "maDA", "DA-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := l.(*omap.Map).Val("id").(float64)
+	want("tạo ở tu-van", "ensure:design:2000000000", "ensure:construction:2000000000")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "dam-phan", "valueVnd", 3e9))
+	want("sang dam-phan (vẫn trong vùng bàn giao, đổi giá trị)")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("note", "gọi lại", "phone", "0909"))
+	want("sửa thứ khác")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("name", "Chị Hoa Lê"))
+	want("đổi tên", "rename:Chị Hoa>Chị Hoa Lê")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "thiet-ke"))
+	want("sang thiet-ke")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "thi-cong"))
+	want("sang thi-cong", "detach:1")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "bao-gia"))
+	want("sang bao-gia (đã ở ngoài)")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("name", "Chị Hoa L."))
+	want("đổi tên khi ở ngoài")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "tu-van"))
+	want("quay lại tu-van", "ensure:design:3000000000", "ensure:construction:3000000000")
+	if _, err := s.DeleteLead(ctx, a, id); err != nil {
+		t.Fatal(err)
+	}
+	want("xoá", "delete:1")
+
+	// bao-gia-thi-cong không còn tính là đã chốt
+	l, _ = s.CreateLead(ctx, a, omap.Of("name", "B", "stage", "bao-gia-thi-cong"))
+	if l.(*omap.Map).Val("wonAt") != nil {
+		t.Errorf("bao-gia-thi-cong không phải đã chốt: %v", l.(*omap.Map).Val("wonAt"))
 	}
 }
 

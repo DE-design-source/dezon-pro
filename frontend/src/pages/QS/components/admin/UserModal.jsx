@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as api from '../../api/qsApi'
+import * as hrApi from '../../../ChamCong/api'
 import { GRANT_TABS as PERM_TABS } from '../../state/store'
 import { qsToast } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
@@ -30,6 +31,21 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   // Quyền trong tab Danh sách SP: CHỌN MỘT — chỉ sửa, hoặc sửa và duyệt
   const [lv, setLv] = useState(perms0.indexOf('sp_duyet') >= 0 ? 'sp_duyet' : (perms0.indexOf('sp_edit') >= 0 ? 'sp_edit' : ''))
   const [busy, setBusy] = useState(false)
+  // Hồ sơ nhân sự (HR) gắn với tài khoản: nhân viên phải được gắn mới dùng được tab Nhân sự. Chỉ khi sửa tài khoản của công ty
+  // đang làm việc (danh sách hồ sơ lấy theo công ty đó); công ty chưa có HR / không đọc được -> ẩn
+  const [hrEmps, setHrEmps] = useState(null)
+  const [hrEmp, setHrEmp] = useState('')
+  const hrOld = useRef(null)
+  useEffect(() => {
+    if (!isEdit || String(u.congTyId || '') !== String(defaultCt || '')) return
+    hrApi.load().then(st => {
+      const list = (st.employees || []).filter(e => e.status !== 'left' || e.userId === u.id)
+      const mine = list.find(e => e.userId === u.id)
+      hrOld.current = mine ? mine.id : null
+      setHrEmp(mine ? String(mine.id) : '')
+      setHrEmps(list)
+    }, () => {})
+  }, [])
 
   const has = k => perms.indexOf(k) >= 0
   // Sửa: email không đổi (bỏ qua hoa thường / khoảng trắng) thì không kiểm, không gửi - email cũ sai dạng vẫn sửa được trường khác
@@ -57,7 +73,14 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
       if (isSuper) patch.congTyId = ct
       // chuyển công ty mà giữ email: vẫn gửi để máy chủ kiểm trùng ở công ty mới (không kiểm lại dạng)
       if (emailChanged || (isSuper && em && String(ct || '') !== String(u.congTyId || ''))) patch.email = em
-      api.adminUpdateUser(u.id, patch).then(() => done('Đã cập nhật'), fail)
+      // đổi hồ sơ HR: bỏ gắn hồ sơ cũ trước (1 tài khoản chỉ gắn 1 hồ sơ), rồi gắn hồ sơ mới
+      const to = hrEmp ? Number(hrEmp) : null
+      const linkHr = async () => {
+        if (!hrEmps || to === hrOld.current) return
+        if (hrOld.current) await hrApi.setUserRole({ empId: hrOld.current, userId: '' })
+        if (to) await hrApi.setUserRole({ empId: to, userId: u.id })
+      }
+      api.adminUpdateUser(u.id, patch).then(linkHr).then(() => done('Đã cập nhật'), fail)
     } else {
       api.adminCreateUser({ username, hoTen, email: em, role, password: pw, perms: ps, phongBan, congTyId: (isSuper && ct) || undefined })
         .then(() => done('Đã tạo tài khoản'), fail)
@@ -94,6 +117,17 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                 <div className="qsa-f"><label>Phòng ban</label>
                   <input value={phongBan} onChange={e => setPhongBan(e.target.value)} placeholder="vd: Kinh doanh, Thiết kế, Mua hàng" /></div>
               </div>
+              {hrEmps ? (
+                <div className="qsa-grid2">
+                  <div className="qsa-f"><label>Hồ sơ nhân sự (HR)</label>
+                    <select value={hrEmp} onChange={e => setHrEmp(e.target.value)}>
+                      <option value="">— Chưa gắn —</option>
+                      {hrEmps.map(e => <option key={e.id} value={e.id}>{e.code} · {e.name}{e.userId && e.userId !== u.id ? ' (đang gắn tài khoản khác)' : ''}</option>)}
+                    </select>
+                    <i className="qsa-f-hint">Nhân viên cần gắn hồ sơ mới dùng được tab Nhân sự (HR); vai trò HR đặt ở Phân quyền &amp; bảo mật.</i></div>
+                  <div className="qsa-f" />
+                </div>
+              ) : null}
               {isEdit ? null : (
                 <div className="qsa-grid2">
                   <div className="qsa-f"><label>Mật khẩu <em>*</em></label>

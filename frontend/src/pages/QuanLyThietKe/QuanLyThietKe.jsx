@@ -32,6 +32,7 @@ function initialRoute() {
   return { tab: VALID_TABS.includes(hash) ? hash : 'list', sub: 'setup', gtab: 'overview' }
 }
 
+/* Dữ liệu lưu trên máy chủ (kind "design"): cần đăng nhập */
 export default function QuanLyThietKe() {
   return <WorkGate tab="thietke" title="Quản lý thiết kế"><DeliveryProvider kind="design"><QuanLyThietKePage /></DeliveryProvider></WorkGate>
 }

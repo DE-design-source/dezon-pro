@@ -8,6 +8,7 @@ import (
 	apperr "qspro-backend/internal/shared/errors"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
+	"qspro-backend/internal/shared/tenant"
 )
 
 // Phân quyền HR (migration 0024): tài khoản đăng nhập gắn với 1 hồ sơ nhân sự (hr_nhan_vien.tai_khoan_id) có vai trò HR.
@@ -110,15 +111,9 @@ func (x *access) need(module, action string) error {
 	return nil
 }
 
-// needAll: thao tác cấp công ty (cơ cấu, ca, cấu hình lương...) chỉ cho phạm vi toàn công ty.
+// needAll: thao tác cấp công ty (cơ cấu, ca, cấu hình lương...): như giao diện gốc, chỉ cần quyền theo ma trận.
 func (x *access) needAll(module, action string) error {
-	if err := x.need(module, action); err != nil {
-		return err
-	}
-	if x.scope != "all" {
-		return apperr.Forbidden("Chỉ HR Admin / System Admin làm được thao tác này")
-	}
-	return nil
+	return x.need(module, action)
 }
 
 // meOut: thông tin quyền gửi cho giao diện.
@@ -264,10 +259,71 @@ func (s *Service) SecurityState(ctx context.Context, a *actor.Actor) (any, error
 	for i, l := range logs {
 		lOut[i] = omap.Of("id", l.Val("id"), "at", l.Val("created_at"), "user", l.Val("username"), "action", l.Val("action"), "detail", l.Val("detail"))
 	}
-	return omap.Of("perms", x.perms, "maskSalary", x.mask, "accounts", accs, "audit", lOut), nil
+	ui, err := s.uiState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// nhật ký do giao diện ghi (POST /hr/audit): mỗi dòng là 1 mục như INITIAL_AUDIT của giao diện
+	uiLogs, err := s.db.Select(ctx, "audit_log", database.SelectOpt{Filter: database.Eq("action", "hr.ui"), Order: "created_at.desc", Limit: 1000})
+	if err != nil {
+		return nil, err
+	}
+	uiOut := []any{}
+	for _, l := range uiLogs {
+		if m, err := omap.DecodeString(jsval.Str(l.Val("detail"))); err == nil {
+			if mm, ok := m.(*omap.Map); ok {
+				uiOut = append(uiOut, mm.Set("id", l.Val("id")))
+			}
+		}
+	}
+	return omap.Of("perms", x.perms, "maskSalary", x.mask, "accounts", accs, "audit", lOut, "ui", ui, "uiAudit", uiOut), nil
 }
 
-// SaveSecurity: {perms?, maskSalary?} - chỉ System Admin (security edit).
+// uiState: tài liệu cài đặt bảo mật của giao diện (hr_bao_mat.giao_dien); chưa lưu = {}.
+func (s *Service) uiState(ctx context.Context) (any, error) {
+	rows, err := s.db.Select(ctx, "hr_bao_mat", database.SelectOpt{Select: "giao_dien", Limit: 1})
+	if err != nil || len(rows) == 0 {
+		return omap.New(), err
+	}
+	if m, ok := rows[0].Val("giao_dien").(*omap.Map); ok {
+		return m, nil
+	}
+	return omap.New(), nil
+}
+
+const maxAuditEntryBytes = 4 * 1024
+
+// AddAudit: {entries: [{time, user, role, module, action, target, ip, warn?}]} - nhật ký thao tác do giao diện ghi
+// (audit_logs, action hr.ui, detail = JSON của mục). Ai vào được HR cũng ghi được nhật ký của mình.
+func (s *Service) AddAudit(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
+	if _, err := s.gate(ctx, a, "", ""); err != nil {
+		return nil, err
+	}
+	entries := list(b, "entries")
+	if len(entries) == 0 || len(entries) > 200 {
+		return nil, apperr.BadRequest("Cần 1 đến 200 dòng nhật ký")
+	}
+	rows := []*omap.Map{}
+	for _, e := range entries {
+		e = e.Clone()
+		e.Delete("id")
+		j, err := omap.Marshal(e)
+		if err != nil || len(j) > maxAuditEntryBytes {
+			return nil, apperr.BadRequest("Dòng nhật ký không hợp lệ")
+		}
+		var uid any
+		if jsval.Truthy(a.UID) {
+			uid = a.UID
+		}
+		rows = append(rows, omap.Of("user_id", uid, "username", a.U, "action", "hr.ui", "detail", string(j)))
+	}
+	if _, err := s.db.Insert(ctx, "audit_log", rows); err != nil {
+		return nil, err
+	}
+	return okRes, nil
+}
+
+// SaveSecurity: {perms?, maskSalary?, ui? (cài đặt bảo mật của giao diện)} - chỉ System Admin (security edit).
 func (s *Service) SaveSecurity(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
 	x, err := s.gate(ctx, a, "security", "edit")
 	if err != nil {
@@ -305,6 +361,13 @@ func (s *Service) SaveSecurity(ctx context.Context, a *actor.Actor, b *omap.Map)
 	}
 	if b.Has("maskSalary") {
 		p.Set("an_luong", jsval.Truthy(b.Val("maskSalary")))
+	}
+	if b.Has("ui") {
+		ui, ok := b.Val("ui").(*omap.Map)
+		if j, err := omap.Marshal(ui); !ok || err != nil || len(j) > maxConfigBytes {
+			return nil, apperr.BadRequest("Cài đặt bảo mật phải là object (tối đa 64 KB)")
+		}
+		p.Set("giao_dien", ui)
 	}
 	err = s.db.Tx(ctx, func(ctx context.Context) error {
 		cur, err := s.db.Select(ctx, "hr_bao_mat", database.SelectOpt{Select: "id", Limit: 1})
@@ -376,5 +439,37 @@ func (s *Service) SetUserRole(ctx context.Context, a *actor.Actor, b *omap.Map) 
 		return nil, err
 	}
 	s.audit(ctx, x, "security", "role", detail)
+	return okRes, nil
+}
+
+// ResetData: xoá toàn bộ dữ liệu HR của công ty đang đăng nhập (nạp lại dữ liệu mẫu demo). Chỉ admin của 1 công ty
+// (super phải chọn "xem như công ty"); thiếu ngữ cảnh công ty thì từ chối để không xoá xuyên công ty.
+func (s *Service) ResetData(ctx context.Context, a *actor.Actor, b *omap.Map) (any, error) {
+	if _, err := s.gate(ctx, a, "", ""); err != nil {
+		return nil, err
+	}
+	if s.prod {
+		return nil, apperr.Forbidden("Không xoá dữ liệu HR trên production (chỉ dùng khi nạp dữ liệu mẫu ở máy phát triển)")
+	}
+	if !a.IsAdmin() || !tenant.Scoped(ctx) {
+		return nil, apperr.Forbidden("Chỉ admin công ty xoá được dữ liệu HR")
+	}
+	if str(b, "confirm") != "XOA_DU_LIEU_HR" {
+		return nil, apperr.BadRequest("Thiếu xác nhận confirm = XOA_DU_LIEU_HR")
+	}
+	err := s.db.Tx(ctx, func(ctx context.Context) error {
+		// bảng gốc theo công ty; bảng con (chấm công, đơn, ứng viên...) xoá theo khoá ngoại cascade
+		for _, t := range []string{"hr_tin_tuyen", "hr_jd", "hr_muc_tieu", "hr_lo_trinh", "hr_khoa_hoc", "hr_ky_luong", "hr_cau_hinh_luong",
+			"hr_nhan_vien", "hr_don_vi", "hr_ca", "hr_dia_diem", "hr_bao_mat"} {
+			if _, err := s.db.Remove(ctx, t, ""); err != nil {
+				return err
+			}
+		}
+		_, err := s.db.Remove(ctx, "audit_log", "action=like.hr.*")
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
 	return okRes, nil
 }

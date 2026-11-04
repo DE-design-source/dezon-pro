@@ -1,19 +1,15 @@
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, deptOf, fmtDate, HR_TODAY, daysBetween, WORK_SITES, siteOptions } from '../../../data/hrData'
+import { DEPTS, deptOf, fmtDate, HR_TODAY, daysBetween, WORK_SITES, addDaysIso, MONTHS } from '../../../data/hrData'
 import { STAGES, SOURCES, REVIEW_CRITERIA, JD_LEVELS } from '../../../data/hrData2'
 import { Pill, Seg, Modal, Field, Empty } from './shared'
 import { useAccess, NoAccess } from './access'
 import OnboardPage from './OnboardPage'
-import { uploadRaw, mediaUrl } from '../../QS/api/files'
-import { safeUrl_ } from '../../QS/lib/format'
 
 const JOB_STATUS = { open: { label: 'Đang tuyển', tone: 'success' }, paused: { label: 'Tạm dừng', tone: 'finance' }, closed: { label: 'Đã đóng', tone: 'muted' } }
 const initials = n => n.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase()
 const avg = r => { const v = Object.values(r.scores); return v.reduce((a, b) => a + b, 0) / v.length }
-/* Ngày sau hôm nay n ngày (yyyy-mm-dd) - mặc định hạn nộp / lịch phỏng vấn */
-const afterDays = n => { const d = new Date(HR_TODAY + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
-const BLANK_JOB = { jdId: null, title: '', dept: 'thicong', qty: 1, site: '', salary: '', deadline: afterDays(30), status: 'open', channels: [] }
+const BLANK_JOB = { jdId: null, title: '', dept: 'thicong', qty: 1, site: 'Văn phòng HCM', salary: '', deadline: addDaysIso(HR_TODAY, 38), status: 'open', channels: [] }
 const BLANK_JD = { code: '', title: '', dept: 'thicong', level: 'Nhân viên', salary: '', summary: '', duties: '', requirements: '', benefits: '' }
 const toJdForm = jd => ({ ...jd, duties: jd.duties.join('\n'), requirements: jd.requirements.join('\n'), benefits: jd.benefits.join('\n') })
 
@@ -43,11 +39,8 @@ function Stars({ value, onChange }) {
 }
 
 /* Phân hệ "Tuyển dụng & Onboarding" */
-/* recruit = { jds, jobs, candidates, interviews } từ máy chủ; tal = thao tác ghi (ChamCong.jsx), mỗi lệnh trả Promise kết quả hoặc null khi lỗi.
-   Kênh đăng tin / thư mời phỏng vấn chỉ ghi nhận, hệ thống chưa tự đăng hay gửi email. */
-export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode, defaultManagerOf, employees = [], onOpenEmployee }) {
-  const { can, canAll, user, role, log } = useAccess()
-  const canHire = can('recruit', 'edit') && canAll('employees', 'create') // nhận việc = tạo hồ sơ nhân sự
+export default function RecruitModule({ recruit, setRecruit, onHire, toast, nextEmpCode, defaultManagerOf, employees = [], onOpenEmployee }) {
+  const { can, user, role, log } = useAccess()
   const [tab, setTab] = useState('pipeline')
   const [jobFilter, setJobFilter] = useState('all')
   const [jobForm, setJobForm] = useState(null)
@@ -74,14 +67,16 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
   const cands = candidates.filter(c => jobIds.has(c.jobId) && (jobFilter === 'all' || c.jobId === Number(jobFilter)))
   const jobOf = id => jobs.find(j => j.id === id)
   const candOf = id => candidates.find(c => c.id === id)
+  const set = patch => setRecruit(r => ({ ...r, ...patch }))
 
   function moveStage(id, stage) {
     const c = candOf(id)
     if (!c || c.stage === stage) return
     if (!can('recruit', 'edit')) { toast('Bạn không có quyền chuyển trạng thái ứng viên', 'danger'); return }
     if (c.empCode) { toast(`${c.name} đã nhận việc (hồ sơ ${c.empCode}) — không thể chuyển lại`, 'danger'); return }
-    if (stage === 'hired') { if (canHire) startOnboard(c); else toast('Nhận việc cần quyền tạo hồ sơ nhân sự (HR Admin)', 'danger'); return }
-    tal.updCand(id, { stage }).then(r => r && log('recruit', 'edit', `Ứng viên ${c.name} → ${STAGES.find(s => s.key === stage).label}`))
+    if (stage === 'hired') { startOnboard(c); return }
+    set({ candidates: candidates.map(x => (x.id === id ? { ...x, stage } : x)) })
+    log('recruit', 'edit', `Ứng viên ${c.name} → ${STAGES.find(s => s.key === stage).label}`)
   }
   function pickJd(id) {
     const jd = jds.find(x => x.id === Number(id))
@@ -91,83 +86,69 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
     const f = jdForm
     if (!f.title.trim()) return
     const lines = t => t.split('\n').map(x => x.replace(/^[-•\s]+/, '').trim()).filter(Boolean)
-    const rec = { ...f, title: f.title.trim(), duties: lines(f.duties), requirements: lines(f.requirements), benefits: lines(f.benefits) }
-    tal.saveJd(rec, f.id ? 'Đã cập nhật JD — các tin tuyển dụng liên quan dùng nội dung mới' : `Đã thêm "${rec.title}" vào thư viện JD`).then(r => {
-      if (!r) return
-      log('recruit', f.id ? 'edit' : 'create', `Thư viện JD: ${rec.code} ${rec.title}`)
-      setOpenJd(r.id)
-      setJdForm(null)
-    })
+    const rec = { ...f, title: f.title.trim(), duties: lines(f.duties), requirements: lines(f.requirements), benefits: lines(f.benefits), updated: HR_TODAY }
+    if (f.id) set({ jds: jds.map(x => (x.id === f.id ? rec : x)), jobs: jobs.map(j => (j.jdId === f.id ? { ...j, title: rec.title, dept: rec.dept } : j)) })
+    else { rec.id = Math.max(0, ...jds.map(x => x.id)) + 1; set({ jds: [...jds, rec] }) }
+    log('recruit', f.id ? 'edit' : 'create', `Thư viện JD: ${rec.code} ${rec.title}`)
+    toast(f.id ? 'Đã cập nhật JD — các tin tuyển dụng liên quan dùng nội dung mới' : `Đã thêm "${rec.title}" vào thư viện JD`)
+    setOpenJd(rec.id)
+    setJdForm(null)
   }
   function deleteJd(jd) {
     const used = jobs.filter(j => j.jdId === jd.id).length
     if (used) { toast(`JD đang được dùng bởi ${used} tin tuyển dụng — không thể xoá`, 'danger'); return }
     if (!confirm(`Xoá JD "${jd.title}" khỏi thư viện?`)) return
-    tal.deleteJd(jd.id, `Đã xoá JD ${jd.title}`).then(r => {
-      if (!r) return
-      setOpenJd(null)
-      log('recruit', 'delete', `Thư viện JD: ${jd.code} ${jd.title}`)
-    })
+    set({ jds: jds.filter(x => x.id !== jd.id) })
+    setOpenJd(null)
+    log('recruit', 'delete', `Thư viện JD: ${jd.code} ${jd.title}`)
   }
   function saveJob() {
     const j = jobForm
     if (!j.jdId) return
-    tal.saveJob(j, j.id ? 'Đã cập nhật tin tuyển dụng' : `Đã lưu tin "${j.title}"${j.channels.length ? ' (kênh: ' + j.channels.join(', ') + ' — đăng tay)' : ''}`).then(r => {
-      if (!r) return
-      log('recruit', j.id ? 'edit' : 'create', `Tin tuyển dụng: ${j.title}`)
-      setJobForm(null)
-    })
+    if (j.id) set({ jobs: jobs.map(x => (x.id === j.id ? j : x)) })
+    else set({ jobs: [...jobs, { ...j, id: Math.max(0, ...jobs.map(x => x.id)) + 1 }] })
+    log('recruit', j.id ? 'edit' : 'create', `Tin tuyển dụng: ${j.title}`)
+    toast(j.id ? 'Đã cập nhật tin tuyển dụng' : `Đã đăng tin "${j.title}" lên ${j.channels.join(', ') || 'website'}`)
+    setJobForm(null)
   }
-  /* CV tải lên kho file (/upload/file -> /files/...) khi bấm Thêm ứng viên */
-  async function saveCand() {
+  function saveCand() {
     const c = candForm
     if (!c.name.trim() || !c.jobId) return
-    const { file, ...rest } = c
-    let cvUrl = ''
-    if (file) {
-      try { cvUrl = (await uploadRaw(file)).url || '' } catch (e) { toast(`Tải CV lỗi: ${e.message}`, 'danger'); return }
-    }
-    const rec = { ...rest, name: c.name.trim(), jobId: Number(c.jobId), cv: c.cv || `CV_${c.name.replace(/\s+/g, '')}.pdf`, cvUrl }
-    tal.addCand(rec, `Đã thêm ứng viên ${rec.name}`).then(r => {
-      if (!r) return
-      log('recruit', 'create', `Ứng viên ${rec.name} — ${jobOf(rec.jobId).title}`)
-      setCandForm(null)
-    })
+    const rec = { ...c, id: Math.max(0, ...candidates.map(x => x.id)) + 1, jobId: Number(c.jobId), stage: 'applied', applied: HR_TODAY, reviews: [], cv: c.cv || `CV_${c.name.replace(/\s+/g, '')}.pdf` }
+    set({ candidates: [...candidates, rec] })
+    log('recruit', 'create', `Ứng viên ${rec.name} — ${jobOf(rec.jobId).title}`)
+    toast(`Đã thêm ứng viên ${rec.name}`)
+    setCandForm(null)
   }
   function saveReview() {
     const r = review
-    tal.updCand(r.candId, { review: { by: user.name, round: r.round, scores: r.scores, note: r.note } }, 'Đã lưu đánh giá').then(res => {
-      if (!res) return
-      log('recruit', 'edit', `Đánh giá ứng viên ${candOf(r.candId).name} (${r.round})`)
-      setReview(null)
-    })
+    set({ candidates: candidates.map(x => (x.id === r.candId ? { ...x, reviews: [...x.reviews, { by: user.name, round: r.round, scores: r.scores, note: r.note, date: HR_TODAY }] } : x)) })
+    log('recruit', 'edit', `Đánh giá ứng viên ${candOf(r.candId).name} (${r.round})`)
+    toast('Đã lưu đánh giá')
+    setReview(null)
   }
   function saveInterview() {
     const v = ivForm
     if (!v.candidateId || !v.date) return
+    set({ interviews: [...interviews, { ...v, id: Math.max(0, ...interviews.map(x => x.id)) + 1, candidateId: Number(v.candidateId) }] })
     const c = candOf(Number(v.candidateId))
-    const { candidateId: _c, ...iv } = v
-    // máy chủ chuyển ứng viên đang Ứng tuyển / Sàng lọc sang Phỏng vấn
-    tal.updCand(c.id, { interview: iv }, `Đã đặt lịch phỏng vấn ${c.name} (chưa gửi thư mời tự động)`).then(r => {
-      if (!r) return
-      log('recruit', 'create', `Lịch phỏng vấn ${c.name} — ${fmtDate(v.date)} ${v.time}`)
-      setIvForm(null)
-    })
+    if (['applied', 'screening'].includes(c.stage)) set({ candidates: candidates.map(x => (x.id === c.id ? { ...x, stage: 'interview' } : x)) })
+    log('recruit', 'create', `Lịch phỏng vấn ${c.name} — ${fmtDate(v.date)} ${v.time}`)
+    toast(`Đã đặt lịch & gửi thư mời phỏng vấn tới ${c.email}`)
+    setIvForm(null)
   }
   function startOnboard(c) {
     const job = jobOf(c.jobId) || {}
     const level = JD_LEVELS.includes(job.level) ? job.level : 'Nhân viên'
-    setOnboard({ candId: c.id, code: nextEmpCode ? nextEmpCode() : '', dept: job.dept || DEPTS[0]?.key, position: job.title || '', level: level === 'Thực tập' ? 'Nhân viên' : level, joinDate: HR_TODAY, managerId: defaultManagerOf?.(job.dept)?.id || '', site: job.site || WORK_SITES[0] })
+    setOnboard({ candId: c.id, code: nextEmpCode ? nextEmpCode() : '', dept: job.dept || DEPTS[0]?.key, position: job.title || '', level: level === 'Thực tập' ? 'Nhân viên' : level, joinDate: addDaysIso(MONTHS[0].key + '-01', 31).slice(0, 8) + '01', managerId: defaultManagerOf?.(job.dept)?.id || '', site: job.site || WORK_SITES[0] })
   }
   const hire = c => startOnboard(c)
-  async function confirmOnboard(data) {
+  function confirmOnboard(data) {
     const c = candOf(onboard.candId)
     if (!c) return
     const o = { ...onboard, ...data }
-    let res
-    // tạo hồ sơ + đánh dấu ứng viên Nhận việc trong 1 lệnh; lỗi đã báo và giữ form (không tạo hồ sơ nào)
-    try { res = await onHire(c, jobOf(c.jobId) || { title: o.position, dept: o.dept, salary: '12', site: o.site }, o) } catch (e) { return }
-    if (!res) return
+    const res = onHire(c, jobOf(c.jobId) || { title: o.position, dept: o.dept, salary: '12', site: o.site }, o)
+    set({ candidates: candidates.map(x => (x.id === c.id ? { ...x, stage: 'hired', hiredAt: HR_TODAY, empCode: res?.code || o.code, empId: res?.id, empDept: o.dept } : x)) })
     setOnboard(null)
     setOpenCand(null)
   }
@@ -203,7 +184,7 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
         {tab === 'jd' && <select className="cc-select" value={jdDept} onChange={e => setJdDept(e.target.value)}><option value="all">Tất cả phòng ban</option>{DEPTS.map(d => <option key={d.key} value={d.key}>{d.name}</option>)}</select>}
         {tab === 'jd' && can('recruit', 'create') && <button className="cc-btn" onClick={() => setJdForm({ ...BLANK_JD })}><Icon name="plus" size={14} stroke={2.4} />Thêm JD</button>}
         {tab === 'jobs' && can('recruit', 'create') && <button className="cc-btn" onClick={() => setJobForm({ ...BLANK_JOB })}><Icon name="plus" size={14} stroke={2.4} />Đăng tin tuyển dụng</button>}
-        {tab === 'interviews' && can('recruit', 'edit') && <button className="cc-btn" onClick={() => setIvForm({ candidateId: '', date: afterDays(1), time: '09:00', round: 'Vòng 1 — Chuyên môn', interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch phỏng vấn</button>}
+        {tab === 'interviews' && can('recruit', 'edit') && <button className="cc-btn" onClick={() => setIvForm({ candidateId: '', date: addDaysIso(HR_TODAY, 5), time: '09:00', round: 'Vòng 1 — Chuyên môn', interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch phỏng vấn</button>}
       </div>
 
       {tab === 'pipeline' && (
@@ -362,9 +343,9 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
         footer={opened && <>
           {can('recruit', 'edit') && <select className="cc-select" value={opened.stage} onChange={e => moveStage(opened.id, e.target.value)}>{STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>}
           <span className="cc-grow" />
-          {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setIvForm({ candidateId: opened.id, date: afterDays(1), time: '09:00', round: 'Vòng ' + (opened.reviews.length + 1), interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch PV</button>}
+          {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setIvForm({ candidateId: opened.id, date: addDaysIso(HR_TODAY, 5), time: '09:00', round: 'Vòng ' + (opened.reviews.length + 1), interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch PV</button>}
           {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setReview({ candId: opened.id, round: 'Vòng ' + (opened.reviews.length + 1), scores: Object.fromEntries(REVIEW_CRITERIA.map(c => [c.key, 3])), note: '' })}><Icon name="award" size={14} />Đánh giá</button>}
-          {opened.stage === 'offer' && canHire && <button className="cc-btn" onClick={() => hire(opened)}><Icon name="userPlus" size={14} />Nhận việc → tạo hồ sơ NV</button>}
+          {opened.stage === 'offer' && can('recruit', 'approve') && <button className="cc-btn" onClick={() => hire(opened)}><Icon name="userPlus" size={14} />Nhận việc → tạo hồ sơ NV</button>}
           {opened.empId && onOpenEmployee && <button className="cc-btn ghost" onClick={() => onOpenEmployee(opened.empId)}><Icon name="users" size={14} />Mở hồ sơ {opened.empCode}</button>}
         </>}>
         {opened && <div className="cc-grid2">
@@ -373,8 +354,7 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
             <div className="cc-kv"><span>Email</span><b>{opened.email}</b></div>
             <div className="cc-kv"><span>Điện thoại</span><b>{opened.phone}</b></div>
             <div className="cc-kv"><span>Kinh nghiệm</span><b>{opened.exp}</b></div>
-            <div className="cc-doc"><span className="cc-ico sm cc-tone-primary"><Icon name="file" size={13} /></span><div className="cc-grow"><b>{opened.cv}</b><span>{opened.cvUrl ? 'CV đính kèm' : 'Chỉ có tên file (chưa tải lên)'}</span></div>
-              {opened.cvUrl && <a href={safeUrl_(mediaUrl(opened.cvUrl))} target="_blank" rel="noreferrer" title="Mở CV"><Icon name="download" size={15} /></a>}</div>
+            <div className="cc-doc"><span className="cc-ico sm cc-tone-primary"><Icon name="file" size={13} /></span><div className="cc-grow"><b>{opened.cv}</b><span>CV đính kèm</span></div><Icon name="download" size={15} /></div>
             {opened.hiredAt && <div className="cc-phase-note" style={{ marginTop: 10 }}><Icon name="checkCircle" size={14} />Đã chuyển thành hồ sơ nhân viên ngày {fmtDate(opened.hiredAt)}</div>}
           </div>
           <div>
@@ -409,7 +389,7 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
           <Field label="Email"><input type="email" value={candForm.email} onChange={e => setCandForm({ ...candForm, email: e.target.value })} /></Field>
           <Field label="Điện thoại"><input value={candForm.phone} onChange={e => setCandForm({ ...candForm, phone: e.target.value })} /></Field>
           <Field label="Nguồn"><select value={candForm.source} onChange={e => setCandForm({ ...candForm, source: e.target.value })}>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></Field>
-          <Field label="CV (PDF/DOCX)"><input type="file" accept=".pdf,.doc,.docx" onChange={e => setCandForm({ ...candForm, cv: e.target.files[0]?.name || '', file: e.target.files[0] || null })} /></Field>
+          <Field label="CV (PDF/DOCX)"><input type="file" accept=".pdf,.doc,.docx" onChange={e => setCandForm({ ...candForm, cv: e.target.files[0]?.name || '' })} /></Field>
           <Field label="Tóm tắt kinh nghiệm" full><input value={candForm.exp} onChange={e => setCandForm({ ...candForm, exp: e.target.value })} /></Field>
         </div>}
       </Modal>
@@ -431,7 +411,7 @@ export default function RecruitModule({ recruit, tal, onHire, toast, nextEmpCode
           </div>
           <Field label="Phòng ban"><select value={jobForm.dept} disabled title="Theo JD"><option value={jobForm.dept}>{deptOf(jobForm.dept).name}</option></select></Field>
           <Field label="Số lượng"><input type="number" min="1" value={jobForm.qty} onChange={e => setJobForm({ ...jobForm, qty: Number(e.target.value) })} /></Field>
-          <Field label="Nơi làm việc"><select value={jobForm.site} onChange={e => setJobForm({ ...jobForm, site: e.target.value })}><option value="">— Chọn địa điểm —</option>{siteOptions(jobForm.site).map(s => <option key={s}>{s}</option>)}</select></Field>
+          <Field label="Nơi làm việc"><select value={jobForm.site} onChange={e => setJobForm({ ...jobForm, site: e.target.value })}>{WORK_SITES.map(s => <option key={s}>{s}</option>)}</select></Field>
           <Field label="Mức lương"><input value={jobForm.salary} placeholder="VD: 15–20 triệu" onChange={e => setJobForm({ ...jobForm, salary: e.target.value })} /></Field>
           <Field label="Hạn nộp hồ sơ"><input type="date" value={jobForm.deadline} onChange={e => setJobForm({ ...jobForm, deadline: e.target.value })} /></Field>
           <Field label="Trạng thái"><select value={jobForm.status} onChange={e => setJobForm({ ...jobForm, status: e.target.value })}>{Object.entries(JOB_STATUS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}</select></Field>

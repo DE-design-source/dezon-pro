@@ -72,13 +72,14 @@ func TestPhanQuyen(t *testing.T) {
 		t.Errorf("chưa gắn hồ sơ phải 403: %v", err)
 	}
 
-	// nhân viên: chỉ thấy mình, tự gửi đơn / chấm GPS cho mình, không duyệt, không làm thay người khác
+	// nhân viên: hồ sơ đầy đủ chỉ của mình (người khác chỉ thông tin công khai cho sơ đồ tổ chức), tự gửi đơn / chấm GPS cho mình,
+	// không duyệt, không làm thay người khác
 	se, ae := as(uE)
 	st, err := se.Load(ctx, ae)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := codes(st); len(c) != 1 || c["ZZ_hrPE"] == nil || c["ZZ_hrPE"].Val("salary") != 15000000.0 {
+	if c := codes(st); c["ZZ_hrPE"] == nil || c["ZZ_hrPE"].Val("salary") != 15000000.0 || c["ZZ_hrPM"] == nil || c["ZZ_hrPM"].Has("salary") || c["ZZ_hrPM"].Has("phone") {
 		t.Errorf("nhân viên thấy: %v", c)
 	}
 	if me := st.(*omap.Map).Val("me").(*omap.Map); me.Val("role") != "employee" || me.Val("employeeId") != e1 {
@@ -105,6 +106,18 @@ func TestPhanQuyen(t *testing.T) {
 	if ast, _ := se.AttState(ctx, ae, "2031-04-01", "2031-04-01"); len(ast.(*omap.Map).Val("logs").([]any)) != 1 || ast.(*omap.Map).Val("logs").([]any)[0].(*omap.Map).Val("in") != "08:05" {
 		t.Errorf("giờ vào phải theo máy chủ 08:05: %v", ast)
 	}
+	// chấm ra GPS: gửi out (kèm in cũ như giao diện cũ vẫn được) -> giờ ra theo máy chủ, giờ vào giữ nguyên
+	se.now = func() time.Time { return time.Date(2031, 4, 1, 10, 30, 0, 0, time.UTC) } // 17:30 giờ VN
+	if _, err := se.SaveLogs(ctx, ae, omap.Of("logs", []any{omap.Of("empId", e1, "in", "08:05", "out", "17:29", "source", "gps", "gps", "in", "dist", 30.0)})); err != nil {
+		t.Errorf("chấm ra GPS: %v", err)
+	}
+	if ast, _ := se.AttState(ctx, ae, "2031-04-01", "2031-04-01"); ast.(*omap.Map).Val("logs").([]any)[0].(*omap.Map).Val("in") != "08:05" || ast.(*omap.Map).Val("logs").([]any)[0].(*omap.Map).Val("out") != "17:30" {
+		t.Errorf("chấm ra phải giữ giờ vào 08:05, giờ ra 17:30: %v", ast)
+	}
+	se.now = func() time.Time { return time.Date(2031, 4, 2, 1, 0, 0, 0, time.UTC) }
+	if _, err := se.SaveLogs(ctx, ae, omap.Of("logs", []any{omap.Of("empId", e1, "out", "17:00", "source", "gps", "gps", "in", "dist", 30.0)})); status(err) != 400 {
+		t.Errorf("chưa có giờ vào mà chấm ra phải 400: %v", err)
+	}
 	if _, err := se.SaveLogs(ctx, ae, omap.Of("logs", []any{omap.Of("empId", e1, "date", "2031-04-02", "in", "08:00", "source", "manual")})); status(err) != 403 {
 		t.Errorf("nhân viên tự bổ sung giờ (manual) phải 403: %v", err)
 	}
@@ -112,14 +125,14 @@ func TestPhanQuyen(t *testing.T) {
 		t.Errorf("nhân viên sửa cơ cấu phải 403: %v", err)
 	}
 
-	// trưởng phòng: thấy phòng mình, không thấy lương, duyệt đơn trong phòng, không tự duyệt đơn mình
+	// trưởng phòng: hồ sơ đầy đủ của phòng mình (không lương), phòng khác chỉ thông tin công khai; duyệt đơn trong phòng, không tự duyệt đơn mình
 	sm, am := as(uM)
 	st, err = sm.Load(ctx, am)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := codes(st)
-	if len(c) != 2 || c["ZZ_hrPF"] != nil || c["ZZ_hrPE"].Val("salary") != nil {
+	if c["ZZ_hrPF"] == nil || c["ZZ_hrPF"].Has("salary") || !c["ZZ_hrPE"].Has("salary") || c["ZZ_hrPE"].Val("salary") != nil {
 		t.Errorf("trưởng phòng thấy: %v", c)
 	}
 	if _, err := sm.DecideRequest(ctx, am, rq, omap.Of("approve", true)); err != nil {
@@ -260,7 +273,11 @@ func TestBaoVeLuongTuyenDung(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for k, hidden := range map[string]float64{"jds": jdB, "jobs": jobB, "candidates": cB} {
+	// thư viện JD dùng chung cả công ty (như giao diện gốc); tin / ứng viên chỉ của phòng mình
+	if !hasID(ts.(*omap.Map).Val("jds").([]any), jdB) {
+		t.Errorf("trưởng phòng QA phải thấy JD của phòng QB")
+	}
+	for k, hidden := range map[string]float64{"jobs": jobB, "candidates": cB} {
 		for _, x := range ts.(*omap.Map).Val(k).([]any) {
 			if x.(*omap.Map).Val("id") == hidden {
 				t.Errorf("trưởng phòng QA thấy %s của phòng QB", k)
@@ -297,5 +314,53 @@ func TestBaoVeLuongTuyenDung(t *testing.T) {
 	}
 	if _, err := sa.UpdateCandidate(ctx, adm, cB, omap.Of("stage", "hired", "hiredEmployeeId", nv)); status(err) != 400 {
 		t.Errorf("gắn 1 hồ sơ cho 2 ứng viên phải 400: %v", err)
+	}
+}
+
+func hasID(xs []any, id float64) bool {
+	for _, x := range xs {
+		if x.(*omap.Map).Val("id") == id {
+			return true
+		}
+	}
+	return false
+}
+
+// Nhật ký của giao diện (hr.ui) đọc lại được; xoá dữ liệu HR chỉ cho admin có công ty + đúng xác nhận (không chạy xoá thật).
+func TestNhatKyGiaoDienVaReset(t *testing.T) {
+	db, cts := testDB(t)
+	sa, ctx, adm := svcAs(db, "admin", "", cts[0])
+	pool, err := db.Pool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `delete from audit_logs where action = 'hr.ui' and detail like '%ZZ_ui_log%'`)
+	})
+	if _, err := sa.AddAudit(ctx, adm, omap.Of("entries", []any{omap.Of("time", "04/11/2026 · 08:00", "module", "auth", "action", "login", "target", "ZZ_ui_log")})); err != nil {
+		t.Fatal(err)
+	}
+	sec, err := sa.SecurityState(ctx, adm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, x := range sec.(*omap.Map).Val("uiAudit").([]any) {
+		found = found || jsval.Str(x.(*omap.Map).Val("target")) == "ZZ_ui_log"
+	}
+	if !found {
+		t.Error("không đọc lại được dòng nhật ký của giao diện")
+	}
+	if _, err := sa.ResetData(ctx, adm, omap.New()); status(err) != 400 {
+		t.Errorf("thiếu xác nhận phải 400: %v", err)
+	}
+	ok := omap.Of("confirm", "XOA_DU_LIEU_HR")
+	su, sctx, sup := svcAs(db, "super", "", nil)
+	if _, err := su.ResetData(sctx, sup, ok); err == nil {
+		t.Error("super không chọn công ty phải bị từ chối")
+	}
+	us, uctx, u := svcAs(db, "user", "hr", cts[0])
+	if _, err := us.ResetData(uctx, u, ok); status(err) != 403 {
+		t.Errorf("không phải admin phải 403: %v", err)
 	}
 }

@@ -38,8 +38,13 @@ func TestLuong(t *testing.T) {
 	if _, err := s.SavePayrollConfig(ctx, a, omap.Of("config", "x")); status(err) != 400 {
 		t.Errorf("cấu hình không phải object phải 400: %v", err)
 	}
-	if _, err := s.AddAdjustment(ctx, a, omap.Of("empId", eid, "month", "2031-01", "kind", "bonus", "label", "Thưởng", "amount", 5000000.0)); err != nil {
+	added, err := s.AddAdjustment(ctx, a, omap.Of("empId", eid, "month", "2031-01", "kind", "bonus", "label", "Thưởng", "amount", 5000000.0))
+	if err != nil {
 		t.Fatal(err)
+	}
+	adjID := added.(*omap.Map).Val("id")
+	if jsval.ToNumber(adjID) <= 0 {
+		t.Fatalf("AddAdjustment phải trả id: %v", added)
 	}
 	if _, err := s.AddAdjustment(ctx, a, omap.Of("empId", eid, "month", "2031-01", "kind", "tip", "label", "x", "amount", 1.0)); status(err) != 400 {
 		t.Errorf("loại điều chỉnh sai phải 400: %v", err)
@@ -56,7 +61,7 @@ func TestLuong(t *testing.T) {
 		t.Errorf("config: %v", st.Val("config"))
 	}
 	adj := st.Val("adjustments").(*omap.Map).Val("2031-01").(*omap.Map).Val(jsval.Str(eid)).([]any)
-	if len(adj) != 1 || adj[0].(*omap.Map).Val("amount") != 5000000.0 {
+	if len(adj) != 1 || adj[0].(*omap.Map).Val("amount") != 5000000.0 || jsval.Str(adj[0].(*omap.Map).Val("id")) != jsval.Str(adjID) {
 		t.Errorf("adjustments: %v", adj)
 	}
 	if f := st.Val("fixed").(*omap.Map).Val("zzhrpl").(*omap.Map); f.Val("fund") != 60000000.0 || len(f.Val("items").([]any)) != 1 {

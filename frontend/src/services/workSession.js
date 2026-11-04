@@ -10,17 +10,20 @@ let S = { auth: apiConfigured() ? 'checking' : 'unconfigured', me: null, congTy:
 const subs = new Set()
 const set = patch => { S = { ...S, ...patch }; subs.forEach(f => f()) }
 let started = null
+// chỉ khi chạy local (vite dev): tự đăng nhập bằng tài khoản thử trong .env.development.local, bản build luôn hiện màn đăng nhập
+const DEV_USER = import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN_USER
+const devLogin = () => (DEV_USER ? login(DEV_USER, import.meta.env.VITE_DEV_LOGIN_PASSWORD).then(() => true, () => false) : Promise.resolve(false))
 
 function start() {
   if (started || !apiConfigured()) return started
   started = (async () => {
     try {
-      if (!readToken()) { await ping(); set({ auth: 'login' }); return }
+      if (!readToken()) { await ping(); if (!(await devLogin())) set({ auth: 'login' }); return }
       const u = await qsApi.me()
       set({ auth: 'ready', me: u, congTy: u.congTy || null, error: '' })
     } catch (e) {
       if (e && e.name === 'QsUnreachableError') set({ auth: 'unreachable', error: e.message })
-      else { writeToken(''); set({ auth: 'login' }) }
+      else { writeToken(''); if (!(await devLogin())) set({ auth: 'login' }) }
     }
   })()
   return started

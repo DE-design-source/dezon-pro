@@ -16,6 +16,7 @@ type Repository interface {
 	ListProjects(ctx context.Context, kind string) ([]*omap.Map, error)
 	GetProject(ctx context.Context, id float64) (*omap.Map, error)
 	ProjectOfLead(ctx context.Context, leadID any, kind string) (*omap.Map, error)
+	ProjectsOfLead(ctx context.Context, leadID any) ([]*omap.Map, error)
 	InsertProject(ctx context.Context, row *omap.Map) (*omap.Map, error)
 	UpdateProject(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
 	TaskProgress(ctx context.Context, projectIDs []any) ([]*omap.Map, error)
@@ -49,7 +50,8 @@ func (r *pgRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
 }
 
 func (r *pgRepo) ListProjects(ctx context.Context, kind string) ([]*omap.Map, error) {
-	return r.db.Select(ctx, "tk_du_an", database.SelectOpt{Filter: database.Eq("loai", kind), Order: "ngay_tao.desc", Limit: 5000})
+	// dự án đang ẩn (khách Kinh doanh rời giai đoạn bàn giao) không hiện ở danh sách
+	return r.db.Select(ctx, "tk_du_an", database.SelectOpt{Filter: database.Eq("loai", kind) + "&tach_khach_hang=is.false", Order: "ngay_tao.desc", Limit: 5000})
 }
 
 func (r *pgRepo) GetProject(ctx context.Context, id float64) (*omap.Map, error) {
@@ -58,6 +60,10 @@ func (r *pgRepo) GetProject(ctx context.Context, id float64) (*omap.Map, error) 
 
 func (r *pgRepo) ProjectOfLead(ctx context.Context, leadID any, kind string) (*omap.Map, error) {
 	return first(r.db.Select(ctx, "tk_du_an", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID) + "&" + database.Eq("loai", kind), Limit: 1}))
+}
+
+func (r *pgRepo) ProjectsOfLead(ctx context.Context, leadID any) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "tk_du_an", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Limit: 10})
 }
 
 func (r *pgRepo) InsertProject(ctx context.Context, row *omap.Map) (*omap.Map, error) {
@@ -77,7 +83,7 @@ func inIDs(ids []any) string {
 }
 
 func (r *pgRepo) TaskProgress(ctx context.Context, ids []any) ([]*omap.Map, error) {
-	return r.db.Select(ctx, "tk_cong_viec", database.SelectOpt{Select: "du_an_id,tien_do,loai_tien", Filter: inIDs(ids), Limit: 100000})
+	return r.db.Select(ctx, "tk_cong_viec", database.SelectOpt{Select: "du_an_id,tien_do,cot_moc,loai_tien", Filter: inIDs(ids), Limit: 100000})
 }
 
 func (r *pgRepo) MembersOf(ctx context.Context, ids []any) ([]*omap.Map, error) {

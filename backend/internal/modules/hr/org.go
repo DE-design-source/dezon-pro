@@ -202,7 +202,8 @@ func (s *Service) deleteUnit(ctx context.Context, k string) error {
 	if u == nil {
 		return apperr.NotFound("Không tìm thấy đơn vị " + k)
 	}
-	emps, err := s.db.Select(ctx, "hr_nhan_vien", database.SelectOpt{Select: "id", Filter: database.Eq("phong_ban", k), Limit: 1})
+	// như giao diện gốc: chỉ đếm người đang làm; hồ sơ đã nghỉ chuyển sang đơn vị cấp trên (khoá ngoại phòng ban)
+	emps, err := s.db.Select(ctx, "hr_nhan_vien", database.SelectOpt{Select: "id,trang_thai", Filter: database.Eq("phong_ban", k), Limit: 10000})
 	if err != nil {
 		return err
 	}
@@ -210,8 +211,23 @@ func (s *Service) deleteUnit(ctx context.Context, k string) error {
 	if err != nil {
 		return err
 	}
-	if len(emps) > 0 || len(kids) > 0 {
+	left := 0
+	for _, e := range emps {
+		if jsval.Str(e.Val("trang_thai")) == "left" {
+			left++
+		}
+	}
+	if len(emps) > left || len(kids) > 0 {
 		return apperr.BadRequest("Không thể xoá: " + jsval.Str(u.Val("nhan")) + " còn nhân sự hoặc đơn vị trực thuộc")
+	}
+	if left > 0 {
+		parent := jsval.Str(u.Val("cap_tren"))
+		if parent == "" {
+			return apperr.BadRequest("Không thể xoá: " + jsval.Str(u.Val("nhan")) + " còn hồ sơ nhân sự đã nghỉ và không có đơn vị cấp trên để chuyển sang")
+		}
+		if _, err := s.db.Update(ctx, "hr_nhan_vien", database.Eq("phong_ban", k), omap.Of("phong_ban", parent, "cap_nhat", s.nowISO())); err != nil {
+			return err
+		}
 	}
 	_, err = s.db.Remove(ctx, "hr_don_vi", database.Eq("id", u.Val("id")))
 	return err

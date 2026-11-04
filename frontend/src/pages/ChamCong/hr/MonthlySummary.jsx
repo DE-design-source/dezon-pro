@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, MONTHS, HR_TODAY, monthlySummary, deptOf } from '../../../data/hrData'
+import { DEPTS, MONTHS, monthlySummary, deptOf } from '../../../data/hrData'
 import { Avatar, Empty, Pill, downloadCsv } from './shared'
 import { useAccess } from './access'
 
 const n1 = v => (Number.isInteger(v) ? v : v.toFixed(1)).toString().replace('.', ',')
 
 /* Tổng hợp công & phép tồn theo tháng — chốt công, xuất CSV cho bộ phận lương */
-/* closedMonths: {tháng: trạng thái kỳ lương} của các tháng đã chốt công (từ /hr/attendance, ai xem chấm công cũng có);
-   onRun(tháng, 'close' | 'open', null, okMsg) ghi lên máy chủ */
-export default function MonthlySummary({ employees, closedMonths = {}, onRun }) {
-  const { can, canAll, log } = useAccess()
+export default function MonthlySummary({ employees, toast, locked, setLocked }) {
+  const { can, log } = useAccess()
   const [month, setMonth] = useState(MONTHS[0].key)
   const [dept, setDept] = useState('all')
   const [q, setQ] = useState('')
@@ -20,10 +18,7 @@ export default function MonthlySummary({ employees, closedMonths = {}, onRun }) 
   const rows = all.filter(r => (dept === 'all' || r.emp.dept === dept) && (!t || r.emp.name.toLowerCase().includes(t)))
   const sum = k => rows.reduce((s, r) => s + r[k], 0)
   const label = MONTHS.find(m => m.key === month).label
-  const run = { status: closedMonths[month] || 'draft' }
-  const isLocked = !!closedMonths[month]
-  const [yy, mm] = month.split('-').map(Number)
-  const ended = HR_TODAY >= new Date(yy, mm, 0).toLocaleDateString('sv-SE') // máy chủ chỉ cho chốt từ ngày cuối tháng
+  const isLocked = locked.has(month)
 
   function exportCsv() {
     downloadCsv(`tong-hop-cong-${month}.csv`, [
@@ -51,8 +46,7 @@ export default function MonthlySummary({ employees, closedMonths = {}, onRun }) 
             <option value="all">Tất cả phòng ban</option>{DEPTS.map(d => <option key={d.key} value={d.key}>{d.name}</option>)}
           </select>
           {can('attendance', 'export') && <button className="cc-btn ghost" onClick={exportCsv}><Icon name="download" size={14} />Xuất CSV</button>}
-          {!isLocked && canAll('attendance', 'approve') && employees.length > 0 && <button className="cc-btn" disabled={!ended} title={ended ? '' : 'Chốt công từ ngày cuối tháng'} onClick={() => { if (confirm(`Chốt công ${label}? Sau khi chốt, chấm công tháng này không sửa được nữa.`)) onRun(month, 'close', null, `Đã chốt công ${label}`).then(ok => ok && log('attendance', 'approve', `Chốt công ${label}`)) }}><Icon name="lock" size={14} />Chốt công</button>}
-          {isLocked && run.status === 'draft' && canAll('attendance', 'approve') && <button className="cc-link-btn" onClick={() => onRun(month, 'open', null, `Đã mở chốt công ${label}`).then(ok => ok && log('attendance', 'edit', `Mở chốt công ${label}`))}>Mở chốt</button>}
+          {!isLocked && can('attendance', 'approve') && employees.length > 1 && <button className="cc-btn" onClick={() => { if (confirm(`Chốt công ${label}? Sau khi chốt, số liệu được chuyển sang tính lương.`)) { setLocked(s => new Set(s).add(month)); log('attendance', 'approve', `Chốt công ${label}`); toast(`Đã chốt công ${label}`) } }}><Icon name="lock" size={14} />Chốt công</button>}
         </div>
 
         {rows.length === 0 ? <Empty text="Không có dữ liệu" /> : (

@@ -683,12 +683,18 @@ CREATE TABLE public.delivery_projects (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    progress_pct numeric(5,2),
+    bar_color text DEFAULT ''::text NOT NULL,
+    org_chart jsonb,
+    is_lead_detached boolean DEFAULT false NOT NULL,
     CONSTRAINT ck_delivery_projects_approved_budget_vnd CHECK ((approved_budget_vnd >= (0)::numeric)),
     CONSTRAINT ck_delivery_projects_contract_value_vnd CHECK ((contract_value_vnd >= (0)::numeric)),
     CONSTRAINT ck_delivery_projects_dates CHECK (((handover_date IS NULL) OR (start_date IS NULL) OR (handover_date >= start_date))),
     CONSTRAINT ck_delivery_projects_kind CHECK ((kind = ANY (ARRAY['design'::text, 'construction'::text]))),
     CONSTRAINT ck_delivery_projects_name CHECK ((name <> ''::text)),
-    CONSTRAINT ck_delivery_projects_status CHECK ((status = ANY (ARRAY['nhap'::text, 'dang-lam'::text, 'tam-dung'::text, 'hoan-tat'::text])))
+    CONSTRAINT ck_delivery_projects_org_chart CHECK (((org_chart IS NULL) OR (jsonb_typeof(org_chart) = 'object'::text))),
+    CONSTRAINT ck_delivery_projects_progress_pct CHECK (((progress_pct IS NULL) OR ((progress_pct >= (0)::numeric) AND (progress_pct <= (100)::numeric)))),
+    CONSTRAINT ck_delivery_projects_status CHECK ((status = ANY (ARRAY['nhap'::text, 'thiet-ke'::text, 'dang-lam'::text, 'tam-dung'::text, 'hoan-tat'::text])))
 );
 
 
@@ -787,7 +793,7 @@ COMMENT ON COLUMN public.delivery_projects.project_type IS 'Building type (Nhà 
 -- Name: COLUMN delivery_projects.status; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.delivery_projects.status IS 'nhap (draft) / dang-lam (in progress) / tam-dung (paused) / hoan-tat (done).';
+COMMENT ON COLUMN public.delivery_projects.status IS 'nhap (draft) / thiet-ke (design, new from sales) / dang-lam (in progress) / tam-dung (paused) / hoan-tat (done).';
 
 
 --
@@ -844,6 +850,34 @@ COMMENT ON COLUMN public.delivery_projects.created_at IS 'Row creation time.';
 --
 
 COMMENT ON COLUMN public.delivery_projects.updated_at IS 'Last change of the project header (set by the service).';
+
+
+--
+-- Name: COLUMN delivery_projects.progress_pct; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_projects.progress_pct IS 'Manual progress shown in the project list while the project has no Gantt tasks; null = 0.';
+
+
+--
+-- Name: COLUMN delivery_projects.bar_color; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_projects.bar_color IS 'CSS colour of the progress bar in the project list; empty = by status.';
+
+
+--
+-- Name: COLUMN delivery_projects.org_chart; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_projects.org_chart IS 'Project org chart {parallel: [...], children: [...]} (dept, label, color, icon key, flags); null = default chart.';
+
+
+--
+-- Name: COLUMN delivery_projects.is_lead_detached; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_projects.is_lead_detached IS 'true = hidden from the lists: its sales lead left the hand-off stages (tu-van / dam-phan / thiet-ke); shown again when the lead returns.';
 
 
 --
@@ -1074,11 +1108,15 @@ CREATE TABLE public.delivery_tasks (
     sort_order integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    purchase_orders jsonb DEFAULT '[]'::jsonb NOT NULL,
+    purchase_flow jsonb,
     CONSTRAINT ck_delivery_tasks_amount_vnd CHECK (((amount_vnd IS NULL) OR (amount_vnd >= (0)::numeric))),
     CONSTRAINT ck_delivery_tasks_dates CHECK ((end_date >= start_date)),
     CONSTRAINT ck_delivery_tasks_finance_kind CHECK (((finance_kind IS NULL) OR (finance_kind = ANY (ARRAY['thu'::text, 'chi'::text])))),
     CONSTRAINT ck_delivery_tasks_name CHECK ((name <> ''::text)),
-    CONSTRAINT ck_delivery_tasks_progress_pct CHECK (((progress_pct >= (0)::numeric) AND (progress_pct <= (100)::numeric)))
+    CONSTRAINT ck_delivery_tasks_progress_pct CHECK (((progress_pct >= (0)::numeric) AND (progress_pct <= (100)::numeric))),
+    CONSTRAINT ck_delivery_tasks_purchase_flow CHECK (((purchase_flow IS NULL) OR (jsonb_typeof(purchase_flow) = 'array'::text))),
+    CONSTRAINT ck_delivery_tasks_purchase_orders CHECK ((jsonb_typeof(purchase_orders) = 'array'::text))
 );
 
 
@@ -1220,6 +1258,20 @@ COMMENT ON COLUMN public.delivery_tasks.created_at IS 'Row creation time.';
 --
 
 COMMENT ON COLUMN public.delivery_tasks.updated_at IS 'Last change (set by the service).';
+
+
+--
+-- Name: COLUMN delivery_tasks.purchase_orders; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_tasks.purchase_orders IS 'Purchase orders of a task in the purchasing phase (kanban): [{id, code, item, supplier, qty, value (million VND), due, owner, stage, assignees, dept}].';
+
+
+--
+-- Name: COLUMN delivery_tasks.purchase_flow; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.delivery_tasks.purchase_flow IS 'Purchase kanban stages of the task: [{key, label, color, depts, owners, received, closed}]; null = default stages.';
 
 
 --
@@ -2748,10 +2800,12 @@ CREATE TABLE public.hr_payroll_runs (
     approved_by uuid,
     paid_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    sent_employee_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT ck_hr_payroll_runs_paid_at CHECK (((run_status = 'paid'::text) = (paid_at IS NOT NULL))),
     CONSTRAINT ck_hr_payroll_runs_pay_month CHECK ((EXTRACT(day FROM pay_month) = (1)::numeric)),
     CONSTRAINT ck_hr_payroll_runs_payslips CHECK ((((run_status = 'draft'::text) = (payslips IS NULL)) AND ((payslips IS NULL) OR (jsonb_typeof(payslips) = 'object'::text)))),
-    CONSTRAINT ck_hr_payroll_runs_run_status CHECK ((run_status = ANY (ARRAY['draft'::text, 'approved'::text, 'paid'::text])))
+    CONSTRAINT ck_hr_payroll_runs_run_status CHECK ((run_status = ANY (ARRAY['draft'::text, 'approved'::text, 'paid'::text]))),
+    CONSTRAINT ck_hr_payroll_runs_sent_employee_ids CHECK ((jsonb_typeof(sent_employee_ids) = 'array'::text))
 );
 
 
@@ -2830,6 +2884,13 @@ COMMENT ON COLUMN public.hr_payroll_runs.paid_at IS 'Time it was marked paid (no
 --
 
 COMMENT ON COLUMN public.hr_payroll_runs.updated_at IS 'Last change time (set by the service).';
+
+
+--
+-- Name: COLUMN hr_payroll_runs.sent_employee_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.hr_payroll_runs.sent_employee_ids IS 'Employee ids whose payslip was sent (step "Gửi phiếu lương"); cleared when the run is reopened.';
 
 
 --
@@ -3247,7 +3308,9 @@ CREATE TABLE public.hr_security_settings (
     mask_salary boolean DEFAULT true NOT NULL,
     updated_by uuid,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_hr_security_settings_perms CHECK ((jsonb_typeof(perms) = 'object'::text))
+    ui_settings jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT ck_hr_security_settings_perms CHECK ((jsonb_typeof(perms) = 'object'::text)),
+    CONSTRAINT ck_hr_security_settings_ui_settings CHECK ((jsonb_typeof(ui_settings) = 'object'::text))
 );
 
 
@@ -3298,6 +3361,13 @@ COMMENT ON COLUMN public.hr_security_settings.updated_by IS 'User who saved last
 --
 
 COMMENT ON COLUMN public.hr_security_settings.updated_at IS 'Last change time (set by the service).';
+
+
+--
+-- Name: COLUMN hr_security_settings.ui_settings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.hr_security_settings.ui_settings IS 'UI security settings document: {settings {key: {label, value}}, session, branches {employeeId: [branch]}, roleUsers {role: employeeId}}.';
 
 
 --
@@ -10103,6 +10173,7 @@ ALTER TABLE ONLY public.work_items
 
 
 
+
 insert into public.schema_migrations (version, name, checksum) values ('0001', '0001_dealer_price_generated', '88ba91a42e051629a406c974bf01de3e715a9a5ed85fd13d1ccc2296e91b84e2');
 insert into public.schema_migrations (version, name, checksum) values ('0002', '0002_company_settings', '8b7c95337c1b6d0bf4fe5a64752c26cb1271c241cebf15ad6ce2b64c3187ff15');
 insert into public.schema_migrations (version, name, checksum) values ('0003', '0003_quarantine_and_fixes', '950c761b9fbd9e065c5be9f803ea429486ef7d9c6a3ceb08381c1206f913539b');
@@ -10127,3 +10198,8 @@ insert into public.schema_migrations (version, name, checksum) values ('0023', '
 insert into public.schema_migrations (version, name, checksum) values ('0024', '0024_hr_security', '041ad5e87083fecb0cb8fa997f397f94f7f02157c70c5466617fca689df28768');
 insert into public.schema_migrations (version, name, checksum) values ('0025', '0025_hr_extras', '5b9680fafc07ca7c8ef8d539478b2f0162853aca54724aa367c0f03f9b25aebe');
 insert into public.schema_migrations (version, name, checksum) values ('0026', '0026_hr_work_sites', 'fd8635b8d47fdac1976fdc021308b40cdc57daa9d124d16b61738b8336ecc1f0');
+insert into public.schema_migrations (version, name, checksum) values ('0027', '0027_hr_ui_restore', 'cb1bda996099b2f33ef3ddacfe0d203634bb608003aa51cbe69c197bc707cedd');
+insert into public.schema_migrations (version, name, checksum) values ('0028', '0028_delivery_ui_restore', 'a21aadc9d8494f70fe3c09c21bbfabfa24f00e66175c0396f09b88886b5c5e32');
+insert into public.schema_migrations (version, name, checksum) values ('0029', '0029_delivery_core_phases', 'd99fc826ea8ced41844771856a480d736ddf71b48832f7d8bda6d1147d05439b');
+insert into public.schema_migrations (version, name, checksum) values ('0030', '0030_delivery_purchase_flow', 'be01e672691f1e250f78ad261785680437517ab7d44688892a6c865623df5561');
+insert into public.schema_migrations (version, name, checksum) values ('0031', '0031_delivery_lead_link', 'd77320eaceccf9262f69472b9fd97500a3d09b66c96489e86cc49819c31d8893');

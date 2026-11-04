@@ -42,7 +42,10 @@ export const enroll = (empId, courses) => request('POST', '/hr/enroll', { body: 
 
 /* Phân quyền HR (hr/access.go) */
 export const loadSecurity = () => request('GET', '/hr/security')
+/* { perms?, maskSalary?, ui? {settings, session, branches, roleUsers} } */
 export const saveSecurity = s => request('POST', '/hr/security', { body: s })
+/* Nhật ký thao tác của giao diện: [{time, user, role, module, action, target, ip}] */
+export const addAudit = entries => request('POST', '/hr/audit', { body: { entries } })
 /* { empId, role?, userId? ('' = bỏ gắn) } */
 export const setUserRole = r => request('POST', '/hr/security/user', { body: r })
 export const saveCourse = c => request('POST', '/hr/courses', { body: c })
