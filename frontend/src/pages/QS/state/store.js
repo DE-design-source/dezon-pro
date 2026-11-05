@@ -82,6 +82,7 @@ export function canTab(tab, me = S.me, congTy = S.congTy) {
   me = me || {}
   if (tab === 'dsduan') tab = 'duan'          // trang Danh sách dự án dùng chung quyền tab Dự án
   if (tab === 'dsncc') tab = 'sanpham'        // trang Nhà cung cấp dùng chung quyền Danh sách sản phẩm
+  if (tab === 'dsntk') tab = 'duan'           // trang Nhà thiết kế (KTS / studio của dự án) dùng chung quyền tab Dự án
   if (tab === 'congty') return me.role === 'super'
   if (tab === 'admin') return me.role === 'admin' || me.role === 'super'
   if (!ctHasFeature_(tab, me, congTy)) return false

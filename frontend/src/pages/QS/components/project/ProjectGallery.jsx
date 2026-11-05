@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
 import { showTab } from '../../state/store'
-import { safeUrl_, money } from '../../lib/format.js'
+import { safeUrl_, money, qbNorm_ } from '../../lib/format.js'
 import { mediaUrl } from '../../api/files'
 import { dezonUrl_ } from '../../lib/dashModel.js'
 import ProjectDetail from './ProjectDetail'
@@ -83,6 +83,7 @@ export default function ProjectGallery() {
   return (
     <div className="qs-pg">
       <div className="qs-pg-head">
+      <span className="qs-pg-total" title={shown.length + ' dự án đang hiện'}>{shown.length}</span>
       <div className="qs-pg-flt qs-pg-mod">
         <button type="button" className={`qs-pg-chip${coBG ? ' on' : ''}`} disabled={!statDone && !coBG} aria-pressed={coBG}
           title={statDone ? 'Chỉ hiện dự án đã có dòng báo giá' : 'Đang đếm dòng báo giá của các dự án…'} onClick={() => setCoBG(v => !v)}>
@@ -96,8 +97,8 @@ export default function ProjectGallery() {
           picked.forEach(v => { if (keys.indexOf(v) < 0) keys.push(v) })
           if (!keys.length) return null
           const isOpen = open === g[0]
-          const dq = ddq.trim().toLowerCase()
-          const list = isOpen ? keys.filter(k => !dq || k.toLowerCase().indexOf(dq) >= 0) : []
+          const dq = qbNorm_(ddq.trim())   // không phân biệt dấu
+          const list = isOpen ? keys.filter(k => !dq || qbNorm_(k).indexOf(dq) >= 0) : []
           return (
             <div key={g[0]} className="qs-pg-dd" ref={isOpen ? ddRef : null}>
               <button type="button" className={`qs-pg-ddb${picked.length ? ' on' : ''}`} aria-expanded={isOpen} onClick={() => setOpen(o => (o === g[0] ? '' : g[0]))}>
@@ -143,8 +144,7 @@ export default function ProjectGallery() {
           <b>{nCol}</b>
         </label>
       )}
-      <button type="button" className="qs-pg-new" title="Nhập thông tin một dự án vào danh sách" onClick={() => { setCreating(true); const sc = document.querySelector('.qs-scroll'); if (sc) sc.scrollTop = 0 }}><Icon name="plus" size={15} />Nhập dự án</button>
-      <span className="qs-pg-n">{shown.length} dự án</span>
+      <button type="button" className="qs-pg-new" title="Nhập thông tin một dự án vào danh sách" onClick={() => { setCreating(true); const sc = document.querySelector('.qs-scroll'); if (sc) sc.scrollTop = 0 }}><Icon name="plus" size={15} stroke={3} />Nhập dự án</button>
       <div className="qs-pg-search qs-pg-mod">
         <Icon name="search" size={16} />
         <input placeholder="Tìm kiếm dự án, khách hàng, khu vực, phân khúc…" value={q} onChange={e => setQ(e.target.value)} />

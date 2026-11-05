@@ -34,7 +34,7 @@ export default function NodePicker({ ctx, small }) {
         <Pop anchor={anchor} width={360} onClose={close}>
           <PopHead title="Trang 2 trở đi: hạng mục đã bóc" sub={sel.length ? sel.length + ' mục đã tích' : 'chưa tích = in tất cả'} onClose={close} />
           <div className="qsq-pop-tools">
-            <span>Trang 1 luôn là tờ bìa (Mẫu 1 / Mẫu 2)</span>
+            <span>Trang 1 luôn là tờ bìa</span>
             <span style={{ flex: 1 }} />
             <button type="button" className="qs-qt-btn" onClick={() => bgSelAll_(bgTreeNodes_(c.cur).filter(t => bgNodeCnt_(t.code, c)).map(t => t.code))}>Chọn tất cả</button>
             <button type="button" className="qs-qt-btn" onClick={() => bgSelAll_([])}>Bỏ chọn</button>

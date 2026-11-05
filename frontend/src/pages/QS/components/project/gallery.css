@@ -103,9 +103,11 @@
 .qs-pd-cardh.tog:hover .more{text-decoration:underline;}
 .qs-pd-kv{display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:16px 28px; margin:0;}
 /* Thông tin cơ bản: 2 cột, mỗi mục 1 hàng "NHÃN:  giá trị" (như trang dự án dezon.vn) */
-.qs-pd-kv.basic{grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px 56px;}
-.qs-pd-kv.basic .kv{display:grid; grid-template-columns:190px minmax(0, 1fr); align-items:baseline; gap:12px;}
-.qs-pd-kv.basic dt{font-size:13.5px; font-weight:800; letter-spacing:0; color:var(--text);}
+/* Thông tin nâng cao dùng cùng lưới này. Cột nhãn rộng theo nhãn dài nhất (subgrid), tối thiểu 180px để giá trị của
+   2 khối thẳng cột với nhau -> nhãn không rớt dòng, giá trị các hàng thẳng một cột */
+.qs-pd-kv.basic{grid-template-columns:minmax(180px, max-content) minmax(0, 1fr) minmax(180px, max-content) minmax(0, 1fr); gap:14px 56px;}
+.qs-pd-kv.basic .kv{display:grid; grid-column:span 2; grid-template-columns:subgrid; align-items:baseline; column-gap:24px;}
+.qs-pd-kv.basic dt{font-size:13.5px; font-weight:800; letter-spacing:0; color:var(--text); white-space:nowrap;}
 .qs-pd-kv.basic dt::after{content:':';}
 .qs-pd-kv.basic dd{font-size:15px; font-weight:500; color:var(--dash-accent);}
 .qs-pd-kv.basic dd.main{font-size:15px; font-weight:600; color:var(--text);}
@@ -129,8 +131,8 @@
 .qs-pd-kv dd .rg{display:flex; align-items:center; gap:10px; height:36px;}
 .qs-pd-kv dd .rg input{flex:1; height:auto; padding:0; border:none; background:none; accent-color:var(--dash-accent);}
 .qs-pd-kv dd .rg b{min-width:42px; text-align:right;}
-@media (max-width:1100px){ .qs-pd-kv.basic{grid-template-columns:1fr;} }
-@media (max-width:640px){ .qs-pd-kv{grid-template-columns:1fr;} .qs-pd-kv:not(.basic) .kv.wide{grid-column:auto;} .qs-pd-kv.basic .kv{grid-template-columns:130px minmax(0, 1fr);} }
+@media (max-width:1100px){ .qs-pd-kv.basic{grid-template-columns:minmax(180px, max-content) minmax(0, 1fr);} }
+@media (max-width:640px){ .qs-pd-kv{grid-template-columns:1fr;} .qs-pd-kv:not(.basic) .kv.wide{grid-column:auto;} .qs-pd-kv.basic{grid-template-columns:minmax(0, 130px) minmax(0, 1fr);} .qs-pd-kv.basic dt{white-space:normal;} }
 .qs-pd-introedit{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; margin-bottom:18px;}
 .qs-pd-introedit label{display:flex; flex-direction:column; gap:6px; min-width:0;}
 .qs-pd-introedit h3{margin:0; font-size:16px;}
@@ -236,12 +238,74 @@
 .qs-pd-hero.empty:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
 .qs-pd-hero.empty .ic{width:64px; height:64px; border-radius:50%; background:var(--surface); display:grid; place-items:center; color:var(--dash-accent);}
 .qs-pd-hero.empty b{font-size:17px; color:var(--text);}
-.qs-pim{display:flex; flex-direction:column; gap:16px;}
-.qs-pim-drop{display:flex; flex-direction:column; align-items:center; gap:6px; padding:28px; border:2px dashed var(--border); border-radius:14px; background:var(--dash-soft); color:var(--text-muted); text-align:center; cursor:pointer;}
+.qs-pim{display:flex; flex-direction:column; gap:0;}
+/* Khung thêm ảnh (cả khung nhận kéo thả): đầu khung = tiêu đề + ô "Vào phòng"; dưới = 6 cách thêm ảnh dạng thẻ */
+.qs-pim-up{position:relative; display:flex; flex-direction:column; gap:14px; margin-bottom:12px; padding:16px 18px 18px; border:2px dashed var(--border); border-radius:14px; background:var(--dash-soft); transition:border-color .12s, background .12s;}
+.qs-pim-up.first{padding:28px 28px 30px;}
+.qs-pim-up.over{border-color:var(--dash-accent); background:var(--dash-accent-tint);}
+.qs-pim-uph{display:flex; align-items:center; gap:14px;}
+.qs-pim-uph .ic{width:42px; height:42px; flex:none; border-radius:50%; background:var(--surface); color:var(--dash-accent); display:grid; place-items:center;}
+.qs-pim-uph .tx{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+.qs-pim-uph .tx b{font-size:15.5px; color:var(--text);}
+.qs-pim-uph .tx span{font-size:12.5px; color:var(--text-muted);}
+.qs-pim-ph{flex:0 0 260px; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:var(--text-muted); white-space:nowrap;}
+.qs-pim-ph input{flex:1; min-width:0; height:38px; padding:0 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:14px; font-weight:400; outline:none;}
+.qs-pim-ph input:focus{border-color:var(--dash-accent);}
+.qs-pim-ways{display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:10px;}
+.qs-pim-ways button{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer; transition:border-color .12s, box-shadow .12s;}
+.qs-pim-ways button:hover:not(:disabled){border-color:var(--dash-accent); box-shadow:0 2px 10px rgba(15, 23, 42, .08);}
+.qs-pim-ways button:disabled{opacity:.5; cursor:default;}
+.qs-pim-ways .wi{width:34px; height:34px; margin-bottom:4px; border-radius:9px; background:var(--dash-accent-tint); color:var(--dash-accent); display:grid; place-items:center;}
+.qs-pim-ways b{font-size:13.5px;}
+.qs-pim-ways button > span:last-child{font-size:12px; color:var(--text-muted); line-height:1.35;}
+.qs-pim-up.first .qs-pim-ways button{padding:18px 16px;}
+.qs-pim-prog{display:flex; align-items:center; gap:12px; font-size:13px; font-weight:600; color:var(--dash-accent);}
+.qs-pim-prog .tr{flex:1; height:6px; border-radius:3px; background:var(--surface-alt); overflow:hidden;}
+.qs-pim-prog .tr i{display:block; height:100%; border-radius:3px; background:var(--dash-accent); transition:width .2s;}
+.qs-pim-ovl{position:absolute; inset:0; z-index:2; border-radius:12px; background:var(--dash-accent-tint); color:var(--dash-accent); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; pointer-events:none;}
+.qs-pim-ovl b{font-size:16px;} .qs-pim-ovl span{font-size:13px;}
+/* Hộp chọn ảnh sản phẩm */
+.qsc-dlg.qs-pim-spd{width:min(860px, 94vw); max-width:none; padding:20px 22px;}
+.qs-pim-spg{display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:10px; max-height:60vh; overflow:auto; padding:4px 2px 12px;}
+.qs-pim-spg button{position:relative; aspect-ratio:1; padding:0; border:2px solid var(--border); border-radius:10px; background:#fff; overflow:hidden; cursor:pointer;}
+.qs-pim-spg button img{width:100%; height:100%; object-fit:contain;}
+.qs-pim-spg button i{position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; border:2px solid #fff; background:rgba(15, 23, 42, .25); color:transparent; display:grid; place-items:center;}
+.qs-pim-spg button.on{border-color:var(--dash-accent);}
+.qs-pim-spg button.on i{background:var(--dash-accent); color:#fff;}
+@media (max-width:1300px){ .qs-pim-ways{grid-template-columns:repeat(3, minmax(0, 1fr));} }
+.qs-pim-drop{flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:14px; padding:16px 20px; border:2px dashed var(--border); border-radius:14px; background:var(--dash-soft); color:var(--text-muted); cursor:pointer;}
+.qs-pim-drop > div{display:flex; flex-direction:column; gap:2px;}
 .qs-pim-drop:hover, .qs-pim-drop.over{border-color:var(--dash-accent); background:var(--dash-accent-tint); color:var(--dash-accent);}
-.qs-pim-drop b{font-size:15px; color:var(--text);}
+.qs-pim-drop b{font-size:14.5px; color:var(--text);}
 .qs-pim-drop span{font-size:12.5px;}
-.qs-pim-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
+/* Mỗi phòng 1 hàng như trang dự án dezon.vn: tên phòng trái, dải ảnh cuộn ngang phải (thấy ~3 ảnh, ló ảnh thứ 4) */
+.qs-pim-room{display:grid; grid-template-columns:minmax(180px, 24%) minmax(0, 1fr); align-items:center; gap:32px; padding:36px 0; border-top:1px solid var(--border);}
+.qs-pim-room:first-of-type{border-top:none;}
+.qs-pim-rh{display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding-left:8%;}
+.qs-pim-rh h3{margin:0; font-size:26px; font-weight:500; line-height:1.25; color:var(--text);}
+.qs-pim-rh h3.nil{color:var(--text-muted);}
+.qs-pim-rh small{font-size:13px; color:var(--text-muted);}
+.qs-pim-rh .acts{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; opacity:0; transition:opacity .12s;}
+.qs-pim-room:hover .acts, .qs-pim-rh .acts:focus-within{opacity:1;}
+@media (hover:none){ .qs-pim-rh .acts{opacity:1;} }
+.qs-pim-rh .acts button{height:28px; padding:0 10px; border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
+.qs-pim-rh .acts button:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qs-pim-rail{position:relative; min-width:0;}
+.qs-pim-track{display:grid; grid-auto-flow:column; grid-auto-columns:calc((100% - 36px) / 3.15); gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none;}
+.qs-pim-track::-webkit-scrollbar{display:none;}
+.qs-pim-track.r2{grid-template-rows:repeat(2, auto); gap:10px 16px;}
+.qs-pim-track > .qs-pim-it{scroll-snap-align:start; aspect-ratio:4 / 5;}
+.qs-pim-track.r2 > .qs-pim-it{aspect-ratio:3 / 2;}
+.qs-pim-nav{position:absolute; top:50%; transform:translateY(-50%); width:48px; height:64px; padding:0; border:none; background:none; color:#fff; display:grid; place-items:center; cursor:pointer; filter:drop-shadow(0 1px 3px rgba(0,0,0,.65));}
+.qs-pim-nav:hover{transform:translateY(-50%) scale(1.12);}
+.qs-pim-nav.l{left:4px;} .qs-pim-nav.l svg{transform:rotate(180deg);}
+.qs-pim-nav.r{right:4px;}
+@media (max-width:900px){
+  .qs-pim-uph{flex-wrap:wrap;} .qs-pim-ph{flex:1 1 100%;} .qs-pim-ways{grid-template-columns:repeat(2, minmax(0, 1fr));}
+  .qs-pim-room{grid-template-columns:1fr; gap:14px; padding:24px 0;}
+  .qs-pim-rh{flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:10px; padding-left:0;} .qs-pim-rh h3{font-size:20px;} .qs-pim-rh .acts{opacity:1; margin-top:0;}
+  .qs-pim-track{grid-auto-columns:calc((100% - 16px) / 1.6);}
+}
 .qs-pim-it{position:relative; aspect-ratio:4 / 3; border-radius:10px; overflow:hidden; border:1px solid var(--border); background:#0f172a;}
 .qs-pim-it .img{display:block; width:100%; height:100%; padding:0; border:none; background:none; cursor:zoom-in;}
 .qs-pim-it img{width:100%; height:100%; object-fit:cover;}
@@ -250,6 +314,7 @@
 .qs-pim-it:hover .act{opacity:1;}
 @media (hover:none){ .qs-pim-it .act{opacity:1;} }
 .qs-pim-it .act.cv{left:8px;} .qs-pim-it .act.cv:hover{color:#F59E0B;}
+.qs-pim-it .act.mv{right:42px;} .qs-pim-it .act.mv:hover{color:var(--dash-accent);}
 .qs-pim-it .act.del{right:8px;} .qs-pim-it .act.del:hover{background:var(--danger); color:#fff;}
 .qs-pg-cover .cv{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
 /* Module thu gọn được (ảnh dự án, thông tin dự án) */
@@ -431,3 +496,33 @@
 .qs-pg-info .qs-pg-name{padding-bottom:6px; border-bottom:1px solid var(--border); height:auto;}
 .qs-pg-info .qs-pg-ncc{height:auto; min-height:22px; padding:6px 0; border-bottom:1px solid var(--border);}
 .qs-pg-info .qs-pg-bg{padding-top:6px; height:auto;}
+
+/* ---------- Thanh đầu trang Danh sách dự án / Nhà cung cấp theo băng dự án của Bóc tách (.qs-pc, project.css) ----------
+   Module khung mờ cao 40, bo 10, khe giữa module 16; trong module: nút viên thuốc cao 30 bo 15 (chip lọc, ô chọn), số đếm dạng [21]
+   màu xanh nhạt; chế độ xem = cụm nút như "Bảng tính / Bảng thường" (khung viên thuốc, nút đang chọn nền trắng chữ navy) */
+.qs-pg-head{gap:16px; min-height:58px; padding:9px 14px;}
+.qs-pg-head .qs-pg-mod{height:40px; min-height:0; padding:0 12px; gap:8px; border-radius:10px;}
+.qs-pg-head .qs-pg-flt{flex-wrap:nowrap; padding:0 6px;}
+.qs-pg-head .qs-pg-chip, .qs-pg-head .qs-pg-ddb{height:30px; padding:0 12px; border-radius:15px; font-size:12.5px; font-weight:700; gap:6px;}
+.qs-pg-head .qs-pg-chip small{display:inline; min-width:0; height:auto; padding:0; border-radius:0; background:none; color:#9fc0e3; font-size:12px; font-weight:600;}
+.qs-pg-head .qs-pg-chip small::before{content:'[';} .qs-pg-head .qs-pg-chip small::after{content:']';}
+.qs-pg-head .qs-pg-chip.on small{background:none; color:#4b6584;}
+.qs-pg-head .qs-pg-ddb .lb{font-weight:600;}
+.qs-pg-head .qs-pg-clear{height:30px; font-size:12.5px;}
+/* chế độ xem: khung viên thuốc bên trong module */
+.qs-pg-head .qs-pg-views{gap:6px; padding:0 6px;}
+.qs-pg-head .qs-pg-views button{height:30px; padding:0 14px; border:1px solid rgba(255,255,255,.25); border-radius:15px; background:rgba(255,255,255,.06); font-size:12.5px; font-weight:600;}
+.qs-pg-head .qs-pg-views button.on{border-color:#fff;}
+/* số dự án đang hiện: ô số ở đầu thanh (chỉ số, rê chuột thấy "n dự án đang hiện") */
+.qs-pg-head .qs-pg-total{flex:none; width:40px; height:40px; padding:0; border:1.5px solid rgba(255,255,255,.6); border-radius:50%; background:transparent; color:#fff; font-size:15px; font-weight:800; display:grid; place-items:center;}   /* tròn, nền trong suốt, viền trắng mờ */
+.qs-pg-head .qs-pg-cols{padding:0 14px; font-size:12.5px; font-weight:700; color:#fff;}
+.qs-pg-head .qs-pg-cols b{color:#9fc0e3;}
+/* Nhập dự án · số dự án · ô tìm: cao 40 như module */
+.qs-pg-head .qs-pg-new{height:40px; padding:0 16px; border-radius:10px; font-size:12.5px;}
+.qs-pg-head .qs-pg-n{font-size:12.5px; font-weight:600; color:#9fc0e3; white-space:nowrap;}
+.qs-pg-head .qs-pg-search{height:40px; border-radius:10px;}
+.qs-pg-head .qs-pg-search input{font-size:13px;}
+
+/* dòng chú thích dưới tiêu đề trang Nhập dự án (vd: ghi danh SP vào dự án sau khi lưu) */
+.qs-pn-note{margin:-10px 0 0; font-size:13px; color:var(--text-muted);}
+.qs-pn-boq > .qs-pn-boqc:only-child{grid-column:1 / -1;}

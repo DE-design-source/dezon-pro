@@ -188,8 +188,10 @@ html[data-theme="dark"] .qsi-field input.qsi-calc{color:var(--dash-bar-2);}
 /* ---------- Ghi danh + nút lưu ---------- */
 .qsi-ghck{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--text); cursor:pointer; font-weight:600;}
 .qsi-ghck input{width:16px; height:16px; cursor:pointer;}
-.qsi-savebar{display:flex; flex-direction:column; align-items:stretch; gap:0; padding:4px 0 0; margin-top:14px;}
-.qsi-savebar .qsi-btn.qsi-sm{align-self:center; width:auto; margin-top:8px;}
+/* Hàng nút cuối form: Đưa vào danh sách chờ (50%) | Xoá form (50%), cùng chiều cao */
+.qsi-savebar{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; padding:4px 0 0; margin-top:14px;}
+.qsi-savebar .qsi-btn.qsi-sm{width:100%; height:auto; margin:0; padding:15px; font-size:15px; font-weight:800; border-radius:12px; border:1.5px solid var(--border); color:var(--text-muted);}
+.qsi-savebar .qsi-btn.qsi-sm:hover{border-color:var(--danger); color:var(--danger); background:var(--danger-tint);}
 .qsi-pe-note{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--dash-accent); background:var(--dash-accent-tint); border:1px solid var(--dash-accent-border); border-radius:9px; padding:8px 12px; margin-bottom:10px;}
 
 /* ---------- Nhập hàng loạt ---------- */
@@ -300,7 +302,10 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-stats-per button.on{background:var(--dash-navy); color:#fff;}
 .qsi-stats-range{display:flex; align-items:center; gap:6px;}
 .qsi-stats-range input{flex:1; min-width:0; height:30px; padding:0 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font-size:12.5px;}
-.qsi-stats-flt{display:grid; grid-template-columns:1fr 1fr; gap:6px 8px;}
+/* mỗi ô lọc 1 hàng trọn bề ngang cột (2 cột thì ô Người duyệt tràn ra ngoài, mất chữ) */
+.qsi-stats-flt{display:grid; grid-template-columns:minmax(0, 1fr); gap:6px 8px;}
+.qsi-stats-flt label{min-width:0;}
+.qsi-stats-flt label > :not(span){width:100%; min-width:0; max-width:100%;}
 .qsi-stats-flt label{display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:600; color:var(--text-muted);}
 .qsi-stats-flt select{height:30px; padding:0 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font-size:12.5px;}
 .qsi-stats-clr{align-self:end; height:30px; border:none; background:none; color:var(--dash-accent); font-size:12.5px; font-weight:600; cursor:pointer;}
@@ -582,4 +587,12 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-stats-fly .qsi-ch.big{height:340px;}
 @media(max-width:1600px){ .qsi-sf-lists.one .qsi-rk-list{grid-template-columns:minmax(0, 1fr);} }
 /* Dấu * bắt buộc: đỏ tươi, to, đậm (theo minh hoạ) */
-.qsi-req, .qsi-field label .qsi-req{display:inline-block; margin-left:2px; color:#ef1c24; font-size:1.45em; font-weight:800; line-height:0; vertical-align:-.28em;}
+.qsi-req, .qsi-field label .qsi-req{display:inline-block; margin-left:2px; color:#ef1c24; font-size:2.9em; font-weight:800; line-height:0; vertical-align:-.41em;}   /* dấu sao bắt buộc to gấp đôi (1,45em -> 2,9em) */
+
+/* Ô Dự án của "Ghi danh vào dự án" (ProductForm GhiCard): nút mở bảng chọn nhiều dự án, cùng cỡ ô nhập */
+.qsi-ghpick{display:flex; align-items:center; gap:8px; width:100%; min-width:0; height:40px; padding:0 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:14px; text-align:left; cursor:pointer;}
+.qsi-ghpick:hover, .qsi-ghpick:focus-visible{border-color:var(--dash-accent); outline:none;}
+.qsi-ghpick svg{flex:none; color:var(--dash-accent);}
+.qsi-ghpick .t{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsi-ghpick.has{color:var(--text); font-weight:600;}
+.qsi-ghpick .c{flex:none; font-size:11px; color:var(--text-muted);}

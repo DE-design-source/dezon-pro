@@ -48,7 +48,9 @@ func protoCol(k string) (string, bool) {
 // projDataKeys =PROJ_DATA_KEYS (store_supa.js:1121).
 // anhDuAn: ảnh công trình của dự án (mảng URL, ảnh đầu = ảnh bìa); boqFiles: file BOQ đính kèm (mảng {url, name, at}, Excel / PDF)
 // - trang Danh sách dự án / chi tiết dự án của React. nccLogo: logo nhà cung cấp {thương hiệu: URL}, lưu theo công ty ('__cty') - trang Nhà cung cấp.
-var projDataKeys = []string{"phanTho", "area", "ptInfo", "ptVat", "cpCfg", "bgCfg", "bgHist", "bgOrg", "mhPay", "btFmt", "anhDuAn", "boqFiles", "nccLogo"}
+// ntkInfo: hồ sơ nhà thiết kế (mảng {id, loai: kts|studio, ten, ...}), lưu theo công ty - trang Nhà thiết kế.
+// nccInfo: hồ sơ nhà cung cấp {thương hiệu: {gioiThieu, ..., doiTac: [...], catalogue: [...]}}, lưu theo công ty - tab Giới thiệu / Đối tác / Catalogue.
+var projDataKeys = []string{"phanTho", "area", "ptInfo", "ptVat", "cpCfg", "bgCfg", "bgHist", "bgOrg", "mhPay", "btFmt", "anhDuAn", "boqFiles", "nccLogo", "nccInfo", "ntkInfo", "bgTuy", "vatHm", "mkAds"}
 
 // daDataHD = DA_DATA_HD (store_supa.js:1098).
 const daDataHD = "Bảng du_an_data chưa được cấp quyền ghi — kiểm tra quyền của tài khoản database trong DATABASE_URL rồi thử lại."

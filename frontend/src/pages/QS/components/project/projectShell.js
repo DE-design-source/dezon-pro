@@ -5,6 +5,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { getState } from '../../state/store'
 import { projDataLoad_ } from '../../state/projData'
+import { tuyGop_ } from '../quote/tuyMau'
 
 export const FOLD_KEYS = ['pcard', 'totals', 'tools', 'cols']
 const FOLD_EV = 'qs:fold'
@@ -41,7 +42,7 @@ export function projCtx_(cur, projData) {
     vat: cur ? cur.vat : 0,
     phanTho: Array.isArray(pd.phanTho) ? pd.phanTho : [],
     ptVat: (v != null && v !== '' && isFinite(nv)) ? nv : (Number(cur && cur.vat) || 0),
-    bgCfg: pd.bgCfg,
+    bgCfg: tuyGop_(pd.bgCfg),   // khoá Tuỳ biến chưa đặt -> mặc định công ty (quote/tuyMau)
   }
 }
 

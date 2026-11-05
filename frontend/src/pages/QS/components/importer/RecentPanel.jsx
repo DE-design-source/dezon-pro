@@ -51,7 +51,7 @@ export default function RecentPanel({ specs, onEditOpen, open, onOpen }) {
           {p.loi ? <div className="qsi-pc-loi">{p.loi}</div> : null}
           <span className="qsi-pc-tag">{dangSua ? 'Đang sửa' : (p.loi ? 'Lỗi — sửa lại' : 'Chờ lưu')}</span>
           {p.combo && p.combo.length ? <span className="qsi-pc-tag">+ combo {p.combo.length}</span> : null}
-          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ dự án ×{p.ghi.qty || 1}</span> : null}
+          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ {(p.ghi.maDAs || []).length > 1 ? p.ghi.maDAs.length + ' dự án' : 'dự án'} ×{p.ghi.qty || 1}</span> : null}
         </div>
         <div className="qsi-pc-act">
           <button className="qsi-pc-btn" title="Sửa — mở lại trong form" onClick={async () => { if (await pendingEdit_(p, specs) && onEditOpen) onEditOpen() }}><QsIcon name="edit" size={14} /></button>

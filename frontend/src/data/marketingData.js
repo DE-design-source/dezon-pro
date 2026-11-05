@@ -105,6 +105,7 @@ export const MAIN_TABS = [
   { id: 'quote', label: 'Báo giá' },
   { id: 'tasks', label: 'Nhiệm vụ' },
   { id: 'staff', label: 'Cơ cấu phòng ban' },
+  { id: 'ads', label: 'Chi tiêu quảng cáo' },
 ]
 
 /* ---------- Mẫu báo giá ---------- */
@@ -130,14 +131,14 @@ export function todayStr() {
 }
 
 export const QUOTE_TEMPLATES = [
-  { id: 'modern', label: 'Hiện đại', swatch: 'linear-gradient(135deg,#C23B78,#7A2856)' },
+  { id: 'modern', label: 'Hiện đại', swatch: 'linear-gradient(135deg,#1F5FBF,#12314f)' },
   { id: 'classic', label: 'Cổ điển', swatch: '#1C1F26' },
   { id: 'minimal', label: 'Tối giản', swatch: 'linear-gradient(135deg,#F3F4F7,#DADFE8)' },
-  { id: 'detailed', label: 'Chi tiết', swatch: 'linear-gradient(135deg,#C23B78,#B7791F)' },
+  { id: 'detailed', label: 'Chi tiết', swatch: 'linear-gradient(135deg,#1F5FBF,#B7791F)' },
   { id: 'elegant', label: 'Sang trọng', swatch: 'linear-gradient(135deg,#1C1B18,#B7791F)' },
   { id: 'compact', label: 'Gọn nhẹ', swatch: 'linear-gradient(135deg,#DADFE8,#8A8F9C)' },
 ]
-export const TEMPLATE_ACCENT = { modern: '#C23B78', classic: '#1C1F26', minimal: '#C23B78', detailed: '#C23B78', elegant: '#B7791F', compact: '#1C1F26' }
+export const TEMPLATE_ACCENT = { modern: '#1F5FBF', classic: '#1C1F26', minimal: '#1F5FBF', detailed: '#1F5FBF', elegant: '#B7791F', compact: '#1C1F26' }
 
 /* ---------- Modal: Tạo chiến dịch ---------- */
 export const CAMP_STEPS = ['basic', 'items', 'quote']

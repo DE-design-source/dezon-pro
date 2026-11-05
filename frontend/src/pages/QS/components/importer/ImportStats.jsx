@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQs } from '../../state/QsData'
 import { usePref, TypeSw, TrendChart, TrendLegend, RankChart, TREND_TYPES, RANK_TYPES } from './ImportChart'
+import SearchSelect from '../common/SearchSelect'
 
 /* Dashboard "Ghi nhận dữ liệu nhập" (cột trái tab Nhập dữ liệu, dưới Sản phẩm vừa nhập): đếm sản phẩm đã nhập vào danh mục
    theo kỳ (Hôm nay · Tuần · Tháng · Quý · Năm · Tuỳ chọn), lọc theo Người nhập / Người duyệt / Thương hiệu.
@@ -100,9 +101,9 @@ export default function ImportStats({ open, onOpen, onKpi }) {
         </div>
       )}
       <div className="qsi-stats-flt">
-        <label><span>Người nhập</span><select value={fNhap} onChange={e => setFNhap(e.target.value)}><option value="">Tất cả</option>{opts('nguoiTao').map(v => <option key={v}>{v}</option>)}</select></label>
-        <label><span>Người duyệt</span><select value={fDuyet} onChange={e => setFDuyet(e.target.value)}><option value="">Tất cả</option>{opts('nguoiDuyet').map(v => <option key={v}>{v}</option>)}</select></label>
-        <label><span>Thương hiệu</span><select value={fBrand} onChange={e => setFBrand(e.target.value)}><option value="">Tất cả</option>{opts('thuongHieu').map(v => <option key={v}>{v}</option>)}</select></label>
+        <label><span>Người nhập</span><SearchSelect className="sm" value={fNhap} options={opts('nguoiTao')} allLabel="Tất cả người nhập" onChange={setFNhap} /></label>
+        <label><span>Người duyệt</span><SearchSelect className="sm" value={fDuyet} options={opts('nguoiDuyet')} allLabel="Tất cả người duyệt" onChange={setFDuyet} /></label>
+        <label><span>Thương hiệu</span><SearchSelect className="sm" value={fBrand} options={opts('thuongHieu')} allLabel="Tất cả thương hiệu" onChange={setFBrand} /></label>
         {nFlt > 0 && <button type="button" className="qsi-stats-clr" onClick={() => { setFNhap(''); setFDuyet(''); setFBrand('') }}>Xoá lọc ({nFlt})</button>}
       </div>
       <div className="qsi-stats-kpi">

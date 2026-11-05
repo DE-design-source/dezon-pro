@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { QUOTE_TEMPLATES, TEMPLATE_ACCENT, STATUS_LABEL, STATUS_COLOR, STATUS_TINT, monthsBetween } from '../../../data/marketingData'
 import QuoteDoc from './QuoteDoc'
+import { Ic } from './CampaignsTab'
 
 const ACCENT_KEY = 'siteflow-quote-accent'
 const TEXT_KEY = 'siteflow-quote-textcolor'
@@ -142,7 +143,7 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
         </Step>
 
         <Step num="4" title="Tuỳ chỉnh màu &amp; font" desc="Không bắt buộc.">
-          <ColorField id="mkQpAccentInput" label="Màu tiêu đề" value={accent || TEMPLATE_ACCENT[template] || '#C23B78'} onChange={setAccent} />
+          <ColorField id="mkQpAccentInput" label="Màu tiêu đề" value={accent || TEMPLATE_ACCENT[template] || '#1F5FBF'} onChange={setAccent} />
           <ColorField id="mkQpTextColorInput" label="Màu chữ" value={textColor || '#1C1F26'} onChange={setTextColor} />
           {/* Font + cỡ chữ ghép liền một hàng như ô chọn font của Word */}
           <div>
@@ -188,10 +189,12 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
         </Step>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* vùng xem trước = 1 module (kiểu QS): thanh tiêu đề tóm tắt lựa chọn + thu phóng, thân là tờ báo giá */}
+      <div className="mk-mod" style={{ flex: 1, minWidth: 0 }}>
         {/* Thanh tóm tắt: cho biết bản xem trước đang phản ánh những lựa chọn nào */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Xem trước báo giá</span>
+        <div className="mk-mod-h">
+          <span className="mk-mod-ic"><Ic n="draft" /></span>
+          <b>Xem trước báo giá</b>
           <span style={chip}>Mẫu {templateLabel}</span>
           <span style={chip}>{vatOn ? 'Có VAT 8%' : 'Chưa có VAT'}</span>
           <span style={chip}>{paperSize} · {orientLabel}</span>
@@ -204,7 +207,7 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
           </div>
         </div>
         {/* Khung đo bề rộng để tính mức "vừa khung"; tờ giấy có max-width nên không bao giờ tràn ngang */}
-        <div ref={previewRef}>
+        <div ref={previewRef} className="mk-mod-b mk-qprev">
           <div style={{ zoom: zoom / 100 }}>
             <QuoteDoc catalog={catalog} camp={camp} vatOn={vatOn} template={template} accent={accent} textColor={textColor} font={font} fontScale={fontScale} />
           </div>
@@ -248,11 +251,17 @@ export default function QuoteTab({ visible, catalog, campaigns, quoteCampaignId,
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: campaigns.length ? 'flex' : 'none', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <label htmlFor="mkQuoteCampaignSelect" style={{ fontSize: 13, fontWeight: 700 }}>Lập báo giá cho chiến dịch:</label>
+      {/* chọn chiến dịch = module thanh trên (kiểu QS) */}
+      <div className="mk-mod" style={{ display: campaigns.length ? 'block' : 'none' }}>
+      <div className="mk-mod-h">
+        <span className="mk-mod-ic"><Ic n="mega" /></span>
+        <label htmlFor="mkQuoteCampaignSelect" style={{ fontSize: 14, fontWeight: 700 }}>Lập báo giá cho chiến dịch</label>
         <select id="mkQuoteCampaignSelect" value={camp ? camp.id : ''} onChange={e => onSelectCampaign(e.target.value)} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12.5, fontFamily: 'inherit', minWidth: 260 }}>
           {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        {camp && <span className="mk-cnt" style={{ background: STATUS_TINT[camp.status], color: STATUS_COLOR[camp.status] }}>{STATUS_LABEL[camp.status]}</span>}
+        {camp && <span className="mk-mod-sum">{camp.client || 'Chưa có khách hàng'} · {camp.start || '—'} → {camp.end || '—'} ({monthsBetween(camp.start, camp.end)} tháng)</span>}
+      </div>
       </div>
       <div style={{ display: campaigns.length ? 'none' : 'block', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 14, padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
         Chưa có chiến dịch nào để lập báo giá — bấm "Tạo chiến dịch" ở góc trên bên phải.

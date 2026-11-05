@@ -14,8 +14,8 @@ import { putCombo } from '../../breakdown/catalog/comboCache'
 import { spKey_ } from './spModel'
 import { spAddToProject, spAddCombo, spPrivateCopy, spAddToProjects } from './spActions'
 import { getState, showTab } from '../../../state/store'
-import { qsAsk, getDialogs } from '../../common/dialogs'
-import { importProjectForm } from '../../project/projectActions'
+import { getDialogs, qsToast } from '../../common/dialogs'
+import ProjectCreate from '../../project/ProjectCreate'
 
 /* Modal "Thông tin sản phẩm" của tab Danh sách SP (spModal, PUB/sanpham.js:1827-1848): ảnh + thông số (pdMedia_ / pdSpecs_ /
    pdPriceFoot_, app.js:1076-1282), khối "Sản phẩm đi kèm" ghi vào DỰ ÁN (pdLoadCombo_ / pdComboVe_ / pdCbBoSet_ / pdCbSL_ /
@@ -258,12 +258,14 @@ const MP_GROUPS = [
   ['phanKhuc', 'Phân khúc', x => String(x.phanKhuc || '').trim()],
   ['quyMo', 'Quy mô', x => String(x.quyMo || '').trim()],
 ]
-export function MultiProjPop({ p, onClose, onGallery }) {
+/* Chế độ CHỌN (onPick có giá trị, vd. form Nhập dữ liệu): không ghi danh ngay - bấm nút chân hộp trả về onPick([maDA], số lượng)
+   để nơi gọi tự ghi danh sau (sau khi lưu SP vào Database); initPick / initSl = dự án + số lượng đang chọn sẵn */
+export function MultiProjPop({ p, onClose, onGallery, onPick, initPick, initSl }) {
   const projects = getState().projects || []
   const curMa = getState().cur ? getState().cur.maDA : ''
   const [q, setQ] = useState('')
   const [flt, setFlt] = useState({})            // {nhóm: {giá trị: 1}}
-  const [pick, setPick] = useState(() => new Set())
+  const [pick, setPick] = useState(() => new Set(initPick || []))
   const [onlyPicked, setOnlyPicked] = useState(false)
   /* Thu gọn từng nhóm lọc (nhớ trong máy) */
   const [gFold, setGFoldSt] = useState(() => { try { return JSON.parse(localStorage.getItem('qs_mp_fold') || '{}') || {} } catch (e) { return {} } })
@@ -274,12 +276,14 @@ export function MultiProjPop({ p, onClose, onGallery }) {
       <span className={'qspl-mp-chev' + (gFold[k] ? ' closed' : '')} aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg></span>
     </button>
   )
-  const [sl, setSl] = useState(1)
+  const [sl, setSl] = useState(() => Math.max(1, Number(initSl) || 1))
   const [busy, setBusy] = useState(false)
+  const [creating, setCreating] = useState(false)   // khung "Nhập dự án" (Ghi danh dự án mới) phủ lên hộp
+  const creatingRef = useRef(false); creatingRef.current = creating
   const ref = useRef(null)
   useEffect(() => {
-    // Esc khi đang mở hộp nhập (Ghi danh dự án mới) chỉ đóng hộp nhập
-    const key = e => { if (e.key === 'Escape' && !getDialogs().asks.length) onClose() }
+    // Esc khi đang mở khung Nhập dự án (Ghi danh dự án mới) chỉ đóng khung đó
+    const key = e => { if (e.key !== 'Escape' || getDialogs().asks.length) return; if (creatingRef.current) setCreating(false); else onClose() }
     document.addEventListener('keydown', key)
     return () => document.removeEventListener('keydown', key)
   }, [onClose])
@@ -293,28 +297,24 @@ export function MultiProjPop({ p, onClose, onGallery }) {
   const allOn = shown.length > 0 && shown.every(x => pick.has(x.maDA))
   const toggleAll = () => setPick(s0 => { const n = new Set(s0); shown.forEach(x => (allOn ? n.delete(x.maDA) : n.add(x.maDA))); return n })
   async function save() {
+    if (onPick) { onPick([...pick], sl); onClose(); return }
     if (!pick.size || busy) return
     setBusy(true)
     try { const r = await spAddToProjects(p, [...pick], sl); if (!r.fail) onClose() } finally { setBusy(false) }
   }
-  /* "Ghi danh dự án mới": tạo dự án (chỉ thêm vào danh sách, không đổi dự án đang mở) rồi ghi danh SP này vào đó với Số lượng đang chọn */
-  async function newProject() {
-    if (busy) return
-    const r = await qsAsk({
-      title: 'Ghi danh vào dự án mới', note: 'Tạo dự án mới rồi ghi danh "' + (p.ten || '') + '" ×' + sl + ' vào dự án đó.', ok: 'Tạo & ghi danh',
-      fields: [
-        { key: 'ten', label: 'Tên dự án *', placeholder: 'VD: Nhà phố anh Thành' },
-        { key: 'kienTrucSu', label: 'Kiến trúc sư' },
-        { key: 'khachHang', label: 'Khách hàng' },
-        { key: 'diaChi', label: 'Địa điểm', placeholder: 'Số nhà, đường, quận, tỉnh / thành' },
-      ],
-    })
-    if (!r) return
+  /* "Ghi danh dự án mới": mở khung "Nhập dự án" (cùng form nút Nhập dự án của Danh sách dự án) phủ lên hộp; lưu = tạo dự án
+     (chỉ thêm vào danh sách, không đổi dự án đang mở) rồi ghi danh SP này vào đó với Số lượng đang chọn.
+     Bấm dự án đã có của KTS (hoặc trùng tên) = chọn dự án đó trong danh sách, quay về hộp */
+  async function afterCreate(np) {
+    setCreating(false)
+    if (onPick) { setPick(s0 => new Set(s0).add(np.maDA)); qsToast("Đã tạo và chọn dự án \"" + (np.ten || "") + "\""); return }
     setBusy(true)
-    try {
-      const np = await importProjectForm({ ...r, vat: 0 })
-      if (np) { const res = await spAddToProjects(p, [np.maDA], sl); if (!res.fail) onClose() }
-    } finally { setBusy(false) }
+    try { const res = await spAddToProjects(p, [np.maDA], sl); if (!res.fail) onClose() } finally { setBusy(false) }
+  }
+  function pickExisting(ma) {
+    setPick(s0 => new Set(s0).add(ma)); setCreating(false)
+    const x = projects.find(y => y.maDA === ma)
+    qsToast('Đã chọn dự án có sẵn' + (x ? ' "' + x.ten + '"' : '') + ' - bấm Ghi danh dự án để ghi danh')
   }
   return (
     <div className="qspl-mp" ref={ref} role="dialog" aria-label="Ghi danh vào nhiều dự án">
@@ -332,7 +332,7 @@ export function MultiProjPop({ p, onClose, onGallery }) {
           <div className="qspl-mp-mod qspl-mp-top">
           <div className="qspl-mp-fh"><b>Bộ lọc</b>
             {nFlt > 0 && <button type="button" className="qsc-btn qspl-xs" onClick={() => setFlt({})}>Xoá lọc ({nFlt})</button>}
-            <button type="button" className="qsc-btn blue qspl-xs qspl-mp-new" disabled={busy} title="Tạo dự án mới rồi ghi danh sản phẩm này vào đó" onClick={newProject}>
+            <button type="button" className="qsc-btn blue qspl-xs qspl-mp-new" disabled={busy} title="Tạo dự án mới rồi ghi danh sản phẩm này vào đó" onClick={() => setCreating(true)}>
               <QsIcon name="plus" size={13} /> Ghi danh dự án mới
             </button>
           </div>
@@ -388,8 +388,15 @@ export function MultiProjPop({ p, onClose, onGallery }) {
         <span style={{ flex: 1 }} />
         <label className="qspl-multi-sl">Số lượng <input type="number" min="1" value={sl} onChange={e => setSl(Math.max(1, Number(e.target.value) || 1))} /></label>
         <button type="button" className="qsc-btn" onClick={onClose}>Huỷ</button>
-        <button type="button" className="qsc-btn blue" disabled={!pick.size || busy} onClick={save}>{busy ? 'Đang ghi danh…' : 'Ghi danh dự án' + (pick.size ? ' (' + pick.size + ')' : '')}</button>
+        <button type="button" className="qsc-btn blue" disabled={(!onPick && !pick.size) || busy} onClick={save}>{onPick ? (pick.size ? 'Chọn ' + pick.size + ' dự án' : 'Không ghi danh') : (busy ? 'Đang ghi danh…' : 'Ghi danh dự án' + (pick.size ? ' (' + pick.size + ')' : ''))}</button>
       </div>
+      {creating && (
+        <div className="qspl-mp-newpane">
+          <ProjectCreate noDash backLabel="Ghi danh vào nhiều dự án" saveLabel={onPick ? "Lưu & chọn" : "Lưu & ghi danh"}
+            note={onPick ? "Lưu xong dự án này được chọn sẵn trong danh sách." : 'Lưu xong sẽ ghi danh "' + (p.ten || '') + '" ×' + sl + ' vào dự án này.'}
+            onBack={() => setCreating(false)} onCreated={afterCreate} onOpen={pickExisting} />
+        </div>
+      )}
     </div>
   )
 }

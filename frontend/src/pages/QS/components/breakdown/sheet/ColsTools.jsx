@@ -9,6 +9,10 @@ import {
 import { getState } from '../../../state/store'
 
 const TK = COLSET.tk
+/* Chip các cột giá / lợi nhuận tô cam cho nổi bật trên dải chip cột (Giá bán lẻ · CK đại lý · Giá đại lý · Markup · Margin · LN VND · Thành tiền) */
+const TIEN_COLS = { giaNCC: 1, chietKhau: 1, giaDaiLy: 1, markup: 1, margin: 1, lnVnd: 1, thanhTien: 1 }
+/* Chip các cột nhận diện sản phẩm tô xanh (Tên sản phẩm · Thương hiệu · Hình ảnh) */
+const SP_COLS = { ten: 1, thuongHieu: 1, hinhAnh: 1 }
 
 /* Nhãn nút "Chọn nhanh" (csQuickBtn_ PUB/app.js:1733-1740): "Của tôi" / tên bộ đang khớp / tên bộ tự đặt / "Chọn nhanh" */
 export function presetLabel(cols) {
@@ -209,7 +213,7 @@ export function ColsStrip({ columns, cols, editing, onToggle }) {
     <>
       {/* không ghi lại "Cột hiển thị n/N": số đã có ở nút Cột hiển thị trên đầu bảng (SheetHeader) */}
       {columns.map(c => (
-        <button key={c.key} className={`qs-bd-strip-chip qs-colchip${cols[c.key] ? ' on' : ''}`} aria-pressed={!!cols[c.key]} onClick={() => onToggle(c.key)}>{c.label}</button>
+        <button key={c.key} className={`qs-bd-strip-chip qs-colchip${cols[c.key] ? ' on' : ''}${TIEN_COLS[c.key] ? ' tien' : ''}${SP_COLS[c.key] ? ' spc' : ''}`} aria-pressed={!!cols[c.key]} onClick={() => onToggle(c.key)}>{c.label}</button>
       ))}
       {/* vạch ngăn + viền xanh: nút thao tác hàng loạt, khác với chip bật / tắt từng cột.
           "Hiện tất cả" bật / tắt: bật = hiện mọi cột; tắt = về bộ mặc định của tôi (chưa đặt thì bộ Mặc định) */}

@@ -191,6 +191,17 @@ export function setVat(v) {
     .catch(e => luuLoi_(e, 'VAT của dự án'))
 }
 
+/* VAT riêng của 1 hạng mục (projData.vatHm[mã]): ô trống hoặc bằng VAT dự án = bỏ đặt riêng (theo VAT dự án).
+   Báo giá cộng VAT theo % của từng hạng mục (lib/quote.js vatOf_ / bgVatParts_) */
+export function setVatHm(code, v) {
+  const c = cur(); if (!c || !code) return
+  const m = { ...((getState().projData || {}).vatHm || {}) }
+  const s = String(v == null ? '' : v).trim().replace(',', '.')
+  const n = Number(s)
+  if (s === '' || !isFinite(n) || n < 0 || n === (Number(c.vat) || 0)) delete m[code]; else m[code] = Math.min(100, n)
+  projDataSet_('vatHm', Object.keys(m).length ? m : null)
+}
+
 /* ---- Chọn / tạo sản phẩm cho 1 dòng ---- */
 export async function pickProduct(lineId, p) {
   const g = giaDongTuSP_(p, getState().products)

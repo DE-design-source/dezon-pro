@@ -196,3 +196,11 @@ html[data-theme="dark"] .qs-bdc-cc.bt .qs-bdc-cc-h{color:#E9A24C; background:#33
 html[data-theme="dark"] .qs-bdc-cc.fav{border-color:#5A4416;}
 html[data-theme="dark"] .qs-bdc-cc.fav .qs-bdc-cc-h{color:#FBBF24; background:#33280C;}
 .qs-bdc-favnone{padding:28px 16px; border:1px dashed var(--border); border-radius:12px; background:var(--surface); text-align:center; font-size:13px; color:var(--text-muted);}
+
+/* Ô tìm trong dải chip dài (FChips, từ 12 giá trị) - FilterSections; ô Thương hiệu = SearchSelect (common.css) */
+.qs-bd-ss{margin:0 6px 0 7px;}
+.qs-bd-ffind{display:flex; align-items:center; gap:6px; height:30px; margin:0 6px 8px 7px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-muted);}
+.qs-bd-ffind:focus-within{border-color:var(--dash-accent);}
+.qs-bd-ffind input{flex:1; min-width:0; height:100%; padding:0; border:none; outline:none; background:none; color:var(--text); font:inherit; font-size:12.5px;}
+.qs-bd-ffind button{width:20px; height:20px; flex:none; padding:0; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qs-bd-fchips.finding{max-height:none;}

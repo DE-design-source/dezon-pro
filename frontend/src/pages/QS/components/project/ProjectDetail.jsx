@@ -29,7 +29,7 @@ const foldGet = () => { try { return JSON.parse(localStorage.getItem(FOLD_LS) ||
 const foldSet = v => { try { localStorage.setItem(FOLD_LS, JSON.stringify(v)) } catch (e) { /* bỏ qua */ } }
 const BOQ_ACCEPT = '.xlsx,.xls,.csv,.pdf'
 /* Khối Thông tin cơ bản + bảng Thông tin: [nhãn, khoá, kiểu] - cùng 1 bảng cho xem và sửa tại chỗ (nút Sửa thông tin / Yêu cầu sửa).
-   Khu vực (khoá null) tự lấy từ đoạn cuối Địa điểm, không sửa được. Hàng 'edit' chỉ hiện khi sửa (VAT, link Dezon). */
+   Khu vực (khoá null) tự lấy từ đoạn cuối Địa điểm, Mã dự án (kiểu 'ma') tự tạo khi nhập: cả hai không sửa được. Hàng 'edit' chỉ hiện khi sửa (VAT, link Dezon). */
 const TRANG_THAI = ['Bản nháp', 'Đang thực hiện', 'Hoàn thành']
 /* Thông tin cơ bản (như trang dự án dezon.vn, 2 cột nhãn : giá trị, đọc theo hàng): Công ty = cột studio (migration 0020);
    Nhóm thiết kế / Nhiếp ảnh gia / Nhà thầu thi công / Năm hoàn thiện = migration 0021. Còn lại là Thông tin nâng cao */
@@ -38,9 +38,10 @@ const BASIC_ROWS = [
   ['Địa điểm', 'diaChi'], ['Nhóm thiết kế', 'nhomThietKe'],
   ['Kiến trúc sư', 'kienTrucSu'], ['Nhiếp ảnh gia', 'nhiepAnhGia'],
   ['Nhà thầu thi công', 'nhaThauThiCong'], ['Năm hoàn thiện', 'namHoanThien', 'nam'],
-  ['Khu vực', null], ['Mã báo giá', 'maBaoGia'],
+  ['Khu vực', null], ['Mã dự án', 'maDA', 'ma'],
 ]
 const INFO_ROWS = [
+  ['Mã báo giá', 'maBaoGia'],
   ['Khách hàng', 'khachHang'], ['Điện thoại', 'sdt'],
   ['Phân khúc', 'phanKhuc'], ['Quy mô', 'quyMo'],
   ['Tổng diện tích', 'tongDT', 'm2'], ['Diện tích báo giá', 'dtBaoGia', 'm2'],
@@ -163,6 +164,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const infoInput = r => {
     const k = r[1]
     if (!k) return <input value={kv_({ diaChi: f.diaChi })} readOnly tabIndex={-1} placeholder="Tự lấy từ Địa điểm" />
+    if (r[2] === 'ma') return <input value={s_(p[k])} readOnly tabIndex={-1} title="Mã tự tạo khi nhập dự án, không sửa được" />
     if (r[2] === 'tt') return <select value={f.trangThai} onChange={setFld('trangThai')}>{TRANG_THAI.map(o => <option key={o}>{o}</option>)}</select>
     if (r[2] === 'pct') return <span className="rg"><input type="range" min="0" max="100" value={f.tienDo} onChange={setFld('tienDo')} /><b>{f.tienDo}%</b></span>
     if (r[2] === 'vat') return <span className="un"><input type="number" min="0" max="100" value={f.vat} onChange={setFld('vat')} /><i>%</i></span>
@@ -307,7 +309,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                 {!editing && <span className="cnt">{advFilled}/{advRows.length} mục đã có</span>}
                 <span className="more">{advOpen ? 'Thu gọn' : 'Mở rộng'}<Icon name={advOpen ? 'chevronUp' : 'chevronDown'} size={15} /></span>
               </button>
-              {advOpen && <dl className="qs-pd-kv">{advRows.map(kvItem)}</dl>}
+              {advOpen && <dl className="qs-pd-kv basic">{advRows.map(kvItem)}</dl>}
             </section>
           </div>
           {editing ? (
@@ -322,7 +324,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
       )}
       {tab === 'img' && (
         <div className="qs-pd-sec">
-          {anh == null ? <div className="qs-pd-empty">Đang tải…</div> : <ImageManager list={pics} onSave={saveAnh} onView={setView} inputRef={fileRef} />}
+          {anh == null ? <div className="qs-pd-empty">Đang tải…</div> : <ImageManager list={pics} onSave={saveAnh} onView={setView} inputRef={fileRef} spImgs={ls.map(l => l.hinhAnh)} />}
         </div>
       )}
       {tab === 'sp' && (

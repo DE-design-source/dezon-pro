@@ -101,6 +101,9 @@
 .qspl-table td{padding:8px 10px; border-bottom:1px solid var(--border); background:var(--surface); vertical-align:middle; overflow:hidden; text-overflow:ellipsis;}
 .qspl-table td.num{text-align:right; white-space:nowrap;} .qspl-table td.ct{text-align:center;}
 .qspl-table td.thumbcol{padding:6px 8px;}
+/* ảnh luôn là khung vuông đủ cỡ (không bị ép méo / co khi cột hẹp); tiêu đề Ảnh 1 dòng */
+.qspl-table td.thumbcol .qspl-th{flex:none; box-sizing:border-box; aspect-ratio:1 / 1;}
+.qspl-table th.thumbcol{white-space:nowrap; text-overflow:clip;}
 .qspl-table .qspl-frz{position:sticky; z-index:2;}
 .qspl-table th.qspl-frz{z-index:4;}
 .qspl-tblwrap.xscroll .qspl-frz.last{box-shadow:4px 0 6px -2px rgba(15,23,42,.18);}
@@ -167,7 +170,9 @@
 .qspl-spin.ok{border-color:var(--success); background:var(--success-tint);}
 .qspl-spin.err{border-color:var(--danger); background:var(--danger-tint);}
 .qspl-spin.wide{position:relative; z-index:12; box-shadow:0 6px 18px rgba(15,23,42,.18);}
-.qspl-spin.code{font-size:11px; color:var(--text-muted); height:24px;}
+/* ô Mã sản phẩm ở chế độ Edit: rõ là ô nhập (chữ thường đậm vừa, viền như ô tên) - trước chữ xám nhạt trông như chữ chỉ đọc */
+.qspl-spin.code{font-size:12px; color:var(--text); height:26px; font-weight:500; letter-spacing:.01em;}
+.qspl-spin.code::placeholder{color:var(--text-muted); font-weight:400;}
 .qspl-table td.qspl-ovf{overflow:visible; position:relative; z-index:12;}
 .qspl-spin-name{display:flex; flex-direction:column; gap:3px;}
 .qspl-spin-wrap.ro{opacity:.75;}
@@ -792,3 +797,37 @@
 /* Cụm nút thao tác của dòng: 1 khung viền mảnh bo góc */
 .qspl-actgrp{display:inline-flex; align-items:center; gap:1px; padding:3px 5px; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
 .qspl-row:hover .qspl-actgrp{border-color:var(--dash-accent-border);}
+
+/* khung "Nhập dự án" (Ghi danh dự án mới) phủ lên hộp Ghi danh vào nhiều dự án */
+.qspl-mp-newpane{position:absolute; inset:0; z-index:8; overflow:auto; background:var(--bg, var(--surface)); padding:14px 18px;}
+
+/* 3 cột giá luôn hiện, đứng liền nhau (Giá bán lẻ -> %Chiết khấu -> Giá đại lý, spModel SP_PRICE_COLS): tiêu đề giữ chữ trắng; số trong ô màu xanh chữ thường (cả dấu %), Giá đại lý nghiêng, không chữ "đ"; chip cột tô cam */
+.qspl-table td.sp-hl, .qspl-table td.sp-hl input, .qspl-table td.sp-hl .qspl-spin-wrap i{color:var(--dash-bar-2, #2E6BC6); font-weight:400;}
+.qspl-table td.sp-hl.sp-price{font-style:italic; font-weight:700;}   /* Giá đại lý (tự tính): đậm + nghiêng */
+html[data-theme="dark"] .qspl-table td.sp-hl, html[data-theme="dark"] .qspl-table td.sp-hl input, html[data-theme="dark"] .qspl-table td.sp-hl .qspl-spin-wrap i{color:#7FA8F5;}
+/* chip 3 cột giá (bật / tắt được): tắt = viền + chữ cam; bật = nền cam nhạt */
+.qs-bd-strip-chip.qs-colchip.sp-hl{color:#C2410C; border-color:#EA580C;}
+.qs-bd-strip-chip.qs-colchip.sp-hl.on{color:#C2410C; background:#FFF3E8; border-color:transparent;}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.sp-hl{color:#FB923C; border-color:#FB923C;}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.sp-hl.on{background:#3A2614; border-color:transparent;}
+/* Ảnh + Thương hiệu: chip cột tô xanh; chữ Thương hiệu trong bảng màu xanh (lớp sp-hl2) */
+.qs-bd-strip-chip.qs-colchip.sp-hl2{color:var(--dash-bar-2, #2E6BC6); border-color:var(--dash-bar-2, #2E6BC6);}
+.qs-bd-strip-chip.qs-colchip.sp-hl2.on{background:color-mix(in srgb, var(--dash-bar-2, #2E6BC6) 12%, transparent); border-color:transparent;}
+.qspl-table td.sp-hl2{color:var(--dash-bar-2, #2E6BC6);}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.sp-hl2, html[data-theme="dark"] .qspl-table td.sp-hl2{color:#7FA8F5;}
+/* Cột nút thao tác (sao · thêm · biến thể · duyệt · sửa · nhân bản · xem) đóng băng mép phải khi cuộn ngang */
+.qspl-table th.qspl-actcol, .qspl-table td.qspl-actcol{position:sticky; right:0;}
+.qspl-table td.qspl-actcol{z-index:2; box-shadow:-6px 0 8px -6px rgba(15,23,42,.22);}
+.qspl-table th.qspl-actcol{z-index:4; background:var(--dash-navy-2); box-shadow:-6px 0 8px -6px rgba(0,0,0,.35);}
+/* Panel trái: bấm 1 SP mở cột Thông tin sản phẩm (ProductInfo, như Bóc tách) - con trỏ tay + viền xanh SP đang mở */
+.qspl-pp-list .qspl-pp-prod, .qspl-pp-list .qspl-pp-row, .qspl-pp-list .qspl-pp-tile{cursor:pointer;}
+.qspl-pp-list .qspl-pp-prod.active, .qspl-pp-list .qspl-pp-row.active, .qspl-pp-list .qspl-pp-tile.active{border-color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint); background:var(--dash-accent-tint);}
+/* cột Thông tin sản phẩm nằm giữa panel trái và bảng: rộng bằng panel trái (--qspl-pp-w), cao vừa khung nhìn (trang QS bị zoom nên chia --qs-zoom),
+   dính khi cuộn trang; phần thân cuộn bên trong, thanh kéo chỉ hiện khi rê chuột vào */
+.qspl-ws > .qs-bd-info{margin-right:0; align-self:flex-start; position:sticky; top:0; width:var(--qspl-pp-w, 440px); height:calc((100vh - 120px) / var(--qs-zoom, .675));}
+.qspl-ws > .qs-bd-info .qs-bd-info-body{scrollbar-width:thin; scrollbar-color:transparent transparent;}
+.qspl-ws > .qs-bd-info:hover .qs-bd-info-body{scrollbar-color:var(--scrollbar-thumb, #c3ccd8) transparent;}
+.qspl-ws > .qs-bd-info .qs-bd-info-body::-webkit-scrollbar{width:8px;}
+.qspl-ws > .qs-bd-info .qs-bd-info-body::-webkit-scrollbar-thumb{border-radius:8px; background:transparent;}
+.qspl-ws > .qs-bd-info:hover .qs-bd-info-body::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb, #c3ccd8);}
+@media (max-width:1000px){ .qspl-ws > .qs-bd-info{width:100%; min-height:0;} }

@@ -67,9 +67,18 @@ export function computeQuoteLocal(toanDuAn, ctx){
 export function coverDepth(s){ return String(s).split('.').length; }
 export function coverSortFn(a,b){ function k(s){return String(s).split('.').map(function(x){return parseInt(x,10)||0;});} var ka=k(a.stt),kb=k(b.stt),n=Math.max(ka.length,kb.length); for(var i=0;i<n;i++){var d=(ka[i]||0)-(kb[i]||0); if(d)return d;} return 0; }
 export function coverHasChild(cover, stt){ return (cover||[]).some(function(c){ return c.stt!==stt && String(c.stt).indexOf(stt+'.')===0; }); }
-// Mục lớn đã ẩn khỏi tờ bìa (bgCfg.an)
+// Mục đã ẩn khỏi tờ bìa (bgCfg.an = {stt: 1}): ẩn 1 mục thì ẩn cả các mục con của nó (khớp bản Excel, quotations/service_export.go)
 export function bgAn_(bgCfg){ return (bgCfg||{}).an||{}; }
-export function bgHidden(stt, bgCfg){ var root=String(stt).split('.')[0]; return !!bgAn_(bgCfg)[root]; }
+export function bgHidden(stt, bgCfg){ var an=bgAn_(bgCfg), p=String(stt).split('.'); for(var i=1;i<=p.length;i++){ if(an[p.slice(0,i).join('.')]) return true; } return false; }
+/* Đánh số lại liên tục các mục đang hiện (bgCfg.soLai, mặc định bật): mục lớn hiện đầu tiên = 1, mục con = 1.1, 1.2…
+   rows = mục đang hiện, đã sắp (coverSortFn). Trả {stt gốc: số in}; mục có tổ tiên không nằm trong rows thì đánh theo tổ tiên gần nhất có mặt.
+   Cùng thuật toán với coverSoLai (quotations/service_export_opts.go) cho file Excel */
+export function bgSoLaiOn_(bgCfg){ return (bgCfg||{}).soLai!==false; }
+export function coverSoLai_(rows){ var disp={}, cnt={};
+  (rows||[]).forEach(function(c){ var p=String(c.stt).split('.'), pk='';
+    for(var i=p.length-1;i>=1;i--){ var a=p.slice(0,i).join('.'); if(Object.prototype.hasOwnProperty.call(disp,a)){ pk=disp[a]; break; } }
+    cnt[pk]=(cnt[pk]||0)+1; disp[c.stt]=(pk?pk+'.':'')+cnt[pk]; });
+  return disp; }
 // bgToggle: map 'an' mới -> bgCfg.an
 export function bgToggleAn_(bgCfg, stt){ var a=Object.assign({},bgAn_(bgCfg)); if(a[stt]) delete a[stt]; else a[stt]=1; return a; }
 // Giá trị 1 mục LÁ: có dòng bóc tách thuộc mục -> tự cộng (Phần thô cho 3.1 / 3)
@@ -88,7 +97,7 @@ export function coverTag_(c, ctx){ var a=coverAutoOf_(c.stt, ctx); if(!a.n) retu
 export function coverCosts(ctx){
   var cover=ctx.cover||[], cost={};
   cover.forEach(function(c){
-    if(coverHasChild(cover, c.stt)){ var s=0; cover.forEach(function(d){ if(d.stt!==c.stt && String(d.stt).indexOf(c.stt+'.')===0 && !coverHasChild(cover, d.stt)) s+=coverLeafVal_(d, ctx); }); cost[c.stt]=s; }
+    if(coverHasChild(cover, c.stt)){ var s=0; cover.forEach(function(d){ if(d.stt!==c.stt && String(d.stt).indexOf(c.stt+'.')===0 && !coverHasChild(cover, d.stt) && !bgHidden(d.stt, ctx.bgCfg)) s+=coverLeafVal_(d, ctx); }); cost[c.stt]=s; }
     else cost[c.stt]=coverLeafVal_(c, ctx);
   });
   var total=0; cover.forEach(function(c){ if(coverDepth(c.stt)===1 && !bgHidden(c.stt, ctx.bgCfg)) total+=cost[c.stt]; });
@@ -171,11 +180,37 @@ export function bgOpt_(bgCfg, now){
 export function bgOptSet_(bgCfg,k,v){ var c=Object.assign({},bgCfg||{}); if(v==null) delete c[k]; else c[k]=v; return c; }
 // Cộng chưa VAT của báo giá đang xuất: dòng thuộc hạng mục đã chọn + Phần thô (nếu đang xuất)
 export function bgSub_(ctx){ return bgLines_(ctx).reduce(function(a,l){ return a+ttBan_(l); },0)+bgPTSecs_(ctx).reduce(function(a,sec){ return a+(Number(sec.tt)||0); },0); }
-// Tổng: tạm tính -> chiết khấu tổng -> VAT (vat = cur.vat)
-export function bgTong_(sub, bgCfg, vat){
+/* VAT theo hạng mục (projData.vatHm = {mã hạng mục: %}, đặt ở Bóc tách): mã chưa đặt thì xét mã cha (3.2.7 -> 3.2 -> 3),
+   vẫn chưa có thì VAT dự án; Phần thô (3.1) chưa đặt thì theo VAT Phần thô */
+export function vatOf_(ctx, code){
+  var m=(ctx&&ctx.vatHm)||{}, p=String(code||'').split('.');
+  for(var i=p.length;i>0;i--){ var k=p.slice(0,i).join('.'); if(m[k]!=null&&m[k]!==''&&isFinite(Number(m[k]))) return Number(m[k]); }
+  if(String(code)==='3.1'&&ctx&&ctx.ptVat!=null) return Number(ctx.ptVat)||0;
+  return Number(ctx&&ctx.cur&&ctx.cur.vat)||0;
+}
+/* Phần tiền chưa VAT của phạm vi đang xuất, mỗi phần kèm % VAT: [{tt, vp}] (dòng theo hạng mục + Phần thô) */
+export function bgVatParts_(ctx){
+  var by={}, ds=[];
+  bgLines_(ctx).forEach(function(l){ var k=(l.nhom||'').trim(); by[k]=(by[k]||0)+ttBan_(l); });
+  Object.keys(by).forEach(function(k){ ds.push({tt:by[k], vp:vatOf_(ctx,k)}); });
+  try{ var pt=bgPTSecs_(ctx).reduce(function(a,s){ return a+(Number(s.tt)||0); },0); if(pt) ds.push({tt:pt, vp:vatOf_(ctx,'3.1')}); }catch(e){ /* Phần thô lỗi: 0 như computeQuoteLocal */ }
+  return ds;
+}
+/* Tổng: tạm tính -> chiết khấu tổng -> VAT. vat = % chung (cur.vat); parts = [{tt, vp}] khi VAT khác nhau theo hạng mục:
+   VAT = Σ phần × (sau chiết khấu / tạm tính) × % của phần. vatPct = % chung nếu mọi phần cùng %, khác nhau thì null;
+   vatNhan = chữ in cạnh "VAT": "(theo VAT hạng mục)" khi có parts, không thì "10%" */
+export function bgTong_(sub, bgCfg, vat, parts){
   var o=bgOpt_(bgCfg), ck=o.ckKieu==='vnd'?Math.min(sub,o.ck):Math.round(sub*Math.min(100,o.ck)/100);
-  var sau=sub-ck, vp=Number(vat)||0, vatAmt=Math.round(sau*vp/100);
-  return {sub:sub, ck:ck, ckPct:sub?ck/sub*100:0, sau:sau, vatPct:vp, vat:vatAmt, total:sau+vatAmt};
+  var sau=sub-ck, vp=Number(vat)||0, vatAmt=Math.round(sau*vp/100), vatPct=vp, vatDs=[vp];
+  var ps=(parts||[]).filter(function(x){ return Number(x.tt); }), tong=ps.reduce(function(a,x){ return a+Number(x.tt); },0);
+  if(ps.length&&tong){
+    var hs=sau/tong; vatAmt=Math.round(ps.reduce(function(a,x){ return a+Number(x.tt)*hs*(Number(x.vp)||0)/100; },0));
+    vatDs=ps.map(function(x){ return Number(x.vp)||0; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).sort(function(a,b){ return a-b; });
+    vatPct=vatDs.length===1?vatDs[0]:null;
+  }
+  // tính theo từng hạng mục -> nhãn không ghi 1 con số % mà ghi rõ cách tính
+  var vatNhan=ps.length&&tong?'(theo VAT hạng mục)':vatDs.map(function(v){ return v+'%'; }).join(' · ');
+  return {sub:sub, ck:ck, ckPct:sub?ck/sub*100:0, sau:sau, vatPct:vatPct, vatDs:vatDs, vatNhan:vatNhan, vat:vatAmt, total:sau+vatAmt};
 }
 export function fmtVN_(iso){ var d=new Date(iso); if(isNaN(d)) return String(iso||''); return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear(); }
 // Đọc số tiền thành chữ: 239769720 -> "Hai trăm ba mươi chín triệu bảy trăm sáu mươi chín nghìn bảy trăm hai mươi đồng"
@@ -199,7 +234,8 @@ export function bgGhiChu_(q, bgCfg){
   if(o.ghiChu!=null) return o.ghiChu.split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
   return ['Khối lượng trên là tạm tính, khối lượng quyết toán theo thực tế thi công.',
     'Giá trên chưa bao gồm nhân công hoàn thiện.',
-    q.vatPct?('Đơn giá chưa gồm VAT; thuế VAT '+q.vatPct+'% đã tính ở phần tổng.'):'Giá trên chưa bao gồm thuế VAT.'];
+    q.vatPct==null?('Đơn giá chưa gồm VAT; thuế VAT theo từng hạng mục ('+(q.vatDs||[]).map(function(v){ return v+'%'; }).join(' · ')+') đã tính ở phần tổng.')
+      :q.vatPct?('Đơn giá chưa gồm VAT; thuế VAT '+q.vatPct+'% đã tính ở phần tổng.'):'Giá trên chưa bao gồm thuế VAT.'];
 }
 /* Nội dung khối tổng kết của trang cuối (bgTongKetHTML_ 1102-1123, phần chữ / số): dùng CHUNG cho bản xem trước và
    opts.tongKet của file Excel (M8.1) để hai bên luôn cùng chữ, cùng số. q = bgTong_(...) · me = người đang đăng nhập.

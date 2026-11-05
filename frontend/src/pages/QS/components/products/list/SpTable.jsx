@@ -20,6 +20,7 @@ const SP_FRZ = 3   // số cột dữ liệu đóng băng (STT · Ảnh · Sản
 
 const img1 = v => (v ? mediaUrl(String(v).split('\n')[0].trim()) : '')
 const Dash = () => <span className="qspl-muted">—</span>
+const THUMB_MIN = 112   // ảnh 96px (khung vuông tối thiểu) + đệm 2 x 8px; đủ chỗ tiêu đề "ẢNH" + nút lọc
 const FUNNEL = <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z" /></svg>
 
 export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCount, canEdit, canDuyet, isAdmin, on }) {
@@ -38,7 +39,8 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
   /* Bề rộng cột của bản gốc tính theo chữ 13px, còn chữ trong QS được nhân --fs (bù thu nhỏ 75%) nên cột chữ nhân cùng hệ số,
      không thì tiêu đề bị cắt ("Công s…"). Độ rộng lưu (w, qs_spcolcfg) vẫn theo đơn vị của bản gốc. Cột ảnh không có chữ. */
   const cwK = k => (k === 'thumb' ? 1 : fk)
-  const cw = k => Math.round(spColW_(w, k) * cwK(k))
+  /* cột Ảnh không hẹp hơn THUMB_MIN: ảnh luôn là khung vuông 96px, tiêu đề "ẢNH" không bị cắt / xếp dọc */
+  const cw = k => (k === 'thumb' ? Math.max(THUMB_MIN, Math.round(spColW_(w, k))) : Math.round(spColW_(w, k) * cwK(k)))
   useLayoutEffect(() => {
     const t = tblRef.current; if (!t) return
     const v = Math.round(((parseFloat(getComputedStyle(t).fontSize) || 13) / 13) * 100) / 100
@@ -201,7 +203,10 @@ export default function SpTable({ cols, rows, w, sel, edit, sort, wrapW, skuCoun
   )
 }
 
-function thCls(c) { const cl = c.cls || ''; if (cl.indexOf('num') >= 0) return 'num'; if (cl.indexOf('ct') >= 0) return 'ct'; if (cl.indexOf('thumbcol') >= 0) return 'thumbcol'; return '' }
+function thCls(c) {
+  const cl = c.cls || '', hl = cl.indexOf('sp-hl') >= 0 ? ' sp-hl' : ''   // 3 cột giá: tiêu đề tô màu nổi bật
+  if (cl.indexOf('num') >= 0) return 'num' + hl; if (cl.indexOf('ct') >= 0) return 'ct' + hl; if (cl.indexOf('thumbcol') >= 0) return 'thumbcol'; return hl.trim()
+}
 function editable(c, p) { return !!c.e && !p.spChung }
 
 /* Ô hiển thị (cột ở chế độ xem) */
@@ -221,7 +226,7 @@ function Cell({ c, p, r, on, skuCount, ts }) {
       const n = skuCount(p)
       return <span className={`qspl-sku${n > 1 ? ' multi' : ''}`} title={n > 1 ? n + ' biến thể cùng mã ' + (p.ma || '') : 'Chỉ 1 biến thể'}>{n}</span>
     }
-    case 'giaDaiLy': return <>{money(p.donGiaBan)}<span className="unit">đ</span></>
+    case 'giaDaiLy': return money(p.donGiaBan)   // 3 cột giá (sp-hl): chỉ số, không chữ "đ"
     case 'nguoiTao': return p.nguoiTao ? <span className="qspl-who">{p.nguoiTao}</span> : <Dash />
     case 'ngayTao': return p.ngayTao ? fmtDate(p.ngayTao) : <Dash />
     case 'nguoiSua': return p.nguoiSua ? <span className="qspl-who" title={'Lúc ' + fmtDateTime_(p.ngayCapNhat)}>{p.nguoiSua}</span> : <Dash />
@@ -229,7 +234,7 @@ function Cell({ c, p, r, on, skuCount, ts }) {
       const col = c.e.col
       if (SP_ALWAYS[col]) return <SpInp p={p} e={c.e} val={spEditRaw_(p, col)} />   // chiết khấu: luôn sửa được
       const v = spColVal_(p, col)
-      if (c.e.money) return v === '' ? <Dash /> : <>{money(v)}<span className="unit">đ</span></>
+      if (c.e.money) return v === '' ? <Dash /> : (c.cls.indexOf('sp-hl') >= 0 ? money(v) : <>{money(v)}<span className="unit">đ</span></>)
       if (col === 'link_datasheet') return v ? <a href={safeUrl_(v)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>Datasheet</a> : <Dash />
       return v ? v : <Dash />
     }

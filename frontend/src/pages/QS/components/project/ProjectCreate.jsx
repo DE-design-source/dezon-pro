@@ -4,6 +4,7 @@ import { useQs } from '../../state/QsData'
 import { qsToast as toast } from '../common/dialogs'
 import { showTab } from '../../state/store'
 import { importProjectForm, attachBoqFiles } from './projectActions'
+import './gallery.css'
 
 /* Trang "Nhập dự án" (mở từ nút Nhập dự án của Danh sách dự án): cùng khung với trang chi tiết (ProjectDetail),
    đủ các trường của bảng Thông tin + phần giới thiệu (Nhu cầu / Hiện trạng / Ghi chú). Khu vực tự lấy từ đoạn cuối Địa điểm.
@@ -13,7 +14,11 @@ import { importProjectForm, attachBoqFiles } from './projectActions'
    Khối BOQ (chỉ khi nhập mới): tải file BOQ PDF / Excel (đính kèm vào dữ liệu 'boqFiles' sau khi lưu), hoặc "Tạo BOQ từ Dezon Pro":
    tạo dự án như "Tạo dự án" của Bảng điều khiển (mở thành dự án đang làm) rồi chuyển sang Bảng điều khiển.
    Props: onBack(), onCreated(p) (dự án vừa nhập), onOpen(maDA) (dự án đã có).
-   Sửa dự án đã có: sửa tại chỗ ở trang chi tiết (ProjectDetail), không dùng trang này. */
+   openOnSave (nút "Tạo dự án" của Bảng điều khiển): Lưu = tạo + mở thành dự án đang làm, quay về Bảng điều khiển;
+   ẩn thẻ "Tạo BOQ từ Dezon Pro" vì đã đang ở Bảng điều khiển.
+   Sửa dự án đã có: sửa tại chỗ ở trang chi tiết (ProjectDetail), không dùng trang này.
+   Dùng trong hộp "Ghi danh vào nhiều dự án" (MultiProjPop): backLabel / saveLabel đổi chữ nút, note = dòng chú thích dưới tiêu đề,
+   noDash ẩn thẻ "Tạo BOQ từ Dezon Pro". */
 const TRANG_THAI = ['Bản nháp', 'Đang thực hiện', 'Hoàn thành']
 const EMPTY = {
   kienTrucSu: '', ten: '', khachHang: '', diaChi: '', sdt: '', phanKhuc: '', quyMo: '', tongDT: '', dtBaoGia: '',
@@ -24,7 +29,7 @@ const BOQ_ACCEPT = '.xlsx,.xls,.csv,.pdf'
 /* So tên không phân biệt hoa thường / dấu / khoảng trắng thừa */
 const norm_ = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
 
-export default function ProjectCreate({ onBack, onCreated, onOpen }) {
+export default function ProjectCreate({ onBack, onCreated, onOpen, openOnSave, backLabel, saveLabel, note, noDash }) {
   const { projects } = useQs()
   const [f, setF] = useState(EMPTY)
   const [boqFiles, setBoqFiles] = useState([])   // File chờ tải lên sau khi lưu dự án
@@ -61,7 +66,7 @@ export default function ProjectCreate({ onBack, onCreated, onOpen }) {
     if (busy) return
     if (dup) { toast('Dự án "' + dup.ten + '" của KTS ' + dup.kienTrucSu + ' đã có - chuyển về trang dự án'); onOpen(dup.maDA); return }
     setBusy(true)
-    const p = await importProjectForm(f)
+    const p = await importProjectForm(f, openOnSave ? { open: true } : undefined)
     if (p && boqFiles.length) await attachBoqFiles(p.maDA, boqFiles)
     setBusy(false)
     if (p) onCreated(p)
@@ -81,16 +86,17 @@ export default function ProjectCreate({ onBack, onCreated, onOpen }) {
   return (
     <form className="qs-pd qs-pn" onSubmit={submit}>
       <div className="qs-pd-top">
-        <button type="button" className="qs-pd-back" onClick={onBack}><Icon name="arrowLeft" size={16} /> Danh sách dự án</button>
+        <button type="button" className="qs-pd-back" onClick={onBack}><Icon name="arrowLeft" size={16} /> {backLabel || (openOnSave ? 'Bảng điều khiển' : 'Danh sách dự án')}</button>
         <span style={{ flex: 1 }} />
         <button type="button" className="qs-pd-btn" onClick={onBack}>Huỷ</button>
-        <button type="submit" className="qs-pd-btn primary" disabled={busy}><Icon name="check" size={14} /> {busy ? 'Đang lưu…' : 'Lưu dự án'}</button>
+        <button type="submit" className="qs-pd-btn primary" disabled={busy}><Icon name="check" size={14} /> {busy ? 'Đang lưu…' : saveLabel || 'Lưu dự án'}</button>
       </div>
 
       <div className="qs-pd-title">
         <h1>{f.ten.trim() || 'Nhập dự án'}</h1>
         <span className="st">{f.trangThai}</span>
       </div>
+      {note && <p className="qs-pn-note">{note}</p>}
 
       <section className="qs-pn-sec">
         <h3>Kiến trúc sư</h3>
@@ -179,13 +185,13 @@ export default function ProjectCreate({ onBack, onCreated, onOpen }) {
                 </div>
               )}
             </div>
-            <div className="qs-pn-boqc dz">
+            {!openOnSave && !noDash && <div className="qs-pn-boqc dz">
               <b><Icon name="table" size={16} /> Tạo BOQ từ Dezon Pro</b>
               <span>Tạo dự án mới ở Bảng điều khiển với thông tin trên rồi chuyển tới Bảng điều khiển để bóc tách / lập BOQ.</span>
               <button type="button" className="qs-pd-btn primary" disabled={busy} onClick={createDash}>
                 <Icon name="plus" size={14} /> {busy === 'dash' ? 'Đang tạo…' : 'Tạo dự án & lập BOQ'}
               </button>
-            </div>
+            </div>}
           </div>
         </section>
     </form>

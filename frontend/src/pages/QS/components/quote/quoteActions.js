@@ -13,21 +13,23 @@ import { money, esc, pctIn_ } from '../../lib/format.js'
 import { donGiaCK_, ttBan_ } from '../../lib/calc.js'
 import {
   bgOptSet_ as bgOptNew_, bgToggleAn_, bgMauDat_ as bgMauChon_, coverTayMap_, bgOpt_, coverEditVal_, coverAddBig_, coverAddSmall_,
-  coverCosts, coverHasChild, areaSetVal_, areaCompute_, areaApplyFields_, bgChot_ as bgChotNew_, bgTong_, computeQuoteLocal,
-  bgSelCodes_, bgPTSecs_, bgNoiBoXuat_, bgAn_, bgSub_, bgOrg_, bgHist_, bgTongKetData_,
+  coverCosts, coverHasChild, areaSetVal_, areaCompute_, areaApplyFields_, bgChot_ as bgChotNew_, bgTong_, bgVatParts_, computeQuoteLocal,
+  bgSelCodes_, bgPTSecs_, bgNoiBoXuat_, bgAn_, bgSub_, bgOrg_, bgHist_, bgTongKetData_, bgSoLaiOn_, vatOf_, bgLines_,
 } from '../../lib/quote.js'
 import { exportBaoGiaOpts, logoXuat_ } from './quoteApi'
 import {
   getQ, setQ, setCoverRows, coverLuu_, coverCancelPending, coverVeBanLuu_, coverBatDauGhi_, coverLanGhi_, coverLanDang_, setColOrder,
 } from './quoteState'
 import { freshModel } from './quoteModel'
-import { bgDocCols_, bgExportCols_, bgBia_ } from './docModel'
-import { bgDocCss_, printCss_, bgChu_, bgFontHref_ } from './docCss'
+import { bgDocCols_, bgExportCols_, bgBia_, bgColHm_, bgExportColsOf_, bgCoverParts_ } from './docModel'
+import { bgDocCss_, printCss_, bgChu_, bgFontHref_, fitA4_ } from './docCss'
 
 const curNow = () => getState().cur
 const pdNow = () => getState().projData || {}
 
 /* ---- Cấu hình báo giá theo dự án (projData.bgCfg) ---- */
+/* bgCfg của bản nháp đang mở (chưa gộp mặc định công ty) */
+export function bgCfgRaw() { return pdNow().bgCfg }
 export function bgOptSet(k, v) { projDataSet_('bgCfg', bgOptNew_(pdNow().bgCfg, k, v)) }
 /* Ghi nhiều khoá bgCfg trong 1 lần ({khoá: giá trị}, null = xoá khoá) */
 export function bgOptSetMany(m) { projDataSet_('bgCfg', Object.keys(m).reduce((c, k) => bgOptNew_(c, k, m[k]), pdNow().bgCfg)) }
@@ -164,7 +166,7 @@ export function areaApply() {
 export function bgChot(lyDo) {
   const m = freshModel()
   const c = m.ctx.cur; if (!c) return null
-  const q = bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, c.vat)
+  const q = bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, c.vat, bgVatParts_(m.ctx))
   const me = getState().me
   const r = bgChotNew_(m.hist, m.sn, c, q, lyDo, (me && (me.hoTen || me.username)) || '')
   if (r.trung) {
@@ -198,7 +200,8 @@ export function printDoc(pages, css) {
   const w = window.open('', '_blank'); if (!w) { toast('Cho phép popup để in/PDF'); return }
   w.document.write('<!doctype html><title>Báo giá — ' + esc(c.ten || '') + '</title>' + hrefs.map(h => '<link rel="stylesheet" href="' + esc(h) + '">').join('') + '<style>' + pcss + '</style><div class="qsd-doc">' + html + '</div>')
   w.document.close()
-  const go = () => { w.focus(); w.print() }
+  // mỗi trang đúng 1 tờ A4 ngang: thu nhỏ trang nhiều chữ cho vừa (cùng cách bản xem trước) rồi mới in
+  const go = () => { try { fitA4_(w.document.querySelector('.qsd-doc'), null) } catch (e) { /* bỏ qua */ } w.focus(); w.print() }
   setTimeout(() => { try { w.document.fonts.ready.then(go, go) } catch (e) { go() } }, 400)
 }
 
@@ -242,10 +245,10 @@ export async function doExport(fmt, lech) {
     const anMap = bgAn_(m.ctx.bgCfg)
     const an = Object.keys(anMap).filter(k => anMap[k])
     const o = bgOpt_(m.ctx.bgCfg)
-    const t = bgTong_(bgSub_(m.ctx), m.ctx.bgCfg, m.ctx.cur.vat)
+    const t = bgTong_(bgSub_(m.ctx), m.ctx.bgCfg, m.ctx.cur.vat, bgVatParts_(m.ctx))
     const tong = [['Cộng (chưa VAT)', t.sub]]
     if (t.ck) tong.push(['Chiết khấu' + (o.ckKieu === 'pct' ? ' ' + o.ck + '%' : ''), -t.ck], ['Sau chiết khấu', t.sau])
-    tong.push(['VAT ' + t.vatPct + '%', t.vat], ['TỔNG THANH TOÁN', t.total])
+    tong.push(['VAT ' + t.vatNhan, t.vat], ['TỔNG THANH TOÁN', t.total])
     /* opts (M8.1, M8.2, M8.3): bố cục tờ bìa, công ty, tổng kết lấy đúng từ các hàm của bản xem trước (bgOrg_, bgTongKetData_
        trên cùng tổng t) nên chữ / số trong Excel trùng trang in */
     const org = bgOrg_(m.ctx.congTy, m.ctx.bgOrg)
@@ -253,7 +256,17 @@ export async function doExport(fmt, lech) {
       coverMau: m.ui.coverMau === 'm1' ? 'm1' : 'm2',
       org: { ten: org.ten, logo: logoXuat_(org.logo), lines: org.lines },
       tongKet: bgTongKetData_(t, m.ctx.bgCfg, getState().me),
+      soLai: bgSoLaiOn_(m.ctx.bgCfg),   // đánh số lại liên tục các mục đang hiện trên tờ bìa (coverSoLai_)
     }
+    /* VAT theo hạng mục: khối tổng tờ bìa (cùng số với bản xem trước) + % của từng hạng mục cho sheet hạng mục */
+    const CP = bgCoverParts_(coverCosts(m.ctx), m.ctx, 'm2')
+    if (CP.T) opts.vatBia = { nhan: CP.T.vatNhan, vat: CP.T.vat }
+    const vatHm = {}
+    bgLines_(m.ctx).forEach(l => { const k = String(l.nhom || '').trim(); if (k && vatHm[k] == null) vatHm[k] = vatOf_(m.ctx, k) })
+    opts.vatHm = vatHm
+    /* cột riêng từng hạng mục (bgCfg.colHm): {mã hạng mục: cột Excel của hạng mục đó} - máy chủ dùng cho sheet của hạng mục */
+    const hm = bgColHm_(m.ctx.bgCfg)
+    if (Object.keys(hm).length) { opts.colsHm = {}; Object.keys(hm).forEach(code => { opts.colsHm[code] = bgExportColsOf_(m.ctx, m.ui, code) }) }
     const r = await exportBaoGiaOpts(ma0, cols, 'xlsx', nodes, pt, an, tong, org.ten, opts)
     saveBase64(r)
     if (curNow() && curNow().maDA === ma0) bgChot('excel')       // chỉ ghi phiên bản khi file đã xuất xong
@@ -303,7 +316,7 @@ export function bgHistDiff(ver) {
   const v = bgHist_(S.projData).filter(x => x.ver === ver)[0]; if (!v || !v.snap) return
   const m = freshModel()
   const cu = m.sn
-  const cq = bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, m.ctx.cur.vat)
+  const cq = bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, m.ctx.cur.vat, bgVatParts_(m.ctx))
   const key = l => l.lineId || ((l.maSP || '') + '|' + (l.ten || '') + '|' + (l.tang || ''))
   const A = {}; const B = {}
   v.snap.lines.forEach(l => { A[key(l)] = l }); cu.lines.forEach(l => { B[key(l)] = l })

@@ -301,3 +301,40 @@ html[data-theme="dark"] .qs-pc-node .qs-bd-seg button.on{background:var(--dash-a
   flex-wrap:wrap; row-gap:8px;
   & .qs-pc-main.has-node ~ .qs-pc-money{flex:1 1 100%;}
 }
+
+/* Ô tìm kiếm nằm trong hàng "Hạng mục đã bóc" (PageHead, qbSlot.js): giữa hàng, co giãn */
+.qs-qb-slot{flex:1 1 auto; min-width:0; display:flex; justify-content:center; align-items:center;}
+.qs-qb-slot .qs-qb-find{margin:0; flex:0 1 420px; width:auto; min-width:200px;}
+
+/* Chi phí / Dự án: nút Hiện tất cả · Cột cơ bản trên băng dự án (cùng dáng nút Cột hiển thị) */
+.qs-pc-node .qs-cp-q{flex:none; height:28px; padding:0 10px; border:1px solid rgba(255,255,255,.25); border-radius:14px; background:rgba(255,255,255,.08); color:#cfe0f3; font:inherit; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;}
+.qs-pc-node .qs-cp-q:hover{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff;}
+
+/* Module "Cột hiển thị": nút Cột hiển thị + nút chọn nhanh bộ cột chung 1 khung, vạch mảnh ngăn giữa 2 nút
+   (ColTools ColFrame - Chi phí / Dự án; SheetHeader - Bóc tách). Nút bên trong bỏ khung riêng, nền chỉ hiện khi rê / đang mở */
+.qs-colmod{display:inline-flex; align-items:center; flex:none; gap:5px; height:30px; padding:0 2px; border:1px solid var(--border); border-radius:9px; background:var(--surface);}
+.qs-colmod > button{position:relative; height:24px; border:0 !important; border-radius:7px; background:none; box-shadow:none;}
+.qs-colmod > button:hover{background:var(--dash-accent-tint);}
+.qs-colmod > button.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qs-colmod > button + button::before{content:''; position:absolute; left:-3px; top:4px; bottom:4px; width:1px; background:var(--border); pointer-events:none;}
+.qs-colmod > .qs-bd-preset.icon-only{width:26px; padding:0; justify-content:center;}
+.qs-ct-filters-cols .qs-colmod{height:28px;}
+.qs-ct-filters-cols .qs-colmod > button{height:22px;}
+
+/* trên băng dự án (nền navy): khung viên tròn như các nút khác của băng */
+.qs-pc-node .qs-colmod{height:32px; padding:0 3px; border-color:rgba(255,255,255,.25); border-radius:16px; background:rgba(255,255,255,.08);}
+.qs-pc-node .qs-colmod:hover{border-color:rgba(255,255,255,.45);}
+.qs-pc-node .qs-colmod > button{height:26px; border-radius:13px; background:none; color:#fff;}
+.qs-pc-node .qs-colmod > .qs-bd-preset{color:#cfe0f3;}
+.qs-pc-node .qs-colmod > button:hover, .qs-pc-node .qs-colmod > button.on{background:rgba(255,255,255,.16); color:#fff;}
+.qs-pc-node .qs-colmod > button + button::before{background:rgba(255,255,255,.22);}
+
+/* Chi phí: dải Vốn · Giá bán · Lợi nhuận · Biên trong khung tiền của băng (thay Lợi nhuận / % Lợi nhuận của băng) */
+.qs-pc-cpstats:not(:empty) ~ .qs-pc-kpi, .qs-pc-main.has-node ~ .qs-pc-money .qs-pc-cpstats:not(:empty) ~ .qs-pc-kpi{display:none;}
+.qs-pc-totals .qs-bd-tg.pos b{color:#7BE3A4;}
+.qs-pc-totals .qs-bd-tg.low b{color:#FCD38A;}
+.qs-pc-totals .qs-bd-tg.neg b{color:#FCA5A5;}
+/* VAT (ô nhập % + số tiền) và Tổng trong khung tiền của băng (Chi phí) */
+.qs-pc-totals .qs-pc-vat{display:inline-flex; align-items:center; gap:3px;}
+.qs-pc-totals .qs-pc-vat em{margin-left:5px; font-style:normal;}
+.qs-pc-totals .qs-bd-tg.total b{font-size:16px;}

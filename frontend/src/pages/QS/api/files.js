@@ -4,7 +4,7 @@ import { API_BASE, authHeaders, noAuth, QsApiError, QsUnreachableError, QsAbortE
 
 function needBase() { if (!API_BASE) throw new QsNotConfiguredError() }
 
-function saveBlob(blob, name) {
+export function saveBlob(blob, name) {
   const u = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = u; a.download = name || 'file'

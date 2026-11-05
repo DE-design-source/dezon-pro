@@ -9,6 +9,7 @@ import { bgBuildPages } from './docModel'
 import { getState } from '../../state/store'
 import { getQ } from './quoteState'
 import { getTkCols } from '../breakdown/sheet/tkCols'
+import { tuyGop_ } from './tuyMau'
 
 /* ptEnsure: Phần thô của dự án qua hàm dùng chung với tab Phần thô (ptEnsureVals_: projData, dự phòng localStorage pt_<maDA>,
    VAT phần thô mặc định theo VAT dự án), rồi tính trên BẢN SAO: ptSecTotals gán _kl / _tt / _ttnt lên từng dòng (như bản gốc)
@@ -34,7 +35,7 @@ export function quoteModel(st, q, tk, snap) {
   let ptErr = pt.ptErr
   let ctx = {
     cur, lines: st.lines || [], cover: q.cover.maDA === (cur && cur.maDA) ? q.cover.rows : [],
-    bgCfg: pd.bgCfg || {}, bgNodes: q.bgNodes || {}, phanTho: pt.phanTho, ptVat: pt.ptVat, congTy: st.congTy, bgOrg: pd.bgOrg,
+    vatHm: pd.vatHm || {}, bgCfg: tuyGop_(pd.bgCfg || {}), bgNodes: q.bgNodes || {}, phanTho: pt.phanTho, ptVat: pt.ptVat, congTy: st.congTy, bgOrg: pd.bgOrg,
   }
   let ui = {
     cols: tk.cols || {}, colOrder: tk.order || null, nganh: vsFltNganh_(st.node), bgColOrder: q.bgColOrder || null,

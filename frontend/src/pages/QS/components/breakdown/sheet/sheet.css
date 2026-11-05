@@ -225,6 +225,12 @@
 .qs-tk-qbplus{flex:none; height:26px; padding:0 9px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--dash-accent); font:inherit; font-size:12px; font-weight:700; cursor:pointer;}
 .qs-tk-qbplus:hover{background:var(--dash-accent-tint);}
 .qs-tk-qbnone{padding:12px; font-size:12.5px; color:var(--text-muted);}
+/* Khung Lịch sử (HistoryDock) cạnh cột sản phẩm */
+.qs-tk-htabs{display:flex; gap:4px; padding:8px 10px; border-bottom:1px solid var(--border);}
+.qs-tk-htabs button{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-tk-htabs button.on{color:var(--dash-accent); background:var(--dash-accent-tint); border-color:var(--dash-accent);}
+.qs-tk-hdock .qs-tk-bgtb{padding:0;}
+.qs-tk-hdock .qs-tk-qbhr{padding:9px 12px;}
 
 /* ---------- Chip Nhân công / Vật tư (.shchip) ---------- */
 .qs-tk-sheets{display:inline-flex; gap:5px; margin-left:4px;}
@@ -401,3 +407,18 @@ html[data-theme="dark"] .qs-tk-lnupd{background:#3a2c0a;}
    bảng gọn = ảnh nhỏ 44px (1 dòng / hàng). Cột Hình ảnh tự rộng đủ khung (SheetGrid minW) */
 .qs-tk-grid td.c-hinhAnh .qs-tk-img{width:120px !important; height:120px !important;}
 .qs-tk-grid.compact td.c-hinhAnh .qs-tk-img{width:44px !important; height:44px !important;}
+/* Dải chip cột Bóc tách: chip cột giá / lợi nhuận màu cam (ColsStrip TIEN_COLS) - bật: nền cam nhạt; tắt: viền + chữ cam */
+.qs-bd-strip-chip.qs-colchip.tien{color:#C2410C; border-color:#EA580C;}
+.qs-bd-strip-chip.qs-colchip.tien.on{background:#FFF3E8; border-color:transparent; color:#C2410C;}
+.qs-bd-strip-chip.qs-colchip.tien:hover{border-color:#C2410C; color:#9A3412;}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.tien{color:#FB923C; border-color:#FB923C;}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.tien.on{background:#3A2614; border-color:transparent;}
+/* chip cột nhận diện sản phẩm màu xanh (ColsStrip SP_COLS: Tên sản phẩm · Thương hiệu · Hình ảnh) */
+.qs-bd-strip-chip.qs-colchip.spc{color:var(--dash-bar-2, #2E6BC6); border-color:var(--dash-bar-2, #2E6BC6);}
+.qs-bd-strip-chip.qs-colchip.spc.on{background:color-mix(in srgb, var(--dash-bar-2, #2E6BC6) 12%, transparent); border-color:transparent;}
+.qs-bd-strip-chip.qs-colchip.spc:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.spc{color:#7FA8F5; border-color:#7FA8F5;}
+html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.spc.on{border-color:transparent;}
+/* Bảng Bóc tách (Bảng tính + Bảng thường): số của 3 cột Giá bán lẻ · Chiết khấu của đại lý (%) · Giá đại lý màu cam (cùng màu chip cột giá) */
+.qs-tk-grid td.c-giaNCC, .qs-tk-grid td.c-chietKhau, .qs-tk-grid td.c-giaDaiLy{color:#C2410C;}
+html[data-theme="dark"] .qs-tk-grid td.c-giaNCC, html[data-theme="dark"] .qs-tk-grid td.c-chietKhau, html[data-theme="dark"] .qs-tk-grid td.c-giaDaiLy{color:#FB923C;}

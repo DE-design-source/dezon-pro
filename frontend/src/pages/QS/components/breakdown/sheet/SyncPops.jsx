@@ -133,3 +133,37 @@ export function RecentPop({ anchor, lines, onGo, onPlus, onClose }) {
     </Pop>
   )
 }
+
+/* Khung dọc "Lịch sử" cạnh cột sản phẩm (Bóc tách), cùng kiểu khung "Chọn nhanh cột":
+   tab Vừa thêm = 20 dòng mới nhất; tab Thao tác = các bước hoàn tác, bấm để quay về trước bước đó */
+export function HistoryDock({ width, tab, onTab, lines, labels, onJump, onGo, onPlus, onClose }) {
+  const ds = (lines || []).slice(-20).reverse()
+  const ops = (labels || []).map((label, i) => ({ label, i })).reverse()
+  return (
+    <aside className="qs-card qs-tk-dock qs-tk-hdock" style={width ? { width } : undefined} aria-label="Lịch sử">
+      <div className="qs-tkp-h">
+        <b>Lịch sử</b>
+        <button type="button" className="qsc-x" onClick={onClose}>✕</button>
+      </div>
+      <div className="qs-tk-htabs">
+        <button className={tab === 'recent' ? 'on' : ''} onClick={() => onTab('recent')}><Icon name="clock" size={14} />Vừa thêm vào bảng</button>
+        <button className={tab === 'ops' ? 'on' : ''} onClick={() => onTab('ops')}><Icon name="history" size={14} />Thao tác{ops.length ? ' (' + ops.length + ')' : ''}</button>
+      </div>
+      <div className="qs-tk-bgtb">
+        {tab === 'recent' ? (ds.length ? ds.map(l => (
+          <div key={l.lineId} className="qs-tk-qbhr">
+            <div className="qs-tk-qbrt" title="Tới dòng này" onClick={() => onGo(l)}>
+              <b>{l.ten || ''}</b><i>{l.nhom + '. ' + nodeName(l.nhom) + (l.khuVuc ? ' · ' + l.khuVuc : '') + ' · SL ' + (l.soLuong || 0)}</i>
+            </div>
+            <button className="qs-tk-qbplus" title="Thêm 1 số lượng" onClick={() => onPlus(l)}>+1</button>
+          </div>
+        )) : <div className="qs-tk-qbnone">Bảng chưa có dòng nào.</div>)
+          : (ops.length ? ops.map(({ label, i }) => (
+            <div key={i} className="qs-tk-qbhr">
+              <div className="qs-tk-qbrt" title="Quay về trước thao tác này" onClick={() => onJump(i)}><b>{i + 1}. {label}</b></div>
+            </div>
+          )) : <div className="qs-tk-qbnone">Chưa có thao tác nào.</div>)}
+      </div>
+    </aside>
+  )
+}

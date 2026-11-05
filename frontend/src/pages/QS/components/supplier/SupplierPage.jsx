@@ -6,7 +6,7 @@ import { showTab } from '../../state/store'
 import { mediaUrl, uploadRaw } from '../../api/files'
 import * as api from '../../api/qsApi'
 import { qsToast as toast, qsConfirm } from '../common/dialogs'
-import { money } from '../../lib/format.js'
+import { money, qbNorm_ } from '../../lib/format.js'
 import { spNodeCodeOf_, nodeName } from '../../lib/tree.js'
 import { statCache, loadStats_ } from '../project/projectStats'
 import '../project/gallery.css'
@@ -15,10 +15,12 @@ import './supplier.css'
 import { MultiProjPop } from '../products/list/SpModal'
 import { MrootPortal } from '../common/Mroot'
 import { spAddToProject } from '../products/list/spActions'
+import { useNccInfo, IntroTab, PartnerTab, CatalogueTab } from './SupplierInfo'
 
 /* Trang "Nhà cung cấp" (cùng kiểu trang Danh sách dự án): nhà cung cấp = thương hiệu trong danh mục sản phẩm
    (khớp chip "Nhà cung cấp" của Danh sách dự án). Thẻ: ảnh ghép 4 sản phẩm, ngành hàng, số sản phẩm, khoảng giá, số dự án đang dùng.
-   Bấm thẻ = trang chi tiết: tab Sản phẩm (lọc hạng mục) · Dự án đang dùng · Nhà phân phối (cột NCC của sản phẩm).
+   Bấm thẻ = trang chi tiết: tab Sản phẩm (lọc hạng mục) · Dự án đang dùng · Nhà phân phối (cột NCC của sản phẩm)
+   · Giới thiệu · Đối tác · Catalogue (hồ sơ nhập tay, SupplierInfo.jsx).
    Số dự án đang dùng đọc từ projectStats (đếm dòng báo giá từng dự án, dùng chung với Danh sách dự án). */
 const img1 = v => (v ? mediaUrl(String(v).split('\n')[0].trim()) : '')
 const s_ = v => String(v == null ? '' : v).trim()
@@ -71,6 +73,7 @@ export default function SupplierPage() {
   const [q, setQ] = useState('')
   const [nganhF, setNganhF] = useState({})
   const [open, setOpen] = useState(false)
+  const [ddq, setDdq] = useState('')            // ô tìm trong danh sách Ngành hàng
   const [view, setViewSt] = useState(vGet)
   const setView = v => { setViewSt(v); try { localStorage.setItem(V_LS, v) } catch (e) { /* bỏ qua */ } }
   const [detail, setDetail] = useState('')
@@ -131,8 +134,9 @@ export default function SupplierPage() {
             </button>
             {open && (
               <div className="qs-pg-ddm multi">
+                <div className="qs-pg-ddq"><Icon name="search" size={14} /><input autoFocus placeholder="Tìm ngành hàng…" value={ddq} onChange={e => setDdq(e.target.value)} /></div>
                 <div className="qs-pg-ddl">
-                  {Object.keys(nganhCnt).sort().map(n => (
+                  {Object.keys(nganhCnt).sort().filter(n => !ddq.trim() || qbNorm_(n + ' ' + nodeName(n)).indexOf(qbNorm_(ddq.trim())) >= 0).map(n => (
                     <label key={n} className={`qs-pg-ddi${nganhF[n] ? ' on' : ''}`}>
                       <input type="checkbox" checked={!!nganhF[n]} onChange={() => setNganhF(f => { const x = { ...f }; if (x[n]) delete x[n]; else x[n] = 1; return x })} />
                       <span title={n + '. ' + nodeName(n)}>{nodeName(n)}</span><small>{nganhCnt[n]}</small>
@@ -241,7 +245,11 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
   const hms = Object.keys(o.hm).sort((a, b) => o.hm[b] - o.hm[a])
   const sp = hm ? o.sp.filter(p => s_(p.hangMuc) === hm) : o.sp
   const dists = Object.keys(o.dist).sort((a, b) => o.dist[b] - o.dist[a])
-  const TABS = [['sp', 'Sản phẩm', o.sp.length], ['pj', 'Dự án đang dùng', projs.length], ['dist', 'Nhà phân phối', dists.length]]
+  const NI = useNccInfo()
+  const hs = NI.info[o.ten] || {}
+  const saveHs = part => NI.patch(o.ten, part)
+  const TABS = [['sp', 'Sản phẩm', o.sp.length], ['pj', 'Dự án đang dùng', projs.length], ['dist', 'Nhà phân phối', dists.length],
+    ['intro', 'Giới thiệu', 0], ['partner', 'Đối tác', (hs.doiTac || []).length], ['cat', 'Catalogue', (hs.catalogue || []).length]]
   return (
     <div className="qs-pd">
       {multiP && (
@@ -342,6 +350,9 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
           ) : <div className="qs-pd-empty">Sản phẩm chưa ghi nhà phân phối.</div>}
         </div>
       )}
+      {tab === 'intro' && <div className="qs-pd-sec"><IntroTab key={o.ten} ten={o.ten} d={hs} onSave={saveHs} /></div>}
+      {tab === 'partner' && <div className="qs-pd-sec"><PartnerTab ten={o.ten} d={hs} onSave={saveHs} projs={projs} /></div>}
+      {tab === 'cat' && <div className="qs-pd-sec"><CatalogueTab key={o.ten} ten={o.ten} d={hs} onSave={saveHs} sp={o.sp} /></div>}
     </div>
   )
 }

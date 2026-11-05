@@ -16,6 +16,8 @@ import { ctSyncTemplate_, ptTemplateNew_ } from '../../../lib/phantho.js'
 import { useSpecs } from '../../breakdown/catalog/useSpecs'
 import { useComboCache, loadCombo } from '../../breakdown/catalog/comboCache'
 import ProjPanel from './ProjPanel'
+import ProductInfo from '../../breakdown/ProductInfo'
+import { lineProd_ } from '../../../lib/productFields.js'
 import SpTable from './SpTable'
 import SpCards from './SpCards'
 import { useFitLevel } from '../../common/useFitLevel'
@@ -24,7 +26,7 @@ import { CatPop, FilterPop, PresetPop, BulkEditPop, MorePop, CopyMenu, ColMenu, 
 import { useSpUi, getU, setU, setPer, clearSel } from './spStore'
 import {
   lsJson, lsSet, spKey_, spPanelHidden_, foldCols_, foldColsToggle_, spNganhCur_, spPTMode_, spAllCols_, spSkuMap_, spSkuCount_,
-  spColsNg_, spColScope_, spColsLoad_, spCfgLoad_, spCfgSave_, spQuickLoad_, spOrder_, spColOn_, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
+  spColsNg_, spColScope_, spColsLoad_, spCfgLoad_, spCfgSave_, spQuickLoad_, spOrder_, spColOn_, SP_PRICE_COLS, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
   SP_PER, spPageNums_, spNodeCount_, spScopeProducts_, SP_FLT_EMPTY, spFltCount_, spAnyFilter_, spSortNext_,
   spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_,
 } from './spModel'
@@ -77,6 +79,7 @@ export default function ProductList() {
   const [panelHidden, setPanelHidden] = useState(spPanelHidden_)
   const [folded, setFolded] = useState(foldCols_)
   const [pop, setPop] = useState(null)          // {kind, anchor, p?}
+  const [ppInfo, setPpInfo] = useState(null)   // {lineId, p}: SP đang xem ở cột Thông tin sản phẩm (bấm từ panel trái)
   const [multiP, setMultiP] = useState(null)   // sản phẩm đang mở bảng Ghi danh vào nhiều dự án
   const [dlg, setDlg] = useState(null)          // {kind: 'detail' | 'edit', p, mode?: 'edit' | 'copy' | 'variant' | 'nbt'}
   const [xlsBusy, setXlsBusy] = useState(false)
@@ -658,7 +661,10 @@ export default function ProductList() {
           <QsIcon name="layers" size={15} /><span className="n">{(cur ? lines : []).length}</span>
         </button>
       )}
-      {!panelHidden && <ProjPanel qs={qs} node={node} dragOn={dragOn} onDrop={panelDrop} onHide={panelToggle} />}
+      {!panelHidden && <ProjPanel qs={qs} node={node} dragOn={dragOn} onDrop={panelDrop} onHide={panelToggle}
+        activeId={ppInfo ? ppInfo.lineId : null} onOpen={l => setPpInfo(v => (v && v.lineId === l.lineId ? null : { lineId: l.lineId, p: lineProd_(l, products) || l }))} />}
+      {/* bấm 1 SP trong panel trái: cột Thông tin sản phẩm như tab Bóc tách (ProductInfo); SP không còn trong danh mục thì xem theo dòng */}
+      {!panelHidden && ppInfo && <ProductInfo product={ppInfo.p} onClose={() => setPpInfo(null)} onAdd={p => spAddToProject(p)} />}
       {/* Bộ lọc / Chọn nhanh cột đang mở: bảng thu hẹp sang phải nhường chỗ (has-dock), không bị che */}
       <div className={`qspl-main${pop && (pop.kind === 'flt' || pop.kind === 'preset') ? ' has-dock' : ''}`}>
         {/* Chọn nhanh cột: bảng neo như Bộ lọc; chọn bộ thì giữ bảng mở để thấy dấu chọn (như Bóc tách) */}
@@ -673,7 +679,7 @@ export default function ProductList() {
         )}
         {pop && pop.kind === 'flt' && (
           <FilterPop anchor={pop.anchor} top={0} scope={scope} f={f} fltQ={U.fltQ}
-            onSel={selFilter} onSpec={fltSpec} onNhieuXoa={k => setF({ [k]: {} })}
+            onSel={selFilter} onSpec={fltSpec} onNhieuXoa={k => setF({ [k]: {} })} onMap={(k, m) => setF({ [k]: m })}
             onTim={(k, v) => setU(s => ({ fltQ: { ...s.fltQ, [k]: v } }))}
             onPrice={(k, v) => setF({ [k]: Number(v) || 0 })}
             onReset={() => setU({ node: '', f: SP_FLT_EMPTY(), fltQ: {}, page: 1 })}
@@ -689,8 +695,9 @@ export default function ProductList() {
               {!folded && (
                 <div className="qs-bd-strip qs-bd-colmod qspl-colbox">
                   {colList.filter(c => c.k !== 'stt' && c.k !== 'ten').map(c => {
-                    const on = !!spColOn_(colOn, c.k)
-                    return <button type="button" key={c.k} className={`qs-bd-strip-chip qs-colchip${on ? ' on' : ''}`} title={on ? 'Đang hiện — bấm để ẩn' : 'Đang ẩn — bấm để hiện'} onClick={() => colToggle(c.k)}>{c.label}</button>
+                    const on = !!spColOn_(colOn, c.k), gia = SP_PRICE_COLS.indexOf(c.k) >= 0
+                    return <button type="button" key={c.k} className={`qs-bd-strip-chip qs-colchip${on ? ' on' : ''}${gia ? ' sp-hl' : ''}${c.k === 'thumb' || c.k === 'thuong_hieu' ? ' sp-hl2' : ''}`}
+                      title={on ? 'Đang hiện — bấm để ẩn' : 'Đang ẩn — bấm để hiện'} onClick={() => colToggle(c.k)}>{c.label}</button>
                   })}
                   <span className="qs-colchip-sep" />
                   {(() => {
