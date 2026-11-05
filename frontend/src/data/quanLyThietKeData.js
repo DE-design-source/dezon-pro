@@ -115,12 +115,14 @@ export const STATUS_LABEL = { done: 'Hoàn thành', progress: 'Đang thực hi�
 /* ---------- Avatar ---------- */
 const AVATAR_COLORS = ['#2F5DA8', '#2f9160', '#b87a1f', '#7658c2', '#c1443c', '#0E8A82', '#c26fb0', '#6e8fd0']
 export function avatarColor(name) {
+  name = String(name || '')
   let h = 0
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_COLORS.length
   return AVATAR_COLORS[Math.abs(h)]
 }
 export function initials(name) {
-  const parts = name.trim().split(/\s+/)
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean) // tên trống (dữ liệu từ máy chủ) -> '?'
+  if (!parts.length) return '?'
   if (parts.length === 1) return parts[0][0].toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }

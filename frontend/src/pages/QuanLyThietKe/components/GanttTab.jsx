@@ -54,7 +54,7 @@ function PhaseMemberPopover({ phase, onAdd, onRemove, onClose }) {
       <div className="tk-mp-list">
         {phase.members.length ? phase.members.map((m, i) => (
           <span key={i} className="tk-mp-chip">
-            <span className="tk-avatar-mini" style={{ background: avatarColor(m.name), marginRight: 0 }}>{initials(m.name)}</span>
+            <span className="tk-avatar-mini" style={{ background: QLTK_DATA.avatarColor(m.name), marginRight: 0 }}>{QLTK_DATA.initials(m.name)}</span>
             {m.name}
             <span style={{ cursor: 'pointer', color: 'var(--text-faint)', marginLeft: 2 }} onClick={() => onRemove(i)}>✕</span>
           </span>

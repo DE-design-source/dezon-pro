@@ -244,7 +244,8 @@ export const EMPTY_EMPLOYEE = {
 export const fmtDate = iso => (iso ? iso.split('-').reverse().join('/') : '—')
 export const fmtMoney = v => (v === '' || v == null || isNaN(Number(v)) ? '—' : Number(v).toLocaleString('vi-VN') + ' đ')
 export function initials(name) {
-  const p = name.trim().split(/\s+/)
+  const p = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!p.length) return '?'
   return ((p.length > 1 ? p[p.length - 2][0] : '') + p[p.length - 1][0]).toUpperCase()
 }
 const AVATAR = ['#2F5DA8', '#0E8A82', '#B7791F', '#7658C2', '#C23B78', '#C2621A', '#1E8E5A', '#C0392B']
