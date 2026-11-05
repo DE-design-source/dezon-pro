@@ -156,8 +156,9 @@ cd /opt/qspro
 Trên máy tính (Git Bash, gốc repo):
 
 ```bash
-git ls-files -co --exclude-standard | while IFS= read -r f; do [ -f "$f" ] && echo "$f"; done | grep -v '^\.playwright-mcp/' > /tmp/filelist.txt
-tar -czf /tmp/qspro-src.tar.gz -T /tmp/filelist.txt     # không gồm .env, node_modules, infra/export (đã gitignore)
+# Đóng gói từ commit (đã commit hết trước), KHÔNG tar thư mục làm việc: trên Windows (core.autocrlf=true) file trong thư mục
+# làm việc xuống dòng CRLF -> deploy.sh báo "set: pipefail: invalid option name" (2026-11-05). git archive + autocrlf=false giữ LF.
+git -c core.autocrlf=false archive --format=tar.gz -o /tmp/qspro-src.tar.gz HEAD   # không gồm .env, node_modules, infra/export
 scp /tmp/qspro-src.tar.gz root@<IP máy chủ>:/root/
 ```
 
