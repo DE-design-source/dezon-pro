@@ -177,10 +177,11 @@ export default function PayrollModule({ employees, units = [], concurrentOf = ()
   const run = runs[month] || { status: 'draft', sent: [] }
   const monthLabel = MONTHS.find(m => m.key === month).label
 
-  const rows = useMemo(() => monthlySummary(employees, month).map(att => {
+  // kỳ đã duyệt: bản chụp phiếu lương lưu lúc duyệt (run.payslips {empId: {att, adj, p}})
+  const rows = useMemo(() => (run.payslips && Object.keys(run.payslips).length ? employees.filter(e => run.payslips[e.id]).map(emp => ({ ...run.payslips[emp.id], emp, att: { ...run.payslips[emp.id].att, emp } })) : monthlySummary(employees, month).map(att => {
     const adj = adjustments[month]?.[att.emp.id] || []
     return { emp: att.emp, att, adj, p: calcPay(att.emp, att, adj, cfg, concurrentOf(att.emp.id)) }
-  }), [employees, month, adjustments, cfg, concurrentOf])
+  })), [employees, month, adjustments, cfg, concurrentOf, run.payslips])
 
   if (!can('payroll', 'view')) return <NoAccess />
 

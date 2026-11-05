@@ -42,6 +42,11 @@ var TenantTables = map[string]bool{
 	"de_xuat": true, "chi_tiet_de_xuat_ck": true, "chi_tiet_de_xuat_tt": true, "cong_tac_history": true,
 	"du_an_data": true, "cai_dat_cong_ty": true, "kd_khach_hang": true, "kd_cham_soc": true,
 	"tk_du_an": true, "tk_thanh_vien": true, "tk_thau_phu": true, "tk_giai_doan": true, "tk_cong_viec": true, "tk_binh_luan": true,
+	"hr_don_vi": true, "hr_nhan_vien": true, "hr_kiem_nhiem": true,
+	"hr_ca": true, "hr_lich_tuan": true, "hr_cham_cong": true, "hr_don_tu": true,
+	"hr_cau_hinh_luong": true, "hr_dieu_chinh_luong": true, "hr_ky_luong": true, "hr_dinh_phi": true,
+	"hr_jd": true, "hr_tin_tuyen": true, "hr_ung_vien": true, "hr_muc_tieu": true, "hr_danh_gia": true, "hr_ghi_danh": true, "hr_bao_mat": true,
+	"hr_khoa_hoc": true, "hr_lo_trinh": true, "hr_lich_ngay": true, "hr_dia_diem": true,
 }
 
 // Config: cấu hình kết nối.

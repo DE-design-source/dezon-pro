@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-03 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-04 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -56,6 +56,7 @@
 | [N3](#xong-n3) | Tích hợp QS vào frontend React SiteFlow (`frontend/`) với API Go | ✅ | - |
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 | [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
+| [N9](#xong-n9) | HR (`/cham-cong`) chạy dữ liệu thật: hồ sơ nhân sự, sơ đồ tổ chức, kiêm nhiệm, chấm công & phép, lương & bảo hiểm, tuyển dụng, hiệu suất & đào tạo (API Go + PostgreSQL) | 🟡 | [N9](#n9): email / tích hợp bên ngoài, triển khai |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 | [N8](#xong-n8) | Chat realtime MVP: đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push | 🟡 | [N8](#n8): thấy thông báo push trên Chrome thường, người dùng thử, triển khai production; [N8.1](#n8-1) SMS thật, [N8.2](#n8-2) FCM / APNs, [N8.3](#n8-3) giai đoạn 2-3 (giai đoạn 2 đã code: tệp, trả lời / chuyển tiếp / thu hồi / sửa, reaction, tìm kiếm, đa thiết bị + QR - còn thử trên trình duyệt; còn gọi, E2E), [N8.4](#n8-4) đăng nhập / kết bạn bằng email, [N8.5](#n8-5) chat nhóm nâng cao (đã code, còn thử trên trình duyệt) |
 
@@ -77,8 +78,9 @@
 | <a id="n8"></a>N8 | Chat realtime MVP (đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push): đã code ở máy phát triển 2026-10-30 - migration 0018 (9 bảng `chat_*`, tài khoản chat riêng, không theo công ty), module Go `chat` (REST `/api/v1/chat/...` + WebSocket `/api/v1/chat/ws`, quyền `rpc.SelfAuth`), Web Push VAPID (`platform/webpush`), trang Chat React nối máy chủ thật (giữ Dezbot / SiteFlow Bot); đã thử ở máy phát triển (xem [mục 5](#xong-n8)). Còn lại: thấy thông báo push hiện lên trên Chrome thường (headless chỉ kiểm được tới FCM nhận gói, 201), người dùng thử, triển khai production (migration 0018, `CHAT_*`, WebSocket qua Caddy, `/chat-sw.js`). Tài liệu: `backend/docs/API.md` mục 2.1 "Chat", `docs/02-ky-thuat/database/decisions.md` D-15 | Toàn hệ thống | 🟡 |
 | <a id="n8-4"></a>N8.4 | Chat ([N8](#n8)): đăng nhập / thêm tài khoản bằng email (mã OTP 6 số gửi qua email, SMTP `SMTP_*`; chưa cấu hình thì mã ghi vào log) bên cạnh số điện thoại; tìm người dùng và gửi lời mời kết bạn bằng email. Tài khoản email là tài khoản riêng (chưa liên kết với tài khoản số điện thoại). Đã code + test API ở máy phát triển 2026-11-02 (xem [mục 5](#xong-n8)); còn thử giao diện trên trình duyệt, cấu hình SMTP thật (mailer mới có AUTH PLAIN), chạy migration 0019 ở database dev / production | Toàn hệ thống | 🟡 |
 | <a id="n8-5"></a>N8.5 | Chat nhóm nâng cao ([N8](#n8), `backend/CHAT.md` mục 9): "Đã xem bởi N người" + danh sách đã xem / đã nhận, ghim tin nhắn (tối đa 5, migration 0021) đã code 2026-11-02; @nhắc tên, ảnh đại diện + mô tả nhóm, link mời vào nhóm (có duyệt), quyền quản trị (chuyển trưởng nhóm, giải tán, chỉ quản trị được nhắn / sửa thông tin / thêm người) đã code 2026-11-03 (migration 0022, xem [mục 5](#xong-n8)). Còn lại: thử giao diện trên trình duyệt; `data-dictionary.md` / `erd.md` cho 0021-0022; route ghim tin trong bảng `API.md` | Toàn hệ thống | 🟡 |
+| <a id="n9"></a>N9 | HR: còn gửi phiếu lương qua email / chuyển khoản lương, gửi thư mời phỏng vấn, tự đăng tin lên kênh tuyển dụng (cần SMTP / tài khoản kênh 🔑); 2FA, SSO, giới hạn IP; tích hợp máy chấm công (cần API thiết bị 🔑); triển khai migration 0024-0030 lên dezon.tech (nhánh `src_N` đã có 0018-0023 của Chat nên HR đánh số từ 0024) | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
-| <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; sơ đồ tổ chức, bảng mua hàng PO, nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot vẫn là dữ liệu mẫu | User | 🟡 |
+| <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt | User | 🟡 |
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
@@ -108,7 +110,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N9`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N10`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -511,11 +513,27 @@
 
 - Migration 0015 (`sales_leads`, `sales_lead_activities`) và 0016 (`delivery_projects` + thành viên, thầu phụ, đề mục, công việc, bình luận); module Go `sales`, `delivery` (REST chỉ bản Go `/api/v1/sales/...`, `/api/v1/delivery/...`)
 - Kinh doanh: khách hàng, kéo-thả giai đoạn, bảng con Thiết kế / Thi công, người phụ trách, lịch sử chăm sóc lưu trên máy chủ; gắn dự án QS (giá trị lấy theo tổng báo giá); Tổng quan tính từ dữ liệu thật (doanh số theo ngày chốt)
-- Kéo khách sang "Dự án (Thiết kế)" / "Dự án (Thi công)" tự tạo dự án ở Quản lý thiết kế / Quản lý dự án (1 lần / khách / loại, cùng transaction)
+- Khách ở Tư vấn / Đàm phán / Dự án (Thiết kế) tự có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án (tạo / cập nhật tên, khách, giá trị ước tính; rời giai đoạn hoặc xoá khách thì gỡ, dự án đã có dữ liệu chỉ bỏ liên kết; cùng transaction) - như logic bản tĩnh cũ
 - Quản lý thiết kế / Quản lý dự án dùng chung component: danh sách dự án, thiết lập chung, nhân sự, thầu phụ, tiến độ Gantt (đề mục, công việc, mốc thu chi, kéo giãn, khung mẫu dời về hôm nay), bình luận; "hôm nay" là ngày thật
+- 2026-11-04: giao diện 2 trang trả về đúng bản 8686a37 (component riêng của Quản lý dự án, chọn dự án "Chung cư Riverside / Giai đoạn 2", chip lọc giai đoạn, kanban mua hàng, KPI), chỉ thay dữ liệu mẫu bằng API; migration 0032 (trạng thái "Thiết kế", tiến độ nhập tay + màu thanh ở danh sách, sơ đồ tổ chức theo dự án, đơn mua hàng của công việc); `infra/scripts/seed-demo-delivery.mjs` nạp dữ liệu mẫu bản cũ vào công ty demo - 🟡 chưa thử trên trình duyệt
 - Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
 - Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
 - Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)
+- 🟡 phần còn lại ở 2.2
+
+<a id="xong-n9"></a>
+#### N9 - HR chạy dữ liệu thật (lát 1: hồ sơ + sơ đồ tổ chức; lát 2: chấm công & phép; lát 3: lương & bảo hiểm; lát 4: tuyển dụng, hiệu suất & đào tạo; lát 5: phân quyền thật + bổ sung)
+
+- Migration 0024 (`hr_org_units`, `hr_employees`, `hr_unit_members`); khoá ngoại ghép `(…, company_id)` giữ phòng ban, quản lý, trưởng đơn vị trong cùng công ty; module Go `hr` (REST chỉ bản Go `/api/v1/hr`)
+- Hồ sơ nhân sự: thêm, sửa, cho nghỉ việc (cấp dưới tự chuyển cho quản lý cấp trên), xoá; chi tiết hồ sơ (học vấn, hợp đồng, BHXH, thuế, giấy tờ...) lưu nguyên khối
+- Sơ đồ tổ chức: thêm / sửa / xoá / kéo đơn vị, trưởng đơn vị, kiêm nhiệm (tổng tối đa 90%), công ty con kèm ban kiểm soát / ban chiến lược - mỗi lần thiết lập là 1 transaction; nút "Khởi tạo cơ cấu mẫu" cho công ty chưa có đơn vị
+- Nhận việc từ Tuyển dụng tạo hồ sơ thật trên máy chủ
+- Chấm công & phép (migration 0025: `hr_shifts`, `hr_work_patterns`, `hr_attendance_logs`, `hr_requests`): ca làm việc, lịch tuần lặp lại, nút "Khởi tạo ca & lịch mẫu"; bảng công hôm nay (ngày thật) với import CSV và HR bổ sung giờ; đơn nghỉ / đi muộn / OT tạo ngay trong HR, duyệt theo quản lý trực tiếp -> Nhân sự; Tổng hợp công & phép (và số công dùng ở Lương) tính từ lịch, chấm công, đơn đã duyệt thay công thức mẫu
+- Lương & bảo hiểm (migration 0026: `hr_payroll_settings`, `hr_pay_adjustments`, `hr_payroll_runs`, `hr_unit_budgets`): cấu hình công thức (lưu sau khi ngừng gõ), thưởng / phạt / doanh số, chốt công (khoá ghi chấm công tháng đó), duyệt bảng lương lưu bản chụp phiếu lương, đánh dấu chi trả, mở lại; định phí theo đơn vị
+- Tuyển dụng + hiệu suất & đào tạo (migration 0027: `hr_job_descriptions`, `hr_job_openings`, `hr_candidates`, `hr_objectives`, `hr_performance_reviews`, `hr_course_enrollments`): thư viện JD (tin dùng JD đổi tên theo, JD đang dùng không xoá được), tin tuyển dụng, ứng viên kéo-thả giai đoạn, đánh giá và lịch phỏng vấn, nhận việc gắn hồ sơ nhân sự; mục tiêu OKR theo kỳ (quý hiện tại / quý sau / năm, theo ngày thật), cập nhật tiến độ KR, đợt đánh giá tự đánh giá -> quản lý, ghi danh và tiến độ khoá học
+- Phân quyền thật (migration 0028-0029): gắn tài khoản đăng nhập với hồ sơ + vai trò HR (System Admin / HR Admin / Trưởng phòng / Nhân viên), ma trận quyền theo công ty, máy chủ kiểm quyền mọi lệnh và lọc dữ liệu theo phạm vi (ẩn lương khi không có quyền), nhật ký HR vào `audit_logs`; chấm công GPS "của bạn" chạy khi đã gắn hồ sơ. Rà soát 2026-11-03 (4 reviewer độc lập) và sửa: lương chia theo ngày làm, người nghỉ việc còn ở tháng cuối, chặn NaN, đếm công / phép thống nhất, nhận việc nguyên khối, không lộ / không ghi đè số tiền khi không có quyền xem lương, tuyển dụng theo phòng, GPS theo giờ máy chủ, khoá tháng đã chốt, duyệt đúng người từng bước, nghỉ việc gỡ chức / kiêm nhiệm, nút theo đúng phạm vi, kỳ đánh giá các quý trước, tên công ty thật trên sơ đồ, dự báo chi phí theo tháng thật, giấy tờ nhận việc tải lên kho file, địa điểm làm việc + toạ độ GPS theo công ty (migration 0030) Bổ sung: CV ứng viên tải lên kho file, danh mục khoá học / lộ trình lưu máy chủ (sửa được, có danh mục mẫu), lịch làm việc riêng từng ngày (chế độ "Tuần cụ thể")
+- Quyền tab mới `hr` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
+- Test Go trên PostgreSQL thật: quyền, cơ cấu + hồ sơ, cách ly công ty (`TestCachLyCongTyDB`); thử trên trình duyệt ở máy phát triển 2026-10-30 (database thử): khởi tạo cơ cấu mẫu, tạo hồ sơ, thêm đơn vị kèm trưởng đơn vị, tải lại trang; 2026-10-31: khởi tạo ca & lịch mẫu, tạo + duyệt đơn nghỉ, Tổng hợp công ra đúng số; 2026-11-03: thêm thưởng, duyệt bảng lương tháng 10 (bản chụp + tự chốt công), sửa cấu hình lương; thêm JD, đăng tin, thêm ứng viên, mở đợt đánh giá Q4/2026; gắn tài khoản với hồ sơ, khởi tạo danh mục khoá học mẫu
 - 🟡 phần còn lại ở 2.2
 
 <a id="xong-n7"></a>

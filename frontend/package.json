@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:hr": "node scripts/check-hr-summary.mjs"
   },
   "dependencies": {
     "jsqr": "^1.4.0",

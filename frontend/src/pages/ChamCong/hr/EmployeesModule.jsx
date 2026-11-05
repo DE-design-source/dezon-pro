@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, STATUS, LEVELS, HR_TODAY, deptOf, fmtDate, fmtMoney, yearsBetween, daysBetween } from '../../../data/hrData'
+import { DEPTS, STATUS, LEVELS, HR_TODAY, MONTHS, deptOf, fmtDate, fmtMoney, yearsBetween, daysBetween } from '../../../data/hrData'
 import { Avatar, DeptPill, StatusPill, Pill, Seg, Empty, downloadCsv, RoleList } from './shared'
 import { useAccess } from './access'
 import { DEFAULT_PAYROLL_CONFIG } from '../../../data/hrData2'
@@ -176,7 +176,7 @@ function Allocation({ emp, concurrent, boardUnits = [], editable, onSave, pay, s
       )}
       {!draft && rows.length > 0 && <div className="cc-sub" style={{ marginTop: 8 }}>Tỉ trọng này được dùng để phân bổ chi phí lương theo đơn vị trong Bảng lương.</div>}
       {!draft && pay && showMoney && (
-        <AllocationMatrix p={pay} title="Phân bổ chi tiết theo khoản lương · Tháng 9/2026" sub="Tổng (100%) của từng khoản & phần chia cho mỗi đơn vị theo tỉ trọng kiêm nhiệm" />
+        <AllocationMatrix p={pay} title={`Phân bổ chi tiết theo khoản lương · ${MONTHS[0].label}`} sub="Tổng (100%) của từng khoản & phần chia cho mỗi đơn vị theo tỉ trọng kiêm nhiệm" />
       )}
     </div>
   )
@@ -188,7 +188,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
   const [editSignal, setEditSignal] = useState(0)
   const manager = employees.find(e => e.id === emp.managerId)
   const reports = employees.filter(e => e.managerId === emp.id && e.status !== 'left')
-  const activeContract = emp.contracts.find(c => c.status === 'active')
+  const activeContract = (emp.contracts || []).find(c => c.status === 'active')
   const d = deptOf(emp.dept)
 
   return (
@@ -264,8 +264,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div className="cc-grid2">
           <div className="cc-card cc-pad">
             <h3 className="cc-h3">Học vấn</h3>
-            {emp.education.length === 0 && <Empty icon="graduation" text="Chưa cập nhật" />}
-            {emp.education.map((e, i) => <div key={i} className="cc-tl"><b>{e.school}</b><span>{e.major} · {e.degree}</span><em>{e.from}–{e.to}</em></div>)}
+            {(emp.education || []).length === 0 && <Empty icon="graduation" text="Chưa cập nhật" />}
+            {(emp.education || []).map((e, i) => <div key={i} className="cc-tl"><b>{e.school}</b><span>{e.major} · {e.degree}</span><em>{e.from}–{e.to}</em></div>)}
             <h3 className="cc-h3" style={{ marginTop: 18 }}>Kinh nghiệm</h3>
             {emp.experience.length === 0 && <Empty icon="briefcase" text="Chưa có kinh nghiệm trước đây" />}
             {emp.experience.map((e, i) => <div key={i} className="cc-tl"><b>{e.company}</b><span>{e.role}</span><em>{e.from}–{e.to}</em></div>)}
@@ -287,8 +287,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
             </div>
             <div className="cc-card cc-pad">
               <h3 className="cc-h3">Tài liệu đính kèm</h3>
-              {emp.attachments.length === 0 && <Empty icon="file" text="Chưa có tài liệu" />}
-              {emp.attachments.map((a, i) => (
+              {(emp.attachments || []).length === 0 && <Empty icon="file" text="Chưa có tài liệu" />}
+              {(emp.attachments || []).map((a, i) => (
                 <div key={i} className="cc-doc"><span className="cc-ico sm cc-tone-primary"><Icon name="file" size={13} /></span><div className="cc-grow"><b>{a.name}</b></div><Icon name="download" size={15} /></div>
               ))}
             </div>
@@ -303,8 +303,8 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
             <table className="cc-table2">
               <thead><tr><th>Số hợp đồng</th><th>Loại</th><th>Hiệu lực</th><th>Hết hạn</th><th className="r">Lương</th><th>Trạng thái</th></tr></thead>
               <tbody>
-                {emp.contracts.length === 0 && <tr><td colSpan={6}><Empty icon="file" text="Chưa có hợp đồng" /></td></tr>}
-                {[...emp.contracts].reverse().map(c => {
+                {(emp.contracts || []).length === 0 && <tr><td colSpan={6}><Empty icon="file" text="Chưa có hợp đồng" /></td></tr>}
+                {[...(emp.contracts || [])].reverse().map(c => {
                   const left = c.end ? daysBetween(HR_TODAY, c.end) : null
                   return (
                     <tr key={c.no}>
@@ -343,7 +343,7 @@ function EmployeeDetail({ emp, employees, concurrent = [], boardUnits, onSaveCon
         <div className="cc-card cc-pad">
           <h3 className="cc-h3">Quá trình công tác</h3>
           <ol className="cc-flow">
-            {[...emp.promotions].reverse().map((p, i) => (
+            {[...(emp.promotions || [])].reverse().map((p, i) => (
               <li key={i} className="done"><span className="cc-flow-dot"><Icon name="trending" size={12} /></span><div><b>{p.note}</b><span>{fmtDate(p.date)}</span></div></li>
             ))}
           </ol>
@@ -371,7 +371,7 @@ export default function EmployeesModule({ employees, openId, onOpen, onAdd, onEd
     left: employees.filter(e => e.status === 'left').length,
   }), [employees])
 
-  const expiring = employees.filter(e => e.status !== 'left' && e.contracts.some(c => c.status === 'active' && c.end && daysBetween(HR_TODAY, c.end) >= 0 && daysBetween(HR_TODAY, c.end) <= 30))
+  const expiring = employees.filter(e => e.status !== 'left' && (e.contracts || []).some(c => c.status === 'active' && c.end && daysBetween(HR_TODAY, c.end) >= 0 && daysBetween(HR_TODAY, c.end) <= 30))
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase()

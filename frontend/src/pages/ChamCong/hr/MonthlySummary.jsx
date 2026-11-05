@@ -7,12 +7,11 @@ import { useAccess } from './access'
 const n1 = v => (Number.isInteger(v) ? v : v.toFixed(1)).toString().replace('.', ',')
 
 /* Tổng hợp công & phép tồn theo tháng — chốt công, xuất CSV cho bộ phận lương */
-export default function MonthlySummary({ employees, toast }) {
+export default function MonthlySummary({ employees, toast, locked, setLocked }) {
   const { can, log } = useAccess()
   const [month, setMonth] = useState(MONTHS[0].key)
   const [dept, setDept] = useState('all')
   const [q, setQ] = useState('')
-  const [locked, setLocked] = useState(() => new Set(['2026-08', '2026-07']))
 
   const all = useMemo(() => monthlySummary(employees, month), [employees, month])
   const t = q.trim().toLowerCase()
@@ -54,7 +53,7 @@ export default function MonthlySummary({ employees, toast }) {
           <div className="cc-table-wrap">
             <table className="cc-table2 cc-sum">
               <thead>
-                <tr className="group"><th rowSpan={2}>Nhân viên</th><th colSpan={8} className="c">Chấm công {label.toLowerCase()}</th><th colSpan={4} className="c">Phép năm 2026</th></tr>
+                <tr className="group"><th rowSpan={2}>Nhân viên</th><th colSpan={8} className="c">Chấm công {label.toLowerCase()}</th><th colSpan={4} className="c">Phép năm {month.slice(0, 4)}</th></tr>
                 <tr>
                   <th className="r">Công chuẩn</th><th className="r">Thực tế</th><th className="r">Phép</th><th className="r">Không lương</th>
                   <th className="r">Muộn</th><th className="r">Về sớm</th><th className="r">OT (h)</th><th className="r strong">Tổng công</th>

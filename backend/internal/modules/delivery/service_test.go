@@ -133,10 +133,36 @@ func TestDuAnTrienKhaiDB(t *testing.T) {
 			p = x.(*omap.Map)
 		}
 	}
-	if p == nil || p.Val("name") != "ZZ_tk Anh Long — Biệt thự" || p.Val("contractValueVnd") != 2.5e9 || p.Val("phone") != "0909" {
+	if p == nil || p.Val("name") != "ZZ_tk Anh Long — Biệt thự" || p.Val("contractValueVnd") != 2.5e9 || p.Val("phone") != "0909" || p.Val("status") != "thiet-ke" {
 		t.Fatalf("dự án tạo từ khách hàng: %v", p)
 	}
 	id := p.Val("id").(float64)
+
+	// 2 đề mục cốt lõi tạo cùng dự án; không xoá / đổi tên được
+	det, err := sa.GetProject(ctxA, aA, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	core := map[string]float64{}
+	for _, x := range det.(*omap.Map).Val("phases").([]any) {
+		if ph := x.(*omap.Map); isCorePhase(ph.Val("name")) {
+			core[jsval.Str(ph.Val("name"))] = jsval.ToNumber(ph.Val("id"))
+		}
+	}
+	if len(core) != 2 {
+		t.Fatalf("dự án mới phải có 2 đề mục cốt lõi: %v", core)
+	}
+	if _, err := sa.AddPhase(ctxA, aA, id, omap.Of("name", corePhases[0].name)); status(err) != 400 {
+		t.Errorf("thêm đề mục trùng tên đề mục cốt lõi phải 400: %v", err)
+	}
+	for _, pid := range core {
+		if _, err := sa.RemoveItem(ctxA, aA, "tk_giai_doan", id, pid); status(err) != 400 {
+			t.Errorf("xoá đề mục cốt lõi phải 400: %v", err)
+		}
+		if _, err := sa.UpdatePhase(ctxA, aA, id, pid, omap.Of("name", "Đổi tên")); status(err) != 400 {
+			t.Errorf("đổi tên đề mục cốt lõi phải 400: %v", err)
+		}
+	}
 
 	// tiến độ: 2 công việc 40% + 80% -> 60%; mốc thu không tính
 	ph, err := sa.AddPhase(ctxA, aA, id, omap.Of("name", "Concept", "members", []any{omap.Of("name", "Lan", "role", "KTS")}))
@@ -181,6 +207,66 @@ func TestDuAnTrienKhaiDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	oid := other.(*omap.Map).Val("id").(float64)
+
+	// dữ liệu riêng của giao diện bản cũ: tiến độ nhập tay (khi chưa có công việc), màu thanh, sơ đồ tổ chức, đơn mua hàng
+	oc := omap.Of("parallel", []any{omap.Of("dept", "ban-co-van", "label", "Ban cố vấn", "color", "attendance", "icon", "advisory", "dashed", true, "caption", "Song song", "removable", false, "x", "bỏ")},
+		"children", []any{omap.Of("dept", "custom-1", "label", "Kết cấu", "color", "qs", "icon", "dept", "removable", true)})
+	if _, err := sa.UpdateProject(ctxA, aA, oid, omap.Of("progress", 27, "barColor", "var(--game)", "status", "dang-lam", "orgChart", oc)); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []*omap.Map{omap.Of("barColor", "red;x"), omap.Of("progress", 120), omap.Of("status", "lung-tung"),
+		omap.Of("orgChart", omap.Of("children", []any{omap.Of("label", "x", "icon", "<svg onload=x>")}))} {
+		if _, err := sa.UpdateProject(ctxA, aA, oid, bad); status(err) != 400 {
+			t.Errorf("%v phải 400: %v", bad, err)
+		}
+	}
+	list, _ = sa.ListProjects(ctxA, aA, "design")
+	for _, x := range list.(*omap.Map).Val("projects").([]any) {
+		if m := x.(*omap.Map); m.Val("id") == oid {
+			ch := m.Val("orgChart").(*omap.Map).Val("parallel").([]any)[0].(*omap.Map)
+			if m.Val("progress") != 27.0 || m.Val("barColor") != "var(--game)" || ch.Val("icon") != "advisory" || ch.Has("x") || ch.Val("dashed") != true {
+				t.Errorf("dự án tạo tay: %v", m)
+			}
+		}
+	}
+	po := []any{omap.Of("id", "pu1-1", "code", "PO-1", "item", "Thép", "value", 756, "due", "2026-08-30", "owner", "Trang", "stage", "complete", "assignees", []any{"Trang"})}
+	tk, err := sa.AddTask(ctxA, aA, id, omap.Of("name", "Đặt thép", "phaseId", phID, "start", "2026-11-01", "end", "2026-11-02", "purchaseItems", po))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tk.(*omap.Map).Val("purchaseItems").([]any); len(got) != 1 || got[0].(*omap.Map).Val("value") != 756.0 || got[0].(*omap.Map).Has("dept") {
+		t.Errorf("đơn mua hàng: %v", got)
+	}
+	if _, err := sa.UpdateTask(ctxA, aA, id, tk.(*omap.Map).Val("id").(float64), omap.Of("purchaseItems", []any{omap.Of("id", "x", "due", "30/08")})); status(err) != 400 {
+		t.Errorf("ngày đơn mua hàng sai phải 400: %v", err)
+	}
+	if tk.(*omap.Map).Val("purchaseFlow") != nil {
+		t.Errorf("quy trình mua hàng mặc định phải null: %v", tk.(*omap.Map).Val("purchaseFlow"))
+	}
+	tkID := tk.(*omap.Map).Val("id").(float64)
+	flow := []any{omap.Of("key", "s1", "label", " Báo giá ", "color", "#8b6fd6", "owners", []any{"Trang"}, "x", 1),
+		omap.Of("key", "done", "label", "Hoàn tất", "color", "var(--done)", "dept", "Kho", "received", true)}
+	if _, err := sa.UpdateTask(ctxA, aA, id, tkID, omap.Of("purchaseFlow", flow)); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = sa.GetProject(ctxA, aA, id)
+	for _, ph := range d.(*omap.Map).Val("phases").([]any) {
+		for _, x := range ph.(*omap.Map).Val("tasks").([]any) {
+			if m := x.(*omap.Map); m.Val("id") == tkID {
+				f, _ := m.Val("purchaseFlow").([]any)
+				if len(f) != 2 || f[0].(*omap.Map).Val("label") != "Báo giá" || f[0].(*omap.Map).Has("x") ||
+					f[1].(*omap.Map).Val("received") != true || f[1].(*omap.Map).Val("depts").([]any)[0] != "Kho" {
+					t.Errorf("quy trình mua hàng đọc lại: %v", f)
+				}
+			}
+		}
+	}
+	for _, bad := range []any{[]any{}, "x", []any{omap.Of("key", "a", "label", "")}, []any{omap.Of("key", "a", "label", "A"), omap.Of("key", "a", "label", "B")},
+		[]any{omap.Of("key", "a", "label", "A", "color", "red;x")}} {
+		if _, err := sa.UpdateTask(ctxA, aA, id, tkID, omap.Of("purchaseFlow", bad)); status(err) != 400 {
+			t.Errorf("quy trình mua hàng sai phải 400: %v -> %v", bad, err)
+		}
+	}
 	if _, err := sa.AddTask(ctxA, aA, oid, omap.Of("name", "x", "phaseId", phID, "start", "2026-11-01", "end", "2026-11-02")); status(err) != 400 {
 		t.Errorf("gắn công việc vào giai đoạn của dự án khác phải 400: %v", err)
 	}
@@ -220,10 +306,183 @@ func TestDuAnTrienKhaiDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _ = sa.GetProject(ctxA, aA, id)
-	if n := len(d.(*omap.Map).Val("phases").([]any)); n != 0 || d.(*omap.Map).Val("comments").(*omap.Map).Len() != 0 {
-		t.Errorf("xoá giai đoạn còn sót: %d giai đoạn, %v", n, d.(*omap.Map).Val("comments"))
+	if n := len(d.(*omap.Map).Val("phases").([]any)); n != len(corePhases) || d.(*omap.Map).Val("comments").(*omap.Map).Len() != 0 {
+		t.Errorf("xoá giai đoạn còn sót: %d giai đoạn (chỉ được còn %d đề mục cốt lõi), %v", n, len(corePhases), d.(*omap.Map).Val("comments"))
 	}
 	if _, err := sa.DeleteProject(ctxA, aA, id); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Trên qspro_gotest: bàn giao Kinh doanh -> dự án không làm mất dữ liệu đội thiết kế / thi công nhập.
+// EnsureFromLead tạo 1 lần, gọi lại không ghi đè giá trị HĐ; RenameFromLead chỉ đổi tên còn do khách sinh ra;
+// DetachFromLead: dự án đã đụng tới -> ẩn (rời giai đoạn) / bỏ liên kết (xoá khách), không bao giờ xoá; còn nguyên -> xoá;
+// quay lại giai đoạn -> hiện lại đúng dự án cũ, không tạo trùng.
+func TestBanGiaoTuKinhDoanhDB(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("chưa đặt TEST_DATABASE_URL")
+	}
+	if !regexp.MustCompile(`/qspro_gotest(\?|$)`).MatchString(url) {
+		t.Fatal("TEST_DATABASE_URL phải trỏ tới database thử qspro_gotest")
+	}
+	db := database.New(database.Config{URL: url})
+	t.Cleanup(db.Close)
+	bg := context.Background()
+	clean := func() {
+		if pool, err := db.Pool(); err == nil {
+			_, _ = pool.Exec(bg, `delete from delivery_projects where name like 'ZZ\_bg%' or client_name like 'ZZ\_bg%'`)
+			_, _ = pool.Exec(bg, `delete from sales_leads where customer_name like 'ZZ\_bg%'`)
+		}
+	}
+	clean()
+	t.Cleanup(clean)
+	cts, err := db.Select(bg, "cong_ty", database.SelectOpt{Select: "id", Limit: 1, NoScope: true})
+	if err != nil || len(cts) < 1 {
+		t.Fatalf("database thử cần ít nhất 1 công ty: %v", err)
+	}
+	ct := cts[0].Val("id")
+	s := New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Projects: noProjects{}})
+	ctx, a := tenant.With(bg, tenant.Ctx{Role: "admin", CongTyID: ct}), &actor.Actor{U: "an", R: "admin", CT: ct}
+
+	newLead := func(ten string) *omap.Map {
+		ins, err := db.InsertOne(ctx, "kd_khach_hang", omap.Of("ten_khach", ten, "loai_cong_trinh", "Biệt thự", "quy_mo", "300m2", "giai_doan", "tu-van"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []string{"design", "construction"} {
+			if made, err := s.EnsureFromLead(ctx, a, ins[0], 2e9, k); err != nil || !made {
+				t.Fatalf("tạo %s: %v %v", k, made, err)
+			}
+		}
+		return ins[0]
+	}
+	byKind := func(leadID any) map[string]*omap.Map {
+		out := map[string]*omap.Map{}
+		ps, err := s.repo.ProjectsOfLead(ctx, leadID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range ps {
+			out[jsval.Str(p.Val("loai"))] = p
+		}
+		return out
+	}
+	listed := func(id float64) bool {
+		rows, err := s.repo.ListProjects(ctx, "construction")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows2, _ := s.repo.ListProjects(ctx, "design")
+		for _, r := range append(rows, rows2...) {
+			if jsval.ToNumber(r.Val("id")) == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	lead := newLead("ZZ_bg Chị Hoa")
+	leadID := lead.Val("id")
+	ps := byKind(leadID)
+	if len(ps) != 2 || ps["design"].Val("ten") != "ZZ_bg Chị Hoa — Biệt thự (300m2)" || jsval.ToNumber(ps["construction"].Val("gia_tri_hd")) != 2e9 {
+		t.Fatalf("dự án tạo từ khách: %v", ps)
+	}
+	designID, consID := jsval.ToNumber(ps["design"].Val("id")), jsval.ToNumber(ps["construction"].Val("id"))
+	if ok, err := s.pristine(ctx, ps["design"]); err != nil || !ok {
+		t.Fatalf("dự án vừa tạo phải còn nguyên: %v %v", ok, err)
+	}
+
+	// đội đặt giá trị HĐ (thi công), tự đổi tên (thiết kế); gọi lại Ensure không ghi đè, không tạo thêm
+	if _, err := s.UpdateProject(ctx, a, consID, omap.Of("contractValueVnd", 5e9)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateProject(ctx, a, designID, omap.Of("name", "ZZ_bg Villa đội đặt")); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"design", "construction"} {
+		if made, err := s.EnsureFromLead(ctx, a, lead, 3e9, k); err != nil || made {
+			t.Fatalf("ensure lại %s: %v %v", k, made, err)
+		}
+	}
+	if ps = byKind(leadID); len(ps) != 2 || jsval.ToNumber(ps["construction"].Val("gia_tri_hd")) != 5e9 {
+		t.Fatalf("giá trị HĐ đội nhập bị ghi đè: %v", ps)
+	}
+
+	// khách đổi tên -> chỉ dự án còn tên sinh từ khách đổi theo; tên khách đổi ở cả 2; giá trị HĐ giữ
+	newer := lead.Clone().Set("ten_khach", "ZZ_bg Chị Hoa Lê")
+	if err := s.RenameFromLead(ctx, lead, newer); err != nil {
+		t.Fatal(err)
+	}
+	ps = byKind(leadID)
+	if ps["construction"].Val("ten") != "ZZ_bg Chị Hoa Lê — Biệt thự (300m2)" || ps["design"].Val("ten") != "ZZ_bg Villa đội đặt" ||
+		ps["design"].Val("khach") != "ZZ_bg Chị Hoa Lê" || jsval.ToNumber(ps["construction"].Val("gia_tri_hd")) != 5e9 {
+		t.Fatalf("đổi tên theo khách: %v", ps)
+	}
+
+	// rời giai đoạn: dự án đã sửa -> ẩn, giữ liên kết, không xoá
+	if err := s.DetachFromLead(ctx, leadID, false); err != nil {
+		t.Fatal(err)
+	}
+	if ps = byKind(leadID); len(ps) != 2 || !jsval.Truthy(ps["design"].Val("tach_khach_hang")) || listed(designID) || listed(consID) {
+		t.Fatalf("rời giai đoạn phải ẩn, giữ dự án + liên kết: %v", ps)
+	}
+	// quay lại: hiện lại đúng 2 dự án cũ, không tạo trùng
+	for _, k := range []string{"design", "construction"} {
+		if made, err := s.EnsureFromLead(ctx, a, lead, 9e9, k); err != nil || made {
+			t.Fatalf("quay lại %s: %v %v", k, made, err)
+		}
+	}
+	if ps = byKind(leadID); len(ps) != 2 || jsval.ToNumber(ps["design"].Val("id")) != designID || jsval.ToNumber(ps["construction"].Val("id")) != consID ||
+		!listed(designID) || !listed(consID) || jsval.ToNumber(ps["construction"].Val("gia_tri_hd")) != 5e9 {
+		t.Fatalf("quay lại phải hiện đúng dự án cũ: %v", ps)
+	}
+
+	// xoá khách: dự án đã sửa -> bỏ liên kết, hiện như dự án tạo tay
+	if err := s.DetachFromLead(ctx, leadID, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []float64{designID, consID} {
+		if p, _ := s.repo.GetProject(ctx, id); p == nil || p.Val("khach_hang_id") != nil || jsval.Truthy(p.Val("tach_khach_hang")) || !listed(id) {
+			t.Errorf("xoá khách: dự án %v phải còn, bỏ liên kết, hiện: %v", id, p)
+		}
+	}
+
+	// khách 2: thiết kế còn nguyên -> xoá; thi công chỉ thêm 1 đề mục (không công việc) -> giữ, ẩn
+	lead2 := newLead("ZZ_bg Anh Bình")
+	ps = byKind(lead2.Val("id"))
+	d2, c2 := jsval.ToNumber(ps["design"].Val("id")), jsval.ToNumber(ps["construction"].Val("id"))
+	if _, err := s.AddPhase(ctx, a, c2, omap.Of("name", "Móng")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DetachFromLead(ctx, lead2.Val("id"), false); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.repo.GetProject(ctx, d2); p != nil {
+		t.Error("dự án thiết kế còn nguyên phải bị xoá khi rời giai đoạn")
+	}
+	if p, _ := s.repo.GetProject(ctx, c2); p == nil || !jsval.Truthy(p.Val("tach_khach_hang")) || listed(c2) {
+		t.Errorf("dự án có đề mục riêng phải còn, ẩn: %v", p)
+	}
+	// quay lại: thi công hiện lại (không trùng), thiết kế tạo mới
+	made := map[string]bool{}
+	for _, k := range []string{"design", "construction"} {
+		if made[k], err = s.EnsureFromLead(ctx, a, lead2, 1e9, k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ps = byKind(lead2.Val("id")); !made["design"] || made["construction"] || len(ps) != 2 || jsval.ToNumber(ps["construction"].Val("id")) != c2 {
+		t.Fatalf("quay lại sau khi xoá dự án còn nguyên: %v %v", made, ps)
+	}
+
+	// người dùng xoá dự án; khách vẫn ở giai đoạn bàn giao, đổi tên -> không tạo lại
+	if _, err := s.DeleteProject(ctx, a, c2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RenameFromLead(ctx, lead2, lead2.Clone().Set("ten_khach", "ZZ_bg Anh Bình 2")); err != nil {
+		t.Fatal(err)
+	}
+	if ps = byKind(lead2.Val("id")); len(ps) != 1 || ps["construction"] != nil {
+		t.Fatalf("dự án người dùng đã xoá bị tạo lại: %v", ps)
 	}
 }

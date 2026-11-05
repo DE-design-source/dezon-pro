@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { DEPTS, deptOf, fmtDate, HR_TODAY, daysBetween, WORK_SITES } from '../../../data/hrData'
+import { DEPTS, deptOf, fmtDate, HR_TODAY, daysBetween, WORK_SITES, addDaysIso, MONTHS } from '../../../data/hrData'
 import { STAGES, SOURCES, REVIEW_CRITERIA, JD_LEVELS } from '../../../data/hrData2'
 import { Pill, Seg, Modal, Field, Empty } from './shared'
 import { useAccess, NoAccess } from './access'
@@ -9,7 +9,7 @@ import OnboardPage from './OnboardPage'
 const JOB_STATUS = { open: { label: 'Đang tuyển', tone: 'success' }, paused: { label: 'Tạm dừng', tone: 'finance' }, closed: { label: 'Đã đóng', tone: 'muted' } }
 const initials = n => n.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase()
 const avg = r => { const v = Object.values(r.scores); return v.reduce((a, b) => a + b, 0) / v.length }
-const BLANK_JOB = { jdId: null, title: '', dept: 'thicong', qty: 1, site: 'Văn phòng HCM', salary: '', deadline: '2026-10-31', status: 'open', channels: [] }
+const BLANK_JOB = { jdId: null, title: '', dept: 'thicong', qty: 1, site: 'Văn phòng HCM', salary: '', deadline: addDaysIso(HR_TODAY, 38), status: 'open', channels: [] }
 const BLANK_JD = { code: '', title: '', dept: 'thicong', level: 'Nhân viên', salary: '', summary: '', duties: '', requirements: '', benefits: '' }
 const toJdForm = jd => ({ ...jd, duties: jd.duties.join('\n'), requirements: jd.requirements.join('\n'), benefits: jd.benefits.join('\n') })
 
@@ -140,7 +140,7 @@ export default function RecruitModule({ recruit, setRecruit, onHire, toast, next
   function startOnboard(c) {
     const job = jobOf(c.jobId) || {}
     const level = JD_LEVELS.includes(job.level) ? job.level : 'Nhân viên'
-    setOnboard({ candId: c.id, code: nextEmpCode ? nextEmpCode() : '', dept: job.dept || DEPTS[0]?.key, position: job.title || '', level: level === 'Thực tập' ? 'Nhân viên' : level, joinDate: '2026-10-01', managerId: defaultManagerOf?.(job.dept)?.id || '', site: job.site || WORK_SITES[0] })
+    setOnboard({ candId: c.id, code: nextEmpCode ? nextEmpCode() : '', dept: job.dept || DEPTS[0]?.key, position: job.title || '', level: level === 'Thực tập' ? 'Nhân viên' : level, joinDate: addDaysIso(MONTHS[0].key + '-01', 31).slice(0, 8) + '01', managerId: defaultManagerOf?.(job.dept)?.id || '', site: job.site || WORK_SITES[0] })
   }
   const hire = c => startOnboard(c)
   function confirmOnboard(data) {
@@ -184,7 +184,7 @@ export default function RecruitModule({ recruit, setRecruit, onHire, toast, next
         {tab === 'jd' && <select className="cc-select" value={jdDept} onChange={e => setJdDept(e.target.value)}><option value="all">Tất cả phòng ban</option>{DEPTS.map(d => <option key={d.key} value={d.key}>{d.name}</option>)}</select>}
         {tab === 'jd' && can('recruit', 'create') && <button className="cc-btn" onClick={() => setJdForm({ ...BLANK_JD })}><Icon name="plus" size={14} stroke={2.4} />Thêm JD</button>}
         {tab === 'jobs' && can('recruit', 'create') && <button className="cc-btn" onClick={() => setJobForm({ ...BLANK_JOB })}><Icon name="plus" size={14} stroke={2.4} />Đăng tin tuyển dụng</button>}
-        {tab === 'interviews' && can('recruit', 'edit') && <button className="cc-btn" onClick={() => setIvForm({ candidateId: '', date: '2026-09-28', time: '09:00', round: 'Vòng 1 — Chuyên môn', interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch phỏng vấn</button>}
+        {tab === 'interviews' && can('recruit', 'edit') && <button className="cc-btn" onClick={() => setIvForm({ candidateId: '', date: addDaysIso(HR_TODAY, 5), time: '09:00', round: 'Vòng 1 — Chuyên môn', interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch phỏng vấn</button>}
       </div>
 
       {tab === 'pipeline' && (
@@ -343,7 +343,7 @@ export default function RecruitModule({ recruit, setRecruit, onHire, toast, next
         footer={opened && <>
           {can('recruit', 'edit') && <select className="cc-select" value={opened.stage} onChange={e => moveStage(opened.id, e.target.value)}>{STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>}
           <span className="cc-grow" />
-          {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setIvForm({ candidateId: opened.id, date: '2026-09-28', time: '09:00', round: 'Vòng ' + (opened.reviews.length + 1), interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch PV</button>}
+          {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setIvForm({ candidateId: opened.id, date: addDaysIso(HR_TODAY, 5), time: '09:00', round: 'Vòng ' + (opened.reviews.length + 1), interviewer: user.name, mode: 'Trực tiếp', place: 'Phòng họp 1 — VP HCM' })}><Icon name="calendar" size={14} />Đặt lịch PV</button>}
           {can('recruit', 'edit') && <button className="cc-btn ghost" onClick={() => setReview({ candId: opened.id, round: 'Vòng ' + (opened.reviews.length + 1), scores: Object.fromEntries(REVIEW_CRITERIA.map(c => [c.key, 3])), note: '' })}><Icon name="award" size={14} />Đánh giá</button>}
           {opened.stage === 'offer' && can('recruit', 'approve') && <button className="cc-btn" onClick={() => hire(opened)}><Icon name="userPlus" size={14} />Nhận việc → tạo hồ sơ NV</button>}
           {opened.empId && onOpenEmployee && <button className="cc-btn ghost" onClick={() => onOpenEmployee(opened.empId)}><Icon name="users" size={14} />Mở hồ sơ {opened.empCode}</button>}

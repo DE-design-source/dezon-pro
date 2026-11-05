@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { REQUEST_TYPES } from '../../../data/hrData'
+import { REQUEST_TYPES, HR_TODAY } from '../../../data/hrData'
 import { Avatar, Pill, Seg, Empty } from './shared'
 import { useAccess } from './access'
 
@@ -11,7 +11,7 @@ export function reqStatus(r) {
   return 'pending'
 }
 const STATUS = { pending: { label: 'Chờ duyệt', tone: 'finance' }, approved: { label: 'Đã duyệt', tone: 'success' }, rejected: { label: 'Từ chối', tone: 'danger' } }
-const nowLabel = () => '23/09/2026 · ' + new Date().toTimeString().slice(0, 5)
+const nowLabel = () => HR_TODAY.split('-').reverse().join('/') + ' · ' + new Date().toTimeString().slice(0, 5)
 
 /* Đơn từ (nghỉ phép / đi muộn – về sớm / OT) với luồng duyệt nhiều cấp — góc nhìn HR / quản lý */
 export default function LeaveRequests({ employees, requests: allRequests, setRequests, toast }) {
@@ -20,7 +20,7 @@ export default function LeaveRequests({ employees, requests: allRequests, setReq
   const requests = allRequests.filter(r => employees.some(e => e.id === r.empId))
   const [type, setType] = useState('all')
   const [status, setStatus] = useState('pending')
-  const [open, setOpen] = useState(() => new Set([2]))
+  const [open, setOpen] = useState(() => new Set(requests.filter(r => reqStatus(r) === 'pending').slice(0, 1).map(r => r.id))) // mở sẵn đơn chờ duyệt đầu tiên (id thật từ máy chủ)
   const [notes, setNotes] = useState({})
 
   const emp = id => employees.find(e => e.id === id)

@@ -265,7 +265,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
 | `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); route gốc `/mau-nhap-*.xlsx` đóng băng theo bản Node nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
-| `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng |
+| `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng (`createdAt` / `wonAt` yyyy-mm-dd tuỳ chọn, chỉ khi tạo: nạp dữ liệu mẫu) |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
 | `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |
 | `GET` | `/sales/leads/:id/activities` | `kdListActivities` | `rpc.Login` | sales | Lịch sử chăm sóc |
@@ -277,7 +277,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `DELETE` | `/delivery/projects/:id` | `tkDeleteProject` | `rpc.Login` | delivery | Xoá dự án + mọi dữ liệu con |
 | `POST / DELETE` | `/delivery/projects/:id/members[/:itemId]` | `tkAddMember / tkRemoveMember` | `rpc.Login` | delivery | Thành viên |
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/subcontractors[/:itemId]` | `tkAddSubcontractor / tkUpdateSubcontractor / tkRemoveSubcontractor` | `rpc.Login` | delivery | Thầu phụ |
-| `POST / PATCH / DELETE` | `/delivery/projects/:id/phases[/:itemId]` | `tkAddPhase / tkUpdatePhase / tkRemovePhase` | `rpc.Login` | delivery | Đề mục tiến độ (xoá kéo theo công việc) |
+| `POST / PATCH / DELETE` | `/delivery/projects/:id/phases[/:itemId]` | `tkAddPhase / tkUpdatePhase / tkRemovePhase` | `rpc.Login` | delivery | Đề mục tiến độ (xoá kéo theo công việc). Mọi dự án luôn có "Mua hàng & cung ứng" và "Tài chính — dòng tiền" (tạo cùng dự án, migration 0033 bổ sung cho dự án cũ): xoá / đổi tên 2 đề mục này -> 400 |
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/tasks[/:itemId]` | `tkAddTask / tkUpdateTask / tkRemoveTask` | `rpc.Login` | delivery | Công việc / cột mốc / mốc thu chi |
 | `POST` | `/delivery/projects/:id/tasks/:itemId/comments` | `tkAddComment` | `rpc.Login` | delivery | Bình luận công việc |
 | (nhiều) | `/chat/...` (36 route, kể cả `GET /chat/ws` và 4 route `/chat/media/...`) | `chat*` | `rpc.Public` (3 route đăng nhập) / `rpc.SelfAuth` (33) | chat | Chat MVP + tệp đính kèm: mục "Chat" ngay dưới |
@@ -287,9 +287,79 @@ Kinh doanh (`sales`) và dự án triển khai (`delivery`, trang Quản lý thi
   công ty có `tinh_nang` mà thiếu tab -> 403, admin được, nhân viên cần tab trong `perms`: `kinhdoanh` (sales), `thietke` (`kind=design`),
   `thicong` (`kind=construction`). Route theo `:id` dự án kiểm quyền theo `kind` của chính dự án đó.
 - Dòng con (`:itemId`) phải thuộc đúng dự án `:id`, không thì 404. Dữ liệu công ty khác: 404 (lớp dữ liệu lọc theo công ty).
-- Kéo khách sang giai đoạn `thiet-ke` / `thi-cong` (tạo hoặc sửa) tự tạo dự án `design` / `construction` (1 lần / khách / loại),
-  chép tên, khách, liên hệ, loại công trình, mã dự án QS và giá trị (tổng báo giá QS nếu đã gắn), trong cùng transaction với lệnh sửa khách.
+- Khách ở giai đoạn `tu-van` / `dam-phan` / `thiet-ke` có dự án ở CẢ `design` lẫn `construction`. Chỉ đồng bộ khi giai đoạn qua ranh giới
+  nhóm này hoặc tên / loại công trình / quy mô đổi; sửa thứ khác (người phụ trách, bảng con, ghi chú, giá trị...) không đụng dự án.
+  Khách VÀO nhóm (tạo mới hoặc kéo từ ngoài vào): chưa có dự án thì tạo (tên: `type` có "—" thì lấy `type`, không thì `tên — type`; chép
+  khách, liên hệ, loại công trình, mã dự án QS, giá trị = `valueVnd` khách nhập lúc đó), có rồi (kể cả đang ẩn) thì chỉ hiện lại, không
+  ghi đè. Vẫn trong nhóm mà đổi tên / loại: chỉ đổi tên dự án còn đúng tên sinh từ khách cũ (đội chưa tự đặt), tên khách còn đúng tên cũ;
+  giá trị HĐ không bao giờ bị ghi đè. Dự án người dùng đã xoá chỉ tạo lại khi khách rời nhóm rồi vào lại.
+  Khách RỜI nhóm (kể cả `thi-cong`): dự án ẩn khỏi danh sách (`is_lead_detached`, migration 0035), giữ `leadId` để quay lại hiện đúng dự án
+  cũ. Khách bị xoá: bỏ liên kết (`leadId` = null), dự án hiện như tạo tay. Cả hai trường hợp chỉ xoá dự án còn nguyên như lúc tạo (chưa sửa
+  thông tin, chỉ 2 đề mục cốt lõi chưa gán người, không công việc / thành viên / thầu phụ / bình luận). Cùng transaction.
+- Đã chốt (`wonAt`): `chot-hd`, `thiet-ke`, `thi-cong`. Danh sách khách: cũ trước (`ngay_tao` tăng dần).
 - Tiền gửi / trả bằng đồng (`valueVnd`, `contractValueVnd`, `amountVnd`); ngày dạng `yyyy-mm-dd`.
+- Delivery (migration 0032, giao diện bản 8686a37): dự án mới từ Kinh doanh có `status: thiet-ke`; dự án có `progress` nhập tay (danh sách dùng
+  khi chưa có công việc thường), `barColor`, `orgChart {parallel, children}` (icon là tên khoá, không nhận SVG); công việc có `purchaseItems`
+  (đơn mua hàng của bảng kanban, `value` tính bằng triệu) và `purchaseFlow` (migration 0034: các bước kanban `[{key, label, color, depts, owners,
+  received, closed}]`, 1-30 bước, key duy nhất; `null` = quy trình mặc định). `progress` ở danh sách = trung bình % công việc trừ mốc và dòng thu / chi (= KPI "TB" của Gantt).
+
+| Method | Route | Tên | Quyền | Module | Ghi chú |
+|---|---|---|---|---|---|
+| `GET` | `/hr` | `hrLoad` | `rpc.Login` | hr | Toàn bộ dữ liệu HR của công ty: `units`, `heads {key: id}`, `members {key: [{id, pct, title, allowance}]}`, `employees` |
+| `POST` | `/hr/employees` | `hrCreateEmployee` | `rpc.Login` | hr | Thêm hồ sơ; trả `{id, ...dữ liệu HR}` |
+| `PATCH` | `/hr/employees/:id` | `hrUpdateEmployee` | `rpc.Login` | hr | Sửa 1 phần; `status: left` chuyển cấp dưới cho quản lý cấp trên |
+| `DELETE` | `/hr/employees/:id` | `hrDeleteEmployee` | `rpc.Login` | hr | Xoá hồ sơ (cấp dưới chuyển lên, kiêm nhiệm xoá theo, trưởng đơn vị -> trống) |
+| `GET` | `/hr/attendance?from=&to=` | `hrAttendance` | `rpc.Login` | hr | Ca, lịch tuần `{empId: [7 mã ca \| off]}`, chấm công trong khoảng (tối đa 400 ngày), 2000 đơn mới nhất |
+| `POST` | `/hr/shifts` | `hrSaveShifts` | `rpc.Login` | hr | 1 transaction: thêm / sửa ca (`orig` = mã cũ), `deleteShifts`, ghi đè lịch tuần `schedule` |
+| `POST` | `/hr/logs` | `hrSaveLogs` | `rpc.Login` | hr | Ghi chấm công 1 dòng / người / ngày, chỉ sửa khoá gửi lên (tối đa 2000 dòng); tự chấm GPS: đã có giờ vào + gửi `out` = chấm ra |
+| `POST` | `/hr/requests` | `hrCreateRequest` | `rpc.Login` | hr | Tạo đơn nghỉ / đi muộn / OT; bước duyệt: quản lý trực tiếp -> Nhân sự |
+| `POST` | `/hr/requests/:id/decide` | `hrDecideRequest` | `rpc.Login` | hr | Duyệt / từ chối bước đang chờ (`approve`, `note` bắt buộc khi từ chối) |
+| `GET` | `/hr/payroll` | `hrPayroll` | `rpc.Login` | hr | Lương: `config` (null = mặc định giao diện), `adjustments {tháng: {empId: [...]}}`, `runs {tháng: {status, closed, payslips, approvedAt, paidAt}}`, `fixed {unitKey: {fund, items}}` |
+| `POST` | `/hr/payroll/config` | `hrSavePayrollConfig` | `rpc.Login` | hr | Ghi đè cấu hình công thức lương (tài liệu, tối đa 64 KB) |
+| `POST / DELETE` | `/hr/payroll/adjustments[/:id]` | `hrAddAdjustment / hrDeleteAdjustment` | `rpc.Login` | hr | Thưởng / phạt / doanh số (thêm trả `{ok, id}`); từ chối khi bảng lương của tháng đã duyệt |
+| `POST` | `/hr/payroll/runs` | `hrRunAction` | `rpc.Login` | hr | `close` / `open` chốt công (chỉ khi nháp), `approve` (kèm `payslips` bản chụp, tự chốt công), `pay`, `reopen` |
+| `POST` | `/hr/payroll/budgets` | `hrSaveBudget` | `rpc.Login` | hr | Định phí của 1 đơn vị `{unit, fund, items}` |
+| `GET` | `/hr/talent` | `hrTalent` | `rpc.Login` | hr | Tuyển dụng + hiệu suất: `jds`, `jobs`, `candidates`, `interviews`, `okrs`, `reviews {kỳ: {empId: ...}}`, `enroll {empId: {courseId: %}}` |
+| `POST / DELETE` | `/hr/jds[/:id]` | `hrSaveJD / hrDeleteJD` | `rpc.Login` | hr | Thêm / sửa JD (tin dùng JD đổi tên theo); xoá JD chưa có tin dùng |
+| `POST` | `/hr/jobs` | `hrSaveJob` | `rpc.Login` | hr | Thêm / sửa tin tuyển dụng từ JD |
+| `POST` | `/hr/candidates` | `hrCreateCandidate` | `rpc.Login` | hr | Thêm ứng viên vào 1 tin |
+| `PATCH` | `/hr/candidates/:id` | `hrUpdateCandidate` | `rpc.Login` | hr | Đổi giai đoạn / thêm đánh giá / thêm lịch phỏng vấn / nhận việc (`hiredEmployeeId`) |
+| `POST` | `/hr/okrs`, `/hr/okrs/:id/kr` | `hrCreateOKR / hrSetKR` | `rpc.Login` | hr | Tạo mục tiêu; cập nhật tiến độ 1 kết quả then chốt |
+| `POST` | `/hr/reviews` | `hrReviewAction` | `rpc.Login` | hr | `launch {empIds}` / `self` / `mgr {empId, scores 1-5, note}` theo `period` |
+| `POST` | `/hr/enroll` | `hrEnroll` | `rpc.Login` | hr | Ghi danh / tiến độ khoá học `{empId, courses {courseId: %}}` |
+| `GET / POST` | `/hr/security` | `hrSecurity / hrSaveSecurity` | `rpc.Login` | hr | Ma trận quyền, ẩn lương, tài khoản công ty, nhật ký HR; lưu chỉ System Admin |
+| `POST` | `/hr/security/user` | `hrSetUserRole` | `rpc.Login` | hr | Gắn tài khoản với hồ sơ / đặt vai trò HR |
+| `POST` | `/hr/audit` | `hrAddAudit` | `rpc.Login` | hr | Nhật ký thao tác do giao diện ghi (`audit_logs`, action `hr.ui`); đọc lại ở `GET /hr/security` -> `uiAudit` |
+| `POST` | `/hr/reset` | `hrReset` | `rpc.Login` | hr | Xoá toàn bộ dữ liệu HR của công ty đang đăng nhập (admin công ty, `confirm: XOA_DU_LIEU_HR`) - nạp lại dữ liệu mẫu |
+| `POST / DELETE` | `/hr/courses[/:id]`, `/hr/paths[/:id]` | `hrSaveCourse / hrDeleteCourse / hrSavePath / hrDeletePath` | `rpc.Login` | hr | Danh mục khoá học, lộ trình (HR Admin) |
+| `POST` | `/hr/org` | `hrSaveOrg` | `rpc.Login` | hr | Thiết lập cơ cấu trong 1 transaction: `units` -> `employees` -> `deleteMembers` -> `members` -> `deleteUnits` |
+
+HR (`hr`, trang `/cham-cong`), migration 0024-0031 (chấm công tháng đã chốt thì `POST /hr/logs` bị từ chối):
+- Quyền: tab `hr` (như `sales`) + vai trò HR. Admin / super công ty là System Admin; tài khoản khác phải được gắn với 1 hồ sơ
+  (`/hr/security/user`), vai trò quyết định phạm vi (toàn công ty / phòng ban / bản thân) và quyền theo ma trận (`hr_security_settings`).
+  Mọi lệnh kiểm quyền phân hệ theo ma trận (thao tác cấp công ty không đòi thêm phạm vi); dữ liệu đọc lọc theo phạm vi: `employees` có đủ người
+  cho sơ đồ tổ chức nhưng người ngoài phạm vi chỉ có thông tin công khai (mã, tên, phòng, chức danh, cấp bậc, trạng thái, quản lý, nơi làm việc, ngày vào / nghỉ, giới tính);
+  không có quyền xem lương thì `salary` = null. Lệnh ghi ghi nhật ký `audit_logs` (`hr.*`).
+- `GET /hr` trả thêm `me {role, scope, employeeId, perms, maskSalary}`. `/hr/attendance` trả thêm `overrides {empId: {ngày: mã ca | off}}`;
+  `/hr/shifts` nhận thêm `overrides [{empId, date, shift: mã | off | '' (bỏ)}]`. `/hr/talent` trả thêm `courses`, `paths`; ứng viên có `cvUrl`.
+- Không có quyền xem lương: hồ sơ không có `salary`, lương trong `contracts`, `insurance.base`; `members` không có `allowance`; lệnh sửa
+  bỏ qua `salary` / `contracts` / `insurance.base` / `allowance` (không ghi đè). Thư viện JD dùng chung cả công ty; trưởng phòng chỉ thấy và thao tác
+  tin / ứng viên của phòng mình. Mở đợt đánh giá: HR Admin / System Admin; chấm điểm quản lý: HR Admin / System Admin, hoặc trưởng phòng cho cấp dưới trực tiếp và người cùng phòng.
+- `POST /hr/employees` nhận `candidateId`: cần quyền duyệt tuyển dụng (trưởng phòng chỉ tuyển vào phòng mình), đánh dấu ứng viên Nhận việc trong cùng
+  transaction (ứng viên đã nhận việc -> 400, không tạo hồ sơ). Hồ sơ mới cấp Trưởng phòng / Giám đốc có vai trò HR mặc định Trưởng phòng.
+- Tự chấm GPS (`source: gps`, `empId` = hồ sơ của mình, chỉ cần vào được HR): chỉ hôm nay, giờ vào / ra lấy theo đồng hồ máy chủ (giờ VN), không chấm vào 2 lần.
+- Chốt công / duyệt lương không giới hạn ngày; duyệt lương tự chốt công. Tháng đã chốt công: không ghi chấm công, không tạo / duyệt đơn chạm tháng đó, không đặt lịch riêng ngày;
+  còn tháng chốt mà chưa duyệt lương thì không đổi lịch tuần. `/hr/attendance` trả thêm `closedMonths {yyyy-mm: trạng thái kỳ lương}` và `sites`.
+- Duyệt đơn: người có quyền duyệt chấm công duyệt bước đang chờ của đơn người trong phạm vi (không tự duyệt đơn mình). Đơn đi muộn / về sớm chỉ 1 bước
+  quản lý trực tiếp (không có quản lý -> Nhân sự); nghỉ phép / OT: quản lý trực tiếp rồi Nhân sự.
+- Nghỉ việc (`status: left`): cấp dưới chuyển lên quản lý cấp trên (trưởng đơn vị, kiêm nhiệm giữ nguyên); không chọn người đã nghỉ làm quản lý / trưởng đơn vị / kiêm nhiệm.
+  Xoá đơn vị: chỉ đếm người đang làm; hồ sơ đã nghỉ chuyển sang đơn vị cấp trên.
+- `/hr/shifts` nhận thêm `sites [{orig?, name, lat, lng, radius, isField}]` (đổi tên -> hồ sơ, tin tuyển dụng đổi theo) và `deleteSites [tên]`.
+- Đơn vị nhận diện bằng `key` (không đổi được); `parent` = key cấp trên | `__holding` | `__mother` | null. Nhân sự: khoá cột
+  (`code, name, dept, status, joinDate, dob, leaveDate, managerId, salary, gender, position, level, site, contractType, phone, email`),
+  khoá khác lưu vào tài liệu `details` (gộp theo khoá khi sửa; tối đa 100 khoá / 512 KB).
+- Service chặn: trùng mã NV, phòng ban / quản lý / trưởng đơn vị / thành viên không thuộc công ty, vòng quản lý, đơn vị nằm dưới chính nó,
+  xoá đơn vị còn nhân sự hoặc đơn vị con, tổng kiêm nhiệm của 1 người > 90%.
 
 #### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023)
 

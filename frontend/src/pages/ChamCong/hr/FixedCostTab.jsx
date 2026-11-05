@@ -6,7 +6,7 @@ import { calcPay } from './PayrollModule'
 
 const vnd = v => Math.round(v).toLocaleString('vi-VN')
 const short = v => (v >= 1e9 ? (v / 1e9).toFixed(2).replace('.', ',') + ' tỷ' : Math.round(v / 1e6).toLocaleString('vi-VN') + ' tr')
-const FORECAST = [{ key: '2026-10', label: 'Tháng 10/2026' }, { key: '2026-11', label: 'Tháng 11/2026' }, { key: '2026-12', label: 'Tháng 12/2026' }]
+const FORECAST = [1, 2, 3].map(i => { const [y, m] = MONTHS[0].key.split('-').map(Number); const d = new Date(y, m - 1 + i, 1); return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: `Tháng ${d.getMonth() + 1}/${d.getFullYear()}` } })
 const nextMonth = key => { const [y, m] = key.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` }
 const payDate = key => { const [y, m] = nextMonth(key).split('-'); return `05/${m}/${y}` }
 const monthShort = key => `T${Number(key.slice(5))}/${key.slice(2, 4)}`
@@ -194,7 +194,7 @@ export default function FixedCostTab({ rows, units, fixed, setFixed, editable, m
         <div className="cc-card cc-kpi2 cc-tone-primary"><span className="cc-ico"><Icon name="building" size={15} /></span><div><span>Tổng định phí / tháng</span><b>{money(company.total)}</b><em>quỹ lương + định phí khác · toàn Dezon</em></div></div>
         <div className="cc-card cc-kpi2 cc-tone-attendance"><span className="cc-ico"><Icon name="wallet" size={15} /></span><div><span>Chi phí lương {monthLabel}</span><b>{money(company.act)}</b><em>quỹ kế hoạch {money(company.f.fund)}</em></div></div>
         <div className={`cc-card cc-kpi2 cc-tone-${usageTone(company.usage)}`}><span className="cc-ico"><Icon name="trending" size={15} /></span><div><span>Sử dụng quỹ lương</span><b>{(company.usage * 100).toFixed(1).replace('.', ',')}%</b><em>đã phân bổ kiêm nhiệm</em></div></div>
-        <div className="cc-card cc-kpi2 cc-tone-qs"><span className="cc-ico"><Icon name="calendar" size={15} /></span><div><span>Dự kiến chi 3 tháng tới</span><b>{money(series.filter(s => s.kind === 'forecast').reduce((t, s) => t + s.total, 0))}</b><em>T10–T12/2026 · {over.length ? `${over.length} đơn vị đang vượt quỹ` : 'không đơn vị nào vượt quỹ'}</em></div></div>
+        <div className="cc-card cc-kpi2 cc-tone-qs"><span className="cc-ico"><Icon name="calendar" size={15} /></span><div><span>Dự kiến chi 3 tháng tới</span><b>{money(series.filter(s => s.kind === 'forecast').reduce((t, s) => t + s.total, 0))}</b><em>{monthShort(FORECAST[0].key).split('/')[0]}–{monthShort(FORECAST[2].key).split('/')[0]}/{FORECAST[2].key.slice(0, 4)} · {over.length ? `${over.length} đơn vị đang vượt quỹ` : 'không đơn vị nào vượt quỹ'}</em></div></div>
       </div>
 
       <div className="cc-toolbar" style={{ marginBottom: 0 }}>

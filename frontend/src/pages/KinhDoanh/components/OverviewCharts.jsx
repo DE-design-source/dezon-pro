@@ -61,7 +61,7 @@ function GridLines({ W, plotH }) {
 export function TrendLine({ labels, values }) {
   const [boxRef, size] = useBoxSize()
   const { W, H, plotH, font } = trendFrame(size)
-  const max = Math.max(...values) * 1.18
+  const max = Math.max(...values) * 1.18 || 1
   const stepX = (W - PAD_L - PAD_R) / ((labels.length - 1) || 1)
   const points = values.map((v, i) => [PAD_L + i * stepX, PAD_TOP + (1 - v / max) * plotH])
   const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')
@@ -90,7 +90,7 @@ export function TrendLine({ labels, values }) {
 export function TrendBar({ labels, values }) {
   const [boxRef, size] = useBoxSize()
   const { W, H, plotH, font } = trendFrame(size)
-  const max = Math.max(...values) * 1.18
+  const max = Math.max(...values) * 1.18 || 1
   const stepX = (W - PAD_L - PAD_R) / labels.length
   const barW = stepX * 0.55
   const bars = values.map((v, i) => {

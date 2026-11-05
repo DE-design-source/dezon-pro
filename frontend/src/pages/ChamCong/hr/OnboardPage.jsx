@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { DEPTS, deptOf, WORK_SITES, LEVELS } from '../../../data/hrData'
 import { Field } from './shared'
+import { uploadRaw } from '../../QS/api/files'
 
 /* Trang nhận việc: nhập hồ sơ nhân sự đầy đủ theo chuẩn hồ sơ lao động (sơ yếu lý lịch, BLLĐ)
    & tờ khai tham gia BHXH-BHYT-BHTN (TK1-TS) — kèm đính kèm giấy tờ. */
@@ -70,14 +71,32 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
   const deptStaff = employees.filter(e => e.status !== 'left' && ['Giám đốc', 'Trưởng phòng', 'Phó phòng', 'Quản lý', 'Trưởng nhóm'].includes(e.level))
 
   const fileRef = useRef({})
-  const addFiles = (key, files) => set({ docs: { ...f.docs, [key]: [...f.docs[key], ...[...files].map(x => ({ name: x.name, url: URL.createObjectURL(x), size: x.size }))] } })
+  /* File chọn: hiện ngay bằng blob:, đồng thời tải lên máy chủ (/upload/file); lúc hoàn tất thay bằng đường dẫn /files/... */
+  const uploads = useRef({})
+  const busy = useRef(false)
+  const upload = x => {
+    const url = URL.createObjectURL(x)
+    uploads.current[url] = uploadRaw(x).then(r => r.url)
+    uploads.current[url].catch(() => {})
+    return url
+  }
+  const addFiles = (key, files) => set({ docs: { ...f.docs, [key]: [...f.docs[key], ...[...files].map(x => ({ name: x.name, url: upload(x), size: x.size }))] } })
   const removeFile = (key, i) => set({ docs: { ...f.docs, [key]: f.docs[key].filter((_, j) => j !== i) } })
   useEffect(() => { const k = e => { if (e.key === 'Escape') onCancel() }; document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k) }, [onCancel])
 
-  function submit() {
+  async function submit() {
     setTried(true)
     if (total) { setTab(TABS.find(t => errs[t.key].length).key); return }
-    const attachments = DOCS.flatMap(d => f.docs[d.key].map(x => ({ name: x.name, url: x.url, type: d.label }))).concat(f.photo ? [{ name: f.photo.name, url: f.photo.url, type: 'Ảnh 3×4' }] : [])
+    if (busy.current) return
+    busy.current = true
+    let attachments
+    try {
+      attachments = await Promise.all(DOCS.flatMap(d => f.docs[d.key].map(x => ({ name: x.name, url: x.url, type: d.label }))).concat(f.photo ? [{ name: f.photo.name, url: f.photo.url, type: 'Ảnh 3×4' }] : [])
+        .map(async a => ({ ...a, url: (await uploads.current[a.url]?.catch(e => { throw new Error(`"${a.name}": ${e.message}`) })) || a.url })))
+    } catch (e) {
+      alert('Tải giấy tờ lên máy chủ lỗi: ' + (e.message || e) + '\nBỏ file lỗi rồi tải lại.')
+      return
+    } finally { busy.current = false }
     onConfirm({
       code: f.code, dept: f.dept, position: f.position.trim(), level: f.level, managerId: f.managerId, site: f.site, joinDate: f.joinDate,
       probationMonths: Number(f.probationMonths) || 2, probationRate: Number(f.probationRate) || 85, salary: Number(f.salary),
@@ -130,7 +149,7 @@ export default function OnboardPage({ candidate: c, job = {}, initial, employees
             <div className="cc-form">
               <div className="cc-ob-photo full">
                 <label className="cc-ob-photo-box">{f.photo ? <img src={f.photo.url} alt="Ảnh 3x4" /> : <><Icon name="users" size={20} /><span>Ảnh 3×4</span></>}
-                  <input type="file" accept="image/*" hidden onChange={e => { const x = e.target.files[0]; if (x) set({ photo: { name: x.name, url: URL.createObjectURL(x) } }) }} />
+                  <input type="file" accept="image/*" hidden onChange={e => { const x = e.target.files[0]; if (x) set({ photo: { name: x.name, url: upload(x) } }) }} />
                 </label>
                 <div className="cc-sub">Ảnh chân dung nền trắng, chụp trong 6 tháng — dùng cho thẻ nhân viên & hồ sơ BHXH.</div>
               </div>

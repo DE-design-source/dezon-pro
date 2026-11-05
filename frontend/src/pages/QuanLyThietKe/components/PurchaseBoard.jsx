@@ -81,10 +81,9 @@ function SearchAdd({ placeholder, options, onPick }) {
 
 /* Trang chi tiết mua hàng dạng kanban — mở khi bấm công việc thuộc giai đoạn "Mua hàng & cung ứng".
    Mỗi đơn có người & phòng ban phụ trách; quy trình (các bước) chỉnh sửa / khởi tạo từ mẫu được cho từng công việc. */
-export default function PurchaseBoard({ task, items, open, onClose, onMove, onUpdateItems }) {
+export default function PurchaseBoard({ task, items, open, onClose, onMove, onUpdateItems, onSaveFlow }) {
   const [dragId, setDragId] = useState(null)
   const [overStage, setOverStage] = useState(null)
-  const [flows, setFlows] = useState({}) // taskId → các bước quy trình đã tuỳ chỉnh
   const [detailId, setDetailId] = useState(null) // đơn đang xem chi tiết
   const [picker, setPicker] = useState(null) // ô chọn người phụ trách: { q }
   const [flowDraft, setFlowDraft] = useState(null) // trình chỉnh sửa quy trình: { steps, tpl, newTpl? }
@@ -93,7 +92,8 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
   const [bellOpen, setBellOpen] = useState(false)
   const [toast, setToast] = useState(null)
 
-  const stages = (task && flows[task.id]) || PO_STAGES
+  // quy trình lưu trên máy chủ theo công việc (task.purchaseFlow); chưa lưu = quy trình mặc định
+  const stages = (task && task.purchaseFlow && task.purchaseFlow.length && task.purchaseFlow) || PO_STAGES
   const byKey = Object.fromEntries(stages.map(s => [s.key, s]))
 
   useEffect(() => {
@@ -200,8 +200,7 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
     }
     const first = steps.find(s => !s.closed) || steps[0]
     const keys = new Set(steps.map(s => s.key))
-    setFlows(f => ({ ...f, [task.id]: steps }))
-    if (orphanCount) onUpdateItems(task.id, l => l.map(it => (keys.has(it.stage) ? it : { ...it, stage: first.key })))
+    onSaveFlow(task.id, steps, orphanCount ? (l => l.map(it => (keys.has(it.stage) ? it : { ...it, stage: first.key }))) : null)
     // Người mới được giao phụ trách 1 bước → gửi thông báo
     let sent = 0
     steps.forEach(s => {
@@ -272,8 +271,9 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
 
         <div className="tk-pb-body">
           <div className="tk-pb-board" style={{ gridTemplateColumns: `repeat(${stages.length + 1}, minmax(220px, 1fr))` }}>
-            {stages.map(stage => {
-              const cards = list.filter(it => it.stage === stage.key)
+            {stages.map((stage, si) => {
+              // đơn ở bước không có trong quy trình hiện tại hiện ở cột đầu (không bao giờ bị ẩn)
+              const cards = list.filter(it => it.stage === stage.key || (si === 0 && !byKey[it.stage]))
               const sum = cards.reduce((s, it) => s + it.value, 0)
               return (
                 <div

@@ -1198,7 +1198,7 @@ Một `*Service` có thể cài nhiều interface (users cài `Auditor`, `UserRe
 
 ## 12. Nối module, tài liệu API và kiểm tra tích hợp
 
-- `internal/server/routes.go` (khối MODULE WIRING) dựng `system` rồi 16 module nghiệp vụ theo đúng thứ tự mục 11.2 (13 module chuyển từ Node + `delivery`, `sales`, `chat` chỉ bản Go; chat kèm gateway `realtime.Hub`); `Server.Reports()` trả module reports,
+- `internal/server/routes.go` (khối MODULE WIRING) dựng `system` rồi 17 module nghiệp vụ theo đúng thứ tự mục 11.2 (13 module chuyển từ Node + `delivery`, `sales`, `chat`, `hr` chỉ bản Go; chat kèm gateway `realtime.Hub`); `Server.Reports()` trả module reports,
   `Server.Expiry()` trả phần nhắc gia hạn của companies, cho `cmd/api/main.go` bật job nền (`jobs.Start`: báo cáo + nhắc gia hạn, tắt cả hai
   bằng `REPORT_JOB=0`, dừng qua `srv.OnShutdown`).
 - `internal/server/rest.go`: bảng `RestRoutes` (80 hàm rpc -> route REST) và `RootRoutes` (9 route lẻ). Hai bảng này ĐÓNG BĂNG cùng 80 hàm

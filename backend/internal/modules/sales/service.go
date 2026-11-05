@@ -22,8 +22,10 @@ import (
 const Tab = "kinhdoanh"
 
 var (
-	stages      = set("tiep-can", "tu-van", "bao-gia", "dam-phan", "chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong", "truot-thau")
-	wonStages   = set("chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong")
+	stages    = set("tiep-can", "tu-van", "bao-gia", "dam-phan", "chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong", "truot-thau")
+	wonStages = set("chot-hd", "thiet-ke", "thi-cong") // = closedWon của giao diện (OverviewTab.jsx)
+	// syncStages = SYNC_STAGES cũ đã lọc như ProjectListTab cũ: khách ở đây có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án
+	syncStages  = set("tu-van", "dam-phan", "thiet-ke")
 	boardStages = set("intake", "concept", "drafting", "review", "approved", "prep", "structure", "finishing", "acceptance", "handover")
 	depts       = set("dan-dung", "du-an")
 	kinds       = set("call", "meeting", "site", "zalo", "email", "quote", "note")
@@ -80,11 +82,11 @@ func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) er
 	return s.db.Tx(ctx, fn)
 }
 
-// deliveryKind: giai đoạn của khách -> loại dự án triển khai cần có.
-var deliveryKind = map[string]string{"thiet-ke": "design", "thi-cong": "construction"}
-
-// saveAndDeliver: chạy write (chèn / sửa khách hàng) rồi, nếu khách đang ở thiet-ke / thi-cong, bảo đảm có dự án triển khai.
-func (s *Service) saveAndDeliver(ctx context.Context, a *actor.Actor, write func(ctx context.Context) (*omap.Map, error)) (*omap.Map, any, error) {
+// saveAndDeliver: chạy write (chèn / sửa khách hàng) rồi đồng bộ dự án triển khai (thiết kế + thi công) - CHỈ khi giai đoạn
+// đổi qua ranh giới syncStages hoặc tên / loại công trình đổi; sửa thứ khác (người phụ trách, bảng con, ghi chú...) không đụng
+// dự án. old = dòng trước khi sửa (nil khi tạo mới). Vào syncStages -> tạo / hiện lại dự án (giá trị = giá trị ước tính, chỉ
+// khi tạo); rời -> ẩn (xoá nếu còn nguyên); vẫn trong -> đổi tên dự án theo khách nếu đội chưa tự đặt tên.
+func (s *Service) saveAndDeliver(ctx context.Context, a *actor.Actor, old *omap.Map, write func(ctx context.Context) (*omap.Map, error)) (*omap.Map, any, error) {
 	var out *omap.Map
 	var q any
 	err := s.tx(ctx, func(ctx context.Context) error {
@@ -92,19 +94,36 @@ func (s *Service) saveAndDeliver(ctx context.Context, a *actor.Actor, write func
 		if out, err = write(ctx); err != nil || out == nil {
 			return err
 		}
-		if q, err = s.getQuote(ctx, out); err != nil {
+		if q, err = s.getQuote(ctx, out); err != nil || s.delivery == nil {
 			return err
 		}
-		if k := deliveryKind[jsval.Str(out.Val("giai_doan"))]; k != "" && s.delivery != nil {
+		was := old != nil && syncStages[jsval.Str(old.Val("giai_doan"))]
+		switch is := syncStages[jsval.Str(out.Val("giai_doan"))]; {
+		case is && !was:
 			v := jsval.ToNumber(out.Val("gia_tri_vnd"))
-			if m, ok := q.(*omap.Map); ok {
-				v = jsval.ToNumber(m.Val("ban"))
+			for _, k := range []string{"design", "construction"} {
+				if _, err = s.delivery.EnsureFromLead(ctx, a, out, v, k); err != nil {
+					return err
+				}
 			}
-			_, err = s.delivery.EnsureFromLead(ctx, a, out, v, k)
+		case is && nameChanged(old, out):
+			return s.delivery.RenameFromLead(ctx, old, out)
+		case was && !is:
+			return s.delivery.DetachFromLead(ctx, out.Val("id"), false)
 		}
-		return err
+		return nil
 	})
 	return out, q, err
+}
+
+// nameChanged: các cột tạo nên tên dự án triển khai (delivery leadProjectName) có đổi không.
+func nameChanged(old, out *omap.Map) bool {
+	for _, k := range []string{"ten_khach", "loai_cong_trinh", "quy_mo"} {
+		if jsval.Str(old.Val(k)) != jsval.Str(out.Val(k)) {
+			return true
+		}
+	}
+	return false
 }
 
 // allow: giống canTab('kinhdoanh') của giao diện. Super phải "xem như" 1 công ty (không thì thấy lẫn mọi công ty và
@@ -230,11 +249,20 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 		row.Set("nguoi_tao_ten", a.U)
 	}
 	now := s.now().UTC().Format(time.RFC3339Nano)
-	if wonStages[jsval.Str(row.Val("giai_doan"))] {
-		row.Set("ngay_chot", now)
+	// createdAt / wonAt (yyyy-mm-dd) chỉ khi tạo: nạp dữ liệu mẫu / dữ liệu cũ đúng ngày; giao diện không gửi
+	created, err := dayOr(body, "createdAt", now)
+	if err != nil {
+		return nil, err
 	}
-	row.Set("nguoi_tao", a.UID).Set("ngay_tao", now).Set("cap_nhat", now)
-	out, q, err := s.saveAndDeliver(ctx, a, func(ctx context.Context) (*omap.Map, error) { return s.repo.InsertLead(ctx, row) })
+	won, err := dayOr(body, "wonAt", now)
+	if err != nil {
+		return nil, err
+	}
+	if wonStages[jsval.Str(row.Val("giai_doan"))] {
+		row.Set("ngay_chot", won)
+	}
+	row.Set("nguoi_tao", a.UID).Set("ngay_tao", created).Set("cap_nhat", now)
+	out, q, err := s.saveAndDeliver(ctx, a, nil, func(ctx context.Context) (*omap.Map, error) { return s.repo.InsertLead(ctx, row) })
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +295,8 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 		}
 	}
 	patch.Set("cap_nhat", now)
-	out, q, err := s.saveAndDeliver(ctx, a, func(ctx context.Context) (*omap.Map, error) { return s.repo.UpdateLead(ctx, id, patch) })
+	old = old.Clone() // repo có thể trả lại chính map này sau khi sửa (repo giả trong test)
+	out, q, err := s.saveAndDeliver(ctx, a, old, func(ctx context.Context) (*omap.Map, error) { return s.repo.UpdateLead(ctx, id, patch) })
 	if err != nil {
 		return nil, err
 	}
@@ -277,17 +306,27 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 	return leadOut(out, q), nil
 }
 
-// DeleteLead: xoá khách hàng (lịch sử chăm sóc xoá theo, khoá ngoại cascade).
+// DeleteLead: xoá khách hàng (lịch sử chăm sóc xoá theo, khoá ngoại cascade) và gỡ dự án triển khai đã gắn (dự án đã có
+// dữ liệu thì giữ, bỏ liên kết, hiện như dự án tạo tay).
 func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (any, error) {
 	if err := s.allow(ctx, a); err != nil {
 		return nil, err
 	}
-	n, err := s.repo.DeleteLead(ctx, id)
+	// gỡ dự án triển khai trước (khoá ngoại chỉ set null), cùng transaction với lệnh xoá
+	err := s.tx(ctx, func(ctx context.Context) error {
+		if s.delivery != nil {
+			if err := s.delivery.DetachFromLead(ctx, id, true); err != nil {
+				return err
+			}
+		}
+		n, err := s.repo.DeleteLead(ctx, id)
+		if err == nil && n == 0 {
+			err = apperr.NotFound("Không tìm thấy khách hàng")
+		}
+		return err
+	})
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, apperr.NotFound("Không tìm thấy khách hàng")
 	}
 	return omap.Of("ok", true), nil
 }
@@ -467,6 +506,19 @@ func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
 		}
 	}
 	return p, nil
+}
+
+// dayOr: body[k] = yyyy-mm-dd -> 9:00 giờ VN ngày đó (ISO UTC); không có -> def.
+func dayOr(b *omap.Map, k, def string) (string, error) {
+	d := str(b, k)
+	if d == "" {
+		return def, nil
+	}
+	t, err := time.ParseInLocation("2006-01-02", d, vn)
+	if err != nil {
+		return "", apperr.BadRequest("Ngày không hợp lệ: " + k)
+	}
+	return t.Add(9 * time.Hour).UTC().Format(time.RFC3339Nano), nil
 }
 
 func str(m *omap.Map, k string) string {

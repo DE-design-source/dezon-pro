@@ -684,6 +684,10 @@
    "gia_tri_hd": "contract_value_vnd",
    "ngan_sach": "approved_budget_vnd",
    "ghi_chu": "note",
+   "tien_do": "progress_pct",
+   "mau_thanh": "bar_color",
+   "so_do_to_chuc": "org_chart",
+   "tach_khach_hang": "is_lead_detached",
    "nguoi_tao": "created_by",
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
@@ -760,6 +764,8 @@
    "so_tien": "amount_vnd",
    "da_xac_nhan": "is_confirmed",
    "thu_tu": "sort_order",
+   "don_mua": "purchase_orders",
+   "quy_trinh_mua": "purchase_flow",
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
   },
@@ -1000,6 +1006,388 @@
    "da_dung": "consumed_at",
    "het_han": "expires_at",
    "ngay_tao": "created_at"
+  }
+ },
+ "hr_don_vi": {
+  "table": "hr_org_units",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ma": "unit_key",
+   "nhan": "label",
+   "ten": "unit_name",
+   "loai": "unit_kind",
+   "cap_tren": "parent_key",
+   "lien_ket": "group_link",
+   "truong_don_vi": "head_employee_id",
+   "mau": "tone",
+   "mo_ta": "description",
+   "bo_nhiem_tu_me": "is_appointed_from_parent",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_nhan_vien": {
+  "table": "hr_employees",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ma_nv": "employee_code",
+   "ho_ten": "full_name",
+   "gioi_tinh": "gender",
+   "ngay_sinh": "birth_date",
+   "phong_ban": "dept_key",
+   "chuc_danh": "job_title",
+   "cap_bac": "job_level",
+   "trang_thai": "employment_status",
+   "ngay_vao": "join_date",
+   "ngay_nghi": "leave_date",
+   "quan_ly_id": "manager_id",
+   "noi_lam_viec": "work_site",
+   "loai_hd": "contract_type",
+   "luong": "salary_vnd",
+   "sdt": "phone",
+   "email": "email",
+   "chi_tiet": "details",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at",
+   "tai_khoan_id": "user_id",
+   "vai_tro_hr": "hr_role"
+  }
+ },
+ "hr_kiem_nhiem": {
+  "table": "hr_unit_members",
+  "columns": {
+   "id": "id",
+   "don_vi_id": "unit_id",
+   "nhan_vien_id": "employee_id",
+   "chuc_vu": "role_title",
+   "ty_le_pct": "time_pct",
+   "phu_cap": "allowance_vnd",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "unit_id",
+   "parent": "hr_org_units",
+   "key": "id"
+  }
+ },
+ "hr_ca": {
+  "table": "hr_shifts",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ma": "shift_code",
+   "ten": "shift_name",
+   "gio_vao": "start_time",
+   "gio_ra": "end_time",
+   "nghi_phut": "break_minutes",
+   "mau": "tone",
+   "ghi_chu": "note",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_lich_tuan": {
+  "table": "hr_work_patterns",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "thu": "weekday",
+   "ca_id": "shift_id",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_cham_cong": {
+  "table": "hr_attendance_logs",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "ngay": "work_date",
+   "gio_vao": "check_in",
+   "gio_ra": "check_out",
+   "nguon": "log_source",
+   "gps": "gps_zone",
+   "khoang_cach": "gps_distance_m",
+   "ghi_chu": "note",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_don_tu": {
+  "table": "hr_requests",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "loai": "request_kind",
+   "loai_nghi": "leave_kind",
+   "tieu_de": "title",
+   "tu_ngay": "from_date",
+   "den_ngay": "to_date",
+   "so_ngay": "days",
+   "so_gio": "hours",
+   "ly_do": "reason",
+   "cac_buoc": "approval_steps",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_cau_hinh_luong": {
+  "table": "hr_payroll_settings",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "cau_hinh": "config",
+   "nguoi_sua": "updated_by",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_dieu_chinh_luong": {
+  "table": "hr_pay_adjustments",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "thang": "pay_month",
+   "loai": "adjustment_kind",
+   "noi_dung": "label",
+   "so_tien": "amount_vnd",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_ky_luong": {
+  "table": "hr_payroll_runs",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "thang": "pay_month",
+   "trang_thai": "run_status",
+   "chot_cong": "is_attendance_closed",
+   "phieu_luong": "payslips",
+   "da_gui": "sent_employee_ids",
+   "ngay_duyet": "approved_at",
+   "nguoi_duyet": "approved_by",
+   "ngay_chi": "paid_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_dinh_phi": {
+  "table": "hr_unit_budgets",
+  "columns": {
+   "id": "id",
+   "don_vi_id": "unit_id",
+   "quy_luong": "monthly_fund_vnd",
+   "khoan_khac": "cost_items",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "unit_id",
+   "parent": "hr_org_units",
+   "key": "id"
+  }
+ },
+ "hr_jd": {
+  "table": "hr_job_descriptions",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ma": "jd_code",
+   "ten": "title",
+   "phong_ban": "dept_key",
+   "cap_bac": "job_level",
+   "luong": "salary_text",
+   "tom_tat": "summary",
+   "nhiem_vu": "duties",
+   "yeu_cau": "requirements",
+   "quyen_loi": "benefits",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_tin_tuyen": {
+  "table": "hr_job_openings",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "jd_id": "jd_id",
+   "ten": "title",
+   "phong_ban": "dept_key",
+   "so_luong": "quantity",
+   "noi_lam_viec": "work_site",
+   "luong": "salary_text",
+   "han_nop": "deadline_date",
+   "trang_thai": "opening_status",
+   "kenh": "channels",
+   "mo_ta": "description",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_ung_vien": {
+  "table": "hr_candidates",
+  "columns": {
+   "id": "id",
+   "tin_id": "job_id",
+   "ho_ten": "full_name",
+   "email": "email",
+   "sdt": "phone",
+   "nguon": "lead_source",
+   "giai_doan": "stage",
+   "ngay_nop": "applied_date",
+   "cv": "cv_name",
+   "kinh_nghiem": "experience_note",
+   "danh_gia": "reviews",
+   "phong_van": "interviews",
+   "nhan_vien_id": "hired_employee_id",
+   "ngay_nhan_viec": "hired_date",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at",
+   "cv_url": "cv_url"
+  },
+  "tenant": {
+   "via": "job_id",
+   "parent": "hr_job_openings",
+   "key": "id"
+  }
+ },
+ "hr_muc_tieu": {
+  "table": "hr_objectives",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ky": "period_label",
+   "ten": "title",
+   "phu_trach_id": "owner_employee_id",
+   "phong_ban": "dept_key",
+   "ket_qua": "key_results",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_danh_gia": {
+  "table": "hr_performance_reviews",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "ky": "review_period",
+   "trang_thai": "review_state",
+   "tu_cham": "self_scores",
+   "ql_cham": "manager_scores",
+   "tu_nhan_xet": "self_note",
+   "ql_nhan_xet": "manager_note",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_ghi_danh": {
+  "table": "hr_course_enrollments",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "khoa_hoc_id": "course_id",
+   "tien_do_pct": "progress_pct",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_bao_mat": {
+  "table": "hr_security_settings",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "quyen": "perms",
+   "an_luong": "mask_salary",
+   "giao_dien": "ui_settings",
+   "nguoi_sua": "updated_by",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_khoa_hoc": {
+  "table": "hr_courses",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ten": "title",
+   "nhom": "category",
+   "so_gio": "hours",
+   "hinh_thuc": "course_format",
+   "bat_buoc": "is_mandatory",
+   "mau": "tone",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_lo_trinh": {
+  "table": "hr_learning_paths",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ten": "title",
+   "doi_tuong": "audience",
+   "khoa_hoc_ids": "course_ids",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "hr_lich_ngay": {
+  "table": "hr_schedule_overrides",
+  "columns": {
+   "id": "id",
+   "nhan_vien_id": "employee_id",
+   "ngay": "work_date",
+   "ca_id": "shift_id",
+   "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "employee_id",
+   "parent": "hr_employees",
+   "key": "id"
+  }
+ },
+ "hr_dia_diem": {
+  "table": "hr_work_sites",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ten": "site_name",
+   "vi_do": "latitude",
+   "kinh_do": "longitude",
+   "ban_kinh": "radius_m",
+   "cong_truong": "is_field_site",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
   }
  }
 }

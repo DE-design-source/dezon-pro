@@ -68,7 +68,7 @@ export default function ShiftSchedule({ employees, shifts, setShifts, schedule, 
 
       <div className="cc-card cc-pad">
         <div className="cc-toolbar">
-          <div><h3 className="cc-h3" style={{ margin: 0 }}>Lịch làm việc tuần 21/09 – 27/09</h3><span className="cc-sub">Chọn ca trong từng ô để phân ca · tổng giờ được tính tự động</span></div>
+          <div><h3 className="cc-h3" style={{ margin: 0 }}>Lịch làm việc tuần {WEEK_DAYS[0].date} – {WEEK_DAYS[6].date}</h3><span className="cc-sub">Chọn ca trong từng ô để phân ca · tổng giờ được tính tự động</span></div>
           <span className="cc-grow" />
           <select className="cc-select" value={dept} onChange={e => setDept(e.target.value)}>
             <option value="all">Tất cả phòng ban</option>{DEPTS.map(d => <option key={d.key} value={d.key}>{d.name}</option>)}

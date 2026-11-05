@@ -37,7 +37,6 @@ function KinhDoanhPage() {
 
   /* ---------- Dữ liệu pipeline ---------- */
   const [leads, setLeads] = useState([])
-  const [loadState, setLoadState] = useState('loading') // loading | ok | lỗi (chuỗi)
   const [dept, setDept] = useState('all')
   const [timeFilter, setTimeFilter] = useState({ time: 'all', from: '', to: '' })
 
@@ -59,11 +58,7 @@ function KinhDoanhPage() {
 
   const scrollRef = useRef(null)
 
-  function reload() {
-    setLoadState('loading')
-    kdApi.listLeads().then(ls => { setLeads(ls); setLoadState('ok') }, e => setLoadState(e.message || 'Lỗi tải dữ liệu'))
-  }
-  useEffect(reload, [])
+  useEffect(() => { kdApi.listLeads().then(setLeads, e => alert('Lỗi tải khách hàng: ' + e.message)) }, [])
 
   /* Mở trang khách hàng -> tải lịch sử chăm sóc thật */
   useEffect(() => {
@@ -89,7 +84,7 @@ function KinhDoanhPage() {
   function moveLead(id, newStage) {
     const lead = leads.find(l => sameId(l.id, id))
     if (!lead || lead.stage === newStage) return
-    /* Sang thiet-ke / thi-cong: máy chủ tự tạo dự án ở Quản lý thiết kế / Quản lý dự án */
+    /* tu-van / dam-phan / thiet-ke: máy chủ tạo / cập nhật dự án ở Quản lý thiết kế + Quản lý dự án; giai đoạn khác: gỡ */
     patchLead(lead.id, { stage: newStage })
     const cfg = HANDOFF_CONFIG[newStage]
     /* Cột nào có cấu hình phiếu thì kéo thẻ vào (từ bất kỳ cột nào) đều hiện phiếu */
@@ -99,7 +94,7 @@ function KinhDoanhPage() {
   function deleteLead(id) {
     const lead = leads.find(l => sameId(l.id, id))
     if (!lead) return
-    if (!window.confirm('Xoá khách hàng "' + lead.name + '" và toàn bộ lịch sử chăm sóc? Hành động này không thể hoàn tác.')) return
+    if (!window.confirm('Xoá lead "' + lead.name + '"? Hành động này không thể hoàn tác.')) return
     kdApi.deleteLead(lead.id).then(() => {
       setLeads(prev => prev.filter(l => !sameId(l.id, lead.id)))
     }, e => alert('Không xoá được: ' + e.message))
@@ -112,7 +107,7 @@ function KinhDoanhPage() {
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
-      setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [saved, ...prev]))
+      setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [...prev, saved]))
       closeLeadModal()
     } catch (e) {
       alert('Không lưu được: ' + e.message)
@@ -159,7 +154,7 @@ function KinhDoanhPage() {
   const setLeadSub = (id, sub) => patchLead(id, { sub })
   function addSubCard(name, parentStage, sub) {
     kdApi.createLead({ name, stage: parentStage, sub, dept: 'dan-dung', creator: meName, manager: meName })
-      .then(saved => setLeads(prev => [saved, ...prev]), e => alert('Không thêm được: ' + e.message))
+      .then(saved => setLeads(prev => [...prev, saved]), e => alert('Không thêm được: ' + e.message))
   }
 
   /* ---------- Nhiệm vụ ---------- */
@@ -228,11 +223,6 @@ function KinhDoanhPage() {
 
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
       <div ref={scrollRef} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
-        {loadState !== 'ok' && (
-          <div style={{ ...hintStyle, padding: '10px 12px', marginBottom: 12, borderRadius: 9, background: 'var(--surface-alt)', display: 'flex', gap: 10, alignItems: 'center' }}>
-            {loadState === 'loading' ? 'Đang tải khách hàng…' : <>Lỗi tải dữ liệu: {loadState} <button onClick={reload} style={{ border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit', padding: '3px 9px' }}>Thử lại</button></>}
-          </div>
-        )}
         {detail.open && detailLead && (
           <CustomerPage
             lead={detailLead}

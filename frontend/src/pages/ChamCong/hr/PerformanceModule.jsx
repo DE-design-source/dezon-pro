@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { deptOf } from '../../../data/hrData'
-import { PERIODS, REVIEW_SKILLS, REVIEW_STATES, COURSES, LEARNING_PATHS } from '../../../data/hrData2'
+import { PERIODS, REVIEW_PERIOD, REVIEW_SKILLS, REVIEW_STATES, COURSES, LEARNING_PATHS } from '../../../data/hrData2'
 import { Avatar, Pill, Seg, Modal, Field, Empty } from './shared'
 import { useAccess, NoAccess } from './access'
 
@@ -62,7 +62,7 @@ export default function PerformanceModule({ employees, perf, setPerf, toast }) {
       const next = mode === 'self' ? { ...r, state: 'manager', self: draft.scores, selfNote: draft.note } : { ...r, state: 'done', mgr: draft.scores, mgrNote: draft.note }
       return { ...p, reviews: { ...p.reviews, [emp.id]: next } }
     })
-    log('performance', mode === 'self' ? 'edit' : 'approve', `${mode === 'self' ? 'Tự đánh giá' : 'Quản lý đánh giá'} Q3/2026 — ${emp.name}`)
+    log('performance', mode === 'self' ? 'edit' : 'approve', `${mode === 'self' ? 'Tự đánh giá' : 'Quản lý đánh giá'} ${REVIEW_PERIOD} — ${emp.name}`)
     toast(mode === 'self' ? 'Đã gửi tự đánh giá cho quản lý' : `Đã hoàn tất đánh giá ${emp.name}`)
     setReviewOf(null)
   }
@@ -72,7 +72,7 @@ export default function PerformanceModule({ employees, perf, setPerf, toast }) {
       staff.forEach(e => { if (!r[e.id]) r[e.id] = { state: 'self' } })
       return { ...p, reviews: r }
     })
-    log('performance', 'create', 'Mở đợt đánh giá Q3/2026 cho toàn bộ nhân sự')
+    log('performance', 'create', `Mở đợt đánh giá ${REVIEW_PERIOD} cho toàn bộ nhân sự`)
     toast('Đã gửi yêu cầu tự đánh giá tới nhân sự')
   }
 
@@ -94,7 +94,7 @@ export default function PerformanceModule({ employees, perf, setPerf, toast }) {
     <div className="cc-stack">
       <div className="cc-kpis">
         <div className="cc-card cc-kpi2 cc-tone-primary"><span className="cc-ico"><Icon name="target" size={15} /></span><div><span>Tiến độ OKR {period}</span><b>{list.length ? Math.round(list.reduce((s, o) => s + okrProgress(o), 0) / list.length * 100) : 0}%</b><em>{list.length} mục tiêu</em></div></div>
-        <div className="cc-card cc-kpi2 cc-tone-attendance"><span className="cc-ico"><Icon name="award" size={15} /></span><div><span>Đánh giá Q3 hoàn tất</span><b>{doneReviews.length}<small>/{reviewStaff.length}</small></b><em>{reviewStaff.filter(e => rv(e.id).state === 'manager').length} chờ quản lý chấm</em></div></div>
+        <div className="cc-card cc-kpi2 cc-tone-attendance"><span className="cc-ico"><Icon name="award" size={15} /></span><div><span>Đánh giá {REVIEW_PERIOD.split('/')[0]} hoàn tất</span><b>{doneReviews.length}<small>/{reviewStaff.length}</small></b><em>{reviewStaff.filter(e => rv(e.id).state === 'manager').length} chờ quản lý chấm</em></div></div>
         <div className="cc-card cc-kpi2 cc-tone-success"><span className="cc-ico"><Icon name="trending" size={15} /></span><div><span>Điểm trung bình</span><b>{avgScore ? avgScore.toFixed(2) : '—'}</b><em>xếp loại {grade(avgScore)}</em></div></div>
         <div className="cc-card cc-kpi2 cc-tone-danger"><span className="cc-ico"><Icon name="graduation" size={15} /></span><div><span>Hoàn thành đào tạo bắt buộc</span><b>{Math.round(compliance * 100)}%</b><em>{mandatory.map(c => c.title).join(' · ')}</em></div></div>
       </div>
@@ -145,7 +145,7 @@ export default function PerformanceModule({ employees, perf, setPerf, toast }) {
 
       {tab === 'review' && (
         <div className="cc-card cc-pad">
-          <div className="cc-toolbar"><div><h3 className="cc-h3" style={{ margin: 0 }}>Đợt đánh giá Q3/2026</h3><span className="cc-sub">Quy trình: nhân viên tự đánh giá → quản lý trực tiếp đánh giá → chốt xếp loại (A ≥ 4,5 · B ≥ 3,75 · C ≥ 3 · D)</span></div></div>
+          <div className="cc-toolbar"><div><h3 className="cc-h3" style={{ margin: 0 }}>Đợt đánh giá {REVIEW_PERIOD}</h3><span className="cc-sub">Quy trình: nhân viên tự đánh giá → quản lý trực tiếp đánh giá → chốt xếp loại (A ≥ 4,5 · B ≥ 3,75 · C ≥ 3 · D)</span></div></div>
           {reviewStaff.length === 0 && <Empty text="Không có nhân sự" />}
           <div className="cc-table-wrap">
             <table className="cc-table2 hover">
@@ -245,7 +245,7 @@ export default function PerformanceModule({ employees, perf, setPerf, toast }) {
       </Modal>
 
       <Modal open={!!reviewOf} onClose={() => setReviewOf(null)} width={640} icon="award"
-        title={reviewOf ? (reviewOf.mode === 'self' ? 'Tự đánh giá Q3/2026' : reviewOf.mode === 'mgr' ? `Đánh giá ${reviewOf.emp.name}` : `Kết quả đánh giá — ${reviewOf.emp.name}`) : ''}
+        title={reviewOf ? (reviewOf.mode === 'self' ? `Tự đánh giá ${REVIEW_PERIOD}` : reviewOf.mode === 'mgr' ? `Đánh giá ${reviewOf.emp.name}` : `Kết quả đánh giá — ${reviewOf.emp.name}`) : ''}
         sub={reviewOf ? `${reviewOf.emp.position} · ${deptOf(reviewOf.emp.dept).name}` : ''}
         footer={reviewOf && <><span className="cc-grow cc-sub">{reviewOf.mode !== 'view' && draft ? `Điểm có trọng số: ${weighted(draft.scores).toFixed(2)} · xếp loại ${grade(weighted(draft.scores))}` : ''}</span>
           <button className="cc-btn ghost" onClick={() => setReviewOf(null)}>{reviewOf.mode === 'view' ? 'Đóng' : 'Hủy'}</button>

@@ -16,6 +16,7 @@ import (
 	"qspro-backend/internal/modules/delivery"
 	"qspro-backend/internal/modules/estimates"
 	"qspro-backend/internal/modules/files"
+	"qspro-backend/internal/modules/hr"
 	"qspro-backend/internal/modules/materials"
 	"qspro-backend/internal/modules/notifications"
 	"qspro-backend/internal/modules/projects"
@@ -134,7 +135,7 @@ func (s *Server) modules() []Module {
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
 		Users: usersSvc, Auditor: usersSvc})
 	reportsSvc := reports.New(reports.Deps{DB: d.DB, Cfg: d.Cfg})
-	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: kéo khách sang thiet-ke / thi-cong tự tạo dự án triển khai (DeliveryFromLead)
+	// Kinh doanh -> Quản lý thiết kế + Quản lý dự án: khách ở tu-van / dam-phan / thiet-ke có dự án triển khai ở cả 2 trang (DeliveryFromLead)
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
 		Delivery: delivSvc})
@@ -148,13 +149,14 @@ func (s *Server) modules() []Module {
 	chatSvc.SetGateway(chatHub)
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
 	s.OnShutdown(chatSvc.Shutdown)
+	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
 	s.expiry = compSvc
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc,
 	}
 }
 

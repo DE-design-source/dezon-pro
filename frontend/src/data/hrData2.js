@@ -175,7 +175,13 @@ export const INITIAL_INTERVIEWS = [
 ]
 
 /* ======================= HIỆU SUẤT & ĐÀO TẠO ======================= */
-export const PERIODS = ['Q3/2026', 'Q4/2026', 'Năm 2026']
+/* Kỳ mục tiêu: quý hiện tại, quý sau, cả năm (theo ngày thật, giờ VN). Đánh giá nhân sự theo quý hiện tại (REVIEW_PERIOD). */
+export const PERIODS = (() => {
+  const [y, m] = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).split('-').map(Number)
+  const q = Math.ceil(m / 3)
+  return [`Q${q}/${y}`, q === 4 ? `Q1/${y + 1}` : `Q${q + 1}/${y}`, `Năm ${y}`]
+})()
+export const REVIEW_PERIOD = PERIODS[0]
 export const INITIAL_OKRS = [
   { id: 1, period: 'Q3/2026', title: 'Bàn giao đúng tiến độ dự án Riverside GĐ2', owner: 2, dept: 'cco',
     krs: [{ id: 11, title: 'Hoàn thành kết cấu phần thân tầng 1–5', target: 100, current: 72, unit: '%', owner: 6 },

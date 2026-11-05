@@ -1,10 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
-import { SITES, HR_TODAY_LABEL, attendanceStatus, lateMinutes } from '../../../data/hrData'
+import { SITES, HR_TODAY_LABEL, TODAY_IDX, attendanceStatus, lateMinutes } from '../../../data/hrData'
 import { Avatar, Pill, Seg, Empty, downloadCsv } from './shared'
 import { useAccess } from './access'
 
-const TODAY_IDX = 2 // T4 trong tuần lịch làm việc
 const SOURCE = {
   machine: { label: 'Máy chấm công', icon: 'fingerprint', tone: 'primary' },
   gps: { label: 'GPS di động', icon: 'mapPin', tone: 'attendance' },
