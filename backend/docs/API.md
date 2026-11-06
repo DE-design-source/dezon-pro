@@ -4,7 +4,8 @@ Hai lối vào dùng chung một tầng service: cổng tương thích `POST /ap
 
 ## 1. Cổng tương thích: `POST /api/<tênHàm>`
 
-Giao diện cũ `public/` của app Node (đã gỡ khỏi repo) dùng lối này. Hành vi giữ đúng như `server/index.js`.
+Cổng gọi hàm theo tên, giữ cho client cũ; giao diện React không dùng lối này. Tập hàm, quyền và hành vi đóng băng
+(80 hàm, `tests/fixtures/registry.json`, test `TestRegistryParity`).
 
 Request:
 
@@ -17,7 +18,7 @@ Content-Type: application/json
 {"args": ["DA-001"]}
 ```
 
-- `args` là mảng tham số theo đúng thứ tự của hàm Node (không tính actor).
+- `args` là mảng tham số theo đúng thứ tự tham số của hàm (không tính actor; tên và thứ tự: `GET /api-docs.json`).
 - Token ở header được ưu tiên hơn `token` trong thân.
 
 Response (luôn kèm header `x-app-ver`):
@@ -31,7 +32,7 @@ Response (luôn kèm header `x-app-ver`):
 | Hàm chỉ Admin | 403 | `{"error":"Không có quyền (chỉ Admin)"}` |
 | Hàm chỉ quản trị hệ thống | 403 | `{"error":"Chỉ quản trị hệ thống"}` |
 | Hàm báo lỗi | 500 | `{"error":"<thông báo>"}` (không có thông báo -> `Lỗi máy chủ`) |
-| Thân JSON hỏng | 400 | trang lỗi HTML kiểu Express (`Bad Request`) |
+| Thân JSON hỏng | 400 | trang lỗi HTML (`Bad Request`) |
 | Thân JSON quá 30 MB | 413 | trang lỗi HTML (`Payload Too Large`) |
 
 Cổng này LUÔN trả 500 cho lỗi của hàm, kể cả khi service trả lỗi có mã 4xx.
@@ -49,7 +50,7 @@ Cổng này LUÔN trả 500 cho lỗi của hàm, kể cả khi service trả l�
   khác của cùng tài khoản vẫn chạy.
 - `changePassword` thu hồi mọi phiên KHÁC của tài khoản; phiên đang dùng giữ nguyên.
 - Khoá tài khoản / đổi vai trò / đổi công ty / xoá tài khoản: có hiệu lực ngay như trước (bỏ cache). Khoá KHÔNG xoá phiên:
-  mở khoá lại thì token cũ dùng tiếp (giữ hành vi bản Node). Xoá tài khoản xoá luôn phiên (khoá ngoại `ON DELETE CASCADE`).
+  mở khoá lại thì token cũ dùng tiếp. Xoá tài khoản xoá luôn phiên (khoá ngoại `ON DELETE CASCADE`).
 - Admin đặt lại mật khẩu (`adminSetPassword`, `PUT /users/:id/password`) thu hồi MỌI phiên của tài khoản đó (mật khẩu cũ có thể
   đã lộ: khoá -> đặt lại mật khẩu -> mở khoá thì token kẻ gian đang giữ không dùng tiếp được). Admin tự đặt lại cho chính mình
   thì giữ phiên đang dùng, các phiên khác bị thu hồi.
@@ -69,13 +70,13 @@ lỗi trả về giữ nguyên, nhưng phần đã ghi của thao tác được 
 - `deleteProject`: 4 lệnh xoá ghi trọn hoặc không (lỗi xoá dữ liệu phụ của dự án vẫn bị bỏ qua như cũ).
 - `duplicateProject`: lỗi -> không còn dự án bản sao dở.
 - `saveCover`, `PUT /api/v1/projects/:id/cover`: lỗi -> tờ bìa giữ nguyên bản cũ (không còn cảnh bản cũ + bản mới cùng lúc).
-- `createCongTy`: tạo tài khoản chủ lỗi -> công ty cũng không được tạo (bản Node để lại công ty mồ côi).
+- `createCongTy`: tạo tài khoản chủ lỗi -> công ty cũng không được tạo (không còn công ty mồ côi).
 - `deleteCongTy`: lỗi -> dữ liệu các bảng của công ty không bị xoá dở (lỗi xoá từng bảng vẫn bị bỏ qua như cũ).
 - `setCombo`, `setBienThe`, `deleteDbProduct`: phần ghi trọn hoặc không; lịch sử, nhật ký, xoá cache chạy sau khi lưu xong.
   Hai lời gọi `setBienThe` / `setCombo` cùng lúc gặp deadlock: 1 bên lưu, bên kia nhận lỗi "Có người khác đang sửa cùng các sản phẩm này..."
   (không thay đổi gì, máy chủ không tự chạy lại).
 
-### Quyền của từng hàm (giữ như `server/index.js` của app Node cũ, đóng băng trong `tests/fixtures/registry.json`)
+### Quyền của từng hàm (đóng băng trong `tests/fixtures/registry.json`)
 
 - Không cần đăng nhập: `login`.
 - Chỉ super: `listCongTy`, `createCongTy`, `deleteCongTy`, `listCongTyUsers`, `createCongTyUser`, `baoCaoNhapSP`.
@@ -85,11 +86,11 @@ lỗi trả về giữ nguyên, nhưng phần đã ghi của thao tác được 
 - Còn lại: chỉ cần đăng nhập.
 
 Danh sách hàm đang đăng ký trên server đang chạy: `Registry.Names()` (xem `internal/server/rpc`).
-Tham số của từng hàm: `docs/PORTING_MAP.md` mục A, hoặc `GET /api-docs.json`.
+Tham số của từng hàm: `GET /api-docs.json`.
 
 ## 2. REST: `/api/v1`
 
-Chỉ bản Go có. Cùng cách xác thực (`Authorization: Bearer <token>`, `x-view-company`), cùng phong bì:
+Cùng cách xác thực (`Authorization: Bearer <token>`, `x-view-company`), cùng phong bì:
 
 - thành công: `{"ok":true,"result":...}`
 - lỗi: `{"error":"...","code":"..."}`; mã HTTP lấy từ lỗi của service (4xx nếu service đặt), lỗi thường là 500
@@ -98,13 +99,13 @@ Chỉ bản Go có. Cùng cách xác thực (`Authorization: Bearer <token>`, `x
   giao diện React QS so giá trị này để nhắc "Đã có bản cập nhật mới" (M1.1). Khi bật `CORS_ORIGINS`, header nằm trong `Access-Control-Expose-Headers`
 
 Mỗi route gọi đúng phương thức service mà hàm rpc tương ứng gọi, nên kết quả và quy tắc nghiệp vụ giống nhau.
-Ngoại lệ: `PUT /projects/:id/cover` đổi lỗi chi phí âm thành 400 tiếng Việt (mục 2.1); rpc `saveCover` vẫn trả lỗi ràng buộc DB (500) như Node.
+Ngoại lệ: `PUT /projects/:id/cover` đổi lỗi chi phí âm thành 400 tiếng Việt (mục 2.1); rpc `saveCover` vẫn trả lỗi ràng buộc DB (500).
 
 Quy ước truyền tham số:
 
 - Tham số đường dẫn (`:id`, `:key`, `:code`, `:khoa`) ứng với các tham số ĐẦU của hàm rpc, theo thứ tự.
 - Tham số còn lại: `GET` lấy từ query string, phương thức khác lấy từ thân JSON theo tên tham số
-  (tên tham số từng hàm: `docs/PORTING_MAP.md` mục A; hàm nhận nguyên một object thì thân JSON chính là object đó).
+  (tên tham số từng route: `GET /api-docs.json`; hàm nhận nguyên một object thì thân JSON chính là object đó).
 - Phương thức dùng: `GET` đọc, `POST` tạo / thao tác, `PATCH` sửa một phần, `PUT` ghi đè một giá trị, `DELETE` xoá.
 
 Bảng route đầy đủ (80 route, sinh từ `RestRoutes` trong `internal/server/rest.go`; quyền lấy từ `tests/fixtures/registry.json`).
@@ -197,9 +198,9 @@ Không có route `GET /projects/:id` (chi tiết một dự án): dùng `GET /bo
 
 ### 2.1 REST chỉ bản Go
 
-Từ khi gỡ app Node, tính năng mới KHÔNG thêm hàm `POST /api/<tênHàm>` (cổng rpc giữ đúng 80 hàm của Node, test
-`TestRegistryParity` so với `tests/fixtures/registry.json`) và KHÔNG thêm dòng vào bảng `RestRoutes`. Tính năng mới là route REST
-"chỉ bản Go" dưới `/api/v1`, do chính module khai ở hai chỗ:
+Tính năng mới KHÔNG thêm hàm `POST /api/<tênHàm>` (cổng rpc giữ đúng 80 hàm, test `TestRegistryParity` so với
+`tests/fixtures/registry.json`) và KHÔNG thêm dòng vào bảng `RestRoutes`. Tính năng mới là route REST "chỉ bản Go" (`rpc.GoRoute`,
+tên nhóm trong tài liệu Swagger) dưới `/api/v1`, do chính module khai ở hai chỗ:
 
 1. Trong `RegisterRPC`: `reg.RegisterGoRoute(rpc.GoRoute{...})` - tên, method, đường dẫn, quyền, nhóm tài liệu, tham số.
    Trùng `Name`, trùng `Method + Path`, hoặc `Name` trùng một hàm rpc -> panic lúc khởi động.
@@ -243,7 +244,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
   `Path` có đoạn `*` / `:` không tên / tham số trùng.
 - Phong bì như mọi route REST: `{"ok":true,"result":...}` / `{"error":"...","code":"..."}` (dùng `response.Result` / `response.Fail`).
 - Tài liệu `/api-docs.json` tự có thao tác của route: nhóm `REST - <Tag> (chỉ bản Go)` (`Tag` trống -> `Khác`),
-  `operationId` = `v1go_<Name>`. Không sửa `internal/server/apidocs/*` (dữ liệu của Node, đóng băng).
+  `operationId` = `v1go_<Name>`. Không sửa `internal/server/apidocs/*` (dữ liệu đóng băng).
 - Test `TestRestRoutes` coi route `/api/v1` ngoài bảng `RestRoutes` là hợp lệ khi đã khai bằng `RegisterGoRoute`, và kiểm 401 / 403 theo `Perm`
   (người không đủ quyền bị chặn đúng thân; người đủ quyền KHÔNG bị middleware chặn - gắn middleware chặt hơn `Perm` cũng hỏng test);
   route gắn mà không khai, hoặc khai mà không gắn, đều làm test hỏng. Ca đủ quyền chạy handler thật với request đã huỷ context
@@ -263,7 +264,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/work-items/import/parse` | `ctImportParse` | `rpc.Login` | estimates | Đọc file nhập công tác -> `{rows, loi}` (M5.1) |
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
-| `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); route gốc `/mau-nhap-*.xlsx` đóng băng theo bản Node nên ngành mới đi dưới `/api/v1` |
+| `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); bảng route gốc `/mau-nhap-*.xlsx` (`RootRoutes`) đóng băng nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
 | `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng (`createdAt` / `wonAt` yyyy-mm-dd tuỳ chọn, chỉ khi tạo: nạp dữ liệu mẫu) |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
@@ -1031,7 +1032,7 @@ Kết quả `{ok: true, id, ma, ten}` (`id` = id dòng mới). Lỗi nghiệp v�
   không kiểm trùng.
 - Ghi thêm: lịch sử `db_san_pham_history` trường `SAO CHÉP TỪ KHO DEZON` (`<tên> (từ SP #<key> kho Dezon) (bởi <user>)`); nhật ký
   `sao_chep_sp_dezon`; xoá cache danh mục. Sau đó `GET /products` của công ty trả bản riêng và ẩn dòng kho chung trùng ĐỦ khoá kiểm trùng ở
-  trên (khác Node, `ARCHITECTURE.md` mục 10.4). Bản sao sửa / xoá / duyệt như sản phẩm thường.
+  trên (`ARCHITECTURE.md` mục 10.4). Bản sao sửa / xoá / duyệt như sản phẩm thường.
 
 `POST /companies/expiry-reminders` (tag "Công ty", `companies/expiry.go`; không có hàm `/api/:fn` tương ứng, parity 80 hàm giữ nguyên):
 - Thân `{dryRun?: boolean}`. CHỈ gửi thật khi `dryRun === false` (boolean); thiếu `dryRun`, thân rỗng / `{}` / không phải object, hay
@@ -1046,18 +1047,18 @@ Kết quả `{ok: true, id, ma, ten}` (`id` = id dòng mới). Lỗi nghiệp v�
   `refId` = id công ty. Nhật ký `audit_log` action `nhac_gia_han` (công ty = công ty được nhắc).
 - Job nền gọi cùng hàm lúc 8h05 giờ VN mỗi ngày (`ARCHITECTURE.md` mục 10.4).
 
-Tham số / kiểm tra mới trên route cũ (chỉ bản Go; chi tiết ở `ARCHITECTURE.md` mục 10.4):
+Tham số / kiểm tra mới trên route cũ (chi tiết ở `ARCHITECTURE.md` mục 10.4):
 
 - `PATCH /users/:id` (`adminUpdateUser`): khoá thân `email` (tuỳ chọn). Trùng email đang lưu (trim + chữ thường) = không đổi, không ghi.
   Đổi: trim + chữ thường; `""` / null = xoá; sai dạng -> `Email không hợp lệ`; trùng tài khoản khác cùng công ty ->
   `Email đã dùng cho tài khoản khác trong công ty`. `POST /users` (`adminCreateUser`) không đổi.
 - `POST /companies`, `PATCH /companies/:id` (`createCongTy`, `updateCongTy`): `mauChinh` khác null phải là `""`, `#RGB` hoặc `#RRGGBB`,
-  khác -> `Màu chính phải dạng #RRGGBB`. `createCongTy` không lưu màu (như Node): lưu bằng `updateCongTy` sau khi tạo.
+  khác -> `Màu chính phải dạng #RRGGBB`. `createCongTy` không lưu màu: lưu bằng `updateCongTy` sau khi tạo.
 - `PATCH /companies/:id` (`updateCongTy`), M17.3: patch có `hanDung` thì đọc `cong_ty` trước khi update (lỗi đọc bỏ qua); super đổi `hanDung`
   sang ngày khác thì một lệnh RIÊNG đặt `nhac_moc` = `nhac_lan_cuoi` = NULL (chỉ khi đang khác null; lỗi chỉ ghi log). Kết quả trả về và
   nhật ký không đổi.
 - `POST /product-delete-requests` (`requestDeleteProducts`): khoá thân `lyDo` (rpc args[1]), tuỳ chọn. Trim; rỗng / thiếu / không phải chuỗi
-  = không ghi gì (lệnh chèn y như Node). Có chữ: ghi `delete_requests.note` trong CÙNG lệnh chèn và nối `": <lyDo>"` vào thông báo gửi admin.
+  = không ghi gì (lệnh chèn như khi không có lý do). Có chữ: ghi `delete_requests.note` trong CÙNG lệnh chèn và nối `": <lyDo>"` vào thông báo gửi admin.
   > 500 ký tự (đếm theo ký tự Unicode) -> `Lý do tối đa 500 ký tự`.
 - `POST /product-delete-requests/:id/resolve` (`resolveDeleteRequest`): khoá thân `lyDo` (rpc args[2]), tuỳ chọn, chỉ dùng khi
   `approve = false`. Có chữ: lệnh RIÊNG (sau lệnh giành quyền) ghi `resolution_note`, lỗi lệnh này (vd 42703 khi chưa chạy 0010) chỉ ghi
@@ -1080,20 +1081,20 @@ Tham số / kiểm tra mới trên route cũ (chỉ bản Go; chi tiết ở `AR
   `coverMau='m1'` (6 cột NO | HẠNG MỤC | NỘI DUNG | CHI PHÍ DỰ KIẾN | TỶ TRỌNG | MÔ TẢ, ô NO / HẠNG MỤC gộp dọc theo mục lớn);
   `cols[i].w` (px) -> bề rộng cột sheet chi tiết (px/7); sheet "Tổng cộng" thêm "Ngày báo giá · Hiệu lực", TIẾN ĐỘ THANH TOÁN, GHI CHÚ &
   ĐIỀU KHOẢN, Người lập. Giới hạn: chuỗi ≤ 500 ký tự, ≤ 10 dòng công ty, ≤ 20 đợt, ≤ 30 ghi chú, w ≤ 2000 px. Không có `opts` (thiếu / null /
-  không phải object): file giống TỪNG BYTE như trước (`w` trong `cols` bị bỏ qua như Node).
+  không phải object): file giống TỪNG BYTE như trước (`w` trong `cols` bị bỏ qua).
 - `PUT /projects/:id/cover` (`saveCover`): dòng có `chiPhi` < 0 -> HTTP 400 `Chi phí dự kiến không được âm (mục <stt>).`
-  (`(dòng <n>)` khi thiếu stt), không ghi gì. Chỉ route REST; rpc `saveCover` giữ lỗi ràng buộc của DB như Node (golden `save-neg`).
+  (`(dòng <n>)` khi thiếu stt), không ghi gì. Chỉ route REST; rpc `saveCover` giữ lỗi ràng buộc của DB (golden `save-neg`).
   Đổi lỗi SAU khi gọi `saveCover` (lỗi ràng buộc `ck_cost_estimate_lines_cost` -> 400) nên thứ tự kiểm giống rpc: dự án không tồn tại /
   khác công ty vẫn báo `Bản nháp không còn tồn tại...` trước, kể cả khi có chi phí âm.
 - Object dự án (`getProjects`, `getProject`, `createProject`, `updateProject`, `duplicateProject`, `bootstrap.projects`, REST `/projects*`):
   nối cuối khoá `hienTrang` (cột `projects.current_condition`, migration 0011). `updateProject` chỉ ghi khi client gửi khoá `hienTrang`
   (kể cả rỗng); `createProject` ghi khi khác rỗng.
 
-Tài liệu Swagger của 80 route cũ là dữ liệu Node đóng băng nên KHÔNG ghi các khoá mới này.
+Tài liệu Swagger của 80 route cũ là dữ liệu đóng băng nên KHÔNG ghi các khoá mới này.
 
 ## 3. Route khác
 
-Route lẻ của nghiệp vụ (giữ nguyên đường dẫn của bản Node, bảng `RootRoutes` trong `rest.go`):
+Route lẻ của nghiệp vụ (đóng băng, bảng `RootRoutes` trong `rest.go`):
 
 | Route | Đăng nhập | Ý nghĩa |
 |---|---|---|
@@ -1110,38 +1111,38 @@ Route lẻ của nghiệp vụ (giữ nguyên đường dẫn của bản Node, 
 Route lẻ cần đăng nhập nhận token ở header hoặc `token` trong thân; thiếu thì trả 401 `{"error":"Chưa đăng nhập"}` (không có `code`).
 Token đã đăng xuất / bị thu hồi cũng 401 như vậy (kiểm phiên như mục 1, M1.2).
 
-Tài liệu API (Swagger), bật / tắt như bản Node: `SWAGGER_DOCS=0` tắt; `NODE_ENV=production` thì cần `SWAGGER_DOCS=1` mới bật.
+Tài liệu API (Swagger): `SWAGGER_DOCS=0` tắt; `NODE_ENV=production` thì cần `SWAGGER_DOCS=1` mới bật.
 Image Docker đặt sẵn `NODE_ENV=production`, nên trong image các route dưới đây trả 404 cho tới khi đặt `SWAGGER_DOCS=1`.
 | Route | Ý nghĩa |
 |---|---|
-| `GET /api-docs.json` | spec OpenAPI: phần của Node (80 path `/api/<fn>` + 9 route lẻ) cộng 80 thao tác REST `/api/v1` và thao tác của các route chỉ bản Go (mục 2.1) |
+| `GET /api-docs.json` | spec OpenAPI: phần cố định (80 path `/api/<fn>` + 9 route lẻ, đóng băng) cộng 80 thao tác REST `/api/v1` và thao tác của các route chỉ bản Go (mục 2.1) |
 | `/api-docs` | chuyển hướng 301 sang `/api-docs/` |
 | `/api-docs/*` | Swagger UI nhúng sẵn (không gọi CDN); `*/package.json` trả 404 `Not Found` |
 
-`/api-docs` và mọi đường dẫn con trả lời MỌI phương thức và không phân biệt hoa thường, như `app.use('/api-docs', ...)` của bản Node.
+`/api-docs` và mọi đường dẫn con trả lời MỌI phương thức và không phân biệt hoa thường.
 
 Giao diện:
 
 | Route | Ý nghĩa |
 |---|---|
-| `GET /vs-spec.js`, `/son-spec.js`, `/ct-spec.js` | spec ngành (UMD) nhúng trong binary, `application/javascript; charset=UTF-8`, `Cache-Control: no-cache`; không cần đăng nhập |
+| `GET /vs-spec.js`, `/son-spec.js`, `/ct-spec.js`, `/dl-spec.js` | spec ngành (UMD) nhúng trong binary, `application/javascript; charset=UTF-8`, `Cache-Control: no-cache`; không cần đăng nhập |
 | `GET /logo.svg` | logo mặc định nhúng trong binary, `image/svg+xml`, `Cache-Control: public, max-age=0` |
 | `GET /mau-nhap-hang-loat.xlsx` | file mẫu nhập hàng loạt sản phẩm nhúng trong binary, `Cache-Control: public, max-age=0` |
 | `GET /mau-nhap-cong-tac.xlsx` | file mẫu nhập công tác (Phần thô) nhúng trong binary (module estimates), `Cache-Control: public, max-age=0` |
 | `GET /` và file trong `STATIC_DIR` | TUỲ CHỌN (chỉ khi đặt `STATIC_DIR`): giao diện cũ (HTML / JS / CSS luôn `Cache-Control: no-cache`) |
 | `GET /vendor/jspreadsheet/*`, `/vendor/formula/*`, `/vendor/jsuites/*` | TUỲ CHỌN (chỉ khi đặt `STATIC_DIR`): thư viện bảng tính lấy từ `VENDOR_DIR`, cache 7 ngày |
 
-File nhúng trả như `express.static` trước đây: GET / HEAD, `Accept-Ranges: bytes`, ETag yếu theo nội dung (gửi lại `If-None-Match` -> 304), không có `Last-Modified`.
+File nhúng: GET / HEAD, `Accept-Ranges: bytes`, ETag yếu theo nội dung (gửi lại `If-None-Match` -> 304), không có `Last-Modified`.
 
 ## 4. Lỗi chung cho mọi route
 
 | Trường hợp | Mã | Thân |
 |---|---|---|
-| Đường dẫn không có (kể cả dưới `/api/v1`) hoặc sai phương thức | 404 | trang HTML kiểu Express: `Cannot <METHOD> <đường dẫn>` |
-| Thân JSON quá 30 MB gửi tới `/upload/file` | 413 | JSON `{"error":"File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}` (giống bản Node từng byte) |
+| Đường dẫn không có (kể cả dưới `/api/v1`) hoặc sai phương thức | 404 | trang HTML: `Cannot <METHOD> <đường dẫn>` |
+| Thân JSON quá 30 MB gửi tới `/upload/file` | 413 | JSON `{"error":"File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}` |
 | Thân JSON quá 30 MB gửi tới route khác | 413 | trang HTML `Payload Too Large` |
 | `Content-Encoding` hoặc charset không hỗ trợ | 415 | trang HTML `Unsupported Media Type` |
 | Vượt giới hạn tần suất (chỉ khi đặt `RATE_LIMIT_RPS` > 0) | 429 | `{"error":"Quá nhiều yêu cầu, vui lòng thử lại sau"}` + header `Retry-After: 1` |
 | Panic ngoài cổng rpc | 500 | trang HTML `Internal Server Error` |
 
-Khớp đường dẫn như Express 4: `HEAD` dùng handler của `GET`; phần cố định không phân biệt hoa thường; cho phép thừa một dấu `/` cuối.
+Khớp đường dẫn: `HEAD` dùng handler của `GET`; phần cố định không phân biệt hoa thường; cho phép thừa một dấu `/` cuối.

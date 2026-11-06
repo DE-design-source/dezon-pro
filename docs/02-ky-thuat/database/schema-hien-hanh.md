@@ -28,7 +28,7 @@
 | Công ty, tài khoản | `companies` (`cong_ty`) | Công ty (tenant) và gói dịch vụ | 3 | - |
 | Công ty, tài khoản | `company_settings` (`cai_dat_cong_ty`) | Tài liệu cấu hình theo công ty (ptInfo, bgOrg) | 0 | trực tiếp: `company_id` -> `companies` |
 | Công ty, tài khoản | `users` (`users`) | Tài khoản, vai trò, quyền | 8 | trực tiếp: `company_id` -> `companies` |
-| Công ty, tài khoản | `user_sessions` (`phien_dang_nhap`) | Phiên đăng nhập: 1 dòng / lần đăng nhập, token mang id (M1.2) | 0 | xuyên công ty (chỉ truy cập noScope); công ty = công ty của `users` |
+| Công ty, tài khoản | `user_sessions` (`phien_dang_nhap`) | Phiên đăng nhập: 1 dòng / lần đăng nhập, token mang id (M1.2) | 0 | xuyên công ty (chỉ truy cập `NoScope`); công ty = công ty của `users` |
 | Nhật ký, thông báo | `audit_logs` (`audit_log`) | Nhật ký thao tác (chỉ thêm) | 2933 | `company_id` (tham chiếu mềm, không khoá ngoại) |
 | Nhật ký, thông báo | `notifications` (`notifications`) | Thông báo cho từng user | 24 | trực tiếp: `company_id` -> `companies` |
 | Danh mục sản phẩm | `products` (`db_san_pham`) | Sản phẩm / biến thể: định danh, giá, 5 trục biến thể, thuộc tính dùng chung, duyệt | 1093 | trực tiếp: `company_id` -> `companies` |

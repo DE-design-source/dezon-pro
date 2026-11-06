@@ -1,5 +1,7 @@
 # Kết quả triển khai refactor database
 
+> Mục 1-6 là bản ghi lịch sử ngày 2026-10-12, viết khi còn app Node (đã gỡ ở commit `5fa5d52`). Đường dẫn `server/...`, `public/...`, `scripts/...`, `infra/scripts/migrate.js` và lệnh `npm ...` ở đó là của bản cũ; bản hiện hành xem `backend/` và `frontend/`. Mục 7-8 mô tả cách làm hiện nay.
+
 - **Ngày:** 2026-10-12. **Phạm vi:** database local `qspro_en2` (PostgreSQL 17, container `qspro-postgres`, cổng 5434). Production (Supabase / Render) **chưa** đụng tới.
 - **Cấu trúc đang chạy:** [schema-hien-hanh.md](schema-hien-hanh.md) (sinh từ database).
 - Tài liệu này ghi những gì đã làm thật, khác gì so với bản đề xuất, kết quả kiểm thử, và cách vận hành.
@@ -100,7 +102,7 @@ Client không đổi gì khác: mọi API trả đúng hình dạng cũ.
 
 **Quay lui:** đổi `DATABASE_URL` về `.../qspro_en` **và** hoàn code về commit trước refactor (code mới không chạy trên schema cũ). Dữ liệu ghi vào `qspro_en2` sau lúc chuyển sẽ không có ở `qspro_en`.
 
-**Migration** (chạy từ `backend/`; công cụ `infra/scripts/migrate.js` và `npm run migrate` của bản Node đã gỡ, thay bằng `cmd/migrate`):
+**Migration** (chạy từ `backend/`, công cụ `cmd/migrate`):
 
 ```bash
 go run ./cmd/migrate                          # chạy file chưa áp dụng trên DATABASE_URL (.env rồi ../.env)
@@ -132,6 +134,6 @@ File mới đặt ở `infra/db/migrations/NNNN_ten.sql`; không sửa file đã
 
 1. Người dùng thử trên trình duyệt qua các tab chính, đặc biệt: nhập sản phẩm 4 ngành, bóc tách, tờ bìa, mua hàng, đề xuất, xuất Excel.
 2. Quyết định về 13 dòng bóc tách trong khu cách ly (mục 3).
-3. Kế hoạch cắt chuyển production: production nay chạy trên VPS CloudFly (backend Go + PostgreSQL, không còn Render); xem [trien-khai-vps-cloudfly.md](../../04-van-hanh/trien-khai-vps-cloudfly.md) và [migration-plan.md](migration-plan.md) mục 9.
+3. Kế hoạch cắt chuyển production: production nay chạy trên VPS CloudFly (backend Go + PostgreSQL, Docker Compose); xem [trien-khai-vps-cloudfly.md](../../04-van-hanh/trien-khai-vps-cloudfly.md) và [migration-plan.md](migration-plan.md) mục 9.
 4. Các điểm bảo mật không thuộc phạm vi database, vẫn còn nguyên: `AUTH_SECRET` có giá trị dự phòng trong source, project Supabase cũ còn mở, đọc sản phẩm chéo công ty qua combo, webhook Lark dùng chung. Xem [tenant-security.md](tenant-security.md).
 5. Xoá 8 cột `DEPRECATED` còn trong danh sách D-09 (ban đầu 12; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date`, `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15). Transaction (D-13) đã xong ngày 2026-10-15 trên backend Go; còn mở: gộp cả lần gửi nhiều đơn mua hàng vào 1 transaction (cần `clock_timestamp()`).

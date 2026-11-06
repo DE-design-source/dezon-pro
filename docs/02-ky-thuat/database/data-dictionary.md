@@ -58,7 +58,7 @@ Phiên đăng nhập lưu phía máy chủ - thêm bằng migration 0014 (2026-1
 Mỗi lần đăng nhập 1 dòng; token ký HMAC mang `id` (khoá `sid`). Đăng xuất xoá dòng -> token hết hiệu lực ngay; tự đổi mật khẩu
 xoá các phiên khác của tài khoản; admin đặt lại mật khẩu xoá mọi phiên của tài khoản đó; xoá tài khoản xoá phiên (CASCADE). Dòng quá hạn bị bỏ qua và được dọn ở lần đăng nhập kế tiếp
 của tài khoản. **Xếp loại (quy tắc 25): bảng hệ thống, xuyên công ty** - kiểm phiên chạy trước khi biết công ty nên mọi truy vấn
-`noScope` (`backend/internal/modules/auth/postgres.go`), luôn lọc tường minh theo `id` / `user_id`; không có `company_id`
+`NoScope: true` (`backend/internal/modules/auth/postgres.go`), luôn lọc tường minh theo `id` / `user_id`; không có `company_id`
 (công ty của phiên = công ty của `users`), không khai `tenant` trong `db-map.json` và không vào `TenantTables` (super không có
 công ty; thêm vào `TenantTables` sẽ đổi thứ tự xoá dữ liệu khi xoá công ty). Thay cho lọc dự phòng: chỉ module auth được chạm bảng
 (test `TestPhienChiTruyCapQuaAuth` trong `backend/internal/modules/auth`); module khác thu hồi phiên qua

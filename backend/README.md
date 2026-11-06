@@ -1,15 +1,12 @@
 # QS Pro backend (Go + Gin)
 
-Bản chuyển của `server/` (Node + Express, đã gỡ khỏi repo) sang Go, chạy độc lập: giữ cổng `POST /api/<tênHàm>`
-và có REST dưới `/api/v1` (giao diện React `frontend/src/pages/QS` dùng REST). Không cần app Node hay thư mục `public/`:
-6 file giao diện tải thẳng từ server (`/vs-spec.js`, `/son-spec.js`, `/ct-spec.js`, `/logo.svg`, `/mau-nhap-hang-loat.xlsx`,
-`/mau-nhap-cong-tac.xlsx`)
-được nhúng vào binary (go:embed), xem mục "File nhúng" bên dưới.
+Server API của QS Pro: cổng `POST /api/<tênHàm>` (80 hàm, đóng băng) và REST dưới `/api/v1` (giao diện React
+`frontend/src/pages/QS` dùng REST). 7 file giao diện tải thẳng từ server (`/vs-spec.js`, `/son-spec.js`, `/ct-spec.js`, `/dl-spec.js`,
+`/logo.svg`, `/mau-nhap-hang-loat.xlsx`, `/mau-nhap-cong-tac.xlsx`) được nhúng vào binary (go:embed), xem mục "File nhúng" bên dưới.
 
-- Kiến trúc, hợp đồng viết module, khác biệt so với bản Node (mục 10): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Kiến trúc, hợp đồng viết module, hành vi riêng và phần mở rộng (mục 10): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Database, migration: [docs/DATABASE.md](docs/DATABASE.md)
 - API: [docs/API.md](docs/API.md) (tính năng mới = route REST "chỉ bản Go", mục 2.1)
-- Bảng đối chiếu hàm Node -> module Go (bảng làm việc lúc chuyển mã, tiếng Anh): [docs/PORTING_MAP.md](docs/PORTING_MAP.md)
 
 ## Cấu hình
 
@@ -17,23 +14,23 @@ Chép `.env.example` thành `.env` rồi điền. Tối thiểu cần `DATABASE_
 
 Mọi đường dẫn tương đối tính từ THƯ MỤC ĐANG ĐỨNG (không phải vị trí file chạy), nên luôn chạy từ `backend/`:
 
-- `STATIC_DIR` (TUỲ CHỌN, mặc định trống = tắt): thư mục giao diện cũ kiểu `public/` của app Node, kèm thư viện bảng tính
+- `STATIC_DIR` (TUỲ CHỌN cũ, mặc định trống = tắt): thư mục giao diện tĩnh phục vụ ở `/`, kèm thư viện bảng tính
   dưới `/vendor` lấy từ `VENDOR_DIR` (mặc định `../node_modules`). Chỉ khi đặt `STATIC_DIR` server mới phục vụ hai thư mục đó và
   lúc khởi động ghi log `thiếu <đường dẫn> ...` nếu thiếu `index.html` / thư viện. Không đặt thì không có log nào.
 
-### File nhúng (thay cho `public/`)
+### File nhúng
 
 | Đường dẫn | Nguồn trong `backend/` | Content-Type | Cache-Control |
 |---|---|---|---|
-| `/vs-spec.js`, `/son-spec.js`, `/ct-spec.js` | `internal/shared/specs/js/*-spec.js` | `application/javascript; charset=UTF-8` | `no-cache` |
+| `/vs-spec.js`, `/son-spec.js`, `/ct-spec.js`, `/dl-spec.js` | `internal/shared/specs/js/*-spec.js` | `application/javascript; charset=UTF-8` | `no-cache` |
 | `/mau-nhap-hang-loat.xlsx` | `internal/modules/categories/assets/` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `public, max-age=0` |
 | `/mau-nhap-cong-tac.xlsx` | `internal/modules/estimates/assets/` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `public, max-age=0` |
 | `/logo.svg` | `internal/server/assets/` | `image/svg+xml` | `public, max-age=0` |
 
-- Khôi phục nguyên văn từ `public/` của commit cuối còn app Node (test `TestEmbeddedAssets` kiểm mã blob git từng file).
-- Header như `express.static` trước đây (GET / HEAD, Range, ETag yếu -> 304); ETag tính theo nội dung, không có `Last-Modified`.
+- Test `TestEmbeddedAssets` kiểm mã blob git từng file nhúng.
+- Header: GET / HEAD, Range, ETag yếu -> 304; ETag tính theo nội dung, không có `Last-Modified`.
   Bản nhúng đứng trước `STATIC_DIR`, nên luôn thắng nếu thư mục đó cũng có file cùng tên.
-- Ba file `*-spec.js` là NGUỒN DUY NHẤT của thông số ngành: sửa xong chạy `node backend/scripts/gen-specs.js` để sinh lại
+- Bốn file `*-spec.js` là NGUỒN DUY NHẤT của thông số ngành: sửa xong chạy `node backend/scripts/gen-specs.js` để sinh lại
   `internal/shared/specs/data/*.json`, `testdata/golden.json`, `testdata/sources.json` (test Go báo nếu quên).
 
 ### Quy tắc kế thừa `.env` (đọc kỹ trước khi chạy thử)
@@ -58,7 +55,7 @@ webhook Lark thật ghi sẵn trong code):
 | `PURCHASE_WEBHOOK` | `http://127.0.0.1:9/x` | tin yêu cầu mua hàng / đề xuất |
 | `REPORT_WEBHOOK` | `http://127.0.0.1:9/x` | tin báo cáo (hàm `baoCaoNhapSP` gọi tay) |
 
-### Biến của chat (module `chat`, chỉ bản Go)
+### Biến của chat (module `chat`)
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
@@ -186,7 +183,7 @@ Dùng database thử RIÊNG `qspro_chattest` (container `qspro-postgres`), KHÔN
 
 ## Chạy bằng Docker
 
-Dựng image từ GỐC repo (image cần migration ở `infra/db/migrations`; không cần app Node, `public/` hay `npm`):
+Dựng image từ GỐC repo (image cần migration ở `infra/db/migrations`):
 
 ```
 docker build -f infra/docker/backend.Dockerfile -t qspro-backend .
@@ -232,19 +229,13 @@ docker exec qspro-go go test -count=1 ./...          # không có TEST_DATABASE_
 docker exec -e TEST_DATABASE_URL=postgresql://qspro:<mật khẩu>@host.docker.internal:5434/qspro_gotest qspro-go go test -race -count=1 -p 1 ./...
 ```
 
-> **Công cụ đối chiếu với bản Node đã gỡ (2026-10-15).** Bộ so vi sai `tests/e2e/diff/`, `smoke.js`, `http-diff.sh`,
-> `check-node-sync.sh`, `sync-api-docs.js`, `sync-test-sequences.sh`, `tests/fixtures/{gen-registry,gen-swagger,db-diff-node,db-diff-compare}.js`
-> và các script `gen*.js` / `noderef.js` trong `internal/**/testdata/` chỉ chạy được cùng app Node (commit cuối còn Node: `83d264e`)
-> nên đã chuyển khỏi repo. Bản sao để khôi phục: `C:/demo/qs-unused-backup-2026-10-15/` (xem `MANIFEST.txt` trong đó), hoặc
-> `git show 83d264e:<đường dẫn>` với file đã commit. Dữ liệu mong đợi các script đó đã sinh vẫn nằm trong repo nên `go test` không cần Node.
-
 Hai bộ kiểm tra dùng ở lượt nghiệm thu, theo đúng thứ tự (mỗi bộ bắt đầu từ `qspro_gotest` vừa đặt lại về seed, xem lệnh đặt lại ở mục
 "Hạ tầng thử"):
 
 1. Lệnh `go test -race -count=1 -p 1 ./...` ở trên.
 2. E2E trên server Go chạy nền với bộ biến an toàn (lệnh "Chạy nền" ở mục Docker, thêm `-e AUTH_SECRET=<giá trị thử>`), rồi từ gốc repo:
    `$env:BASE_URL = 'http://localhost:3998'; $env:TEST_DATABASE_URL = 'postgresql://qspro:<mật khẩu>@localhost:5434/qspro_gotest'; node backend/tests/e2e/test-api-go.js`.
-   Đúng: `KẾT QUẢ test-api (http://localhost:3998): 96 đạt, 0 lỗi`. Script cần gói npm `pg` và `bcryptjs`; repo không còn `package.json`
+   Đúng: `KẾT QUẢ test-api (http://localhost:3998): 96 đạt, 0 lỗi`. Script cần gói npm `pg` và `bcryptjs`; repo không có `package.json`
    ở gốc nên phải cài riêng (vd `npm install --no-save pg bcryptjs` trong một thư mục tạm rồi đặt `NODE_PATH` trỏ `node_modules` của thư mục đó).
 
 - `-p 1` BẮT BUỘC khi có database: các gói dùng chung `qspro_gotest`, chạy song song thì gói này thấy dòng tạm của gói kia
@@ -288,9 +279,8 @@ Các biến sau bật việc ghi file kết quả; giá trị phải là đườ
 
 ### Dữ liệu mong đợi (golden)
 
-Dữ liệu mong đợi trong `internal/**/testdata/` (khoảng 6 MB) và `tests/fixtures/` được sinh từ mã Node thật và ĐƯỢC LƯU trong repo
-để `go test` chạy không cần Node. App Node đã gỡ nên các file này ĐÓNG BĂNG: không sinh lại, không sửa tay (xem `docs/ARCHITECTURE.md`
-mục 12.1); các script sinh cũ đã chuyển khỏi repo (ghi chú đầu mục Kiểm thử). Còn dùng được:
+Dữ liệu mong đợi trong `internal/**/testdata/` (khoảng 6 MB) và `tests/fixtures/` được lưu trong repo và ĐÓNG BĂNG: không sinh lại
+(script sinh không còn trong repo), không sửa tay (xem `docs/ARCHITECTURE.md` mục 12.1). Script sinh còn dùng được:
 
 - `node backend/scripts/gen-specs.js` (cần Node.js, không cần gói nào): sinh lại `internal/shared/specs/data/*.json` và golden của gói
   `specs` từ `internal/shared/specs/js/*-spec.js`. Sửa một file spec thì chạy lệnh này rồi `go test ./internal/shared/specs ./internal/server`.
@@ -307,7 +297,7 @@ internal/middleware      auth, tenant, rbac, cors, rate limit, đọc thân JSON
 internal/platform        database (PostgreSQL), storage (kho file trên đĩa, UPLOAD_DIR), redis, logger, webpush (Web Push của chat), mailer (email OTP),
                          objstore (MinIO / S3 cho tệp chat, CHAT_S3_*)
 internal/shared          omap, jsval, tenant, actor, response, errors, validator, contracts, qscore, specs, httpx
-internal/modules         nghiệp vụ theo module (17 gói kể cả system; chat có gói con realtime = gateway WebSocket)
+internal/modules         nghiệp vụ theo module (18 gói: system + 17 module nghiệp vụ; chat có gói con realtime = gateway WebSocket)
 internal/jobs            job nền (báo cáo nhập sản phẩm)
 scripts                  gen-specs.js: sinh specs/data từ *-spec.js
 tests/fixtures           dữ liệu đối chiếu tầng dữ liệu, registry, swagger (đóng băng) + jsref.js

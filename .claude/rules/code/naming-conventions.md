@@ -6,10 +6,11 @@
 
 ## Ngôn ngữ
 
-- Tên nghiệp vụ TRONG CODE (tên bảng / cột truyền cho `database.DB` - `Select` / `Insert` / `Update` / `Remove`, nhiều hàm)
-  là **tiếng Việt không dấu**; chú thích và chuỗi hiển thị là tiếng Việt có dấu. Giữ nguyên, không dịch sang tiếng Anh.
-- Tên bảng / cột TRONG DATABASE PostgreSQL là **tiếng Anh** (từ 2026-10-07); `backend/internal/platform/database/db-map.json`
-  ánh xạ hai chiều, tầng `backend/internal/platform/database` tự dịch khi đọc/ghi. Quy tắc database: `docs/02-ky-thuat/database/database-rules.md`.
+- Tên nghiệp vụ TRONG CODE (tên bảng / cột truyền cho `*database.DB`, khoá object trả về của hàm chuyển từ bản cũ) là
+  **tiếng Việt không dấu**; chú thích và chuỗi hiển thị là tiếng Việt có dấu. Giữ nguyên, không dịch sang tiếng Anh.
+- Tên gói, kiểu, file Go và route REST `/api/v1` là **tiếng Anh**.
+- Tên bảng / cột TRONG DATABASE PostgreSQL là **tiếng Anh**; `backend/internal/platform/database/db-map.json` ánh xạ hai chiều,
+  gói `database` tự dịch khi đọc/ghi. Quy tắc database: `docs/02-ky-thuat/database/database-rules.md`.
 
 ## Cơ sở dữ liệu (PostgreSQL)
 
@@ -17,7 +18,7 @@ Cột "Code" là tên dùng trong code (khoá của `db-map.json`); cột "Datab
 
 | Thứ | Code | Database | Ví dụ (code -> database) |
 |---|---|---|---|
-| Bảng | `snake_case`, tiếng Việt không dấu, **số ít** | `snake_case`, tiếng Anh, **số nhiều** | `du_an` -> `projects`, `db_san_pham` -> `products` |
+| Bảng | `snake_case`, tiếng Việt không dấu, **số ít**; bảng của module mới có tiền tố module | `snake_case`, tiếng Anh, **số nhiều**, tiền tố module nếu có | `du_an` -> `projects`, `db_san_pham` -> `products`, `hr_dinh_phi` -> `hr_unit_budgets`, `kd_khach_hang` -> `sales_leads` |
 | Bảng lịch sử | `<bảng>_history` | `<bảng số ít>_histories` | `db_san_pham_history` -> `product_histories`, `cong_tac_history` -> `work_item_histories` |
 | Cột | `snake_case` | `snake_case`, tiếng Anh | `ma_du_an` -> `project_code`, `ten_sp` -> `product_name`, `gia_ban_le` -> `retail_price` |
 | Khoá công ty | luôn là `cong_ty_id` | luôn là `company_id` | - |
@@ -26,52 +27,59 @@ Cột "Code" là tên dùng trong code (khoá của `db-map.json`); cột "Datab
 | Ràng buộc | - | `pk_` / `fk_` / `uq_` / `ck_` + `<bảng>_<cột>` | `pk_company_settings`, `uq_company_settings_company_id_setting_key`, `ck_products_dealer_price` |
 | File migration | - | `infra/db/migrations/<NNNN>_<snake_case>.sql`, số tăng dần | `0002_company_settings.sql`, `0007_proposal_items_split.sql` |
 
-Bảng / cột mới: thêm vào `backend/internal/platform/database/db-map.json` (bản duy nhất) cùng lúc với migration;
-bảng theo công ty thêm vào `TenantTables` trong `backend/internal/platform/database/postgres.go`.
-Cột thông số theo ngành khai báo trong `backend/internal/shared/specs/js/*-spec.js` (`vs-spec.js`, `son-spec.js`, `ct-spec.js`,
-`dl-spec.js`), sửa xong chạy `node backend/scripts/gen-specs.js`; nhãn trùng giữa các spec phải trỏ cùng một cột.
+Bảng / cột mới: thêm vào `backend/internal/platform/database/db-map.json` (bản duy nhất) cùng lúc với migration.
+Cột thông số theo ngành khai báo trong `backend/internal/shared/specs/js/{vs,son,ct,dl}-spec.js`; nhãn trùng
+giữa các spec phải trỏ cùng một cột.
 
-## Backend (`backend/`, Go)
-
-| Thứ | Quy ước | Ví dụ |
-|---|---|---|
-| Module Go | `qspro-backend` | `qspro-backend/internal/modules/takeoff` |
-| Gói module nghiệp vụ | `internal/modules/<tên>`: chữ thường, một từ, tiếng Anh | `auth`, `projects`, `takeoff`, `materials`, `purchasing`, `quotations`, `hr`, `chat` |
-| File trong module | theo vai trò (`backend/docs/ARCHITECTURE.md` mục 4); tách nhỏ bằng tiền tố `service_` | `service.go`, `repository.go`, `postgres.go`, `model.go`, `dto.go`, `handler.go`, `service_test.go`, `service_edit_requests.go` |
-| Hàm `/api/:fn` (rpc) | `camelCase`, khai bằng `reg.Register(tên, quyền, handler)`, **duy nhất**; quyền `rpc.Login` / `Public` / `Admin` / `Super`. Đóng băng 80 hàm, KHÔNG thêm mới | `getProjects`, `ctSave`, `adminCreateUser`, `sendDeXuat` |
-| Route chỉ bản Go | `GoRoute.Name` `camelCase`, duy nhất (không trùng tên hàm rpc); khai bằng `reg.RegisterGoRoute` (`backend/docs/API.md` mục 2.1) | `hrLoad`, `hrCreateEmployee`, `copySharedProduct`, `mauNhapDienLanh` |
-| Phương thức service công khai | tên hàm rpc viết PascalCase | `getProjects` -> `GetProjects`, `getLines` -> `GetLines` |
-| Cửa ngõ kiểm quyền | hậu tố `Gated` trên phương thức service | `SaveLineAsProductGated`, `SetSpDuyetGated` |
-| Hàm / phương thức nội bộ | camelCase chữ đầu thường (không còn hậu tố `_`: `calc_` -> `calc`) | `tx`, `copyChildren`, `readAddLineBody` |
-| Interface gọi chéo module | khai một lần trong `internal/shared/contracts`, tên danh từ tác nhân | `Notifier`, `Auditor`, `UserReader`, `PurchaseNotifier` |
-| Object trả về client | khoá `camelCase` (đổi từ cột `snake_case`), thứ tự khoá qua `omap.Of(...)` / struct tag `json` | `donGiaVon`, `maDA`, `thanhTienBan` |
-| Biến môi trường | `UPPER_SNAKE_CASE`, đọc trong `internal/config` | `AUTH_SECRET`, `REPORT_WEBHOOK`, `UPLOAD_DIR`, `REDIS_URL` |
-
-## Frontend (`frontend/src`, React)
+## Server Go (`backend/`)
 
 | Thứ | Quy ước | Ví dụ |
 |---|---|---|
-| Trang | thư mục `pages/<Tên>/` PascalCase, file `<Tên>.jsx` + `<Tên>.css` cùng tên | `pages/DuAn/DuAn.jsx`, `pages/MuaHang/MuaHang.css`, `pages/QS/QS.jsx` |
-| Component | file `.jsx` PascalCase | `components/layout/Sidebar.jsx`, `pages/QS/components/BreakdownTab.jsx`, `WorkGate.jsx` |
-| Hook | `use<Tên>.js` camelCase | `hooks/useLocalStorage.js`, `pages/QS/state/useLinesSheet.js` |
-| Module JS thường (api, lib, data, service) | `.js` camelCase | `pages/QS/api/qsApi.js`, `pages/QS/lib/calc.js`, `data/duAnData.js`, `services/storageService.js` |
-| Hàm gọi API | `camelCase`, trùng tên hàm rpc tương ứng, gọi REST `/api/v1` | `getProjects`, `createProject`, `notifReadAll` |
-| Hàm chuyển từ giao diện cũ (`pages/QS/lib`) | giữ hậu tố `_` | `recalcLine_`, `giaDaiLy_`, `donGiaCK_`, `spMaMap_` |
-| Lớp lỗi | PascalCase hậu tố `Error` | `QsApiError`, `QsAuthError`, `ChatApiError` |
-| Biến môi trường | tiền tố `VITE_` | `VITE_API_URL` |
+| Gói module | tên thư mục = tên gói, chữ thường một từ, tiếng Anh, trong `internal/modules/` | `takeoff`, `materials`, `purchasing`, `quotations` |
+| Gói tiện ích test | `<gói>test` | `users/userstest` |
+| File | chữ thường, nhiều từ nối `_`; tách nghiệp vụ dài thành `service_<việc>.go` | `handler.go`, `service_export.go`, `service_delete_requests.go`, `rate_limit.go` |
+| File test | `<file>_test.go`; test cần database thường đặt hậu tố `_db_test.go` | `service_test.go`, `service_db_test.go`, `tx_db_test.go` |
+| Kiểu chính của module | `Service`, `Deps`, interface `Repository`; bản cài repository không xuất | `type Service struct`, `type Deps struct`, `type pgRepo struct` |
+| Hàm dựng | `New(d Deps) *Service`, `NewRepository(db *database.DB) Repository` | `takeoff.New(takeoff.Deps{...})` |
+| Phương thức nghiệp vụ | PascalCase; hàm chuyển từ bản cũ giữ tên cũ viết hoa chữ đầu | `getLines` -> `GetLines`, `updateLine` -> `UpdateLine` |
+| Cửa ngõ kiểm quyền | hậu tố `Gated`, nhận `*actor.Actor` | `UpdateProductGated`, `CtSaveGated`, `SaveLineAsProductGated` |
+| Hàm nội bộ / helper | camelCase không xuất, không hậu tố `_` | `calc` (từ `calc_`), `lineToObj` |
+| Interface gọi chéo (`internal/shared/contracts`) | danh từ đuôi `-er` / `-or` theo việc | `Auditor`, `UserReader`, `Notifier`, `ProductSaver`, `LineReader` |
+| Tên hàm rpc (`reg.Register`, đóng băng) | camelCase, duy nhất; hàm quản lý user có tiền tố `admin` | `getProjects`, `ctSave`, `adminCreateUser`, `adminSetActive` |
+| Tên route chỉ bản Go (`GoRoute.Name`) | camelCase, duy nhất, thường có tiền tố module | `hrSaveOrg`, `hrAttendance`, `mauNhapDienLanh`, `nhacGiaHan` |
+| Quyền | `rpc.Login` / `rpc.Public` / `rpc.Admin` / `rpc.Super` / `rpc.Admin\|rpc.Super` / `rpc.SelfAuth`; REST: `middleware.RequireLogin()` / `RequireAdmin()` / `RequireSuper()` / `RequireAdminSuper()` | - |
+| Khoá object trả về client | camelCase; hàm chuyển từ bản cũ giữ khoá tiếng Việt, module chỉ bản Go (hr, sales, delivery) dùng tiếng Anh | `donGiaVon`, `maDA`, `thanhTienBan`; `startDate`, `valueVnd` |
+| Import gói lỗi | bí danh `apperr` | `apperr "qspro-backend/internal/shared/errors"` |
+| Biến môi trường | `UPPER_SNAKE_CASE`, khai ở `internal/config/config.go` + `backend/.env.example` | `AUTH_SECRET`, `REPORT_WEBHOOK`, `UPLOAD_DIR`, `CORS_ORIGINS` |
+
+## Client React (`frontend/src/`)
+
+| Thứ | Quy ước | Ví dụ |
+|---|---|---|
+| Thư mục trang | PascalCase tiếng Việt không dấu, trong `pages/`; file chính cùng tên | `pages/KinhDoanh/KinhDoanh.jsx`, `pages/ChamCong/ChamCong.jsx`, `pages/QS/QS.jsx` |
+| Component | PascalCase, đuôi `.jsx`, 1 component chính / file; tab có hậu tố `Tab` | `BreakdownTab.jsx`, `CostTab.jsx`, `SheetGrid.jsx`, `ConfirmDialog.jsx` |
+| Module JS không phải component | camelCase, đuôi `.js` | `catalogModel.js`, `bocActions.js`, `qsApi.js`, `navigation.js` |
+| Hook | `use<Tên>`, file cùng tên | `useLocalStorage.js`, `useSpecs.js`, `useLinesSheet.js` |
+| Context | `<Tên>Context.jsx` | `context/ThemeContext.jsx` |
+| File gọi API | `api.js` trong thư mục trang, hoặc `api/<tên>Api.js` | `pages/KinhDoanh/api.js`, `pages/QS/api/qsApi.js`, `pages/Chat/api/chatApi.js` |
+| Dịch vụ trình duyệt dùng chung | `services/<tên>Service.js` | `storageService.js`, `kdRequestService.js` |
+| Dữ liệu mẫu | `data/<trang>Data.js` (camelCase) | `kinhDoanhData.js`, `qsData.js` |
+| CSS | cạnh component: cùng tên component (`<Trang>.css`) hoặc tên thư mục chữ thường | `QS.css`, `DatePicker.css`, `breakdown/sheet/sheet.css` |
+| Hàm thuần chuyển từ giao diện cũ (`pages/QS/lib/`) | giữ tên cũ, kể cả hậu tố `_` | `tkNum_`, `safeUrl_`, `recalcLine_`, `giaDaiLy_`, `donGiaCK_` |
+| Hàm mới | camelCase, không hậu tố `_` | `selectProject`, `nodeName`, `fmtDate` |
+| Hằng toàn cục của module | `UPPER_SNAKE_CASE` | `TREE`, `DEFAULT_NODE`, `PERM_TABS`, `API_BASE` |
+| Biến môi trường Vite | `VITE_<TÊN>` | `VITE_API_URL` |
 
 ## Đường dẫn
 
-- REST: `/api/v1/<tài-nguyên>` số nhiều, tiếng Anh, kebab-case (`backend/docs/ARCHITECTURE.md` mục 5) - `/api/v1/projects`,
-  `/api/v1/projects/:id/lines`, `/api/v1/work-items`, `/api/v1/product-approvals`. Bảng route ứng với hàm rpc: `RestRoutes` trong
-  `backend/internal/server/rest.go` (đóng băng); route mới là route chỉ bản Go.
-- Cổng tương thích `POST /api/<tênHàm>` giữ đúng 80 hàm cũ, không thêm.
-- Route lẻ (bảng `RootRoutes`, giữ đường dẫn cũ): kebab-case tiếng Việt không dấu - `/export/san-pham`, `/export/cong-tac`,
-  `/export/bang`, `/upload/file`, `/media`, `/healthz`; file mẫu `/mau-nhap-<ngành>.xlsx`
-  (`/mau-nhap-thiet-bi-ve-sinh.xlsx`, `/mau-nhap-son-nuoc.xlsx`, `/mau-nhap-cong-tac-o-cam.xlsx`).
-- Route trang React: kebab-case tiếng Việt không dấu - `du-an`, `kinh-doanh`, `quan-ly-thiet-ke`, `qs-pro`.
+- REST: `/api/v1/<tài-nguyên>` - tiếng Anh, số nhiều, kebab-case (`/projects/:id/lines`, `/lines/save-as-product`,
+  `/companies/expiry-reminders`, `/product-templates/dien-lanh`); module mới đặt dưới tiền tố của mình (`/hr/...`, `/chat/...`).
+- Cổng cũ `POST /api/<tênHàm>` và 9 route lẻ ở gốc (kebab-case tiếng Việt không dấu: `/export/san-pham`, `/export/cong-tac`,
+  `/export/bang`, `/upload/file`, `/media`, `/healthz`, `/mau-nhap-<ngành>.xlsx`) đã đóng băng - không thêm.
+- Route giao diện React (`App.jsx`): kebab-case tiếng Việt không dấu (`/kinh-doanh`, `/quan-ly-thiet-ke`, `/cham-cong`, `/cai-dat`).
 
 ## Tài liệu
 
 - File trong `docs/`: kebab-case không dấu (xem [docs-placement.md](../docs/docs-placement.md)).
 - Quy trình nghiệp vụ: `docs/03-san-pham/flows/QT-<nn>-<slug>.md`.
+- Tài liệu riêng của backend: `backend/docs/<TÊN>.md` chữ hoa (`API.md`, `ARCHITECTURE.md`, `DATABASE.md`).

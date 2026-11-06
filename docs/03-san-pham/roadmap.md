@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-06 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-06 · **Phiên bản mới nhất:** 1.0.0 (chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -106,8 +106,8 @@
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
 | <a id="n8-3"></a>N8.3 | Chat giai đoạn 2-3 ([N8](#n8), `backend/CHAT.md` mục 1 và 16): ảnh / video / tệp / tin nhắn thoại đã code 2026-11-02 (MinIO + presigned URL, `CHAT.md` mục 12, xem [mục 5](#xong-n8), quyết định D-17); trả lời / chuyển tiếp / thu hồi / sửa tin, reaction, tìm tin không dấu, đa thiết bị (danh sách thiết bị, đăng xuất từ xa, đăng nhập web bằng QR) đã code 2026-11-03 (migration 0023, xem [mục 5](#xong-n8)). Còn lại: thử giao diện giai đoạn 2 trên trình duyệt (camera quét QR, panel tìm tin, menu tin); `data-dictionary.md` / `erd.md` / `decisions.md` cho 0023; gọi thoại / video, mã hoá đầu cuối (E2E); với media: CDN, lưu trữ lạnh sau 90 ngày, nén / chuyển mã video, quét virus thật (ClamAV), tệp trên 200 MB (multipart), triển khai production (MinIO, `CHAT_S3_*`, migration 0020) | Toàn hệ thống | 🟡 |
-| <a id="n1"></a>N1 | Refactor database sang PostgreSQL trực tiếp (`DATABASE_URL`; bản Node dùng `pg`, bản Go dùng `pgx`): đã triển khai trên database local `qspro_en2`; mọi tab QS đã chạy thử tự động trên trình duyệt (React + Go, database thử `qspro_gotest`, xem [N3](#xong-n3)); 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (xem [N2](#n2)); còn người dùng thử tay trên dữ liệu thật, xoá 8 cột `DEPRECATED` (D-09; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date` / `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15 vì M15.2 / M10.2 / M17.3 dùng lại; migration 0010 / 0012 / 0013 đổi chú thích cột) - xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md` mục 8 | Toàn hệ thống | 🟡 |
-| <a id="n2"></a>N2 | Chuyển server Node + Express sang Go + Gin (`backend/`, đã commit ở `5fa5d52` / `033c421`; app Node và `render.yaml` đã gỡ khỏi repo): đã chuyển mã; cấu hình deploy VPS đã có (`infra/deploy/`: Docker Compose + Caddy HTTPS phục vụ React và chuyển tiếp route Go cùng tên miền, PostgreSQL 17, script sao lưu / khôi phục / tạo super; hướng dẫn `docs/04-van-hanh/trien-khai-vps-cloudfly.md`), đã chạy thử trọn bộ trên máy 2026-10-22; 2026-10-24 đã chạy trên VPS CloudFly bằng IP (`http://222.255.184.134/qs`, mã chép thẳng từ máy phát triển, chưa qua GitHub) và nạp dữ liệu `qspro_en2` + 1430 file, mở cổng 80/443 ở Cloud Firewall của CloudFly, vào được từ Internet; tối 2026-10-24 chuyển sang `https://dezon.tech` (chứng chỉ Let's Encrypt, `www` và `http` chuyển về); còn bật Lark (`REPORT_JOB` và webhook đang tắt / giả), so vi sai job báo cáo và các nhánh chỉ chạy khi database thiếu cột - xem `backend/docs/ARCHITECTURE.md` mục "Việc còn mở" | Toàn hệ thống | 🟡 |
+| <a id="n1"></a>N1 | Refactor database sang PostgreSQL trực tiếp (`DATABASE_URL`, backend Go dùng `pgx`): đã triển khai trên database local `qspro_en2`; mọi tab QS đã chạy thử tự động trên trình duyệt (React + Go, database thử `qspro_gotest`, xem [N3](#xong-n3)); 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (xem [N2](#n2)); còn người dùng thử tay trên dữ liệu thật, xoá 8 cột `DEPRECATED` (D-09; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date` / `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15 vì M15.2 / M10.2 / M17.3 dùng lại; migration 0010 / 0012 / 0013 đổi chú thích cột) - xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md` mục 8 | Toàn hệ thống | 🟡 |
+| <a id="n2"></a>N2 | Server Go + Gin (`backend/`, đã commit ở `5fa5d52` / `033c421`): đã chuyển mã; cấu hình deploy VPS đã có (`infra/deploy/`: Docker Compose + Caddy HTTPS phục vụ React và chuyển tiếp route Go cùng tên miền, PostgreSQL 17, script sao lưu / khôi phục / tạo super; hướng dẫn `docs/04-van-hanh/trien-khai-vps-cloudfly.md`), đã chạy thử trọn bộ trên máy 2026-10-22; 2026-10-24 đã chạy trên VPS CloudFly bằng IP (`http://222.255.184.134/qs`, mã chép thẳng từ máy phát triển, chưa qua GitHub) và nạp dữ liệu `qspro_en2` + 1430 file, mở cổng 80/443 ở Cloud Firewall của CloudFly, vào được từ Internet; tối 2026-10-24 chuyển sang `https://dezon.tech` (chứng chỉ Let's Encrypt, `www` và `http` chuyển về); còn bật Lark (`REPORT_JOB` và webhook đang tắt / giả), so vi sai job báo cáo và các nhánh chỉ chạy khi database thiếu cột - xem `backend/docs/ARCHITECTURE.md` mục "Việc còn mở" | Toàn hệ thống | 🟡 |
 
 ---
 
@@ -148,7 +148,7 @@
 - Lưu và xoá bộ cột "Của tôi" theo tài khoản, giữ khi sang máy khác
 - Lưu các bảng cột đặt tên của Bóc tách theo tài khoản
 - Dải nhắc "Đã có bản cập nhật mới" với nút Tải lại ở module QS React (M1.1): server Go gửi header `x-app-ver` trên mọi response `/api/v1` (kể cả 401 / 403 / 404 không có route), cùng giá trị với cổng `/api/:fn`; React thấy giá trị khác lần đầu thì hiện dải, bấm "Tải lại" để nạp bản mới; giao diện tối có nền dải sáng hơn để không lẫn vào thanh trên
-- Đăng xuất làm phiên hết hiệu lực ngay ở máy chủ (M1.2): bảng phiên đăng nhập (migration 0014 `user_sessions`), token mang id phiên; đăng xuất chỉ thu hồi phiên đó, máy khác của cùng tài khoản vẫn dùng tiếp; tự đổi mật khẩu đóng các phiên khác; admin đặt lại mật khẩu thu hồi mọi phiên của tài khoản đó (tự đặt cho mình thì giữ phiên đang dùng); giao diện bị thu hồi phiên thì về màn đăng nhập với "Phiên đã hết, mời đăng nhập lại.". GIẢ ĐỊNH (chủ sản phẩm có thể đổi): token cấp trước 0014 (không có id phiên) bị từ chối, người dùng đăng nhập lại một lần; khoá tài khoản không xoá phiên (mở khoá thì token cũ dùng tiếp, như bản Node); chạy nhiều tiến trình server thì tiến trình khác còn nhận token đã thu hồi tối đa 30 giây (cache phiên). Database chưa chạy 0014 -> 500 báo đích danh bảng thiếu
+- Đăng xuất làm phiên hết hiệu lực ngay ở máy chủ (M1.2): bảng phiên đăng nhập (migration 0014 `user_sessions`), token mang id phiên; đăng xuất chỉ thu hồi phiên đó, máy khác của cùng tài khoản vẫn dùng tiếp; tự đổi mật khẩu đóng các phiên khác; admin đặt lại mật khẩu thu hồi mọi phiên của tài khoản đó (tự đặt cho mình thì giữ phiên đang dùng); giao diện bị thu hồi phiên thì về màn đăng nhập với "Phiên đã hết, mời đăng nhập lại.". GIẢ ĐỊNH (chủ sản phẩm có thể đổi): token cấp trước 0014 (không có id phiên) bị từ chối, người dùng đăng nhập lại một lần; khoá tài khoản không xoá phiên (mở khoá thì token cũ dùng tiếp); chạy nhiều tiến trình server thì tiến trình khác còn nhận token đã thu hồi tối đa 30 giây (cache phiên). Database chưa chạy 0014 -> 500 báo đích danh bảng thiếu
 - Ghi nhật ký đăng nhập, đăng nhập sai, đăng xuất, đổi mật khẩu
 
 <a id="xong-2"></a>
@@ -316,7 +316,7 @@
 - Tải danh sách sản phẩm ra Excel (theo dòng đã chọn hoặc theo bộ lọc)
 - Nhân viên gửi yêu cầu xoá; admin xoá trực tiếp một hoặc nhiều sản phẩm
 - Ghi chú cho từng sản phẩm đi kèm (M10.2): ô "Ghi chú" ở form Cập nhật sản phẩm cho liên kết do chính sản phẩm đặt; liên kết ngược (hai chiều) chỉ xem, kèm "Sửa ghi chú ở sản phẩm kia"; hiện "Ghi chú: …" ở hộp xem sản phẩm, dòng mở rộng của Danh sách sản phẩm, thẻ đi kèm ở thư viện Bóc tách và hộp chi tiết sản phẩm Bóc tách; lưu lại form (đổi số lượng) giữ nguyên ghi chú
-- Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1): nút "Tạo bản sao riêng" ở hộp xem sản phẩm và cột thao tác của dòng "Kho Dezon"; hỏi lại rồi chép sang công ty mình (Chưa duyệt; không chép combo, biến thể, yêu thích), tải lại danh mục và mở form Cập nhật của bản sao. Trùng mã + trục biến thể -> "Công ty bạn đã có sản phẩm mã X" (tìm được đúng 1 bản riêng thì mở form của bản đó). Bản riêng chỉ che dòng kho chung trùng đủ khoá kiểm trùng, kể cả kích thước (khác Node: chép sơn 15L không làm mất 1L / 5L). GIẢ ĐỊNH: `SpPerms` cho MỌI nhân viên quyền sửa nên máy chủ lặp lại phép thử `canTab('sanpham')` của giao diện: công ty có danh sách tính năng thiếu "sanpham" thì không ai chép được; nhân viên cần tab "sanpham"; admin chỉ xét tính năng công ty; quản trị hệ thống được hết. Đây là điều kiện riêng của bản Go, các đường tạo / nhập / sửa sản phẩm khác không xét tab hay tính năng
+- Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1): nút "Tạo bản sao riêng" ở hộp xem sản phẩm và cột thao tác của dòng "Kho Dezon"; hỏi lại rồi chép sang công ty mình (Chưa duyệt; không chép combo, biến thể, yêu thích), tải lại danh mục và mở form Cập nhật của bản sao. Trùng mã + trục biến thể -> "Công ty bạn đã có sản phẩm mã X" (tìm được đúng 1 bản riêng thì mở form của bản đó). Bản riêng chỉ che dòng kho chung trùng đủ khoá kiểm trùng, kể cả kích thước (chép sơn 15L không làm mất 1L / 5L). GIẢ ĐỊNH: `SpPerms` cho MỌI nhân viên quyền sửa nên máy chủ lặp lại phép thử `canTab('sanpham')` của giao diện: công ty có danh sách tính năng thiếu "sanpham" thì không ai chép được; nhân viên cần tab "sanpham"; admin chỉ xét tính năng công ty; quản trị hệ thống được hết. Đây là điều kiện riêng của bản Go, các đường tạo / nhập / sửa sản phẩm khác không xét tab hay tính năng
 
 <a id="xong-11"></a>
 #### M11 - Nhập dữ liệu
@@ -447,7 +447,7 @@
 - "Xem dữ liệu" như một công ty và thoát chế độ xem
 - Xoá công ty cùng toàn bộ dữ liệu, phải gõ đúng mã xác nhận
 - Ghi nhật ký tạo, sửa, xoá công ty
-- Thẻ "Thông tin công ty" ở tab Admin (M17.1): admin sửa tên, logo, email, điện thoại, màu chính của công ty mình, áp ngay (thanh trên đổi màu, không tải lại); quản trị hệ thống sửa khi đang xem một công ty (không đổi công ty đang dùng của chính mình); ô "Hạn dùng" chỉ xem ("Không giới hạn", "Còn N ngày · dd/mm/yyyy", "Hết hạn dd/mm/yyyy", "Đến dd/mm/yyyy" như bản Node)
+- Thẻ "Thông tin công ty" ở tab Admin (M17.1): admin sửa tên, logo, email, điện thoại, màu chính của công ty mình, áp ngay (thanh trên đổi màu, không tải lại); quản trị hệ thống sửa khi đang xem một công ty (không đổi công ty đang dùng của chính mình); ô "Hạn dùng" chỉ xem ("Không giới hạn", "Còn N ngày · dd/mm/yyyy", "Hết hạn dd/mm/yyyy", "Đến dd/mm/yyyy")
 - Ô chọn màu chính (bảng màu + mã hex + Mặc định) ở thẻ trên và tab Thông tin của hộp Tạo / Sửa công ty (M17.2); máy chủ chỉ nhận trống, `#RGB` hoặc `#RRGGBB`, báo "Màu chính phải dạng #RRGGBB"
 - Nhắc gia hạn trong ứng dụng (M17.3): admin đang hoạt động nhận thông báo "Công ty sắp hết hạn sử dụng" ở các mốc còn 30/14/7/3/1/0 ngày (mỗi mốc 1 lần) và thấy dải nhắc đầu trang khi còn ≤ 30 ngày (ẩn trong ngày được; bấm thông báo mở tab Admin và hiện lại dải); job nền 8h05 giờ VN mỗi ngày + gửi bù khi khởi động, chung công tắc `REPORT_JOB`; quản trị hệ thống "Chạy thử" / "Gửi nhắc ngay" ở thẻ "Nhắc gia hạn công ty" tab Công ty. Chống trùng bằng UPDATE có điều kiện (an toàn nhiều tiến trình); không gửi được thì trả mốc; route chỉ gửi thật khi `dryRun=false`. GIẢ ĐỊNH (bản Lark đã gỡ ở 42af44d; chủ sản phẩm có thể huỷ): chỉ trong ứng dụng, không Lark, không email; giá trị mốc cũ ngoài tập coi như chưa nhắc; đổi hạn dùng thì xoá mốc. Migration 0012 chỉ đổi chú thích 2 cột
 
@@ -473,11 +473,11 @@
 <a id="xong-n1"></a>
 #### N1 - Database PostgreSQL trực tiếp
 
-- Server đọc / ghi PostgreSQL qua `pg` và `DATABASE_URL`; ảnh / tài liệu nằm trên ổ đĩa máy chủ (xem [N4](#xong-n4))
-- Tên bảng / cột trong database sang tiếng Anh, `db-map.json` ánh xạ hai chiều với tên trong code (nay là `backend/internal/platform/database/db-map.json`; bản `server/db-map.json` đã gỡ cùng app Node)
+- Server đọc / ghi PostgreSQL trực tiếp qua `DATABASE_URL`; ảnh / tài liệu nằm trên ổ đĩa máy chủ (xem [N4](#xong-n4))
+- Tên bảng / cột trong database sang tiếng Anh, `db-map.json` ánh xạ hai chiều với tên trong code (`backend/internal/platform/database/db-map.json`)
 - Tách bảng sản phẩm thành bảng lõi + 4 bảng thông số theo ngành; cấu hình cấp công ty sang bảng `company_settings`; phiếu đề xuất tách 2 bảng dòng
 - Bảng con bỏ cột công ty, lấy công ty qua bảng cha; thêm khoá ngoại và CHECK công thức
-- Migration đánh số trong `infra/db/migrations/`, chạy bằng `go run ./cmd/migrate` (trong `backend/`; trước đây `npm run migrate` của app Node đã gỡ)
+- Migration đánh số trong `infra/db/migrations/`, chạy bằng `go run ./cmd/migrate` (trong `backend/`)
 - Dữ liệu sai chuyển sang schema `quarantine`, không xoá hẳn
 - Test `npm run test:db` (61 đạt) và `npm run test:api` (96 đạt) trên database local `qspro_en2` (2026-10-12, app Node trước khi gỡ)
 - Transaction cho thao tác nhiều bước (D-13, bản Go, 2026-10-15): lưu đơn mua hàng (mỗi đơn), lưu đề xuất, xoá / nhân bản dự án, lưu tờ bìa, tạo / xoá công ty, ghi combo / biến thể / xoá sản phẩm; lỗi giữa chừng không còn dữ liệu dở dang, thành công giữ nguyên kết quả. Gộp cả lần gửi nhiều đơn vào 1 transaction chưa làm (cần `clock_timestamp()`) - chi tiết `backend/docs/ARCHITECTURE.md` mục 3.5
@@ -498,10 +498,10 @@
 
 - Module QS của frontend React (`frontend/src/pages/QS`, bản clone giao diện cũ) dùng dữ liệu thật qua REST `/api/v1` của server Go; đăng nhập riêng cho QS, bỏ toàn bộ dữ liệu giả
 - Bổ sung phần bản clone còn thiếu: nhập dữ liệu, sửa sản phẩm (combo, biến thể, lịch sử), phần thô, quản trị tài khoản, công ty, thông báo
-- Server Go tự phục vụ thông số ngành (`*-spec.js`), logo, file mẫu nhập hàng loạt và file mẫu công tác `/mau-nhap-cong-tac.xlsx` (nhúng trong binary, byte = bản cuối trong git), không còn cần `public/`; kiểm lại 2026-10-15 với `STATIC_DIR` trống
+- Server Go tự phục vụ thông số ngành (`*-spec.js`), logo, file mẫu nhập hàng loạt và file mẫu công tác `/mau-nhap-cong-tac.xlsx` (nhúng trong binary, byte = bản cuối trong git), không cần thư mục file tĩnh riêng; kiểm lại 2026-10-15 với `STATIC_DIR` trống
 - Chạy React với server Go: đặt `CORS_ORIGINS` của server Go đúng origin của frontend (cấu hình chạy, không phải phần mã còn thiếu; deploy production thuộc [N2](#n2))
 - Backlog mục 2.1 (2026-10-15, 3 đợt) làm trên server Go + module QS React, mục 2.1 nay trống; mỗi việc ghi ở module của nó trong mục 5 (mã M). Kiểm tích hợp sau đợt 3: Go build / vet / gofmt / test toàn bộ đạt trên `qspro_gotest` (migration tới 0013), mọi tab QS chạy với admin / staff / super không lỗi trang
-- Kiểm thử 2026-10-15: build OK, 62.658 golden test công thức đạt (chạy lại sau backlog: 62.658 đạt / 0 khác; 2 ca thư viện công tác "giả", "mẫu+giả" nay đưa danh sách theo thứ tự máy chủ trả vì M5.3 sắp lại công tác ở máy), so từng tab với bản gốc không thiếu số tiền nào (admin, staff, super), file Excel báo giá trùng bản gốc, 20 trang SiteFlow khác không đổi pixel nào, chạy được không có `public/` (cả bản Docker)
+- Kiểm thử 2026-10-15: build OK, 62.658 golden test công thức đạt (chạy lại sau backlog: 62.658 đạt / 0 khác; 2 ca thư viện công tác "giả", "mẫu+giả" nay đưa danh sách theo thứ tự máy chủ trả vì M5.3 sắp lại công tác ở máy), so từng tab với bản gốc không thiếu số tiền nào (admin, staff, super), file Excel báo giá trùng bản gốc, 20 trang SiteFlow khác không đổi pixel nào, chạy được không có thư mục file tĩnh riêng (cả bản Docker)
 
 <a id="xong-n4"></a>
 #### N4 - Kho file trên ổ đĩa máy chủ
@@ -552,7 +552,7 @@
 <a id="xong-n7"></a>
 #### N7 - Ngành Điện lạnh (đề mục 3.2.7)
 
-- Chuyển từ QS Pro (commit ea787b6, app Node) sang bản Go + React: `dl-spec.js` (9 hạng mục: Điều hoà không khí 4 khối thông số; vật tư / phụ kiện / thông gió: Quy cách · Xuất xứ), golden `gen-specs.js` gồm cả `laChung` / `doanHM` / `dong`
+- Chuyển từ QS Pro (commit ea787b6) sang bản Go + React: `dl-spec.js` (9 hạng mục: Điều hoà không khí 4 khối thông số; vật tư / phụ kiện / thông gió: Quy cách · Xuất xứ), golden `gen-specs.js` gồm cả `laChung` / `doanHM` / `dong`
 - Tự nhận ngành theo hạng mục (cả hạng mục ghi chung "Điện lạnh", "Máy lạnh"...) và đoán hạng mục con theo tên SP khi lưu / nhập file (`specs.DLDoanHM`)
 - Bảng `product_hvac_specs` + view `product_catalog` 179 cột (migration 0017); file mẫu `GET /api/v1/product-templates/dien-lanh`
 - Giao diện: ngành "Điện lạnh · sản phẩm" ở Nhập dữ liệu (form 4 khối, nút tải file mẫu), bộ lọc Bóc tách 3.2.7, bộ cột Danh sách SP, panel thông tin SP, modal Mua hàng

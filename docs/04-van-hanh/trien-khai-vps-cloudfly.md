@@ -61,8 +61,7 @@ Tất cả chạy bằng **Docker Compose**: một lệnh `bash infra/deploy/dep
 | IP máy chủ + mật khẩu `root` | Email / trang quản lý VPS của CloudFly |
 | Tên miền (vd `qs.dezon.vn` hoặc `dezon-qs.vn`) | Trang quản lý tên miền CloudFly |
 | Quyền vào repo GitHub `DE-design-source/dezon-pro` | Tài khoản GitHub có quyền admin repo (để thêm deploy key) |
-| `LARK_APP_ID`, `LARK_APP_SECRET` (hiện ảnh cũ trên Lark) | Trang Environment của service `qs-pro` trên Render, hoặc Lark Developer Console |
-| (Tuỳ chọn) `AUTH_SECRET` của server cũ | Render. Chỉ cần nếu muốn người dùng không phải đăng nhập lại - thường không cần |
+| `LARK_APP_ID`, `LARK_APP_SECRET` (hiện ảnh cũ trên Lark) | Lark Developer Console |
 
 **Cấu hình VPS khuyến nghị:** Ubuntu 22.04 hoặc 24.04, tối thiểu 2 vCPU / 2 GB RAM / 30 GB SSD.
 VPS 1 GB RAM vẫn chạy được (script tự thêm 2 GB swap) nhưng lần build đầu sẽ chậm.
@@ -203,8 +202,8 @@ nano /opt/qspro/infra/deploy/.env
 | `POSTGRES_PASSWORD` | (đã sinh sẵn) | Giữ nguyên. Cần khi nối pgAdmin |
 | `AUTH_SECRET` | (đã sinh sẵn) | Giữ nguyên. Đổi = mọi người bị đăng xuất |
 | `PURCHASE_WEBHOOK`, `REPORT_WEBHOOK` | để trống | Trống = gửi vào group Lark đang dùng (webhook ghi sẵn trong code) |
-| `REPORT_JOB` | để trống, hoặc `0` | Trống = BẬT báo cáo Lark 8h thứ 4 / thứ 7. **Đặt `0` nếu server cũ trên Render còn chạy**, để group không nhận 2 báo cáo |
-| `LARK_APP_ID`, `LARK_APP_SECRET` | lấy từ Render | Thiếu thì ảnh cũ lưu trên Lark không hiện |
+| `REPORT_JOB` | để trống, hoặc `0` | Trống = BẬT báo cáo Lark 8h thứ 4 / thứ 7. **Đặt `0` nếu một server khác cũng đang gửi báo cáo vào cùng group**, để group không nhận 2 báo cáo |
+| `LARK_APP_ID`, `LARK_APP_SECRET` | lấy từ Lark Developer Console | Thiếu thì ảnh cũ lưu trên Lark không hiện |
 | `S3_DOMAIN` | `s3.qs.dezon.vn` | **Bắt buộc.** Tên miền riêng của kho tệp chat (bản ghi A ở Bước 1), không có `https://` |
 | `MINIO_ROOT_USER` | giữ `qspro-admin` | Tài khoản root MinIO (chỉ `minio-init` và console quản trị dùng) |
 | `MINIO_ROOT_PASSWORD` | sinh ngẫu nhiên (lệnh dưới) | **Bắt buộc.** >= 8 ký tự, chỉ chữ và số |
@@ -335,8 +334,7 @@ rm -f /root/qspro.dump /root/qspro-files-*.tar.gz
 Đăng nhập bằng tài khoản có sẵn trong dữ liệu. Quên mật khẩu super → chạy `create-super.sh <tên super>` để đặt lại.
 
 > **Dữ liệu mới nhất ở đâu?** `qspro_en2` là bản chụp ngày 2026-10-12 / 15 (xem `docs/02-ky-thuat/database/ket-qua-trien-khai.md`).
-> Dữ liệu người dùng nhập trên app cũ (Render) sau thời điểm đó KHÔNG có trong `qspro_en2`: cần lấy bản dữ liệu mới hơn trước khi chuyển.
-> Lúc chuyển hẳn: khoá ghi app cũ, chuyển dữ liệu, rồi tắt Render.
+> Dữ liệu nhập sau thời điểm đó KHÔNG có trong `qspro_en2`: cần lấy bản dữ liệu mới hơn trước khi nạp.
 
 ---
 
@@ -446,7 +444,7 @@ scp -r root@<IP máy chủ>:/opt/qspro-backups/qspro-media .
 | `git pull` báo `Permission denied (publickey)` | Thiếu deploy key | Làm lại Bước 3 |
 | `git pull` báo không fast-forward được | Có người sửa file trực tiếp trên máy chủ | `git -C /opt/qspro status`; KHÔNG sửa code trên máy chủ, chỉ sửa `.env` |
 | Upload file lớn báo lỗi | Giới hạn của backend: JSON 30 MB, tài liệu 50 MB | Giảm dung lượng file |
-| Group Lark nhận 2 báo cáo | Server cũ (Render) vẫn chạy | Tắt service trên Render, hoặc đặt `REPORT_JOB=0` ở một bên |
+| Group Lark nhận 2 báo cáo | Hai server cùng bật job báo cáo | Đặt `REPORT_JOB=0` ở một bên |
 | Ảnh cũ (Lark) không hiện | Thiếu `LARK_APP_ID` / `LARK_APP_SECRET` | Điền vào `.env`, `bash deploy.sh --no-pull` |
 | Ảnh `/files/...` không hiện (trả trang React hoặc 404) | `Caddyfile` thiếu `/files/*`, hoặc file không có trong volume `uploads` (nạp dữ liệu mà không kèm bản nén kho file, volume bị xoá) | Kiểm tra dòng `@backend` trong `Caddyfile`; `docker compose exec api ls /app/uploads`; khôi phục kho file từ bản `qspro-files-*.tar.gz` |
 | Tải ảnh lên báo lỗi ghi file | Đĩa đầy, hoặc `/app/uploads` không thuộc user `app` | `df -h /`; `docker compose exec api ls -ld /app/uploads` (chủ phải là `app`) |
@@ -461,8 +459,7 @@ scp -r root@<IP máy chủ>:/opt/qspro-backups/qspro-media .
 ## Lưu ý
 
 - **Bảo mật:** file `.env` chứa mật khẩu database và khoá ký token, chỉ root đọc được. Không gửi file này qua chat / email, không commit.
-- **Server cũ trên Render** (app Node, mã đã gỡ khỏi repo ở commit `5fa5d52`, kể cả `render.yaml`): sau khi người dùng chuyển hẳn sang tên miền mới, tắt service `qs-pro` trên Render.
-- **Trang `/qs-pro` của giao diện React** vẫn nhúng app cũ trên Render (`frontend/src/pages/QSPro/QSPro.jsx`, `QS_PRO_URL`). Tắt Render thì trang này trống;
+- **Trang `/qs-pro` của giao diện React** nhúng một địa chỉ ngoài bằng iframe (`frontend/src/pages/QSPro/QSPro.jsx`, hằng `QS_PRO_URL`), không gọi backend Go. Địa chỉ đó tắt thì trang này trống;
   module QS dùng thật là trang `/qs`.
 - **Các trang khác của giao diện SiteFlow** (Chat, Marketing, HR, Tài chính...) đang là dữ liệu mẫu trong `frontend/src/data`, chưa nối backend.
 - **Ảnh / tài liệu** lưu trong volume Docker `uploads` trên máy chủ, phục vụ ở `/files/...`. Sao lưu tự động đã gồm kho file;

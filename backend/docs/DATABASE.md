@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL, kết nối bằng `DATABASE_URL`. Tầng truy cập là `internal/platform/database` - bản chuyển 1:1 của `server/supa.js` ở app Node cũ (đã gỡ khỏi repo).
+PostgreSQL, kết nối bằng `DATABASE_URL`. Tầng truy cập là `internal/platform/database` (`Select` / `Insert` / `Update` / `Remove` với chuỗi lọc kiểu PostgREST).
 
 ## Tên tiếng Việt trong code, tên tiếng Anh trong database
 
@@ -65,13 +65,12 @@ Kết quả do Postgres dựng thành JSON (`json_agg`) rồi đọc về `[]*om
 `timestamptz` là chuỗi `2026-10-13T04:45:22.349392+00:00` (phiên làm việc đặt `timezone=UTC`), `date` là `YYYY-MM-DD`,
 `jsonb` là `*omap.Map` / `[]any`, `uuid` là chuỗi. Thứ tự khoá = thứ tự cột trong database (hoặc thứ tự trong `Select`).
 
-Pool chạy ở chế độ simple protocol của pgx: tham số gửi dạng chữ để Postgres tự suy kiểu theo cột, giống thư viện `pg` mà bản Node cũ dùng.
+Pool chạy ở chế độ simple protocol của pgx: tham số gửi dạng chữ để Postgres tự suy kiểu theo cột.
 
 ## Migration
 
-- Bản Go KHÔNG giữ bản sao migration: đọc thẳng `infra/db/migrations/NNNN_ten.sql` ở gốc repo (nguồn duy nhất).
-  Bảng `schema_migrations` và cách tính checksum giữ như công cụ migrate cũ của bản Node (`infra/scripts/migrate.js`, đã gỡ),
-  nên database từng migrate bằng bản Node chạy tiếp được bằng `go run ./cmd/migrate`.
+- `backend/` KHÔNG giữ bản sao migration: `cmd/migrate` đọc thẳng `infra/db/migrations/NNNN_ten.sql` ở gốc repo (nguồn duy nhất).
+  Bảng `schema_migrations` lưu file đã chạy kèm checksum: sửa một file đã chạy thì checksum báo lệch.
   Chưa có file `.down.sql`: các migration hiện tại chỉ quay lui được bằng bản sao lưu.
 - `infra/db/schema.sql`: toàn bộ cấu trúc hiện tại, dùng để dựng database mới.
 
@@ -86,11 +85,11 @@ go run ./cmd/migrate --dir=duong/dan          # thư mục file SQL (mặc đị
 Chạy từ `backend/`. Trong image Docker: `/app/qspro-migrate [--status|--baseline]` (thư mục làm việc `/app` đã có `migrations/`).
 Không truyền `--url=` (hoặc truyền rỗng) thì công cụ đọc `.env` rồi `../.env` để lấy `DATABASE_URL`.
 
-Thông báo lỗi thiếu cột / bảng (`HDMig` trong `internal/shared/errors`) vẫn giữ nguyên câu cũ của bản Node:
-`Hãy chạy "npm run migrate" rồi khởi động lại server.` Lệnh `npm run migrate` không còn (app Node đã gỡ); lệnh thật là
+Thông báo lỗi thiếu cột / bảng (`HDMig` trong `internal/shared/errors`) là hằng đóng băng (golden kiểm), còn ghi lệnh cũ:
+`Hãy chạy "npm run migrate" rồi khởi động lại server.` Lệnh đó không tồn tại; lệnh thật là
 `go run ./cmd/migrate` (từ `backend/`) hoặc `/app/qspro-migrate` trong image Docker.
 
-Migration mới nhất: `0020_chat_media.sql` (chat gửi ảnh / video / tệp / tin thoại: bảng `chat_media` + cột `chat_messages.media_id` /
+Migration của chat: `0020_chat_media.sql` (chat gửi ảnh / video / tệp / tin thoại: bảng `chat_media` + cột `chat_messages.media_id` /
 `file_name`, `message_type` thêm `image` / `video` / `file` / `voice`), trước đó `0019_chat_email.sql` (chat đăng nhập / tìm bạn bằng email:
 cột `email` của `chat_users` / `chat_otp_codes`) và `0018_chat.sql` (9 bảng `chat_*`). Database chưa chạy 0018 thì lúc nạp danh mục server ghi log
 `Database thiếu bảng của: chat_... — có vẻ CHƯA chạy migration` (QS vẫn chạy, route chat lỗi 500); chưa chạy 0019 thì đăng nhập / tra bằng email
@@ -101,26 +100,15 @@ Thêm thay đổi cấu trúc: viết file mới `infra/db/migrations/NNNN_ten.s
 thêm tên vào `internal/platform/database/db-map.json` (bảng theo công ty: thêm vào `TenantTables` trong `postgres.go`); nếu thêm cột vào
 `products` / `product_*_specs` thì tạo lại view `product_catalog` trong cùng migration.
 
-## Đồng bộ với bản Node (lịch sử)
-
-Migration và `schema.sql` dùng chung ở `infra/db/`, không còn phải chép tay. `db-map.json` của bản Go vốn là bản sao chép tay
-của bản Node; app Node đã gỡ khỏi repo nên bản Go nay là bản DUY NHẤT (script so `check-node-sync.sh` đã gỡ ngày 2026-10-15).
-Bản gốc cũ lấy bằng `git show 83d264e:server/db-map.json`:
-
-| Bản gốc (Node) | Bản sao (Go) |
-|---|---|
-| `server/db-map.json` | `backend/internal/platform/database/db-map.json` |
-
 ## Database thử
 
 Test tích hợp dùng database `qspro_gotest` trong container `qspro-postgres` (cổng 5434 trên máy), đặt lại từ file seed
 `/tmp/qspro_seed.sql` trong container (bản sao bền: `infra/export/qspro_seed.sql`). Test Go có database phải chạy với `-p 1` vì mọi gói dùng chung `qspro_gotest`.
 Chi tiết: mục Kiểm thử của `backend/README.md`.
 
-## Đối chiếu với bản Node (lịch sử)
+## Golden của tầng dữ liệu
 
 `tests/fixtures/db-diff-cases.json` có 110 ca (bảng thường, bảng thuộc công ty có / không lọc, bảng tách kể cả cột vệ tinh,
-bảng con với `cong_ty_id` ảo, mọi toán tử lọc, sắp xếp + giới hạn, các ca lỗi). Hồi app Node còn trong repo, các ca này đã chạy qua
-`server/supa.js` và qua bản Go, kết quả giống nhau từng byte sau khi che id và thời điểm sinh tự động; kết quả của bản Node lưu thành
-golden `tests/fixtures/db-diff-golden.txt`, nay chỉ so bản Go với golden đó (`TestDiffGolden`). Cách chạy: mục 9 của `ARCHITECTURE.md`
-(đường dẫn `DIFF_OUT` / `DIFF_GOLDEN` phải tuyệt đối; `TestDiffGolden` chỉ khớp trên database vừa đặt lại về seed).
+bảng con với `cong_ty_id` ảo, mọi toán tử lọc, sắp xếp + giới hạn, các ca lỗi). Kết quả mong đợi (đã che id và thời điểm sinh tự động)
+nằm trong golden đóng băng `tests/fixtures/db-diff-golden.txt`; `TestDiffGolden` so tầng dữ liệu với golden đó. Cách chạy: mục 9 của
+`ARCHITECTURE.md` (đường dẫn `DIFF_OUT` / `DIFF_GOLDEN` phải tuyệt đối; `TestDiffGolden` chỉ khớp trên database vừa đặt lại về seed).

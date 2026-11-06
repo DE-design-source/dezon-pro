@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 QS Pro (Dezon Pro): web app bóc tách khối lượng / báo giá, nhiều công ty dùng chung (multi-tenant).
 Backend Go + Gin (`backend/`, go.mod riêng), giao diện React + Vite (`frontend/`, `siteflow-ui`), dữ liệu trên PostgreSQL qua `DATABASE_URL`;
 file ảnh / tài liệu lưu trên ổ đĩa máy chủ (`UPLOAD_DIR`, phục vụ ở `/files/...`), tệp chat trên MinIO (`CHAT_S3_*`).
-App Node cũ (`server/`, `public/`) đã gỡ khỏi repo (commit cuối còn Node: `83d264e`).
 Tên trong code, chú thích, chuỗi giao diện là tiếng Việt: giữ nguyên khi sửa. `export/` và `infra/export/` chứa dump dữ liệu thật,
 đã gitignore, không commit.
 Sửa thông số theo ngành (`backend/internal/shared/specs/js/*-spec.js`): dùng skill `thiet-bi-ve-sinh`; sửa xong chạy
@@ -25,8 +24,9 @@ TEST_DATABASE_URL=postgresql://.../qspro_gotest go test -race -count=1 -p 1 ./..
 
 # frontend (chạy từ frontend/)
 npm install
-npm run dev                               # Vite; VITE_API_URL trỏ backend (frontend/.env.development: http://localhost:3000)
+npm run dev                               # Vite; VITE_API_URL trỏ backend (frontend/.env.development, mẫu .env.example)
 npm run build
+npm run test:hr                           # node scripts/check-hr-summary.mjs
 
 node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau khi sửa *-spec.js
 ```
@@ -36,6 +36,7 @@ node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau k
   rỗng = webhook thật ghi sẵn trong code), hoặc `DOTENV=0` rồi truyền đủ biến. Xem `backend/README.md` mục Cấu hình.
 - `TEST_DATABASE_URL` chỉ trỏ database THỬ (`qspro_gotest`, `qspro_chattest` trong container `qspro-postgres`): test ghi và xoá dữ liệu.
   Không verify bằng cách ghi dữ liệu qua server đang chạy với `.env` thật.
+- Backend phải liệt kê origin của frontend trong `CORS_ORIGINS`.
 - E2E trên server Go đang chạy: `node backend/tests/e2e/test-api-go.js` (cần gói `pg`, `bcryptjs` cài riêng, xem `backend/README.md` mục Kiểm thử).
 
 ## Kiến trúc
@@ -48,8 +49,8 @@ node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau k
 - `internal/modules/<module>/`: nghiệp vụ, mỗi module 1 gói (`service.go`, `repository.go`, `postgres.go`, `dto.go`, `handler.go`, `*_test.go`).
   Module không import gói module khác (ngoại lệ: gói dữ liệu thuần `categories`): gọi chéo qua interface trong `internal/shared/contracts`, nối trong `routes.go`.
 - Tính năng mới là route REST "chỉ bản Go" dưới `/api/v1` (`reg.RegisterGoRoute` + gắn route gin cùng middleware quyền, `backend/docs/API.md` mục 2.1).
-  KHÔNG thêm hàm `/api/:fn`, không thêm dòng vào `RestRoutes` / `RootRoutes`, không sửa tay fixture / golden do Node sinh
-  (`backend/docs/ARCHITECTURE.md` mục 12.1).
+  KHÔNG thêm hàm `/api/:fn`, không thêm dòng vào `RestRoutes` / `RootRoutes`, không sửa tay fixture / golden đóng băng
+  (`tests/fixtures/*`, `internal/**/testdata/*`, `internal/server/apidocs/*`, `tests/e2e/**`; `backend/docs/ARCHITECTURE.md` mục 12.1).
 - `internal/middleware/` (auth, tenant, rbac, cors, rate limit, body). Phiên: token `Authorization: Bearer`, lưu phía máy chủ (`user_sessions`).
   Super không có công ty, thấy mọi công ty trừ khi gửi header `x-view-company`.
 - `internal/platform/database/`: tầng dữ liệu duy nhất (`Select` / `Insert` / `Update` / `Remove` + chuỗi lọc PostgREST như `ma_du_an=eq.X`,
@@ -73,8 +74,10 @@ node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau k
   `donGiaCK_()` (`frontend/src/pages/QS/lib/calc.js`). Sửa bên này phải sửa bên kia.
 - Đọc số người dùng gõ: client `tkNum_()` (`frontend/src/pages/QS/lib/format.js`), server `qscore.ToNumber`; hai hàm phải cho cùng kết quả.
 - Mã tờ bìa = mã cây hạng mục `TREE` (`frontend/src/pages/QS/lib/tree.js`).
-- Backend giữ hành vi của bản Node: JSON ra client qua `response` / `omap` (giữ thứ tự khoá, không dùng `c.JSON`), ép kiểu qua `jsval`,
-  thông báo lỗi tiếng Việt giữ nguyên (`backend/docs/ARCHITECTURE.md` mục 2).
+- JSON ra client qua `response` / `omap` (giữ thứ tự khoá, không dùng `c.JSON`), ép kiểu qua `jsval`,
+  thông báo lỗi tiếng Việt giữ nguyên từng byte (`backend/docs/ARCHITECTURE.md` mục 2).
+- Thông số ngành chỉ có một nguồn: `backend/internal/shared/specs/js/{vs,son,ct,dl}-spec.js` (golden kiểm sau gen-specs);
+  `TestEmbeddedAssets` kiểm mã blob git của file nhúng.
 
 ## Database / migration
 
@@ -84,6 +87,8 @@ node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau k
   -> `go run ./cmd/migrate --url=<database>` (từ `backend/`) -> sinh lại `infra/db/schema.sql` (bản `pg_dump`) -> thêm cặp
   `"ten_trong_code": "name_in_db"` vào `backend/internal/platform/database/db-map.json` -> bảng theo công ty thêm vào `TenantTables`.
 - Server Go KHÔNG tự migrate: migrate trước rồi mới khởi động bản mới; server đang chạy phải khởi động lại để nạp lại danh mục cột.
+  Trong image Docker: `/app/qspro-migrate [--status|--baseline]`. Thông báo lỗi thiếu cột (`HDMig`, `internal/shared/errors/colerr.go`)
+  còn ghi lệnh cũ `npm run migrate`: lệnh thật là `go run ./cmd/migrate`.
 - Bảng con không có `company_id`: công ty lấy qua bảng cha (khoá `tenant` trong `db-map.json`).
 - Quy tắc thiết kế bảng: `docs/02-ky-thuat/database/database-rules.md`. Schema đang chạy: `docs/02-ky-thuat/database/schema-hien-hanh.md`.
 

@@ -103,7 +103,7 @@ Vì mọi hàm đổi nằm ở server, đổi cấu trúc database không buộ
 
 ## 4. Phụ thuộc chưa xác minh (UNKNOWN)
 
-- `server/export.js`: các trường sản phẩm dùng khi xuất Excel (mới xác nhận dùng `nganh`, `dvt` và bản chụp trên dòng).
-- `scripts/test-core.js`: có ghi database không (đã thấy `test-vs.js` dùng database giả).
+- `server/export.js`: các trường sản phẩm dùng khi xuất Excel (mới xác nhận dùng `nganh`, `dvt` và bản chụp trên dòng). File đã gỡ ở `5fa5d52`, câu hỏi không còn áp dụng.
+- `scripts/test-core.js`: có ghi database không (đã thấy `test-vs.js` dùng database giả). File đã gỡ ở `5fa5d52`, câu hỏi không còn áp dụng.
 - Công cụ ngoài repo đọc thẳng database (báo cáo, BI): không tìm thấy dấu hiệu nhưng không loại trừ được.
 - `du_an.cap_nhat`: trả về client là `capNhat`, chưa kiểm tra có hiển thị không.

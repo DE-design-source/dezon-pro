@@ -48,7 +48,7 @@ Chỗ chọn spec theo ngành (thêm ngành mới thì sửa đúng mấy chỗ 
 | Server Go | `modules/categories/service.go`: `NganhCua`, `SpecNganh`, `MucNganh`, bảng nhãn↔cột · `shared/errors/colerr.go` · `shared/qscore/importparse.go` `specOf` · `modules/materials`: `service_import.go` (`_nganh`), `service_write.go`, `service_format.go` (`prodToObj`) · file mẫu `categories/template_<ngành>.go` (route gốc `/mau-nhap-*.xlsx` đóng băng: ngành mới đi `/api/v1/product-templates/...`) · `server/assets_test.go` |
 | Database | migration bảng `product_<ngành>_specs` + tạo lại view `product_catalog` · `db-map.json` `db_san_pham.columns` + `parts` · `infra/deploy/Caddyfile` (đường dẫn `/<ngành>-spec.js`) |
 | Client React | `api/specs.js`, `api/files.js` (`TEMPLATES`), `lib/productFields.js` (`dbGroups*`, `coSpec_`, `specNganh_`, `nganhCuaSP_`, `groupsOfNganh_`, `IMP_LOAI`, `dbLabelMaps_`), `lib/catalogFilters.js`, `components/importer/*`, `components/products/list/spModel.js`, `components/products/edit/editModel.js`, `components/breakdown/catalog/catalogModel.js`, `components/purchase/ProductModal.jsx` |
-| Test golden Node | golden Node không sinh lại được: chỉ sửa mã test (`categories` `nodePart`, `colerr_test`, `materials` `stripDL` / `goonly.StripEmpty`) |
+| Test golden đóng băng | golden đóng băng, không sinh lại được: chỉ sửa mã test Go (`categories` `nodePart`, `colerr_test`, `materials` `stripDL` / `goonly.StripEmpty`) |
 
 Nhãn TRÙNG giữa 2 spec phải trỏ **cùng một cột DB** (MÀU SẮC · KÍCH THƯỚC · BỀ MẶT HOÀN THIỆN · LƯU Ý).
 
