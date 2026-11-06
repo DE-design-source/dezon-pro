@@ -5,6 +5,7 @@
    Hộp thoại riêng của phần này (Thông tin dự án, Nhân bản, Đổi tên, Tạo dự án) mở qua openProjDlg(); <ProjectDialogs/> vẽ. */
 import { useSyncExternalStore } from 'react'
 import * as api from '../../api/qsApi'
+import { uploadRaw } from '../../api/files'
 import {
   getState, selectProject, showTab, reloadProjects, createProject, updateProject, deleteProject, duplicateProject,
 } from '../../state/store'
@@ -132,9 +133,72 @@ export async function createFromForm(form) {
   } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)); return false }
 }
 
-/* Lưu thông tin dự án -> áp cho MỌI bản nháp cùng nhóm */
+/* Trang "Nhập dự án" (Danh sách dự án): đủ trường như trang chi tiết -> dự án vừa nhập, null nếu lỗi / thiếu tên.
+   Khác "Tạo dự án" của Bảng điều khiển: chỉ thêm vào danh sách, KHÔNG mở thành dự án đang làm (cur giữ nguyên).
+   opts.open (nút "Tạo BOQ từ Dezon Pro"): tạo như Bảng điều khiển - mở luôn thành dự án đang làm */
+const formFields_ = f => {
+  const t = k => String(f[k] || '').trim()
+  const link = t('linkDezon')
+  return {
+    ten: t('ten'), kienTrucSu: t('kienTrucSu'), studio: t('studio'),
+    nhomThietKe: t('nhomThietKe'), nhiepAnhGia: t('nhiepAnhGia'), nhaThauThiCong: t('nhaThauThiCong'), namHoanThien: t('namHoanThien'),
+    khachHang: t('khachHang'), sdt: t('sdt'), diaChi: t('diaChi'), linkDezon: link ? dezonUrl_(link) : '',
+    phanKhuc: t('phanKhuc'), quyMo: t('quyMo'), tongDT: t('tongDT'), dtBaoGia: t('dtBaoGia'), maBaoGia: t('maBaoGia'),
+    trangThai: t('trangThai'), tienDo: Number(f.tienDo) || 0, vat: Number(f.vat) || 0,
+    nhuCau: t('nhuCau'), hienTrang: t('hienTrang'), ghiChu: t('ghiChu'),
+  }
+}
+export async function importProjectForm(f, opts) {
+  const d = formFields_(f)
+  if (!d.ten) { toast('Nhập tên dự án'); return null }
+  try {
+    let p
+    if (opts && opts.open) p = await createProject(d)
+    else { p = await api.createProject(d); await reloadProjects() }
+    toast((opts && opts.open ? 'Đã tạo dự án "' : 'Đã nhập dự án "') + d.ten + '"')
+    return p
+  } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)); return null }
+}
+
+/* Đính file BOQ (PDF / Excel) vào dữ liệu 'boqFiles' của dự án vừa tạo (cùng dạng tab BOQ của trang chi tiết) */
+export async function attachBoqFiles(maDA, files) {
+  const added = []
+  for (const x of files) {
+    try { const r = await uploadRaw(x); if (r && r.url) added.push({ url: r.url, name: x.name, at: new Date().toISOString() }) } catch (e) { toast('Tải "' + x.name + '" lỗi: ' + errMsg(e)) }
+  }
+  if (!added.length) return
+  try { await api.setProjData(maDA, 'boqFiles', added); toast('Đã đính ' + added.length + ' file BOQ') } catch (e) { if (!isAuth(e)) toast('Lỗi lưu file BOQ: ' + errMsg(e)) }
+}
+
+/* Trang chi tiết "Sửa thông tin" (migration 0037): người duyệt lưu thẳng, người khác gửi yêu cầu chờ duyệt.
+   -> kết quả của máy chủ ({applied, project} | {pending, id}) hoặc null nếu lỗi / không đổi gì */
+export async function editProjectForm(p, f, lyDo) {
+  const d = formFields_(f)
+  if (!d.ten) { toast('Nhập tên dự án'); return null }
+  try {
+    const r = await api.requestProjectEdit(p.maDA, d, lyDo)
+    if (r && r.applied) { await reloadProjects(); toast('Đã lưu thông tin dự án') }
+    else toast('Đã gửi yêu cầu sửa - chờ Admin / người có quyền duyệt')
+    return r || {}
+  } catch (e) { if (!isAuth(e)) toast(errMsg(e)); return null }
+}
+
+/* Duyệt / từ chối 1 phiếu yêu cầu sửa; duyệt xong tải lại danh sách dự án để trang chi tiết hiện thông tin mới */
+export async function resolveProjectEdit(id, approve, lyDo) {
+  try {
+    await api.resolveProjectEditRequest(id, approve, lyDo)
+    if (approve) await reloadProjects()
+    toast(approve ? 'Đã duyệt - thông tin dự án đã cập nhật' : 'Đã từ chối yêu cầu sửa')
+    return true
+  } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)); return false }
+}
+
+/* Lưu thông tin dự án -> áp cho MỌI bản nháp cùng nhóm. kienTrucSu (cột chỉ bản Go, migration 0036) chỉ gửi khi khác giá trị
+   đang có, như hienTrang ở saveDraftInfo */
 export async function saveProjectShared(f) {
   const shared = { ten: f.ten, khachHang: f.khachHang, sdt: f.sdt, diaChi: f.diaChi, linkDezon: String(f.linkDezon || '').trim() }
+  const cu0 = getState().cur
+  if (f.kienTrucSu != null && String(f.kienTrucSu).trim() !== String((cu0 && cu0.kienTrucSu) || '')) shared.kienTrucSu = String(f.kienTrucSu).trim()
   if (shared.linkDezon && !/^https?:\/\//i.test(shared.linkDezon)) shared.linkDezon = 'https://' + shared.linkDezon
   if (shared.linkDezon && !/(^|\.)dezon\.vn$/i.test(dezonHost_(shared.linkDezon))
     && !(await qsConfirm('Link này không thuộc dezon.vn:\n' + shared.linkDezon + '\n\nVẫn lưu?'))) return false

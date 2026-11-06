@@ -35,7 +35,7 @@ function TplModern({ camp, qd, A }) {
           <div className="mk-qp-mono" style={{ fontSize: 12, color: '#6B7280' }}>Ngày: {todayStr()}</div>
         </div>
       </div>
-      <div style={{ background: '#FBE6F0', borderRadius: 10, padding: '16px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px', marginBottom: 22 }}>
+      <div style={{ background: '#E7EEFA', borderRadius: 10, padding: '16px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px', marginBottom: 22 }}>
         <div><div style={lbl}>Chiến dịch</div><div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{camp.name}</div></div>
         <div><div style={lbl}>Dự án / khách hàng</div><div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{camp.client}</div></div>
         <div><div style={lbl}>Thời gian triển khai</div><div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{camp.start || '—'} → {camp.end || '—'} ({qd.months} tháng)</div></div>

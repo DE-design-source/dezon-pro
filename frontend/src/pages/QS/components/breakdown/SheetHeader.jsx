@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { usePcTotalsEl, usePcNodeEl } from '../project/pcSlot'
 import Icon from '../../../../components/ui/Icon'
 import { money } from '../../lib/format.js'
+import ChangeInput from '../quote/ChangeInput'
 
 const Caret = () => <span className="qs-bd-caret" />
 const dong = n => `${money(n)} đ`
@@ -17,7 +18,7 @@ const pad2 = n => (n < 10 ? '0' : '') + n
           subtotal, vat, onVat(v) (ghi khi rời ô / Enter như onchange của bản gốc), view, onView, catalogOpen, onToggleCatalog,
           colsShown, colsTotal, colsOpen, onOpenCols, presetLabel, onOpenPreset(ev), presetOpen */
 export default function SheetHeader({
-  count, treeCount, hideCols, nodeLabel, onOpenTree, treeOpen, sheetChips, subtotal, vat, onVat, view, onView, catalogOpen, onToggleCatalog,
+  count, treeCount, hideCols, nodeLabel, onOpenTree, treeOpen, sheetChips, subtotal, vat, onVat, onVatHm, vatRieng, view, onView, catalogOpen, onToggleCatalog,
   colsShown, colsTotal, colsOpen, onOpenCols, presetLabel, onOpenPreset, presetOpen,
 }) {
   /* Nút gập dải tổng tiền (^) đã bỏ: tổng tiền nằm trên băng dự án (có nút gập riêng); trạng thái qs_fold.totals cũ bỏ qua */
@@ -27,17 +28,16 @@ export default function SheetHeader({
   const oneRow = collapsed || !!pcSlot
   const vatAmount = Math.round(subtotal * (Number(vat) || 0) / 100)
   const preset = `${colsShown}/${colsTotal}`
-  const colTools = (
-    <>
-      {!hideCols && <button className={`qs-bd-cols-label${colsOpen ? ' on' : ''}`} title="Ẩn / hiện các chip cột" onClick={onOpenCols}><span className="qs-bd-cols-t">Cột hiển thị</span><span>{preset}</span><Icon name="chevronDown" size={16} /></button>}
-      {/* trên băng dự án chỉ còn biểu tượng (tên bộ đang bật + số cột ở chú thích khi rê chuột) */}
-      {!hideCols && (
-        <button className={`qs-bd-preset${presetOpen ? ' on' : ''}${pcNode ? ' icon-only' : ''}`} onClick={onOpenPreset}
-          title={'Chọn nhanh bộ cột — đang dùng: ' + presetLabel + ' ' + preset} aria-label="Chọn nhanh bộ cột">
-          <Icon name="sliders" size={pcNode ? 15 : 13} />{!pcNode && <>{presetLabel} {preset}<Caret /></>}
-        </button>
-      )}
-    </>
+  /* Cột hiển thị + chọn nhanh bộ cột chung 1 khung (.qs-colmod); trên băng dự án nút bộ cột chỉ còn biểu tượng
+     (tên bộ đang bật + số cột ở chú thích khi rê chuột) */
+  const colTools = hideCols ? null : (
+    <span className="qs-colmod" role="group" aria-label="Cột hiển thị">
+      <button className={`qs-bd-cols-label${colsOpen ? ' on' : ''}`} title="Ẩn / hiện các chip cột" onClick={onOpenCols}><span className="qs-bd-cols-t">Cột hiển thị</span><span>{preset}</span><Icon name="chevronDown" size={16} /></button>
+      <button className={`qs-bd-preset${presetOpen ? ' on' : ''}${pcNode ? ' icon-only' : ''}`} onClick={onOpenPreset}
+        title={'Chọn nhanh bộ cột — đang dùng: ' + presetLabel + ' ' + preset} aria-label="Chọn nhanh bộ cột">
+        <Icon name="sliders" size={pcNode ? 15 : 13} />{!pcNode && <>{presetLabel} {preset}<Caret /></>}
+      </button>
+    </span>
   )
   /* Mỗi nhóm .qs-bd-tg = nhãn (.qs-bd-tl) + số. Tại chỗ (đầu bảng) nhóm "trải phẳng" thành một hàng như cũ;
      trên băng dự án (.qs-pc-totals, project.css) mỗi nhóm thành ô số trên / nhãn dưới như các KPI của băng */
@@ -46,6 +46,14 @@ export default function SheetHeader({
     <div className="qs-bd-totals">
       <span className="qs-bd-tg"><span className="qs-bd-tl"><span className="qs-bd-muted">Chưa VAT</span></span><b>{dong(subtotal)}</b></span>
       <span className="qs-bd-vsep" />
+      {/* VAT riêng của hạng mục đang xem (báo giá cộng VAT theo % từng hạng mục); trống / bằng VAT dự án = theo VAT dự án */}
+      {onVatHm && (
+        <span className={'qs-bd-tg qs-bd-vathm' + (vatRieng ? ' rieng' : '')} title={vatRieng ? 'VAT riêng của hạng mục này (xoá trống = theo VAT dự án)' : 'Đang theo VAT dự án - nhập % để đặt VAT riêng cho hạng mục này'}>
+          <span className="qs-bd-tl"><span className="qs-bd-muted">VAT</span></span>
+          <b><ChangeInput className="qs-bd-vatin" type="number" step="any" min="0" max="100" value={Number(vat) || 0} onCommit={onVatHm} />%</b>
+        </span>
+      )}
+      {onVatHm && <span className="qs-bd-vsep" />}
       <span className="qs-bd-tg" title={'Đã gồm VAT ' + (Number(vat) || 0) + '% = ' + dong(vatAmount) + ' — sửa % VAT ở Thông tin dự án'}>
         <span className="qs-bd-tl"><span className="qs-bd-total-label">Tổng (VAT)</span></span><b className="qs-bd-total">{dong(subtotal + vatAmount)}</b>
       </span>

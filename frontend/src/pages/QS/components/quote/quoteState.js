@@ -28,7 +28,7 @@ let Q = null
 const subs = new Set()
 function init() {
   Q = {
-    bgView: 'doc', bgPage: 1, coverMau: lsGet('qs_covermau') || 'm2', bgNodes: {},
+    bgView: 'doc', bgPage: 1, coverMau: 'm2', bgNodes: {},
     areaOpen: false, tkOpen: false, colMo: false,
     cover: { maDA: '', rows: [], status: 'idle', error: '' },
     exporting: false,
@@ -49,7 +49,8 @@ export function bgGoPage(n) { setQ({ bgPage: n }) }
 export function bgSetPer_(v) { setQ({ bgPer: Number(v) || 0, bgPage: 1 }); cfgSave() }
 export function bgSetZoom_(v) { setQ({ bgZoom: v }); cfgSave() }
 export function bgTogglePerSec_() { setQ(q => ({ bgPerSec: !(q.bgPerSec !== false), bgPage: 1 })); cfgSave() }
-export function setCoverMau(m) { lsSet('qs_covermau', m); setQ({ coverMau: m }) }
+/* chỉ còn 1 bố cục tờ bìa (Mẫu 2 cũ): mọi lời gọi đều về 'm2' */
+export function setCoverMau() { lsSet('qs_covermau', 'm2'); setQ({ coverMau: 'm2' }) }
 export function bgColReset_() { setQ({ bgColW: {}, bgColOrder: null }); cfgSave(); toast('Đã trả cột về mặc định') }
 export function bgColTuyBien_(q) { return !!(q.bgColOrder && q.bgColOrder.length) || Object.keys(q.bgColW || {}).length > 0 }
 export function setColW(w, save) { setQ({ bgColW: w }); if (save) cfgSave() }

@@ -12,7 +12,10 @@ import { coSpec_, nganhCuaSP_, prodDocs_ } from '../../../lib/productFields.js'
 import { pdImgs_, pdKeyItems_, pdSpecBlocks_ } from '../../breakdown/catalog/catalogModel'
 import { putCombo } from '../../breakdown/catalog/comboCache'
 import { spKey_ } from './spModel'
-import { spAddToProject, spAddCombo, spPrivateCopy } from './spActions'
+import { spAddToProject, spAddCombo, spPrivateCopy, spAddToProjects } from './spActions'
+import { getState, showTab } from '../../../state/store'
+import { getDialogs, qsToast } from '../../common/dialogs'
+import ProjectCreate from '../../project/ProjectCreate'
 
 /* Modal "Thông tin sản phẩm" của tab Danh sách SP (spModal, PUB/sanpham.js:1827-1848): ảnh + thông số (pdMedia_ / pdSpecs_ /
    pdPriceFoot_, app.js:1076-1282), khối "Sản phẩm đi kèm" ghi vào DỰ ÁN (pdLoadCombo_ / pdComboVe_ / pdCbBoSet_ / pdCbSL_ /
@@ -26,6 +29,7 @@ export default function SpModal({ product, specs, specErr, canEdit, onClose, onE
   const [view, setView] = useState('')
   const [bad, setBad] = useState('')
   const [pcBusy, setPcBusy] = useState(false)
+  const [multi, setMulti] = useState(false)     // hộp Ghi danh vào nhiều dự án
   const n = imgs.length
   const at = n ? (((idx % n) + n) % n) : 0
   const go = d => { if (n > 1) setIdx(i => (((i + d) % n) + n) % n) }
@@ -70,6 +74,7 @@ export default function SpModal({ product, specs, specErr, canEdit, onClose, onE
             <span className={`qspl-duyet${p.daDuyet ? ' on' : ''}`}>{p.daDuyet ? 'Đã duyệt' : 'Chưa duyệt'}</span>
             <button type="button" className="qspl-pd-x" title="Đóng" onClick={onClose}>✕</button>
           </div>
+          {multi && <MultiProjPop p={p} onClose={() => setMulti(false)} onGallery={() => { setMulti(false); onClose(); showTab('dsduan') }} />}
           <div className="qspl-pdm-grid">
             <div className="qspl-pdm-left">
               <div className="qspl-pd-gal">
@@ -133,6 +138,11 @@ export default function SpModal({ product, specs, specErr, canEdit, onClose, onE
                 <QsIcon name="copy" size={14} /> {pcBusy ? 'Đang tạo bản sao…' : 'Tạo bản sao riêng'}
               </button>
             )}
+            <span className="qspl-multi-wrap">
+              <button type="button" className={`qsc-btn${multi ? ' on' : ''}`} title="Chọn nhiều dự án để ghi danh sản phẩm này một lần" onClick={() => setMulti(m => !m)}>
+                <QsIcon name="layers" size={14} /> Ghi danh vào nhiều dự án
+              </button>
+            </span>
             <button type="button" className="qsc-btn blue" onClick={() => spAddToProject(p)}><QsIcon name="plus" size={15} /> Thêm vào dự án</button>
           </div>
         </div>
@@ -227,6 +237,166 @@ function SpCombo({ product }) {
           <QsIcon name="plus" size={14} /> Thêm {boN > 1 ? boN + ' bộ' : 'combo'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/* Bảng "Ghi danh vào nhiều dự án": phủ thân modal. Trái = bộ lọc (tìm, Khách hàng, Khu vực, Trạng thái, Phân khúc, Quy mô —
+   chọn nhiều, mỗi nhóm OR, giữa các nhóm AND); phải = danh sách dự án tick nhiều (dự án đang mở đánh dấu); chân = số lượng + Lưu.
+   Khu vực = đoạn cuối của địa chỉ (sau dấu phẩy cuối). Dự án chưa có trường Studio / Kiến trúc sư nên chưa lọc được theo đó. */
+const kv_ = x => { const a = String(x.diaChi || '').split(',').map(t => t.trim()).filter(Boolean); return a.length ? a[a.length - 1] : '' }
+/* Nhóm lọc: [khoá, tên, lấy giá trị, tuỳ chọn {fixed: danh sách giá trị cố định, empty: ghi chú khi chưa có dữ liệu}].
+   Nền tảng: Dezon.vn = dự án đã gắn link bài dezon.vn, Dezon Pro = chưa gắn link; "Dự án của tôi" chưa có dữ liệu người tạo.
+   Studio / Kiến trúc sư: đọc x.studio / x.kienTrucSu — dự án chưa có 2 trường này (cần thêm vào database + form Thông tin dự án) */
+const MP_GROUPS = [
+  ['nenTang', 'Nền tảng', x => (String(x.linkDezon || '').trim() ? 'Dezon.vn' : 'Dezon Pro'), { fixed: ['Dezon.vn', 'Dezon Pro', 'Dự án của tôi'] }],
+  ['studio', 'Studio', x => String(x.studio || '').trim(), { empty: 'Chưa có dữ liệu Studio trong thông tin dự án' }],
+  ['kts', 'Kiến trúc sư', x => String(x.kienTrucSu || '').trim(), { empty: 'Chưa có dữ liệu Kiến trúc sư trong thông tin dự án' }],
+  ['khachHang', 'Khách hàng', x => String(x.khachHang || '').trim()],
+  ['khuVuc', 'Khu vực', kv_],
+  ['trangThai', 'Trạng thái', x => String(x.trangThai || '').trim() || 'Bản nháp'],
+  ['phanKhuc', 'Phân khúc', x => String(x.phanKhuc || '').trim()],
+  ['quyMo', 'Quy mô', x => String(x.quyMo || '').trim()],
+]
+/* Chế độ CHỌN (onPick có giá trị, vd. form Nhập dữ liệu): không ghi danh ngay - bấm nút chân hộp trả về onPick([maDA], số lượng)
+   để nơi gọi tự ghi danh sau (sau khi lưu SP vào Database); initPick / initSl = dự án + số lượng đang chọn sẵn */
+export function MultiProjPop({ p, onClose, onGallery, onPick, initPick, initSl }) {
+  const projects = getState().projects || []
+  const curMa = getState().cur ? getState().cur.maDA : ''
+  const [q, setQ] = useState('')
+  const [flt, setFlt] = useState({})            // {nhóm: {giá trị: 1}}
+  const [pick, setPick] = useState(() => new Set(initPick || []))
+  const [onlyPicked, setOnlyPicked] = useState(false)
+  /* Thu gọn từng nhóm lọc (nhớ trong máy) */
+  const [gFold, setGFoldSt] = useState(() => { try { return JSON.parse(localStorage.getItem('qs_mp_fold') || '{}') || {} } catch (e) { return {} } })
+  const togFold = k => setGFoldSt(f => { const n = { ...f, [k]: !f[k] }; try { localStorage.setItem('qs_mp_fold', JSON.stringify(n)) } catch (e) { /* bỏ qua */ } return n })
+  const gHead = (k, title, nOn) => (
+    <button type="button" className="qspl-mp-gt" aria-expanded={!gFold[k]} title={gFold[k] ? 'Mở rộng' : 'Thu gọn'} onClick={() => togFold(k)}>
+      <span>{title}{nOn ? <em>{nOn}</em> : null}</span>
+      <span className={'qspl-mp-chev' + (gFold[k] ? ' closed' : '')} aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg></span>
+    </button>
+  )
+  const [sl, setSl] = useState(() => Math.max(1, Number(initSl) || 1))
+  const [busy, setBusy] = useState(false)
+  const [creating, setCreating] = useState(false)   // khung "Nhập dự án" (Ghi danh dự án mới) phủ lên hộp
+  const creatingRef = useRef(false); creatingRef.current = creating
+  const ref = useRef(null)
+  useEffect(() => {
+    // Esc khi đang mở khung Nhập dự án (Ghi danh dự án mới) chỉ đóng khung đó
+    const key = e => { if (e.key !== 'Escape' || getDialogs().asks.length) return; if (creatingRef.current) setCreating(false); else onClose() }
+    document.addEventListener('keydown', key)
+    return () => document.removeEventListener('keydown', key)
+  }, [onClose])
+  const qq = q.trim().toLowerCase()
+  const passGroup = (x, skip) => MP_GROUPS.every(g => { if (g[0] === skip) return true; const m = flt[g[0]]; return !m || !Object.keys(m).length || !!m[g[2](x)] })
+  const passQ = x => !qq || [x.ten, x.khachHang, x.diaChi, x.sdt].some(v => String(v || '').toLowerCase().indexOf(qq) >= 0)
+  const shown = projects.filter(x => passQ(x) && passGroup(x) && (!onlyPicked || pick.has(x.maDA)))
+  const toggleF = (g, v) => setFlt(f => { const m = { ...(f[g] || {}) }; if (m[v]) delete m[v]; else m[v] = 1; return { ...f, [g]: m } })
+  const nFlt = Object.values(flt).reduce((n, m) => n + Object.keys(m || {}).length, 0)
+  const toggle = ma => setPick(s0 => { const n = new Set(s0); if (n.has(ma)) n.delete(ma); else n.add(ma); return n })
+  const allOn = shown.length > 0 && shown.every(x => pick.has(x.maDA))
+  const toggleAll = () => setPick(s0 => { const n = new Set(s0); shown.forEach(x => (allOn ? n.delete(x.maDA) : n.add(x.maDA))); return n })
+  async function save() {
+    if (onPick) { onPick([...pick], sl); onClose(); return }
+    if (!pick.size || busy) return
+    setBusy(true)
+    try { const r = await spAddToProjects(p, [...pick], sl); if (!r.fail) onClose() } finally { setBusy(false) }
+  }
+  /* "Ghi danh dự án mới": mở khung "Nhập dự án" (cùng form nút Nhập dự án của Danh sách dự án) phủ lên hộp; lưu = tạo dự án
+     (chỉ thêm vào danh sách, không đổi dự án đang mở) rồi ghi danh SP này vào đó với Số lượng đang chọn.
+     Bấm dự án đã có của KTS (hoặc trùng tên) = chọn dự án đó trong danh sách, quay về hộp */
+  async function afterCreate(np) {
+    setCreating(false)
+    if (onPick) { setPick(s0 => new Set(s0).add(np.maDA)); qsToast("Đã tạo và chọn dự án \"" + (np.ten || "") + "\""); return }
+    setBusy(true)
+    try { const res = await spAddToProjects(p, [np.maDA], sl); if (!res.fail) onClose() } finally { setBusy(false) }
+  }
+  function pickExisting(ma) {
+    setPick(s0 => new Set(s0).add(ma)); setCreating(false)
+    const x = projects.find(y => y.maDA === ma)
+    qsToast('Đã chọn dự án có sẵn' + (x ? ' "' + x.ten + '"' : '') + ' - bấm Ghi danh dự án để ghi danh')
+  }
+  return (
+    <div className="qspl-mp" ref={ref} role="dialog" aria-label="Ghi danh vào nhiều dự án">
+      <div className="qspl-mp-h">
+        <b>Ghi danh vào nhiều dự án</b><span className="sub">{p.ten}</span>
+        <button type="button" className="qspl-pd-x" title="Đóng (Esc)" onClick={onClose}>✕</button>
+      </div>
+      <div className="qspl-mp-body">
+        <aside className="qspl-mp-flt">
+          {onGallery && (
+            <button type="button" className="qspl-mp-gal" title="Mở trang Danh sách dự án (dạng lưới thẻ)" onClick={onGallery}>
+              <QsIcon name="sliders" size={14} /> Trang danh sách dự án <span aria-hidden="true">↗</span>
+            </button>
+          )}
+          <div className="qspl-mp-mod qspl-mp-top">
+          <div className="qspl-mp-fh"><b>Bộ lọc</b>
+            {nFlt > 0 && <button type="button" className="qsc-btn qspl-xs" onClick={() => setFlt({})}>Xoá lọc ({nFlt})</button>}
+            <button type="button" className="qsc-btn blue qspl-xs qspl-mp-new" disabled={busy} title="Tạo dự án mới rồi ghi danh sản phẩm này vào đó" onClick={() => setCreating(true)}>
+              <QsIcon name="plus" size={13} /> Ghi danh dự án mới
+            </button>
+          </div>
+          <input className="qspl-multi-q" placeholder="Tìm tên dự án, khách hàng, địa chỉ…" value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          </div>
+          {MP_GROUPS.map(g => {
+            const cnt = {}
+            projects.forEach(x => { if (!passQ(x) || !passGroup(x, g[0])) return; const v = g[2](x); if (v) cnt[v] = (cnt[v] || 0) + 1 })
+            const opt = g[3] || {}
+            const keys = opt.fixed ? opt.fixed.slice() : Object.keys(cnt).sort((a, b) => a.localeCompare(b, 'vi'))
+            const m = flt[g[0]] || {}
+            Object.keys(m).forEach(v => { if (keys.indexOf(v) < 0) keys.push(v) })
+            if (!keys.length && opt.empty) return (
+              <div key={g[0]} className={'qspl-mp-grp qspl-mp-mod' + (gFold[g[0]] ? ' folded' : '')}>{gHead(g[0], g[1], 0)}{!gFold[g[0]] && <div className="qspl-mp-empty">{opt.empty}</div>}</div>
+            )
+            if (!keys.length) return null
+            return (
+              <div key={g[0]} className={'qspl-mp-grp qspl-mp-mod' + (gFold[g[0]] ? ' folded' : '')}>
+                {gHead(g[0], g[1], Object.keys(m).length)}
+                {!gFold[g[0]] && <div className="qspl-mp-chips">
+                  {keys.map(v => {
+                    const off = v === 'Dự án của tôi'
+                    return <button type="button" key={v} disabled={off} title={off ? 'Chưa có dữ liệu người tạo dự án' : v} className={`qspl-mp-chip${m[v] ? ' on' : ''}`} onClick={() => toggleF(g[0], v)}>{v}{!off && <small>{cnt[v] || 0}</small>}</button>
+                  })}
+                </div>}
+              </div>
+            )
+          })}
+        </aside>
+        <section className="qspl-mp-main">
+          <div className="qspl-mp-bar">
+            <label className="qspl-multi-all"><input type="checkbox" checked={allOn} onChange={toggleAll} /> Chọn tất cả đang hiện ({shown.length})</label>
+            <span style={{ flex: 1 }} />
+            <label className="qspl-multi-all"><input type="checkbox" checked={onlyPicked} onChange={e => setOnlyPicked(e.target.checked)} /> Chỉ hiện đã chọn</label>
+          </div>
+          <div className="qspl-mp-list">
+            <div className="qspl-mp-row head"><span /><span>Dự án</span><span>Khách hàng</span><span>Khu vực</span><span>Trạng thái</span></div>
+            {shown.map(x => (
+              <label key={x.maDA} className={`qspl-mp-row${pick.has(x.maDA) ? ' on' : ''}`}>
+                <input type="checkbox" checked={pick.has(x.maDA)} onChange={() => toggle(x.maDA)} />
+                <span className="nm">{x.ten}{x.maDA === curMa && <i className="cur">Đang mở</i>}</span>
+                <span>{x.khachHang || '—'}</span>
+                <span title={x.diaChi || ''}>{kv_(x) || '—'}</span>
+                <span>{x.trangThai || 'Bản nháp'}</span>
+              </label>
+            ))}
+            {!shown.length && <div className="qspl-multi-none">Không có dự án khớp bộ lọc.</div>}
+          </div>
+        </section>
+      </div>
+      <div className="qspl-mp-f">
+        <span className="qspl-mp-n">Đã chọn <b>{pick.size}</b> dự án</span>
+        <span style={{ flex: 1 }} />
+        <label className="qspl-multi-sl">Số lượng <input type="number" min="1" value={sl} onChange={e => setSl(Math.max(1, Number(e.target.value) || 1))} /></label>
+        <button type="button" className="qsc-btn" onClick={onClose}>Huỷ</button>
+        <button type="button" className="qsc-btn blue" disabled={(!onPick && !pick.size) || busy} onClick={save}>{onPick ? (pick.size ? 'Chọn ' + pick.size + ' dự án' : 'Không ghi danh') : (busy ? 'Đang ghi danh…' : 'Ghi danh dự án' + (pick.size ? ' (' + pick.size + ')' : ''))}</button>
+      </div>
+      {creating && (
+        <div className="qspl-mp-newpane">
+          <ProjectCreate noDash backLabel="Ghi danh vào nhiều dự án" saveLabel={onPick ? "Lưu & chọn" : "Lưu & ghi danh"}
+            note={onPick ? "Lưu xong dự án này được chọn sẵn trong danh sách." : 'Lưu xong sẽ ghi danh "' + (p.ten || '') + '" ×' + sl + ' vào dự án này.'}
+            onBack={() => setCreating(false)} onCreated={afterCreate} onOpen={pickExisting} />
+        </div>
+      )}
     </div>
   )
 }

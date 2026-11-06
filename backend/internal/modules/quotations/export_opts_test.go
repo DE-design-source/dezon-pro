@@ -420,3 +420,30 @@ func TestExportOptsREST(t *testing.T) {
 		t.Errorf("opts qua REST không có hiệu lực: %v", txt)
 	}
 }
+
+// VAT theo hạng mục: tờ bìa thêm dòng VAT (client tính) + TỔNG GỒM VAT; sheet hạng mục có % trong vatHm thêm VAT + THÀNH TIỀN (VAT)
+func TestExportOptsVatHangMuc(t *testing.T) {
+	opts := mustDecode(t, `{"coverMau":"m2","vatBia":{"nhan":"5% · 8%","vat":1000},"vatHm":{"3.2.6.1":8}}`)
+	f, _, _ := exportWithOpts(t, nil, nil, nil, opts)
+	bia := sheetText(t, f, "Tờ bìa")
+	for _, w := range []string{"=VAT 5% · 8%", "=TỔNG CHI PHÍ DỰ KIẾN (GỒM VAT)"} {
+		if !hasText(bia, w) {
+			t.Errorf("tờ bìa thiếu %q: %v", w, bia)
+		}
+	}
+	hm := sheetText(t, f, "3.2.6.1")
+	for _, w := range []string{"=VAT 8%", "=THÀNH TIỀN (VAT)"} {
+		if !hasText(hm, w) {
+			t.Errorf("sheet hạng mục thiếu %q: %v", w, hm)
+		}
+	}
+	// hạng mục không có trong vatHm: không thêm dòng VAT (giữ như cũ)
+	for _, sh := range f.GetSheetList() {
+		if sh == "Tờ bìa" || sh == "3.2.6.1" || sh == "Tổng cộng" {
+			continue
+		}
+		if hasText(sheetText(t, f, sh), "THÀNH TIỀN (VAT)") {
+			t.Errorf("sheet %s không có %% VAT mà vẫn có dòng THÀNH TIỀN (VAT)", sh)
+		}
+	}
+}

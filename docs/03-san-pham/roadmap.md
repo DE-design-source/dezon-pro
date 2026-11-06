@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-05 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-06 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -24,16 +24,16 @@
 | Module | Tên | Trạng thái | Còn lại |
 |---|---|---|---|
 | [M1](#xong-1) | Đăng nhập & phiên | ✅ | - |
-| [M2](#xong-2) | Bảng điều khiển | ✅ | - |
+| [M2](#xong-2) | Bảng điều khiển | 🟡 | [M2.1](#m2-1) |
 | [M3](#xong-3) | Dự án | ✅ | - |
 | [M4](#xong-4) | Bóc tách | ✅ | - |
 | [M5](#xong-5) | Phần thô & công tác | ✅ | - |
 | [M6](#xong-6) | Tờ bìa (khái toán) | ✅ | - |
 | [M7](#xong-7) | Chi phí | ✅ | - |
-| [M8](#xong-8) | Xuất báo giá | ✅ | - |
-| [M9](#xong-9) | Mua hàng & đề xuất | ✅ | - |
-| [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3), [M10.4](#m10-4) |
-| [M11](#xong-11) | Nhập dữ liệu | ✅ | - |
+| [M8](#xong-8) | Xuất báo giá | 🟡 | [M8.4](#m8-4), [M8.5](#m8-5) |
+| [M9](#xong-9) | Mua hàng & đề xuất | 🟡 | [M9.2](#m9-2), [M9.3](#m9-3) |
+| [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3), [M10.4](#m10-4), [M10.5](#m10-5) |
+| [M11](#xong-11) | Nhập dữ liệu | 🟡 | [M11.x](#m11-x) |
 | [M12](#xong-12) | Tệp & ảnh | ✅ | - |
 | [M13](#xong-13) | Thông báo | ✅ | - |
 
@@ -57,6 +57,9 @@
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 | [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
 | [N9](#xong-n9) | HR (`/cham-cong`) chạy dữ liệu thật: hồ sơ nhân sự, sơ đồ tổ chức, kiêm nhiệm, chấm công & phép, lương & bảo hiểm, tuyển dụng, hiệu suất & đào tạo (API Go + PostgreSQL) | 🟡 | [N9](#n9): email / tích hợp bên ngoài, triển khai |
+| [N10](#n10) | Trang Danh sách dự án (lưới thẻ) | 🟡 | [N10](#n10): chạy migration 0036 - 0039, thử trên app, ảnh bìa |
+| [N11](#n11) | Trang Nhà cung cấp | 🟡 | [N11](#n11): thử trên app |
+| [N12](#n12) | Trang Nhà thiết kế (Kiến trúc sư / Studio) | 🟡 | [N12](#n12): thử trên app |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 | [N8](#xong-n8) | Chat realtime MVP: đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push | 🟡 | [N8](#n8): thấy thông báo push trên Chrome thường, người dùng thử, triển khai production; [N8.1](#n8-1) SMS thật, [N8.2](#n8-2) FCM / APNs, [N8.3](#n8-3) giai đoạn 2-3 (giai đoạn 2 đã code: tệp, trả lời / chuyển tiếp / thu hồi / sửa, reaction, tìm kiếm, đa thiết bị + QR - còn thử trên trình duyệt; còn gọi, E2E), [N8.4](#n8-4) đăng nhập / kết bạn bằng email, [N8.5](#n8-5) chat nhóm nâng cao (đã code, còn thử trên trình duyệt) |
 
@@ -68,8 +71,15 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
+| <a id="m8-4"></a>M8.4 | Xuất báo giá - dàn trang A4 ngang: mọi trang cùng cỡ chữ gốc (chia trang theo chiều cao dòng đo thật thay vì thu nhỏ chữ), khối tổng ở cuối bảng hạng mục tờ bìa (1 module: tổng · chiết khấu · VAT · tổng gồm VAT + bằng chữ; Tuỳ biến > Khối tổng: nền 3 kiểu dòng, cỡ chữ, font), tờ bìa dài tự sang trang "(tiếp)", Tuỳ biến tiêu đề cột (nền, màu chữ, cỡ, font) + khung & nét áp cả hàng tiêu đề, Lưu làm mặc định / ô nhanh (1)(2)(3) áp được lên bản xem trước, VAT theo hạng mục (ô VAT ở đầu bảng Bóc tách, projData vatHm; báo giá cộng VAT theo % từng hạng mục, đầu trang mỗi hạng mục có Chưa VAT · VAT · Thành tiền (VAT); Excel: tờ bìa thêm VAT + Tổng gồm VAT, sheet hạng mục thêm VAT + Thành tiền (VAT)), tiến độ thanh toán + ghi chú + ô ký thành trang bìa sau (trang cuối riêng), thanh sheet ở chân vùng xem (mỗi phần / hạng mục 1 thẻ kèm khoảng trang, bấm nhảy tới trang đầu), mức 100% = trang rộng đúng khung xem. Đã code + build + thử dữ liệu giả, còn thử trên app thật; Excel chưa theo bố cục tờ bìa / trang bìa sau mới; Phần thô vẫn chia theo số dòng | User | 🟡 |
 | <a id="m10-3"></a>M10.3 | Danh sách sản phẩm: chọn chế độ xem Bảng · Lưới thẻ · Danh sách (nhớ trong máy, `qs_splayout`; dạng thẻ có ảnh, giá, duyệt, yêu thích, thêm vào dự án, chọn nhiều) + tiêu đề bảng đồng bộ kiểu Bóc tách (IN HOA, căn giữa, xuống dòng, nút phễu mở menu sắp xếp / ẩn cột) + thanh công cụ / hàng chọn cột / bảng tách thành module riêng, thanh công cụ 1 dòng tự gọn khi hẹp (Yêu thích chỉ biểu tượng, "Tất cả" không lặp tên hạng mục). Đã code + build (`SpCards.jsx`, `list.css`), còn thử trên app thật | User | 🟡 |
+| <a id="m10-5"></a>M10.5 | Modal Thông tin sản phẩm: nút "Ghi danh vào nhiều dự án" (tìm + tick nhiều dự án, số lượng, Lưu; trùng SP thì cộng số lượng, không thì thêm vào Chưa phân tầng). Đã code + build, còn thử trên app thật | User | 🟡 |
+| <a id="m11-x"></a>M11.x | Nhập dữ liệu: panel Sản phẩm vừa nhập sang cột trái (rộng như cột trái các tab) + dashboard "Ghi nhận dữ liệu nhập" (kỳ Hôm nay / Tuần / Tháng / Quý / Năm / Tuỳ chọn, lọc Người nhập / Người duyệt / Thương hiệu, KPI, biểu đồ cột, top người nhập). Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="m10-4"></a>M10.4 | Danh sách sản phẩm: bộ cột theo hạng mục - dải chip / "Hiện tất cả cột" chỉ có cột của ngành trong hạng mục (Thiết bị điện = đèn + công tắc; hạng mục chưa có bộ thông số như Thạch cao, Cửa chỉ còn 25 cột chung thay vì 135; lọc "Hạng mục SP" = 1 loại có bộ thông số riêng như Bồn cầu, Lavabo, Ổ cắm thì chỉ còn thông số của loại đó); mỗi hạng mục nhớ cột đang hiện riêng (`qs_spcolcfg.byNode`, hạng mục chưa lưu thì dùng bộ theo ngành như cũ); bộ cột tự đặt tên và nút nhanh (1)(2) chỉ hiện ở hạng mục lúc tạo (bộ / nút cũ chưa gắn hạng mục chuyển về "Tất cả hạng mục"); bộ "Của tôi" vẫn theo tài khoản, dùng chung; khung "Chọn nhanh cột" bỏ bộ "Hiện tất cả cột" (trùng nút Hiện tất cả ở dải chip). Đã code + build (`ProductList.jsx`, `spModel.js`), còn thử trên app thật | User | 🟡 |
+| <a id="m9-2"></a>M9.2 | Mua hàng: nút Edit trên thẻ nhà cung cấp (phòng mua hàng) - thêm hàng tay (tên · ĐVT · SL · đơn giá · ghi chú; cộng vào tổng / VAT / kế hoạch thanh toán và gửi kèm đơn NCC, ghi chú dòng nằm ở ô khu vực của dòng đơn), thêm / đổi tên / xoá cột tự đặt (giá trị từng dòng gửi kèm đơn ở ô khu vực), ghi chú riêng cho NCC (nối vào ghi chú đơn). Lưu ở projData `mhExtra` (thêm khoá vào danh sách cho phép của server Go). Đề xuất chiết khấu không gồm hàng thêm tay. Đã code + build + thử phép tính đơn, còn thử trên app thật | User | 🟡 |
+| <a id="m2-1"></a>M2.1 | Danh sách dự án (Bảng điều khiển, dạng thanh): cột "Phụ trách" - nhân sự phụ trách từng dự án (ô tròn chữ cái đầu, 1 người kèm tên); quản trị bấm "+" gõ tìm + tích chọn nhiều nhân sự, ghi ngay vào dữ liệu công ty `__cty` khoá `daPhuTrach` (thêm khoá vào danh sách cho phép của server Go), người khác chỉ xem. Trang Thông tin dự án: cột trái "Báo cáo" - Nhân sự dự án 3 vai trò (Quản lý = cột Phụ trách · Người điều phối · Người thực hiện; `daPhuTrach[mã] = {ql, dp, th}`, bản cũ dạng mảng = Quản lý) + Báo cáo dự án (trạng thái, tiến độ, ngày tạo, số bản nháp, KTS, dòng SP, giá trị báo giá, lợi nhuận, NCC). Đã code + build + test Go, còn thử trên app thật; chưa lọc "Dự án của tôi" theo cột này | User | 🟡 |
+| <a id="m8-5"></a>M8.5 | Xuất báo giá - khổ in A4 / A3 × ngang / dọc (`bgCfg.kho`, cột trái trên nút xuất): trang xem trước, chia trang theo chiều cao, thu phóng Vừa khung và cửa sổ in / PDF theo khổ. Đã code + build, còn thử trên app thật; file Excel chưa đổi khổ giấy | User | 🟡 |
+| <a id="m9-3"></a>M9.3 | Mua hàng: VAT riêng từng nhà cung cấp (chân bảng NCC: Tổng (chưa VAT) · VAT (%) ô nhập + nút xổ 10 / 8 / 5 / 0% + về VAT dự án · Tổng (VAT); lưu `mhExtra[ncc].vat`, chưa đặt = VAT dự án), tổng / kế hoạch thanh toán / đơn + đề xuất gửi NCC theo VAT riêng. Đã code + build, còn thử trên app thật | User | 🟡 |
 
 ### 2.2 Tính năng mới
 
@@ -79,6 +89,9 @@
 | <a id="n8-4"></a>N8.4 | Chat ([N8](#n8)): đăng nhập / thêm tài khoản bằng email (mã OTP 6 số gửi qua email, SMTP `SMTP_*`; chưa cấu hình thì mã ghi vào log) bên cạnh số điện thoại; tìm người dùng và gửi lời mời kết bạn bằng email. Tài khoản email là tài khoản riêng (chưa liên kết với tài khoản số điện thoại). Đã code + test API ở máy phát triển 2026-11-02 (xem [mục 5](#xong-n8)); còn thử giao diện trên trình duyệt, cấu hình SMTP thật (mailer mới có AUTH PLAIN), chạy migration 0019 ở database dev / production | Toàn hệ thống | 🟡 |
 | <a id="n8-5"></a>N8.5 | Chat nhóm nâng cao ([N8](#n8), `backend/CHAT.md` mục 9): "Đã xem bởi N người" + danh sách đã xem / đã nhận, ghim tin nhắn (tối đa 5, migration 0021) đã code 2026-11-02; @nhắc tên, ảnh đại diện + mô tả nhóm, link mời vào nhóm (có duyệt), quyền quản trị (chuyển trưởng nhóm, giải tán, chỉ quản trị được nhắn / sửa thông tin / thêm người) đã code 2026-11-03 (migration 0022, xem [mục 5](#xong-n8)). Còn lại: thử giao diện trên trình duyệt; `data-dictionary.md` / `erd.md` cho 0021-0022; route ghim tin trong bảng `API.md` | Toàn hệ thống | 🟡 |
 | <a id="n9"></a>N9 | HR: còn gửi phiếu lương qua email / chuyển khoản lương, gửi thư mời phỏng vấn, tự đăng tin lên kênh tuyển dụng (cần SMTP / tài khoản kênh 🔑); 2FA, SSO, giới hạn IP; tích hợp máy chấm công (cần API thiết bị 🔑); đã triển khai lên dezon.tech 2026-11-05 (migration 0024-0035; nhánh `src_N` đã có 0018-0023 của Chat nên HR đánh số từ 0024) | User | 🟡 |
+| <a id="n12"></a>N12 | Trang "Nhà thiết kế" (nút trên thanh đầu QS, trước Nhà cung cấp; quyền = tab Dự án): 2 tab con Kiến trúc sư / Studio, gom từ cột Kiến trúc sư / Công ty của dự án + đối tác ở tab Đối tác của nhà cung cấp; thẻ: số dự án, nhà cung cấp đã dùng, tổng báo giá; chi tiết: Hồ sơ / Dự án / Nhà cung cấp đã dùng / Thương hiệu tin dùng; nút "Tạo hồ sơ" (hộp gần toàn màn hình: ảnh / logo, Kiến trúc sư / Studio, thông tin cơ bản theo loại, liên hệ, mạng xã hội, quan hệ hợp tác + đánh giá sao, chuyên môn dạng chip, giới thiệu; KTS có "Quá trình làm việc" kiểu LinkedIn - lưu dữ liệu công ty `ntkInfo`), sửa / xoá hồ sơ ở trang chi tiết. Đã code + build, còn thử trên app thật | User | 🟡 |
+| <a id="n11"></a>N11 | Trang "Nhà cung cấp" (nút trên thanh đầu QS): nhà cung cấp = thương hiệu trong danh mục; lưới / danh sách thẻ (ảnh ghép sản phẩm, ngành hàng, số sản phẩm, khoảng giá, số dự án đang dùng), lọc ngành hàng, tìm; trang chi tiết tab Sản phẩm (lọc hạng mục) / Dự án đang dùng / Nhà phân phối / Giới thiệu / Đối tác ("Được tin dùng bởi" KTS, studio…; gợi ý từ KTS + studio của dự án đang dùng) / Catalogue (kéo thả file / cả thư mục, chọn file, chụp ảnh, dán Ctrl+V file / ảnh / link, dán link nhận biết Google Drive / OneDrive / Dropbox / flipbook, lấy từ tài liệu kỹ thuật của sản phẩm cùng thương hiệu; hàng đợi tải lên, lọc theo loại) - hồ sơ lưu dữ liệu công ty `nccInfo`. Đã code + build, còn thử trên app thật | User | 🟡 |
+| <a id="n10"></a>N10 | Trang "Danh sách dự án" dạng lưới thẻ (tham khảo dezon.vn/du-an): ô tìm, lọc Nền tảng / Trạng thái / Khu vực / Phân khúc, chip "Dự án có báo giá"; bấm thẻ mở trang chi tiết dự án (ảnh ghép từ ảnh sản phẩm, bảng thông tin, tab Thông tin / Hình ảnh (ảnh gom theo phòng, mỗi phòng 1 dải ảnh cuộn ngang như dezon.vn; ảnh lưu `{url, phong}` trong `anhDuAn`; thêm ảnh bằng chọn ảnh / chọn thư mục (thư mục con = phòng) / kéo thả file, thư mục / Ctrl+V / dán link / ảnh sản phẩm trong dự án / chụp ảnh) / Sản phẩm / Nhà cung cấp / Dự án liên quan, nút Mở ở Bóc tách); liên kết từ bảng Ghi danh nhiều dự án (có nút "Ghi danh dự án mới": tạo dự án rồi ghi danh SP vào đó); nút "Nhập dự án" mở trang nhập đủ trường (chỉ thêm vào danh sách, không mở thành dự án đang làm), ô đầu là Kiến trúc sư (migration 0036 `projects.architect`): gợi ý dự án KTS đã tham gia, trùng KTS + tên thì chuyển về dự án đã có; khối BOQ (tải file PDF / Excel đính vào dự án, hoặc "Tạo BOQ từ Dezon Pro" = tạo dự án ở Bảng điều khiển rồi chuyển sang đó); trang chi tiết có nút Sửa thông tin / Yêu cầu sửa - sửa tại chỗ ngay trên bảng Thông tin của trang chi tiết (cùng các mục, thêm Studio = migration 0038 `projects.studio`; tab Thông tin = thẻ Thông tin cơ bản kiểu dezon.vn - Dự án, Công ty, Địa điểm, Nhóm thiết kế, Kiến trúc sư, Nhiếp ảnh gia, Nhà thầu thi công, Năm hoàn thiện (migration 0039) - + Thông tin nâng cao thu gọn) (migration 0037 `project_edit_requests`): admin / tài khoản có quyền `da_duyet` lưu thẳng, người khác gửi phiếu chờ duyệt (báo người duyệt, Duyệt & áp dụng / Từ chối ngay trên trang chi tiết). Đã code + build + test Go, còn: chạy migration 0036 - 0039, sinh lại schema.sql, thử trên app thật, ảnh bìa dự án, trường người tạo dự án (cần migration) | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt | User | 🟡 |
 ### 2.3 Cần credential 🔑
@@ -110,7 +123,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N10`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N13`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 

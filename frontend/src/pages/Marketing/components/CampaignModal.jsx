@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { GROUP_ORDER, CAMP_STEPS, CAMP_STEP_TITLE, CAMP_TYPES, CAMP_CLIENTS, catalogItem, fmt, monthsBetween, lineTotal } from '../../../data/marketingData'
 import { MK_FONT } from './CampaignsTab'
 import QuoteBlock from './QuoteBlock'
+import DatePicker from '../../../components/ui/DatePicker'
 
 const EMPTY_FORM = { name: '', type: CAMP_TYPES[0], client: CAMP_CLIENTS[0], owner: 'Trần Anh', start: '', end: '', notes: '' }
 const STEP_TAB_LABEL = { basic: '1. Thông tin chiến dịch', items: '2. Chọn hạng mục chi phí', quote: '3. Báo giá & xác nhận' }
@@ -105,8 +106,8 @@ export default function CampaignModal({ open, catalog, onClose, onSave }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               <div className="mk-field"><label>Người phụ trách</label><input type="text" value={form.owner} onChange={set('owner')} /></div>
-              <div className="mk-field"><label>Bắt đầu</label><input type="date" value={form.start} onChange={set('start')} /></div>
-              <div className="mk-field"><label>Kết thúc</label><input type="date" value={form.end} onChange={set('end')} /></div>
+              <div className="mk-field"><label>Bắt đầu</label><DatePicker value={form.start} max={form.end || undefined} ariaLabel="Bắt đầu" onChange={d => setForm(f => ({ ...f, start: d }))} /></div>
+              <div className="mk-field"><label>Kết thúc</label><DatePicker value={form.end} min={form.start || undefined} ariaLabel="Kết thúc" onChange={d => setForm(f => ({ ...f, end: d }))} /></div>
             </div>
             <div className="mk-field"><label>Ghi chú</label><textarea rows={3} placeholder="Mục tiêu chiến dịch, KPI kỳ vọng..." value={form.notes} onChange={set('notes')} /></div>
           </div>

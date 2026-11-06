@@ -89,6 +89,25 @@
    "resolution_note": "resolution_note"
   }
  },
+ "yeu_cau_sua_du_an": {
+  "table": "project_edit_requests",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ma_du_an": "project_code",
+   "ten_du_an": "project_name",
+   "requester_id": "requester_id",
+   "requester_name": "requester_name",
+   "changes": "changes",
+   "old_values": "old_values",
+   "status": "status",
+   "note": "note",
+   "resolver_name": "resolver_name",
+   "resolved_at": "resolved_at",
+   "resolution_note": "resolution_note",
+   "created_at": "created_at"
+  }
+ },
  "db_san_pham": {
   "table": "products",
   "columns": {
@@ -349,7 +368,13 @@
    "ten_ban_nhap": "draft_name",
    "cong_ty_id": "company_id",
    "link_dezon": "dezon_url",
-   "hien_trang": "current_condition"
+   "hien_trang": "current_condition",
+   "kien_truc_su": "architect",
+   "studio": "studio",
+   "nhom_thiet_ke": "design_team",
+   "nhiep_anh_gia": "photographer",
+   "nha_thau_thi_cong": "contractor",
+   "nam_hoan_thien": "completion_year"
   }
  },
  "du_an_data": {

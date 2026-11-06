@@ -12,6 +12,9 @@ import PurchaseTab from './components/PurchaseTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import ImportTab from './components/importer/ImportTab'
 import PCard from './components/project/PCard'
+import ProjectGallery from './components/project/ProjectGallery'
+import SupplierPage from './components/supplier/SupplierPage'
+import DesignerPage from './components/designer/DesignerPage'
 import QuickBar from './components/project/QuickBar'
 import NotificationBell from './components/notifications/NotificationBell'
 import ModalHost from './components/common/ModalHost'
@@ -23,7 +26,6 @@ import { QsDataProvider } from './state/QsData'
 import { useQsStore, showTab, retryBoot } from './state/store'
 import { useQsSession } from './session/QsSession'
 import LoginScreen from './session/LoginScreen'
-import UserChip from './session/UserChip'
 import { API_BASE, apiConfigured, reportClientError } from './api/http'
 import { logoUrl } from './api/files'
 import DevSheetProbe from './state/DevSheetProbe'
@@ -40,19 +42,22 @@ const TABS = [
   { key: 'duan', label: 'Dự án', icon: 'folder' },
 ]
 /* Băng dự án ẩn ở trang không thuộc 1 dự án và ở Bảng điều khiển (PUB/app.js:350-353) */
-const NO_PCARD = { dash: 1, sanpham: 1, import: 1 }
+const NO_PCARD = { dash: 1, sanpham: 1, import: 1, dsduan: 1, dsncc: 1, dsntk: 1 }
 /* Công ty / Admin đã chuyển sang trang Cài đặt (QsSettingsPanels): tab của store còn trỏ tới đó thì /qs về tab đầu tiên được phép */
 const SETTINGS_TABS = { admin: 1, congty: 1 }
 const QB_TABS = { boc: 1, chiphi: 1, duan: 1, muahang: 1 }
 
 /* Hướng bố cục và khoảng cách của từng tab (giống style inline của các .qs-panel trong bản HTML) */
 const PANEL_LAYOUT = {
-  dash: { flexDirection: 'column', gap: 16 },   // = khoảng cách giữa các khối trong Bảng điều khiển (dashboard.css)
+  dash: { flexDirection: 'column', gap: 16, minHeight: '100%' },   // = khoảng cách giữa các khối trong Bảng điều khiển (dashboard.css); cao hết màn hình
   duan: { flexDirection: 'column', gap: 8, minHeight: '100%' },
   /* PCard nằm trên panel trong .qs-scroll: panel lấy phần còn lại (flex) để vừa khít màn hình như #v-boc (requests/1-1B.txt) */
   boc: { flexDirection: 'column', gap: 10, flex: '1 1 0', minHeight: 560 },
   chiphi: { flexDirection: 'column', gap: 8, minHeight: '100%' },
   sanpham: { flexDirection: 'row', gap: 16, minHeight: 0 },
+  dsduan: { flexDirection: 'column', gap: 0 },   // Danh sách dự án (ProjectGallery)
+  dsncc: { flexDirection: 'column', gap: 0 },    // Nhà cung cấp (SupplierPage)
+  dsntk: { flexDirection: 'column', gap: 0 },    // Nhà thiết kế (DesignerPage)
   /* không min-height:100%: chế độ "Xem trước & Xuất" tự vừa đáy .qs-scroll (bgVpApply_), min-height làm trang cuộn dư (requests/2-2B.txt) */
   export: { flexDirection: 'column', gap: 8 },
   muahang: { flexDirection: 'column', gap: 8 },
@@ -125,6 +130,9 @@ function QsRoot() {
         <div style={panel('boc')}>{guard('boc', <BreakdownTab />)}</div>
         <div style={panel('chiphi')}>{guard('chiphi', <CostTab />)}</div>
         <div style={panel('sanpham')}>{guard('sanpham', <ProductsTab />)}</div>
+        <div style={panel('dsduan')}>{guard('dsduan', <ProjectGallery />)}</div>
+        <div style={panel('dsncc')}>{guard('dsncc', <SupplierPage />)}</div>
+        <div style={panel('dsntk')}>{guard('dsntk', <DesignerPage />)}</div>
         <div style={panel('export')}>{guard('export', <QuoteTab />)}</div>
         <div style={panel('muahang')}>{guard('muahang', <PurchaseTab />)}</div>
         <div style={panel('import')}>{guard('import', <ImportTab />)}</div>
@@ -151,13 +159,15 @@ function QsRoot() {
           ))}
         </div>
         <div className="qs-top-actions">
+          {can('dsntk') && <button className={`qs-top-btn${tab === 'dsntk' ? ' on' : ''}`} title="Đơn vị thiết kế (kiến trúc sư, studio)" onClick={() => showTab('dsntk')}><Icon name="edit" size={14} /><span>Đơn vị thiết kế</span></button>}
+          {can('dsncc') && <button className={`qs-top-btn${tab === 'dsncc' ? ' on' : ''}`} title="Nhà cung cấp" onClick={() => showTab('dsncc')}><Icon name="building" size={14} /><span>Nhà cung cấp</span></button>}
+          {can('dsduan') && <button className={`qs-top-btn${tab === 'dsduan' ? ' on' : ''}`} title="Danh sách dự án" onClick={() => showTab('dsduan')}><Icon name="grid" size={14} /><span>Danh sách dự án</span></button>}
           {can('sanpham') && <button className={`qs-top-btn${tab === 'sanpham' ? ' on' : ''}`} title="Danh sách sản phẩm" onClick={() => showTab('sanpham')}><Icon name="listLines" size={14} /><span>Danh sách sản phẩm</span></button>}
           {can('import') && <button className={`qs-top-btn primary${tab === 'import' ? ' on' : ''}`} title="Nhập dữ liệu" onClick={() => showTab('import')}><Icon name="upload" size={14} /><span>Nhập dữ liệu</span></button>}
           <button className="qs-top-btn icon" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
           </button>
           {ready && <NotificationBell />}
-          {ready && <UserChip />}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import QsIcon from '../../common/QsIcon'
 import FloatPop from '../list/FloatPop'
 import { PT_LOAI } from '../../../lib/phantho.js'
+import SearchSelect from '../../common/SearchSelect'
 
 /* Bộ lọc công tác (ptFltPop_, PUB/sanpham.js:1256-1292): loại báo giá, đơn vị tính (14 ĐVT hay dùng nhất), hạng mục, khoảng đơn giá,
    trạng thái (đã có trong bảng / chưa thêm / đã sửa giá). Cùng khung với bảng Bộ lọc sản phẩm (lớp qspl-flt của list/SpPops).
@@ -23,10 +24,7 @@ export function PtFilterPop({ anchor, all, f, onSet, onReset, onClose }) {
       {chips('Loại báo giá', 'ptLoai', PT_LOAI.map(x => [x[0], x[1]]))}
       {chips('Đơn vị tính', 'ptDvt', dvtVals)}
       <div className="qspl-fgrp"><div className="qspl-fgt">Hạng mục</div>
-        <select className="qspl-fsel qsppt-fsel" value={f.ptNhom || ''} onChange={e => onSet('ptNhom', e.target.value)}>
-          <option value="">Tất cả hạng mục</option>
-          {nhomVals.map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
+        <SearchSelect className="sm" inline value={f.ptNhom || ''} options={nhomVals} allLabel="Tất cả hạng mục" onChange={v => onSet('ptNhom', v)} />
       </div>
       <div className="qspl-fgrp"><div className="qspl-fgt">Khoảng đơn giá (đ)</div><div className="qspl-fprice">
         <input type="number" placeholder="Từ" value={f.min || ''} onChange={e => onSet('min', Number(e.target.value) || 0)} />

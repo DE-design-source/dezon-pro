@@ -142,3 +142,42 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 @keyframes qsc-spl-run{0%{left:-40%;} 100%{left:100%;}}
 @keyframes qsc-spl-glow{0%, 100%{opacity:.75; transform:translate(-50%, -50%) scale(1);} 50%{opacity:1; transform:translate(-50%, -50%) scale(1.06);}}
 @media (prefers-reduced-motion:reduce){ .qsc-spl-glow, .qsc-spl-bar span{animation:none;} .qsc-spl-bar span{left:30%;} }
+
+/* SearchSelect: ô chọn gõ để tìm dùng chung cho các bộ lọc QS. Danh sách nổi cao tới ~62% màn hình (vùng QS bị zoom nên chia --qs-zoom);
+   .inline = danh sách trong luồng (trong popup tự cuộn) */
+.qsc-ss{position:relative; min-width:0;}
+.qsc-ss-in{display:flex; align-items:center; gap:8px; height:38px; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text-muted); cursor:text;}
+.qsc-ss.open .qsc-ss-in, .qsc-ss-in:focus-within{border-color:var(--dash-accent);}
+.qsc-ss.has .qsc-ss-in{border-color:var(--dash-accent-border); background:var(--dash-accent-tint);}
+.qsc-ss-in input{flex:1; min-width:0; height:100%; padding:0; border:none; outline:none; background:none; color:var(--text); font:inherit; font-size:14px; font-weight:500;}
+.qsc-ss-in input::placeholder{color:var(--text); opacity:.8;}
+.qsc-ss.open .qsc-ss-in input::placeholder{color:var(--text-muted); opacity:.7;}
+.qsc-ss-in .clr{width:22px; height:22px; flex:none; padding:0; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.qsc-ss-in .clr:hover{background:var(--danger); color:#fff;}
+.qsc-ss-pop{position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:40; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 14px 32px rgba(15, 23, 42, .18); overflow:hidden;}
+.qsc-ss-list{max-height:min(560px, calc(62vh / var(--qs-zoom, .75))); overflow-y:auto; padding:4px;}
+.qsc-ss.inline .qsc-ss-pop{position:static; margin-top:4px; box-shadow:none;}
+.qsc-ss.inline .qsc-ss-list{max-height:min(360px, calc(45vh / var(--qs-zoom, .75)));}
+.qsc-ss-list button{width:100%; min-height:34px; padding:6px 10px; border:none; border-radius:7px; background:none; color:var(--text); font:inherit; font-size:13.5px; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;}
+.qsc-ss-list button span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsc-ss-list button.all{color:var(--text-muted); font-style:italic;}
+.qsc-ss-list button.hi{background:var(--surface-alt);}
+.qsc-ss-list button.on{color:var(--dash-accent); font-weight:600;}
+.qsc-ss-list .none{padding:8px 10px; font-size:12.5px; color:var(--text-muted);}
+/* cỡ gọn trong popup / thanh lọc nhỏ */
+.qsc-ss.sm .qsc-ss-in{height:32px; border-radius:8px;}
+.qsc-ss.sm .qsc-ss-in input{font-size:12.5px;}
+.qsc-ss.sm .qsc-ss-list button{min-height:30px; font-size:12.5px;}
+
+/* SearchSelect chọn nhiều: ô đánh dấu đầu dòng, số đã chọn trong ô, chân danh sách */
+.qsc-ss-list button .bx{flex:none; width:16px; height:16px; border:1.5px solid var(--border); border-radius:4px; background:var(--surface); color:#fff; display:grid; place-items:center; order:-1;}
+.qsc-ss-list button.on .bx{border-color:var(--dash-accent); background:var(--dash-accent);}
+.qsc-ss.multi .qsc-ss-list button{justify-content:flex-start;}
+.qsc-ss.multi .qsc-ss-list button.all .bx{border-style:dashed;}
+.qsc-ss-in .cnt{flex:none; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--dash-accent); color:#fff; font-size:11.5px; font-weight:700; display:grid; place-items:center;}
+.qsc-ss-foot{display:flex; align-items:center; gap:6px; padding:6px 8px; border-top:1px solid var(--border); background:var(--dash-soft); font-size:12px; color:var(--text-muted);}
+.qsc-ss-foot > span{margin-right:auto; white-space:nowrap;}
+.qsc-ss-foot > span b{color:var(--text);}
+.qsc-ss-foot button{height:26px; padding:0 9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;}
+.qsc-ss-foot button:disabled{opacity:.45; cursor:default;}
+.qsc-ss-foot button.ok{border-color:var(--dash-accent); background:var(--dash-accent); color:#fff;}

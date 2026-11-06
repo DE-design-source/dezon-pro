@@ -1,9 +1,11 @@
-import { chipGroupVals_, ctColor, brandOptions, comboCounts_, favCount_, FLT_REG, fltHien_, fltPinned_ } from '../../lib/catalogFilters.js'
+import { chipGroupVals_, ctColor, brandOptions, brandSel_, comboCounts_, favCount_, FLT_REG, fltHien_, fltPinned_ } from '../../lib/catalogFilters.js'
 import { useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
+import { qbNorm_ } from '../../lib/format.js'
 import { setF, toggleFsec, toggleIn } from './catalog/filterStore'
 import { useFltOrder, useModFold, sortFlt, moveFlt, modOf, modTitle } from './catalog/fltOrder'
 import ModHead from './catalog/ModHead'
+import SearchSelect from '../common/SearchSelect'
 
 /* Các khối lọc đang hiện trên panel danh mục (port renderFilters / chipGroup / renderVsFilters_ / favChips_ / comboChips_ /
    fltApplyPins_, PUB/app.js:476-664, 913-964). Props:
@@ -55,18 +57,16 @@ export default function FilterSections({ st, node, products, vsModel, hideDen, f
     vsModel.sections.forEach(s => {
       if (!fltHien_(st.fltShow, 'vs_' + s.key)) return
       const chips = s.chips.length ? (
-        <div className="qs-bd-fchips">
-          {s.chips.map(c => (
-            <button key={c.v} className={`qs-bd-fchip${c.on ? ' on' : ''}`}
-              onClick={() => (c.c === '__hm' ? toggleIn('fNhomSet', c.v) : setF(f => {
-                const o = { ...(f.fVs[c.c] || {}) }
-                if (o[c.v]) delete o[c.v]; else o[c.v] = 1
-                return { fVs: { ...f.fVs, [c.c]: o } }
-              }))}>
-              {c.v}<small>{c.n}</small>
-            </button>
-          ))}
-        </div>
+        <FChips items={s.chips.map(c => ({ k: c.v, on: c.on, c }))} render={({ c }) => (
+          <button key={c.v} className={`qs-bd-fchip${c.on ? ' on' : ''}`}
+            onClick={() => (c.c === '__hm' ? toggleIn('fNhomSet', c.v) : setF(f => {
+              const o = { ...(f.fVs[c.c] || {}) }
+              if (o[c.v]) delete o[c.v]; else o[c.v] = 1
+              return { fVs: { ...f.fVs, [c.c]: o } }
+            }))}>
+            {c.v}<small>{c.n}</small>
+          </button>
+        )} />
       ) : none
       sec('vs_' + s.key, s.title, s.selN ? s.selN + ' đã chọn' : '', chips)
     })
@@ -81,13 +81,11 @@ export default function FilterSections({ st, node, products, vsModel, hideDen, f
       if (hideDen) return
       const g = chipGroupVals_(products, den.field, st[den.map])
       sec(k, title, g.badge, g.all.length ? (
-        <div className={`qs-bd-fchips${den.wide ? ' qs-bdc-eq' : ''}`}>
-          {g.all.map(v => (
-            <button key={v} title={v} className={`qs-bd-fchip${den.wide ? ' qs-bdc-wide' : ''}${st[den.map][v] ? ' on' : ''}`} onClick={() => toggleIn(den.map, v)}>
-              {den.dot && <span className="qs-bdc-dot" style={{ background: ctColor(v) }} />}{v}
-            </button>
-          ))}
-        </div>
+        <FChips cls={den.wide ? 'qs-bdc-eq' : ''} items={g.all.map(v => ({ k: v, on: !!st[den.map][v] }))} render={({ k: v }) => (
+          <button key={v} title={v} className={`qs-bd-fchip${den.wide ? ' qs-bdc-wide' : ''}${st[den.map][v] ? ' on' : ''}`} onClick={() => toggleIn(den.map, v)}>
+            {den.dot && <span className="qs-bdc-dot" style={{ background: ctColor(v) }} />}{v}
+          </button>
+        )} />
       ) : none)
     } else if (k === 'yeuthich') {
       sec(k, title, st.fFav ? '1' : '', (
@@ -114,15 +112,9 @@ export default function FilterSections({ st, node, products, vsModel, hideDen, f
         </div>
       ))
     } else if (k === 'brand') {
-      sec(k, title, '', (
-        <div className="qs-bd-fbrand">
-          <select value={st.fBrand} onChange={e => setF({ fBrand: e.target.value })}>
-            <option value="">Tất cả thương hiệu</option>
-            {brandOptions(products).map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-          <span className="qs-bd-acc-plus"><Icon name="plus" size={10} stroke={3} /></span>
-        </div>
-      ))
+      /* chọn nhiều thương hiệu (fBrand = mảng; bản cũ lưu chuỗi vẫn đọc được qua brandSel_) */
+      const bs = brandSel_(st)
+      sec(k, title, bs.length ? String(bs.length) : '', <SearchSelect className="qs-bd-ss" multi value={bs} options={brandOptions(products)} allLabel="Tất cả thương hiệu" onChange={arr => setF({ fBrand: arr.length ? arr : '' })} />)
     } else if (k === 'price') {
       sec(k, title, '', (
         <div className="qs-bd-fprice">
@@ -176,4 +168,28 @@ export default function FilterSections({ st, node, products, vsModel, hideDen, f
     )
   })
   return out.concat(modEls, tail)
+}
+
+/* Dải chip lọc; từ CHIP_FIND giá trị trở lên thì có ô "gõ để tìm" (không phân biệt dấu) lọc chip ngay trong dải.
+   Chip đang chọn luôn hiện. items [{k: chữ để tìm, on}], render(item) -> nút chip, cls thêm cho khung chip */
+const CHIP_FIND = 12
+export function FChips({ items, render, cls }) {
+  const [q, setQ] = useState('')
+  const nq = qbNorm_(q.trim())
+  const shown = nq ? items.filter(it => it.on || qbNorm_(it.k).indexOf(nq) >= 0) : items
+  return (
+    <>
+      {items.length >= CHIP_FIND && (
+        <div className="qs-bd-ffind">
+          <Icon name="search" size={13} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={'Gõ để tìm trong ' + items.length + ' giá trị…'}
+            onKeyDown={e => { if (e.key === 'Escape') setQ('') }} />
+          {q && <button type="button" title="Xoá" onClick={() => setQ('')}><Icon name="x" size={12} /></button>}
+        </div>
+      )}
+      <div className={'qs-bd-fchips' + (cls ? ' ' + cls : '') + (nq ? ' finding' : '')}>
+        {shown.length ? shown.map(render) : <span className="qs-bdc-nil">Không có giá trị khớp "{q.trim()}"</span>}
+      </div>
+    </>
+  )
 }

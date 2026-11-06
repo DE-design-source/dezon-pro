@@ -2,6 +2,7 @@ package quotations
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -45,8 +46,18 @@ type tongKetOpt struct {
 	nguoi   string
 }
 
+// vatBiaOpt: VAT của khối tổng tờ bìa do client tính theo % từng hạng mục (bản xem trước) - nhan = "10%" hoặc "5% · 8% · 10%".
+type vatBiaOpt struct {
+	nhan string
+	vat  float64
+}
+
 type exportOpts struct {
+	vatBia  *vatBiaOpt
+	vatHm   *omap.Map // % VAT của từng hạng mục (mã l.nhom -> %): sheet của hạng mục thêm dòng VAT + THÀNH TIỀN (VAT)
 	m1      bool
+	soLai   bool      // đánh số lại liên tục các mục tờ bìa đang hiện (coverSoLai)
+	colsHm  *omap.Map // cột riêng từng hạng mục: {mã hạng mục (l.nhom): danh sách cột như tham số cols} - sheet của hạng mục dùng thay cols
 	org     *orgOpt
 	tongKet *tongKetOpt
 }
@@ -100,7 +111,16 @@ func parseExportOpts(v any) *exportOpts {
 	if m == nil {
 		return nil
 	}
-	o := &exportOpts{m1: jsval.StrictEquals(m.Val("coverMau"), "m1")}
+	o := &exportOpts{m1: jsval.StrictEquals(m.Val("coverMau"), "m1"), soLai: jsval.StrictEquals(m.Val("soLai"), true)}
+	if h := jsval.AsMap(m.Val("colsHm")); h != nil {
+		o.colsHm = h
+	}
+	if h := jsval.AsMap(m.Val("vatHm")); h != nil {
+		o.vatHm = h
+	}
+	if b := jsval.AsMap(m.Val("vatBia")); b != nil {
+		o.vatBia = &vatBiaOpt{nhan: optStr(b.Val("nhan"), 60), vat: optNum(b.Val("vat"))}
+	}
 	if g := jsval.AsMap(m.Val("org")); g != nil {
 		org := &orgOpt{ten: optStr(g.Val("ten"), 200), logo: optStr(g.Val("logo"), optLogoMax), lines: optLines(g.Val("lines"), optLinesMax)}
 		if org.ten != "" || len(org.lines) > 0 || org.logo != "" {
@@ -217,7 +237,7 @@ func writeHienTrang(ws *xSheet, r, ncol int, p *omap.Map) {
 
 // buildCoverM1: bảng tờ bìa Mẫu 1 (bgCoverPage_ 158-181): gộp NO / HẠNG MỤC theo mục lớn, cột NỘI DUNG là mục con
 // (mục có con in đậm kèm "(gồm các mục dưới)", mục cấp 3 trở đi thụt vào), MÔ TẢ ở cột cuối. sorted = tờ bìa đã sắp.
-func buildCoverM1(ws *xSheet, sorted []any, cost *omap.Map, total float64, r int) {
+func buildCoverM1(ws *xSheet, sorted []any, cost *omap.Map, total float64, r int, noOf func(any) any) {
 	const ncol = 6
 	headerRow := r
 	for i, h := range []string{"NO", "HẠNG MỤC", "NỘI DUNG", "CHI PHÍ DỰ KIẾN", "TỶ TRỌNG", "MÔ TẢ"} {
@@ -296,7 +316,7 @@ func buildCoverM1(ws *xSheet, sorted []any, cost *omap.Map, total float64, r int
 		ws.merge(first, 1, r-1, 1)
 		ws.merge(first, 2, r-1, 2)
 		no := ws.cell(first, 1)
-		no.set(jsval.Get(sec, "stt"))
+		no.set(noOf(jsval.Get(sec, "stt")))
 		no.font(xFont{Name: "Arial", Bold: true})
 		no.align(xAlign{H: "center", V: "middle"})
 		no.fill("FFEEF0F2")
@@ -405,4 +425,28 @@ func writeTongKet(ws *xSheet, tk *tongKetOpt, r int) {
 		ws.cell(r, 1).set("Người lập: " + tk.nguoi)
 		ws.cell(r, 1).font(xFont{Name: "Arial", Bold: true})
 	}
+}
+
+// coverSoLai: số in ở cột NO khi đánh số lại liên tục (= coverSoLai_ của lib/quote.js): sorted = các mục đang hiện đã sắp,
+// mục lớn đầu tiên = 1, mục con = 1.1…; tổ tiên không có mặt thì đánh theo tổ tiên gần nhất có mặt. Trả {stt gốc: số in}.
+func coverSoLai(sorted []any) map[string]string {
+	disp, cnt := map[string]string{}, map[string]int{}
+	for _, c := range sorted {
+		stt := jsval.ToString(jsval.Get(c, "stt"))
+		parts := strings.Split(stt, ".")
+		pk := ""
+		for i := len(parts) - 1; i >= 1; i-- {
+			if d, ok := disp[strings.Join(parts[:i], ".")]; ok {
+				pk = d
+				break
+			}
+		}
+		cnt[pk]++
+		if pk != "" {
+			disp[stt] = pk + "." + strconv.Itoa(cnt[pk])
+		} else {
+			disp[stt] = strconv.Itoa(cnt[pk])
+		}
+	}
+	return disp
 }

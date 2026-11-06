@@ -12,6 +12,7 @@ var tenantTablesOrder = []string{
 	"tk_binh_luan", "tk_cong_viec", "tk_giai_doan", "tk_thau_phu", "tk_thanh_vien", "tk_du_an",
 	"hr_kiem_nhiem", "hr_lich_ngay", "hr_lich_tuan", "hr_cham_cong", "hr_don_tu", "hr_dieu_chinh_luong", "hr_dinh_phi", "hr_danh_gia", "hr_ghi_danh", "hr_ung_vien", "hr_tin_tuyen", "hr_jd", "hr_muc_tieu", "hr_nhan_vien", "hr_ca", "hr_don_vi",
 	"hr_cau_hinh_luong", "hr_ky_luong", "hr_bao_mat", "hr_khoa_hoc", "hr_lo_trinh", "hr_dia_diem",
+	"yeu_cau_sua_du_an",
 	"users",
 }
 

@@ -10,8 +10,11 @@ import ImgUpBlock from './ImgUpBlock'
 import DocField from './DocField'
 import BulkImport from './BulkImport'
 import DbCard from './DbCard'
+import { MrootPortal } from '../common/Mroot'
+import { MultiProjPop } from '../products/list/SpModal'
+import '../products/list/list.css'
 import { useImp, impForm } from './importStore'
-import { impGroups_, vsApply_, dbCalcDaiLy_, tdSave_ } from './importLogic'
+import { impGroups_, vsApply_, dbCalcDaiLy_, tdSave_, ghiMaDAs_ } from './importLogic'
 import { pendingEditCancel_, impCbAdd_, impCbDel_, impCbSL_, impCbSearch_, cbLbl_, varPreview_ } from './importActions'
 
 /* Cột trái tab Nhập dữ liệu (port renderImport / dbInput / dbCard_ / vsApplyHM_ / impCbRender_ / varPreview_, PUB/nhap.js:151-164,
@@ -138,22 +141,38 @@ function VarCard({ form, loai }) {
   )
 }
 
+/* Ghi danh vào dự án: nút mở bảng chọn nhiều dự án (MultiProjPop chế độ chọn, cùng bảng "Ghi danh vào nhiều dự án"
+   của Danh sách sản phẩm) - chọn xong tự tick "Thêm vào dự án"; ghi danh thật chạy sau khi lưu SP vào Database */
 function GhiCard({ form, projSelRef }) {
   const { projects, cur } = useQs()
+  const [open, setOpen] = useState(false)
   const g = form.ghi
-  const maDA = g.maDA == null ? ((cur && cur.maDA) || '') : g.maDA
+  const sel = ghiMaDAs_(g, cur)
+  const names = sel.map(ma => ((projects || []).find(p => p.maDA === ma) || {}).ten || ma)
   const set = p => impForm(F => ({ ghi: { ...F.ghi, ...p } }))
+  const ten = String((form.vals && form.vals['TÊN SẢN PHẨM']) || '').trim() || 'Sản phẩm đang nhập'
   return (
-    <DbCard title="Ghi danh vào dự án" ic="building" note="Tuỳ chọn — đưa sản phẩm này vào một dự án ngay sau khi lưu vào Database.">
+    <DbCard title="Ghi danh vào dự án" ic="building" note="Tuỳ chọn — đưa sản phẩm này vào một hoặc nhiều dự án ngay sau khi lưu vào Database.">
       <div className="qsi-dbgrid">
         <div className="qsi-field"><label>Dự án</label>
-          <select ref={projSelRef} value={maDA} onChange={e => set({ maDA: e.target.value })}>
-            <option value="">— Không ghi danh —</option>
-            {(projects || []).map(p => <option key={p.maDA} value={p.maDA}>{p.ten}</option>)}
-          </select></div>
+          <button type="button" ref={projSelRef} className={'qsi-ghpick' + (sel.length ? ' has' : '')} title="Chọn dự án (lọc theo khách hàng, khu vực…, chọn nhiều)" onClick={() => setOpen(true)}>
+            <QsIcon name="layers" size={14} />
+            <span className="t">{sel.length ? (sel.length === 1 ? names[0] : sel.length + ' dự án: ' + names.join(', ')) : '— Không ghi danh — bấm để chọn dự án'}</span>
+            <span className="c" aria-hidden="true">▾</span>
+          </button></div>
         <div className="qsi-field"><label>Số lượng</label><input type="number" min="1" value={g.qty} onChange={e => set({ qty: e.target.value })} /></div>
       </div>
-      <label className="qsi-ghck"><input type="checkbox" checked={!!g.on} onChange={e => set({ on: e.target.checked })} /> Thêm sản phẩm này vào dự án đã chọn sau khi lưu</label>
+      <label className="qsi-ghck"><input type="checkbox" checked={!!g.on} onChange={e => set({ on: e.target.checked })} /> Thêm sản phẩm này vào {sel.length > 1 ? sel.length + ' dự án' : 'dự án'} đã chọn sau khi lưu</label>
+      {open && (
+        <MrootPortal>
+          <div className="qsc-ov qspl-ov" onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false) }}>
+            <div className="qspl-pd qspl-mpbox">
+              <MultiProjPop p={{ ten }} initPick={sel} initSl={g.qty} onClose={() => setOpen(false)}
+                onPick={(ds, sl) => set({ maDAs: ds, maDA: ds[0] || '', qty: String(sl), on: ds.length > 0 })} />
+            </div>
+          </div>
+        </MrootPortal>
+      )}
     </DbCard>
   )
 }
