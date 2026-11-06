@@ -21,7 +21,7 @@ import {
 } from '../../lib/quote.js'
 import { bgKy_, bgKyMac_, KY_COT_MAX, bgDocCols_, bgBia_, BG_TT_DS, BG_LOGO_MIN, BG_LOGO_MAX, TD_CO_MIN, TD_CO_MAX, docImg_, bgColHm_ } from './docModel'
 import { nodeName } from '../../lib/tree.js'
-import { bgChu_, bgSoOf_, BG_SO_MIN, BG_SO_MAX, appFontName_, appFontValue_, TT_CO_MIN, TT_CO_MAX, TK_LUI_MAX, khungKeys_, khungW_, KH_W_MIN, KH_W_MAX, BG_HD_NEN, BG_HD_NEN_DS, BG_COT_NEN_DS, BG_TG_NEN_DS, BG_TS_NEN_DS, BG_TS_CHU_DS, BG_TS_VIEN_DS, BG_KIEU_DS, BG_CANH_DS } from './docCss'
+import { bgChu_, bgSoOf_, BG_SO_MIN, BG_SO_MAX, appFontName_, appFontValue_, TT_CO_MIN, TT_CO_MAX, TK_LUI_MAX, khungKeys_, khungW_, KH_W_MIN, KH_W_MAX, BG_HD_NEN, BG_HD_NEN_DS, BG_COT_NEN_DS, BG_TG_NEN_DS, BG_TS_NEN_DS, BG_TS_CHU_DS, BG_TS_VIEN_DS, BG_KIEU_DS, BG_CANH_DS, BG_KHO_DS } from './docCss'
 import { FONT_CATALOG, FONT_CATEGORIES, isFontAvailable } from '../../../../data/fontCatalog'
 import {
   useQuoteUi, setQ, bgSetPer_, bgTogglePerSec_, bgColReset_, bgColTuyBien_,
@@ -1358,6 +1358,18 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
         <TuyBien mau={mau} chu={chu} bia={bia} fontNhom={fontNhom} />
       </The>
 
+      {/* Khổ in: trang xem trước, chia trang và bản in / PDF theo khổ này (bgCfg.kho) */}
+      <div className="qsq-kho" role="radiogroup" aria-label="Khổ in">
+        <span className="lb">Khổ in</span>
+        <div className="ds">
+          {BG_KHO_DS.map(x => (
+            <button key={x[0]} type="button" role="radio" aria-checked={chu.kho.k === x[0]} className={chu.kho.k === x[0] ? 'on' : ''}
+              title={x[1] + ' (' + x[5] + ' × ' + x[6] + ' mm)'} onClick={() => bgOptSet('kho', x[0] === 'A4L' ? null : x[0])}>
+              <i className={x[2] > x[3] ? 'ngang' : 'doc'} aria-hidden="true" />{x[1]}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="qsq-xuat">
         <button type="button" className="qs-qt-btn green" disabled={q.exporting} onClick={() => onExport('xlsx')}>
           <Icon name="download" size={15} />{q.exporting ? 'Đang xuất…' : 'Xuất Excel'}</button>

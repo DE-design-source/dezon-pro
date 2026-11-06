@@ -13,8 +13,9 @@ import ProjectCreate from './project/ProjectCreate'
 import { projCtx_, usePdState, pdRetry_ } from './project/projectShell'
 import './dashboard/dashboard.css'
 
-const SIDE_LS = 'qs_dash_side_w'
-const SIDE_DEF = 380, SIDE_MIN = 280, SIDE_MAX = 760, SIDE_LEFT_MIN = 560
+/* Mặc định rộng bằng cột danh mục bên trái của Bóc tách (CATALOG_DEFAULT = 440, BreakdownTab); khoá lưu mới (_v2) để bỏ độ rộng 380 cũ đã nhớ */
+const SIDE_LS = 'qs_dash_side_w_v2'
+const SIDE_DEF = 440, SIDE_MIN = 300, SIDE_MAX = 760, SIDE_LEFT_MIN = 560
 function readSide_() {
   try { const v = Number(localStorage.getItem(SIDE_LS)); return v >= SIDE_MIN && v <= SIDE_MAX ? v : SIDE_DEF } catch (e) { return SIDE_DEF }
 }

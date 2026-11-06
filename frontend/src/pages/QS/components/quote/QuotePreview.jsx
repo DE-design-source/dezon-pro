@@ -109,6 +109,7 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
   const m = pg.meta || {}
   const vp = Number(vat) || 0
   const z = String(q.bgZoom || 'fit')
+  const kho = (chu && chu.kho) || { w: 1123, h: 794, nhan: 'A4 · Ngang' }   // khổ in (bgKho_)
 
   /* Mức phóng: 100% (= Vừa khung) là trang rộng đúng bề ngang khung xem; 50–150% tính theo bề ngang đó */
   useLayoutEffect(() => {
@@ -116,7 +117,7 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
     if (!box || !doc) return undefined
     const apply = () => {
       const rong = box.clientWidth - 18
-      const vua = rong > 0 ? rong / 1123 : 1
+      const vua = rong > 0 ? rong / kho.w : 1
       doc.style.zoom = vua * (z === 'fit' ? 1 : (Number(z) || 100) / 100)
     }
     apply()
@@ -124,8 +125,8 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
     const ro = new ResizeObserver(apply)
     ro.observe(box)
     return () => ro.disconnect()
-  }, [z])
-  /* Khung đúng A4 ngang (1123 x 794): trang nhiều chữ thì thu nhỏ nội dung cho vừa (fitA4_), chạy lại khi trang vẽ lại và khi font tải xong */
+  }, [z, kho.w])
+  /* Khung đúng khổ in (mặc định A4 ngang 1123 x 794): trang nhiều chữ thì thu nhỏ nội dung cho vừa (fitA4_), chạy lại khi trang vẽ lại và khi font tải xong */
   /* Đo chiều cao THẬT từng dòng bảng: dựng ẩn đủ mọi trang (khung cao 0, cùng CSS xem trước, cân cột như trang thật), đọc chiều cao
      các dòng có data-hk rồi ghi vào docModel (hDoGhi_) -> trang được chia lại theo số đo, mọi trang giữ cỡ chữ gốc (không phải thu nhỏ) */
   const doRef = useRef(null)
@@ -145,7 +146,7 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
          docModel chia trang theo số này -> mọi trang giữ cỡ chữ gốc */
       let cho = null; let cho1 = null
       ;[].slice.call(an.querySelectorAll('.qsd-pg')).forEach(pg => {
-        pg.style.height = '794px'
+        pg.style.height = kho.h + 'px'
         const r0 = pg.getBoundingClientRect()
         const foot = pg.querySelector('.qsd-qp-foot')
         const day = foot ? foot.getBoundingClientRect().top - r0.top - 8 : pg.clientHeight - (parseFloat(getComputedStyle(pg).paddingBottom) || 0)
@@ -171,9 +172,9 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
     const doc = docRef.current
     if (!doc) return undefined
     // trang đã chia vừa khổ nên không thu nhỏ; fitA4_ chỉ là lưới an toàn khi một trang vẫn tràn
-    fitA4_(doc, 794)
+    fitA4_(doc, kho.h)
     let alive = true
-    try { document.fonts.ready.then(() => { if (alive) fitA4_(doc, 794) }) } catch (e) { /* trình duyệt cũ: bỏ qua */ }
+    try { document.fonts.ready.then(() => { if (alive) fitA4_(doc, kho.h) }) } catch (e) { /* trình duyệt cũ: bỏ qua */ }
     return () => { alive = false }
   }, [pg.html, mau, chu])
   /* Đổi trang thì về đầu trang (bgGoPage 130); vẽ lại cùng trang thì giữ chỗ đang cuộn */
@@ -287,7 +288,7 @@ export default function QuotePreview({ pages, mau, chu, vat, onExport }) {
         <b className="qsq-ten">{m.ten || 'Trang ' + page}</b>
         {m.dong ? <span className="qsq-chip">{giua[0]}</span> : null}
         <span className="qsq-chip">{vp ? 'VAT ' + vp + '%' : 'Chưa VAT'}</span>
-        <span className="qsq-chip">A4 · Ngang</span>
+        <span className="qsq-chip">{kho.nhan}</span>
         <span style={{ flex: 1 }} />
         <button type="button" className="qs-qt-btn qsq-dan" onClick={luuMacDinhHT}
           title="Lưu toàn bộ cài đặt Xuất báo giá đang dùng (tờ bìa, logo, trang chi tiết, tuỳ biến, tổng kết, chữ ký) làm mặc định của hệ thống">

@@ -599,3 +599,14 @@ textarea.qsq-tk2-f{height:auto; padding:9px 10px; line-height:1.55; resize:verti
 .qsq-luunhanh-m .so{flex:none; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--dash-navy, #12314f); color:var(--dash-navy, #12314f); display:grid; place-items:center; font-size:11px; font-weight:800;}
 .qsq-luunhanh-m .so.moi{border-style:dashed; color:var(--text-muted); border-color:var(--text-muted);}
 .qsq-tuymau .md{font-size:11.5px; font-weight:600; color:#15803D;}
+
+/* Khổ in (trên 2 nút xuất): 4 nút A4 / A3 × ngang / dọc, có hình trang nhỏ */
+.qsq-kho{display:flex; flex-direction:column; gap:6px; padding:10px 12px 0;}
+.qsq-kho .lb{font-size:12px; font-weight:700; color:var(--text);}
+.qsq-kho .ds{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px;}
+.qsq-kho button{height:32px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qsq-kho button:hover{border-color:var(--dash-accent);}
+.qsq-kho button.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsq-kho button i{display:inline-block; border:1.5px solid currentColor; border-radius:2px;}
+.qsq-kho button i.ngang{width:15px; height:11px;}
+.qsq-kho button i.doc{width:11px; height:15px;}

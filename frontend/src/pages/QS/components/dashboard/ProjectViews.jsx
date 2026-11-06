@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
+import Pop, { PopHead } from '../breakdown/sheet/Pop'
 import Icon from '../../../../components/ui/Icon'
 import { DezonChip } from '../project/PCard'
 import { projInfoModal, removeProjectGroup, addDraft, pickProject } from '../project/projectActions'
-import { fmtDate, money } from '../../lib/format.js'
+import { fmtDate, money, qbNorm_ } from '../../lib/format.js'
 import DraftItem from './DraftItem'
 
 /* Hai chế độ xem thêm của Danh sách dự án (chế độ "Thẻ" là ProjectCard). Cùng props với ProjectCard:
@@ -15,6 +16,7 @@ const subOf_ = g => (g.khachHang || 'Chưa có khách hàng') + (g.sdt ? ' · ' 
 export const BAR_COLS = [
   { key: 'name', label: 'Dự án', def: 280, min: 120 },
   { key: 'kh', label: 'Khách hàng', def: 200, min: 90 },
+  { key: 'pt', label: 'Phụ trách', def: 150, min: 90 },
   { key: 'src', label: 'Nguồn', def: 120, min: 80 },
   { key: 'st', label: 'Trạng thái', def: 130, min: 80 },
   { key: 'val', label: 'Giá trị báo giá', def: 170, min: 110 },
@@ -61,7 +63,51 @@ export function BarHeader({ widths, onResize }) {
 /* Dạng thanh: 1 dòng / dự án, chia cột theo BAR_COLS + Nhà cung cấp. Bấm dòng = mở / thu các bản nháp (DraftItem như trong thẻ);
    bấm tên = Thông tin dự án; "Mở" = mở bản nháp mới nhất ở Bóc tách. Dự án chứa bản nháp đang mở thì mở sẵn.
    kd = có khách hàng Kinh doanh gắn (null = chưa biết); st = {n, tong, ncc[]} của bản đang dùng / mới nhất (null = đang đếm) */
-export function ProjectRow({ group: g, curMa, kd, st }) {
+/* Ô "Phụ trách": mỗi người 1 ô tròn chữ cái đầu (rê chuột = tên), 1 người thì kèm tên; quản trị có nút "+" mở hộp gõ tìm +
+   tích chọn nhiều nhân sự (ghi ngay). ds = [tên đăng nhập]; users = danh sách tài khoản (rỗng khi không phải quản trị) */
+const AV_MAU = ['#13406E', '#2E6BC6', '#1f8a5b', '#b7791f', '#6b46c1', '#c05621', '#2c7a7b', '#9b2c2c']
+const avChu_ = t => { const p = String(t || '?').trim().split(/\s+/); return ((p.length > 1 ? p[p.length - 1][0] + p[0][0] : p[0].slice(0, 2)) || '?').toUpperCase() }
+const avMau_ = t => { let h = 0; String(t || '').split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) | 0 }); return AV_MAU[Math.abs(h) % AV_MAU.length] }
+export function PtCell({ ds, users, canEdit, onChange }) {
+  const [pop, setPop] = useState(null)
+  const [q, setQ] = useState('')
+  const ten = u => { const x = users.find(y => String(y.username || '').toLowerCase() === String(u).toLowerCase()); return (x && (x.hoTen || x.username)) || u }
+  const tim = qbNorm_(q.trim())
+  const hien = users.filter(x => !tim || qbNorm_((x.hoTen || '') + ' ' + (x.username || '')).indexOf(tim) >= 0)
+  const doi = u => onChange(ds.some(x => x.toLowerCase() === u.toLowerCase()) ? ds.filter(x => x.toLowerCase() !== u.toLowerCase()) : ds.concat([u]))
+  return (
+    <div className="qs-dash-row-pt" onClick={e => e.stopPropagation()} title={ds.map(ten).join(', ')}>
+      {ds.length ? ds.slice(0, 3).map(u => <span key={u} className="av" style={{ background: avMau_(u) }}>{avChu_(ten(u))}</span>) : <span className="nil">Chưa giao</span>}
+      {ds.length > 3 && <em>+{ds.length - 3}</em>}
+      {ds.length === 1 && <span className="nm">{ten(ds[0])}</span>}
+      {canEdit && (
+        <button type="button" className={'add' + (pop ? ' on' : '')} title="Giao nhân sự phụ trách dự án" onClick={e => { const b = e.currentTarget; setQ(''); setPop(p => (p ? null : b)) }}>
+          <Icon name="plus" size={12} stroke={2.6} />
+        </button>
+      )}
+      {pop && (
+        <Pop anchor={pop} width={270} className="qs-dash-ptpop" onClose={() => setPop(null)}>
+          <PopHead title="Nhân sự phụ trách" sub={ds.length ? ds.length + ' người' : ''} onClose={() => setPop(null)} />
+          <input className="q" autoFocus value={q} placeholder="Gõ tên nhân sự để tìm…" onChange={e => setQ(e.target.value)} />
+          <div className="ds">
+            {hien.length ? hien.map(x => {
+              const on = ds.some(u => u.toLowerCase() === String(x.username).toLowerCase())
+              return (
+                <label key={x.username} className={on ? 'on' : ''}>
+                  <input type="checkbox" checked={on} onChange={() => doi(x.username)} />
+                  <span className="av" style={{ background: avMau_(x.username) }}>{avChu_(x.hoTen || x.username)}</span>
+                  <span className="t"><b>{x.hoTen || x.username}</b><i>{x.username}</i></span>
+                </label>
+              )
+            }) : <p>{users.length ? 'Không thấy "' + q + '"' : 'Không tải được danh sách nhân sự'}</p>}
+          </div>
+        </Pop>
+      )}
+    </div>
+  )
+}
+
+export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt }) {
   const key = g.drafts[0].maDA
   const hasCur = g.drafts.some(d => d.maDA === curMa)
   const [open, setOpen] = useState(hasCur)
@@ -82,6 +128,7 @@ export function ProjectRow({ group: g, curMa, kd, st }) {
           <span className={g.khachHang ? '' : 'nil'}>{g.khachHang || 'Chưa có khách hàng'}</span>
           {g.sdt && <small>{g.sdt}</small>}
         </div>
+        <PtCell ds={pt || []} users={users || []} canEdit={!!canEditPt} onChange={onPt || (() => {})} />
         <div className="qs-dash-row-st">{kd != null && <span className={'qs-dash-src-pill ' + (kd ? 'kd' : 'qs')}>{kd ? 'Kinh doanh' : 'Phòng QS'}</span>}</div>
         <div className="qs-dash-row-st">
           {hasCur ? <span className="qs-dash-using"><Icon name="check" size={13} stroke={2.4} />Đang dùng</span>

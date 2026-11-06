@@ -3,7 +3,11 @@ import Icon from '../../../../components/ui/Icon'
 import { MrootPortal } from '../common/Mroot'
 import { useQs } from '../../state/QsData'
 import { currentGroup, draftName_, dezonUrl_ } from '../../lib/dashModel.js'
-import { safeUrl_ } from '../../lib/format.js'
+import { safeUrl_, money, fmtDate } from '../../lib/format.js'
+import { cpTong_ } from '../../lib/totals.js'
+import { projCtx_ } from './projectShell'
+import { usePhuTrach, setPhuTrach, ptRoles_, PT_ROLES } from '../dashboard/ptStore'
+import { PtCell } from '../dashboard/ProjectViews'
 import {
   addDraftForCur, saveProjectShared, saveDraftInfo, saveProgress, removeProject,
 } from './projectActions'
@@ -41,12 +45,10 @@ export default function ProjectInfoModal({ onClose }) {
           <div className="qs-pdlg-h">
             <button type="button" className="qsc-btn qs-pi-back" onClick={onClose}><Icon name="arrowLeft" size={15} />Quay lại</button>
             <h3><Icon name="building" size={16} />Thông tin dự án</h3>
-            <button type="button" className="qsc-x" onClick={onClose}>✕</button>
-          </div>
-          <div className="qs-pi-b">
+            {/* tên dự án + chuyển bản nháp nằm luôn trên hàng tiêu đề */}
             <div className="qs-pi-switch">
               <div className="qs-pi-sw-l">
-                <span className="qs-pi-sw-ic"><Icon name="building" size={20} /></span>
+                <span className="qs-pi-sw-ic"><Icon name="building" size={18} /></span>
                 <div style={{ minWidth: 0 }}>
                   <div className="qs-pi-sw-name">{gr.name}</div>
                   <div className="qs-pi-sw-sub">{(cur.khachHang || 'Chưa có khách hàng') + (cur.sdt ? ' · ' + cur.sdt : '') + ' · ' + gr.drafts.length + ' bản nháp'}</div>
@@ -61,12 +63,71 @@ export default function ProjectInfoModal({ onClose }) {
                 <button type="button" className="qs-pi-tab add" onClick={addDraftForCur}><Icon name="plus" size={13} />Thêm bản nháp</button>
               </div>
             </div>
-            <SharedCard key={'s|' + cur.maDA + '|' + ver} p={cur} onSaved={bump} />
-            <DraftCard key={'d|' + cur.maDA + '|' + ver} p={cur} idx={gr.idx} many={gr.drafts.length > 1} onSaved={bump} />
+            <button type="button" className="qsc-x" onClick={onClose}>✕</button>
+          </div>
+          <div className="qs-pi-b">
+            {/* 2 cột: trái = Báo cáo (nhân sự dự án + thông tin khác), phải = Thông tin dự án + Thông tin bản nháp */}
+            <div className="qs-pi-cols">
+              <ReportCard gr={gr} cur={cur} />
+              <div className="qs-pi-main">
+                <SharedCard key={'s|' + cur.maDA + '|' + ver} p={cur} onSaved={bump} />
+                <DraftCard key={'d|' + cur.maDA + '|' + ver} p={cur} idx={gr.idx} many={gr.drafts.length > 1} onSaved={bump} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </MrootPortal>
+  )
+}
+
+/* Cột "Báo cáo": Nhân sự dự án (ptStore, quản trị giao được) + các thông tin khác của dự án / bản nháp đang mở
+   (trạng thái, tiến độ, ngày tạo, số bản nháp, giá trị báo giá + số dòng như tab Chi phí, nhà cung cấp) */
+function ReportCard({ gr, cur }) {
+  const { lines, projData } = useQs()
+  const { map, users, canEdit } = usePhuTrach()
+  const key = gr.drafts.length ? gr.drafts[0].maDA : cur.maDA
+  const roles = ptRoles_(map[key])
+  const nPt = new Set([...roles.ql, ...roles.dp, ...roles.th].map(u => String(u).toLowerCase())).size
+  const ten = u => { const x = users.find(y => String(y.username || '').toLowerCase() === String(u).toLowerCase()); return (x && (x.hoTen || x.username)) || u }
+  const ls = lines || []
+  const T = ls.length ? cpTong_(ls, '', projCtx_(cur, projData)) : null
+  const ncc = [...new Set(ls.map(l => String(l.thuongHieu || '').trim()).filter(Boolean))]
+  const pct = Math.max(0, Math.min(100, Number(cur.tienDo) || 0))
+  const row = (k, v) => <div className="qs-pi-rp-r"><span>{k}</span><b>{v}</b></div>
+  return (
+    <aside className="qs-pi-report" aria-label="Báo cáo">
+      <section className="qs-pi-scard">
+        <div className="qs-pi-sh"><h3>Nhân sự dự án</h3>{nPt > 0 && <span>{nPt + ' người'}</span>}</div>
+        <div className="qs-pi-rp-sec">
+          {/* 3 vai trò: Quản lý (= cột Phụ trách của Danh sách dự án) · Người điều phối · Người thực hiện */}
+          {PT_ROLES.map(([k, nhan]) => (
+            <div key={k} className="qs-pi-role">
+              <span className="lb">{nhan}</span>
+              <PtCell ds={roles[k]} users={users} canEdit={canEdit} onChange={list => setPhuTrach(key, list, k)} />
+              {roles[k].length > 1 && <small className="ppl">{roles[k].map(ten).join(', ')}</small>}
+            </div>
+          ))}
+          {!canEdit && !nPt && <small className="qs-pi-rp-hint">Quản trị giao nhân sự ở đây hoặc cột Phụ trách của Danh sách dự án.</small>}
+        </div>
+      </section>
+      <section className="qs-pi-scard">
+        <div className="qs-pi-sh"><h3>Báo cáo dự án</h3><span>{draftName_(cur, gr.idx < 0 ? 0 : gr.idx)}</span></div>
+        <div className="qs-pi-rp-sec">
+          {row('Trạng thái', cur.trangThai || 'Bản nháp')}
+          <div className="qs-pi-rp-r"><span>Tiến độ</span><b className="qs-pi-rp-pg"><i><em style={{ width: pct + '%' }} /></i>{pct}%</b></div>
+          {row('Ngày tạo', cur.ngayTao ? fmtDate(cur.ngayTao) : '—')}
+          {row('Số bản nháp', gr.drafts.length)}
+          {row('Kiến trúc sư', cur.kienTrucSu || '—')}
+          {row('Dòng sản phẩm', ls.length)}
+          {row('Giá trị báo giá', T ? money(T.total) + ' đ' : 'Chưa có báo giá')}
+          {T && row('Lợi nhuận', money(T.ln) + ' đ · ' + (Math.round(T.bien * 10) / 10).toLocaleString('vi-VN') + '%')}
+          <div className="qs-pi-rp-r col"><span>Nhà cung cấp</span>
+            {ncc.length ? <div className="qs-pi-rp-ncc">{ncc.map(n => <i key={n}>{n}</i>)}</div> : <b>—</b>}
+          </div>
+        </div>
+      </section>
+    </aside>
   )
 }
 

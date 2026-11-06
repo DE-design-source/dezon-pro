@@ -4,6 +4,7 @@ import { listLeads } from '../../../KinhDoanh/api'
 import { useQs } from '../../state/QsData'
 import { dashSearch_ } from '../../lib/dashModel.js'
 import { openProjDlg } from '../project/projectActions'
+import { usePhuTrach, setPhuTrach, ptRoles_ } from './ptStore'
 import { statCache, loadStats_ } from '../project/projectStats'
 import ProjectCard from './ProjectCard'
 import { ProjectRow, ProjectTile, BarHeader, BAR_COLS, BAR_DENSITY } from './ProjectViews'
@@ -82,6 +83,8 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const q = query.toLowerCase().trim()
   // Mã dự án đã gắn với khách hàng Kinh doanh; null = chưa tải được (ẩn bộ lọc nguồn)
   const [kdMa, setKdMa] = useState(null)
+  /* Nhân sự phụ trách từng dự án (ptStore, dùng chung với hộp Thông tin dự án): quản trị giao / bỏ ở cột Phụ trách, người khác chỉ xem */
+  const { map: ptMap, users: ptUsers, canEdit: canEditPt } = usePhuTrach()
   useEffect(() => {
     let off = false
     listLeads().then(ls => { if (!off) setKdMa(new Set(ls.map(l => l.maDA).filter(Boolean))) }, () => { if (!off) setKdMa(null) })
@@ -143,7 +146,8 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
     list = (
       <div className={`qs-dash-rows d-${density}`} style={vars}>
         <BarHeader widths={cols} onResize={resizeCol} />
-        {shown.map(g => <ProjectRow key={g.drafts[0].maDA} group={g} curMa={curMa} kd={kdMa ? isKd(g) : null} st={statOf(g)} />)}
+        {shown.map(g => <ProjectRow key={g.drafts[0].maDA} group={g} curMa={curMa} kd={kdMa ? isKd(g) : null} st={statOf(g)}
+          pt={ptRoles_(ptMap[g.drafts[0].maDA]).ql} users={ptUsers} canEditPt={canEditPt} onPt={list => setPhuTrach(g.drafts[0].maDA, list)} />)}
       </div>
     )
   }

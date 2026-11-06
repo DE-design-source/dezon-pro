@@ -38,7 +38,8 @@ export default function PCard() {
   const nodeRef = useCallback(n => { if (nodeKey) setQbSlotEl(nodeKey, n) }, [nodeKey])
   /* Chi phí: chỗ trong khung tiền cho dải Vốn · Giá bán · Lợi nhuận · Biên (PageHead portal vào, qbSlot 'pcm:chiphi');
      có dải thì ẩn Lợi nhuận / % Lợi nhuận của băng (trùng) */
-  const moneyKey = tab === 'chiphi' ? 'pcm:chiphi' : ''
+  // Mua hàng: dải NCC đang chọn · Sản phẩm · Trước / Sau giảm · VAT · Tổng cũng lên khung tiền (PurchaseTab portal vào 'pcm:muahang')
+  const moneyKey = tab === 'chiphi' ? 'pcm:chiphi' : (tab === 'muahang' ? 'pcm:muahang' : '')
   const moneyRef = useCallback(n => { if (moneyKey) setQbSlotEl(moneyKey, n) }, [moneyKey])
   const openInfo = () => { if (cur) projInfoModal(cur.maDA) }
   const stop = e => e.stopPropagation()

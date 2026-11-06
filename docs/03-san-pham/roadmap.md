@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-03 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-06 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -24,14 +24,14 @@
 | Module | Tên | Trạng thái | Còn lại |
 |---|---|---|---|
 | [M1](#xong-1) | Đăng nhập & phiên | ✅ | - |
-| [M2](#xong-2) | Bảng điều khiển | ✅ | - |
+| [M2](#xong-2) | Bảng điều khiển | 🟡 | [M2.1](#m2-1) |
 | [M3](#xong-3) | Dự án | ✅ | - |
 | [M4](#xong-4) | Bóc tách | ✅ | - |
 | [M5](#xong-5) | Phần thô & công tác | ✅ | - |
 | [M6](#xong-6) | Tờ bìa (khái toán) | ✅ | - |
 | [M7](#xong-7) | Chi phí | ✅ | - |
-| [M8](#xong-8) | Xuất báo giá | 🟡 | [M8.4](#m8-4) |
-| [M9](#xong-9) | Mua hàng & đề xuất | ✅ | - |
+| [M8](#xong-8) | Xuất báo giá | 🟡 | [M8.4](#m8-4), [M8.5](#m8-5) |
+| [M9](#xong-9) | Mua hàng & đề xuất | 🟡 | [M9.2](#m9-2), [M9.3](#m9-3) |
 | [M10](#xong-10) | Danh sách sản phẩm | 🟡 | [M10.3](#m10-3), [M10.4](#m10-4) |
 | [M11](#xong-11) | Nhập dữ liệu | 🟡 | [M11.x](#m11-x) |
 | [M12](#xong-12) | Tệp & ảnh | ✅ | - |
@@ -74,6 +74,10 @@
 | <a id="m10-4"></a>M10.4 | Modal Thông tin sản phẩm: nút "Ghi danh vào nhiều dự án" (tìm + tick nhiều dự án, số lượng, Lưu; trùng SP thì cộng số lượng, không thì thêm vào Chưa phân tầng). Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="m11-x"></a>M11.x | Nhập dữ liệu: panel Sản phẩm vừa nhập sang cột trái (rộng như cột trái các tab) + dashboard "Ghi nhận dữ liệu nhập" (kỳ Hôm nay / Tuần / Tháng / Quý / Năm / Tuỳ chọn, lọc Người nhập / Người duyệt / Thương hiệu, KPI, biểu đồ cột, top người nhập). Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="m10-4"></a>M10.4 | Danh sách sản phẩm: bộ cột theo hạng mục - dải chip / "Hiện tất cả cột" chỉ có cột của ngành trong hạng mục (Thiết bị điện = đèn + công tắc; hạng mục chưa có bộ thông số như Thạch cao, Cửa chỉ còn 25 cột chung thay vì 135; lọc "Hạng mục SP" = 1 loại có bộ thông số riêng như Bồn cầu, Lavabo, Ổ cắm thì chỉ còn thông số của loại đó); mỗi hạng mục nhớ cột đang hiện riêng (`qs_spcolcfg.byNode`, hạng mục chưa lưu thì dùng bộ theo ngành như cũ); bộ cột tự đặt tên và nút nhanh (1)(2) chỉ hiện ở hạng mục lúc tạo (bộ / nút cũ chưa gắn hạng mục chuyển về "Tất cả hạng mục"); bộ "Của tôi" vẫn theo tài khoản, dùng chung; khung "Chọn nhanh cột" bỏ bộ "Hiện tất cả cột" (trùng nút Hiện tất cả ở dải chip). Đã code + build (`ProductList.jsx`, `spModel.js`), còn thử trên app thật | User | 🟡 |
+| <a id="m9-2"></a>M9.2 | Mua hàng: nút Edit trên thẻ nhà cung cấp (phòng mua hàng) - thêm hàng tay (tên · ĐVT · SL · đơn giá · ghi chú; cộng vào tổng / VAT / kế hoạch thanh toán và gửi kèm đơn NCC, ghi chú dòng nằm ở ô khu vực của dòng đơn), thêm / đổi tên / xoá cột tự đặt (giá trị từng dòng gửi kèm đơn ở ô khu vực), ghi chú riêng cho NCC (nối vào ghi chú đơn). Lưu ở projData `mhExtra` (thêm khoá vào danh sách cho phép của server Go). Đề xuất chiết khấu không gồm hàng thêm tay. Đã code + build + thử phép tính đơn, còn thử trên app thật | User | 🟡 |
+| <a id="m2-1"></a>M2.1 | Danh sách dự án (Bảng điều khiển, dạng thanh): cột "Phụ trách" - nhân sự phụ trách từng dự án (ô tròn chữ cái đầu, 1 người kèm tên); quản trị bấm "+" gõ tìm + tích chọn nhiều nhân sự, ghi ngay vào dữ liệu công ty `__cty` khoá `daPhuTrach` (thêm khoá vào danh sách cho phép của server Go), người khác chỉ xem. Trang Thông tin dự án: cột trái "Báo cáo" - Nhân sự dự án 3 vai trò (Quản lý = cột Phụ trách · Người điều phối · Người thực hiện; `daPhuTrach[mã] = {ql, dp, th}`, bản cũ dạng mảng = Quản lý) + Báo cáo dự án (trạng thái, tiến độ, ngày tạo, số bản nháp, KTS, dòng SP, giá trị báo giá, lợi nhuận, NCC). Đã code + build + test Go, còn thử trên app thật; chưa lọc "Dự án của tôi" theo cột này | User | 🟡 |
+| <a id="m8-5"></a>M8.5 | Xuất báo giá - khổ in A4 / A3 × ngang / dọc (`bgCfg.kho`, cột trái trên nút xuất): trang xem trước, chia trang theo chiều cao, thu phóng Vừa khung và cửa sổ in / PDF theo khổ. Đã code + build, còn thử trên app thật; file Excel chưa đổi khổ giấy | User | 🟡 |
+| <a id="m9-3"></a>M9.3 | Mua hàng: VAT riêng từng nhà cung cấp (chân bảng NCC: Tổng (chưa VAT) · VAT (%) ô nhập + nút xổ 10 / 8 / 5 / 0% + về VAT dự án · Tổng (VAT); lưu `mhExtra[ncc].vat`, chưa đặt = VAT dự án), tổng / kế hoạch thanh toán / đơn + đề xuất gửi NCC theo VAT riêng. Đã code + build, còn thử trên app thật | User | 🟡 |
 
 ### 2.2 Tính năng mới
 

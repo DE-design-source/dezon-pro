@@ -52,22 +52,42 @@ export function mhGroups_(lines){
   return order.map(function(k){ return {ncc:k, items:groups[k]}; });
 }
 /* Dải số liệu đầu tab: mọi số cùng 1 phạm vi = các NCC ĐANG CHỌN. Tổng cộng (grand) cũng chỉ tính NCC đang chọn. */
+/* vatPct: số % chung, hoặc hàm (nhóm NCC) -> % VAT riêng của NCC đó (mhExtra[ncc].vat) */
 export function mhHead_(groups,vatPct,sel){
+  var vf=typeof vatPct==='function'?vatPct:function(){ return vatPct; };
   var nLines=groups.reduce(function(a,g){ return a+g.items.length; },0);
-  var grand=groups.reduce(function(sum,g){ return mhOn_(sel,g.ncc) ? sum+mhTot_(g.items,vatPct) : sum; },0);
+  var grand=groups.reduce(function(sum,g){ return mhOn_(sel,g.ncc) ? sum+mhTot_(g.items,vf(g)) : sum; },0);
   var chuaCK=groups.reduce(function(a,g){ return mhOn_(sel,g.ncc) ? a+g.items.reduce(function(b,l){ return b+(Number(l.soLuong)||0)*mhPrice(l); },0) : a; },0);
   var sauCK=groups.reduce(function(a,g){ return mhOn_(sel,g.ncc) ? a+mhSub_(g.items) : a; },0);
   var chon=groups.filter(function(g){ return mhOn_(sel,g.ncc); });
   var spChon=chon.reduce(function(a,g){ return a+g.items.length; },0);
   return { nLines:nLines, nNcc:groups.length, nccChon:chon.length, spChon:spChon, chuaCK:chuaCK, sauCK:sauCK,
-    vat:Math.round(sauCK*vatPct/100), grand:grand };
+    vat:groups.reduce(function(a,g){ return mhOn_(sel,g.ncc) ? a+Math.round(mhSub_(g.items)*vf(g)/100) : a; },0), grand:grand };
 }
-// Đơn gửi NCC của 1 nhóm (mhOrderOf)
-export function mhOrderOf(g,vatPct){
+/* PHẦN SỬA TAY THEO NCC (nút Edit trên thẻ NCC, phòng mua hàng) - projData.mhExtra[ncc] = {rows, cols, vals, note}
+   rows: hàng thêm tay [{id, ten, dvt, sl, donGia, ghiChu}] -> thành "dòng" giả (_ex) trong nhóm: cộng vào tổng / VAT / kế hoạch
+   thanh toán và gửi kèm đơn NCC (ghi chú hàng -> ô khu vực của dòng đơn). cols: cột tự thêm [{id, ten}], vals[khoá dòng][id cột] = chữ
+   (gửi kèm đơn: nối vào ô khu vực "Tên cột: giá trị"). note: ghi chú riêng của NCC (nối vào ghi chú đơn khi gửi). */
+export function mhExEmpty_(){ return {rows:[], cols:[], vals:{}, note:''}; }
+export function mhExOf_(all,ncc){ var e=all&&all[ncc]; return e?Object.assign(mhExEmpty_(), e):mhExEmpty_(); }
+// khoá dòng cho giá trị cột tự thêm: hàng thêm tay = x:id, dòng bóc tách = mã/tên + ĐVT (bền khi dòng gộp / tách tầng)
+export function mhExKey_(l){ return l._ex ? String(l.lineId) : ('l:'+spNorm_(l.maSP||l.ten)+'|'+spNorm_(l.dvt)); }
+export function mhExLine_(r){ var g=tkNum_(r.donGia)||0;
+  return {lineId:'x:'+r.id, _ex:true, exId:r.id, maSP:'x:'+r.id, ten:r.ten||'', dvt:r.dvt||'Cái', soLuong:tkNum_(r.sl)||0,
+    donGiaVon:g, donGiaBan:g, chietKhau:0, khuVuc:r.ghiChu||'', ghiChuEx:r.ghiChu||'', extra:{}}; }
+// nhóm NCC kèm hàng thêm tay (dùng cho thẻ, dải tổng, kế hoạch thanh toán, đơn gửi)
+export function mhWithEx_(g,all){ var e=all&&all[g.ncc]; return e&&e.rows&&e.rows.length ? {ncc:g.ncc, items:g.items.concat(e.rows.map(mhExLine_))} : g; }
+// bỏ hàng thêm tay (đề xuất chiết khấu chỉ cho dòng bóc tách)
+export function mhNoEx_(g){ return {ncc:g.ncc, items:g.items.filter(function(l){ return !l._ex; })}; }
+// chữ các cột tự thêm của 1 dòng: "Tên cột: giá trị · ..."
+export function mhExColTxt_(ex,l){ var v=(ex&&ex.vals&&ex.vals[mhExKey_(l)])||{};
+  return ((ex&&ex.cols)||[]).map(function(c){ var t=String(v[c.id]==null?'':v[c.id]).trim(); return t?(String(c.ten||'Cột').trim()+': '+t):''; }).filter(Boolean).join(' · '); }
+// Đơn gửi NCC của 1 nhóm (mhOrderOf); ex = phần sửa tay của NCC (tuỳ chọn) -> cột tự thêm nối vào ô khu vực của dòng
+export function mhOrderOf(g,vatPct,ex){
   var sub=g.items.reduce(function(s,l){ return s+(Number(l.soLuong)||0)*mhPriceCK_(l); },0);   // giá SAU chiết khấu
   var vat=Math.round(sub*vatPct/100);
   return { supplier:g.ncc, vatPct:vatPct, vat:vat, total:sub+vat,
-    items:mhGop_(g.items).map(function(G){ var l=G.l; return {ten:l.ten||'', ma:l.maSP||'', thuongHieu:l.thuongHieu||'', khuVuc:G.viTri.join(', '), hinhAnh:String(l.hinhAnh||'').split('\n')[0], sl:G.sl, dvt:l.dvt||'Cái', donGia:mhPriceCK_(l), donGiaGoc:mhPrice(l), giamGiaPct:mhDisc_(l)}; }) };
+    items:mhGop_(g.items).map(function(G){ var l=G.l, kv=[G.viTri.join(', '), mhExColTxt_(ex,l)].filter(Boolean).join(' · '); return {ten:l.ten||'', ma:l._ex?'':(l.maSP||''), thuongHieu:l.thuongHieu||'', khuVuc:kv, hinhAnh:String(l.hinhAnh||'').split('\n')[0], sl:G.sl, dvt:l.dvt||'Cái', donGia:mhPriceCK_(l), donGiaGoc:mhPrice(l), giamGiaPct:mhDisc_(l)}; }) };
 }
 // Phần chung của payload đơn / đề xuất. info = S._mhInfo {nguoiGui, phongBan, ghiChu}; payload node = hmNode
 export function mhBase(cur,hm,info){ var mi=info||{}; return { project:cur&&cur.ten, maDA:cur&&cur.maDA, khachHang:cur&&cur.khachHang, sdt:cur&&cur.sdt, node:hm||'', hangMuc:nodeName(hm||''), nguoiGui:mi.nguoiGui||'', phongBan:mi.phongBan||'', ghiChu:mi.ghiChu||'' }; }

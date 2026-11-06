@@ -206,11 +206,24 @@ function ctMac_(c) {
   }
 }
 const hex_ = v => (/^#[0-9a-f]{6}$/i.test(v || '') ? v : '')
+/* Khổ in của báo giá (bgCfg.kho): [mã, nhãn, rộng px, cao px (96 dpi), @page size, rộng mm, cao mm]. Mặc định A4 ngang.
+   Kích thước trang xem trước, chia trang theo chiều cao, thu phóng "Vừa khung" và cửa sổ in đều theo khổ này. */
+export const BG_KHO_DS = [
+  ['A4L', 'A4 · Ngang', 1123, 794, 'A4 landscape', 297, 210],
+  ['A4P', 'A4 · Dọc', 794, 1123, 'A4 portrait', 210, 297],
+  ['A3L', 'A3 · Ngang', 1587, 1123, 'A3 landscape', 420, 297],
+  ['A3P', 'A3 · Dọc', 1123, 1587, 'A3 portrait', 297, 420],
+]
+export function bgKho_(bgCfg) {
+  const r = BG_KHO_DS.find(x => x[0] === ((bgCfg && bgCfg.kho) || '')) || BG_KHO_DS[0]
+  return { k: r[0], nhan: r[1], w: r[2], h: r[3], page: r[4], mmW: r[5], mmH: r[6] }
+}
 export function bgChu_(bgCfg) {
   const c = bgCfg || {}
   const co = Number(c.co)
   const hdCo = Number(c.hdCo)
   return {
+    kho: bgKho_(c),
     font: String(c.font || ''), co: bgSo_(c.coSo) ? Number(c.coSo) / 12 * 100 : (BG_CO_DS.some(x => x[0] === co) ? co : 100),
     /* Đề mục lớn (dòng mục 1, 2, 3… của tờ bìa + dòng mục của bảng chi tiết): nền, màu chữ, cỡ chữ (% so với chữ bảng), font */
     hdNen: /^#[0-9a-f]{6}$/i.test(c.hdNen || '') ? c.hdNen : BG_HD_NEN, hdChu: c.hdChu === 'den' ? 'den' : 'trang',
@@ -381,6 +394,9 @@ export function bgDocCss_(mau, chu) {
   css = css.replace(/font-family:Arial,Helvetica,sans-serif/g, 'font-family:' + famCss_(chu && chu.font))
   const co = chu ? Number(chu.co) || 100 : 100
   if (co !== 100) css = css.replace(/font-size:(\d+(?:\.\d+)?)px/g, (x, n) => 'font-size:' + Math.round(Number(n) * co) / 100 + 'px')
+  // khổ in khác A4 ngang: trang rộng / cao theo khổ
+  const kho = chu && chu.kho
+  if (kho && kho.k !== 'A4L') css += renameCss_('.qs-page{width:' + kho.w + 'px;min-height:' + kho.h + 'px}')
   return css
 }
 
@@ -534,14 +550,17 @@ export function fitA4_(root, pageH, opt) {
   return ds.map(x => x.f)
 }
 
-/* printDoc: CSS của cửa sổ in (A4 ngang, bỏ khung, mỗi trang 1 tờ, ẩn tay kéo cột) */
-export function printCss_(css) {
+/* printDoc: CSS của cửa sổ in (khổ theo bgKho_, mặc định A4 ngang; bỏ khung, mỗi trang 1 tờ, ẩn tay kéo cột) */
+export function printCss_(css, kho) {
+  const k = kho || bgKho_(null)
+  const pgCss = k.k === 'A4L' ? '' : '.qsd-pg{width:' + k.mmW + 'mm;min-height:' + (k.mmH - 1) + 'mm;height:' + (k.mmH - 1) + 'mm}'
   return css
-    + '@page{size:A4 landscape;margin:0}'
+    + '@page{size:' + k.page + ';margin:0}'
     + 'body{margin:0;background:#fff}'
     + '.qsd-doc{margin:0;display:block}'
     + '.qsd-pg{border:none;border-radius:0;box-shadow:none;margin:0 auto;page-break-after:always;width:297mm;min-height:209mm;height:209mm;overflow:hidden;padding:16mm 15mm 18mm}'
     + '.qsd-pg:last-child{page-break-after:auto}'
     + '.qsd-qp-foot{left:15mm;right:15mm;bottom:8mm}'
     + '.qsd-qxrsz{display:none}'
+    + pgCss
 }

@@ -338,3 +338,105 @@ html[data-theme="dark"] .qs-pc-node .qs-bd-seg button.on{background:var(--dash-a
 .qs-pc-totals .qs-pc-vat{display:inline-flex; align-items:center; gap:3px;}
 .qs-pc-totals .qs-pc-vat em{margin-left:5px; font-style:normal;}
 .qs-pc-totals .qs-bd-tg.total b{font-size:16px;}
+
+/* Thông tin dự án: 2 cột - trái "Báo cáo" (nhân sự dự án + thông tin khác), phải 2 thẻ thông tin; màn hẹp xếp chồng */
+.qs-pi-cols{display:grid; grid-template-columns:340px minmax(0, 1fr); gap:14px; align-items:start;}
+.qs-pi-main{display:flex; flex-direction:column; gap:14px; min-width:0;}
+@media (max-width:1100px){ .qs-pi-cols{grid-template-columns:minmax(0, 1fr);} }
+.qs-pi-report{position:sticky; top:0;}
+.qs-pi-rp-sec + .qs-pi-rp-sec{margin-top:16px; padding-top:14px; border-top:1px solid var(--border);}
+.qs-pi-rp-t{margin-bottom:8px; font-size:11.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
+.qs-pi-report .qs-dash-row-pt{min-height:28px;}
+.qs-pi-report .qs-dash-row-pt .add{opacity:1;}
+.qs-pi-rp-ppl{margin:8px 0 0; padding:0 0 0 18px; font-size:12.5px; color:var(--text); line-height:1.6;}
+.qs-pi-rp-hint{display:block; margin-top:6px; font-size:11.5px; color:var(--text-muted);}
+.qs-pi-rp-r{display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:32px; border-bottom:1px dashed color-mix(in srgb, var(--border) 80%, transparent); font-size:12.5px;}
+.qs-pi-rp-r:last-child{border-bottom:0;}
+.qs-pi-rp-r span{color:var(--text-muted); white-space:nowrap;}
+.qs-pi-rp-r b{min-width:0; font-weight:600; color:var(--text); text-align:right; overflow-wrap:anywhere;}
+.qs-pi-rp-r.col{flex-direction:column; align-items:flex-start; padding:6px 0; gap:6px;}
+.qs-pi-rp-pg{display:inline-flex; align-items:center; gap:8px;}
+.qs-pi-rp-pg i{display:block; width:90px; height:6px; border-radius:99px; background:var(--surface-alt); overflow:hidden;}
+.qs-pi-rp-pg em{display:block; height:100%; border-radius:99px; background:var(--dash-accent);}
+.qs-pi-rp-ncc{display:flex; flex-wrap:wrap; gap:4px;}
+.qs-pi-rp-ncc i{font-style:normal; padding:2px 8px; border-radius:6px; background:var(--dash-navy); color:#fff; font-size:11px; font-weight:600;}
+
+/* ===== Thông tin dự án - giao diện mới =====
+   Hàng tiêu đề: Quay lại · Thông tin dự án · tên dự án + tab bản nháp (1 hàng) · ✕
+   Cột trái 440px (bằng cột trái Bảng điều khiển), 2 thẻ bo 16 nền trắng bóng nhẹ (kiểu thẻ Biên lợi nhuận)
+   Thẻ phải: đầu thẻ nền trắng, ô biểu tượng xanh đậm; ô nhập nền xám nhạt không viền, bấm vào nền trắng viền xanh */
+.qs-pi-page .qs-pdlg-h{flex-wrap:wrap; gap:12px 14px; align-items:center;}
+.qs-pi-page .qs-pdlg-h h3{white-space:nowrap;}
+.qs-pdlg-h .qs-pi-switch{flex:1 1 auto; min-width:0; flex-direction:row; align-items:center; flex-wrap:wrap; gap:10px 18px; margin-left:6px; padding:6px 14px 6px 8px; border:1px solid var(--border); border-radius:14px; background:var(--surface);}
+.qs-pdlg-h .qs-pi-sw-ic{width:36px; height:36px; border-radius:10px; background:var(--dash-navy); color:#fff;}
+.qs-pdlg-h .qs-pi-sw-name{font-size:15px;}
+.qs-pdlg-h .qs-pi-tabs{margin-left:auto;}
+.qs-pdlg-h .qs-pi-tab{padding:5px 12px;}
+.qs-pi-cols{grid-template-columns:440px minmax(0, 1fr); gap:16px;}
+.qs-pi-report{position:sticky; top:0; display:flex; flex-direction:column; gap:16px; min-width:0;}
+.qs-pi-scard{border:1px solid var(--border); border-radius:16px; background:var(--surface); box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12); padding:16px 18px 14px;}
+.qs-pi-sh{display:flex; align-items:baseline; gap:8px; margin-bottom:10px;}
+.qs-pi-sh h3{margin:0; font-size:15px; font-weight:700; color:var(--text);}
+.qs-pi-sh span{margin-left:auto; font-size:11.5px; color:var(--text-muted);}
+.qs-pi-scard .qs-pi-rp-sec + .qs-pi-rp-sec{margin-top:0; padding-top:0; border-top:0;}
+.qs-pi-scard .qs-pi-rp-r{min-height:38px; border-bottom:1px solid var(--border); font-size:13px;}
+.qs-pi-scard .qs-pi-rp-r span{color:var(--text-muted);}
+.qs-pi-scard .qs-pi-rp-r b{font-weight:700;}
+.qs-pi-report .qs-dash-row-pt{min-height:32px; gap:6px;}
+.qs-pi-report .qs-dash-row-pt .av{width:30px; height:30px; font-size:11px;}
+.qs-pi-report .qs-dash-row-pt .add{width:28px; height:28px;}
+.qs-pi-report .qs-dash-row-pt .nm, .qs-pi-report .qs-dash-row-pt .nil{font-size:13px;}
+@media (max-width:1280px){ .qs-pi-cols{grid-template-columns:minmax(0, 1fr);} .qs-pi-report{position:static;} }
+.qs-pi-main .qs-pi-card{border:1px solid var(--border); border-radius:16px; background:var(--surface); box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12);}
+.qs-pi-main .qs-pi-card-h{padding:14px 20px; background:var(--surface);}
+.qs-pi-main .qs-pi-card-h h3{font-size:15px; font-weight:700;}
+.qs-pi-main .qs-pi-card-ic{background:var(--dash-navy); color:#fff; border-radius:10px;}
+.qs-pi-main .qs-pi-card-b{padding:18px 20px 20px;}
+.qs-pi-main .qs-pi-note{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; background:var(--dash-accent-tint); color:var(--dash-accent); font-size:12px; font-weight:500;}
+.qs-pi-main .qs-field > span{font-size:11.5px; font-weight:600; color:var(--text-muted); letter-spacing:.01em;}
+.qs-pi-main .qs-field input, .qs-pi-main .qs-field select, .qs-pi-main .qs-field textarea{height:38px; border:1px solid transparent; border-radius:10px; background:var(--surface-alt); color:var(--text); font-size:13.5px; transition:background .12s, border-color .12s, box-shadow .12s;}
+.qs-pi-main .qs-field textarea{height:auto; min-height:76px; padding:9px 12px;}
+.qs-pi-main .qs-field input:hover, .qs-pi-main .qs-field select:hover, .qs-pi-main .qs-field textarea:hover{border-color:var(--border);}
+.qs-pi-main .qs-field input:focus, .qs-pi-main .qs-field select:focus, .qs-pi-main .qs-field textarea:focus{outline:none; background:var(--surface); border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qs-pi-main .qs-pi-grid{gap:16px 18px;}
+
+/* Hàng tiêu đề Thông tin dự án: nền xanh đậm như băng dự án các tab (.qs-pc) */
+.qs-pi-page .qs-pdlg-h{padding:10px 14px; border-radius:12px; background:linear-gradient(90deg, var(--dash-navy), var(--dash-navy-2)); color:#fff; border:0;}
+.qs-pi-page .qs-pdlg-h h3{color:#fff;}
+.qs-pi-page .qs-pdlg-h .qs-pi-back{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff;}
+.qs-pi-page .qs-pdlg-h .qs-pi-back:hover{background:rgba(255,255,255,.16);}
+.qs-pi-page .qs-pdlg-h .qsc-x{color:#cfe0f3; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2);}
+.qs-pi-page .qs-pdlg-h .qsc-x:hover{color:#fff; background:rgba(255,255,255,.16);}
+.qs-pdlg-h .qs-pi-switch{border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.04);}
+.qs-pdlg-h .qs-pi-sw-ic{background:rgba(255,255,255,.12); color:#fff;}
+.qs-pdlg-h .qs-pi-sw-name{color:#fff;}
+.qs-pdlg-h .qs-pi-sw-sub{color:#9fc0e3;}
+.qs-pdlg-h .qs-pi-tab{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#cfe0f3;}
+.qs-pdlg-h .qs-pi-tab:hover{border-color:rgba(255,255,255,.55); color:#fff;}
+.qs-pdlg-h .qs-pi-tab.on{background:#fff; border-color:#fff; color:var(--dash-navy);}
+.qs-pdlg-h .qs-pi-tab.add{border-style:dashed; color:#fff;}
+/* Nhân sự dự án: 3 vai trò, mỗi vai trò 1 dòng (nhãn trên, người + nút giao dưới) */
+.qs-pi-role{display:flex; flex-direction:column; gap:6px; padding:10px 0; border-bottom:1px solid var(--border);}
+.qs-pi-role:first-child{padding-top:2px;}
+.qs-pi-role:last-of-type{border-bottom:0;}
+.qs-pi-role .lb{font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+.qs-pi-role .ppl{font-size:12px; color:var(--text);}
+
+/* Thông tin dự án (2026-11-06): băng tiêu đề thấp như băng dự án các tab (~46px), bỏ nút ✕ (đã có "Quay lại");
+   2 cột kéo tới đáy trang: cột trái thẻ Báo cáo dự án giãn hết phần còn lại, cột phải thẻ Thông tin bản nháp giãn hết;
+   thẻ Nhân sự dự án thoáng hơn (mỗi vai trò cao hơn) */
+.qs-pi-page .qs-pdlg-h{min-height:46px; padding:4px 10px; gap:8px 12px; margin-bottom:12px; border-radius:10px; flex-wrap:nowrap;}
+.qs-pi-page .qs-pdlg-h h3{font-size:15px;}
+.qs-pi-page .qs-pdlg-h .qs-pi-back{height:28px; padding:0 10px; font-size:12.5px;}
+.qs-pi-page .qs-pdlg-h .qsc-x{display:none;}
+.qs-pdlg-h .qs-pi-switch{flex-wrap:nowrap; gap:8px 14px; padding:3px 8px 3px 4px; border-radius:10px;}
+.qs-pdlg-h .qs-pi-sw-ic{width:28px; height:28px; border-radius:8px;}
+.qs-pdlg-h .qs-pi-sw-name{font-size:14px;}
+.qs-pdlg-h .qs-pi-sw-sub{font-size:11px; margin-top:0;}
+.qs-pdlg-h .qs-pi-tab{padding:3px 10px; font-size:12px;}
+.qs-pi-page .qsc-dlg.qs-pi-dlg{display:flex; flex-direction:column; padding-top:10px;}
+.qs-pi-page .qs-pi-b{flex:1 1 auto; min-height:0;}
+.qs-pi-page .qs-pi-cols{flex:1 1 auto; align-items:stretch;}
+.qs-pi-page .qs-pi-report > .qs-pi-scard:last-child, .qs-pi-page .qs-pi-main > .qs-pi-card:last-child{flex:1 0 auto;}
+.qs-pi-page .qs-pi-role{gap:8px; padding:14px 0;}
+@media (max-width:1280px){ .qs-pi-page .qs-pi-report > .qs-pi-scard:last-child, .qs-pi-page .qs-pi-main > .qs-pi-card:last-child{flex:none;} }

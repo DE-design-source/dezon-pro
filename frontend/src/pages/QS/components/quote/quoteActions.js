@@ -188,7 +188,7 @@ export function printDoc(pages, css) {
   }
   const html = pages.map(pg => pg.html).join('')
   const fm = css ? null : freshModel()
-  const pcss = printCss_(css || bgDocCss_(fm.mau, bgChu_(fm.ctx.bgCfg)))
+  const pcss = printCss_(css || bgDocCss_(fm.mau, bgChu_(fm.ctx.bgCfg)), bgChu_((pdNow() || {}).bgCfg).kho)
   /* font báo giá (Montserrat / font Google) nạp trong cửa sổ in; chờ font tải xong mới in */
   const bgCfg = (pdNow() || {}).bgCfg
   const bia = bgBia_(bgCfg)
@@ -200,7 +200,7 @@ export function printDoc(pages, css) {
   const w = window.open('', '_blank'); if (!w) { toast('Cho phép popup để in/PDF'); return }
   w.document.write('<!doctype html><title>Báo giá — ' + esc(c.ten || '') + '</title>' + hrefs.map(h => '<link rel="stylesheet" href="' + esc(h) + '">').join('') + '<style>' + pcss + '</style><div class="qsd-doc">' + html + '</div>')
   w.document.close()
-  // mỗi trang đúng 1 tờ A4 ngang: thu nhỏ trang nhiều chữ cho vừa (cùng cách bản xem trước) rồi mới in
+  // mỗi trang đúng 1 tờ theo khổ in: thu nhỏ trang nhiều chữ cho vừa (cùng cách bản xem trước) rồi mới in
   const go = () => { try { fitA4_(w.document.querySelector('.qsd-doc'), null) } catch (e) { /* bỏ qua */ } w.focus(); w.print() }
   setTimeout(() => { try { w.document.fonts.ready.then(go, go) } catch (e) { go() } }, 400)
 }
