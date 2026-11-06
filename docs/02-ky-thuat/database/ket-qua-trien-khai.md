@@ -100,21 +100,24 @@ Client không đổi gì khác: mọi API trả đúng hình dạng cũ.
 
 **Quay lui:** đổi `DATABASE_URL` về `.../qspro_en` **và** hoàn code về commit trước refactor (code mới không chạy trên schema cũ). Dữ liệu ghi vào `qspro_en2` sau lúc chuyển sẽ không có ở `qspro_en`.
 
-**Migration:**
+**Migration** (chạy từ `backend/`; công cụ `infra/scripts/migrate.js` và `npm run migrate` của bản Node đã gỡ, thay bằng `cmd/migrate`):
 
 ```bash
-npm run migrate                 # chạy file chưa áp dụng trên DATABASE_URL
-node infra/scripts/migrate.js --status
+go run ./cmd/migrate                          # chạy file chưa áp dụng trên DATABASE_URL (.env rồi ../.env)
+go run ./cmd/migrate --status                 # chỉ liệt kê
+go run ./cmd/migrate --url=postgresql://...   # chỉ định database đích, không đọc .env
 ```
 
-File mới đặt ở `infra/db/migrations/NNNN_ten.sql`; không sửa file đã chạy. Sau khi chạy: sinh lại `infra/db/schema.sql`, cập nhật `server/db-map.json`.
+Trong image Docker: `/app/qspro-migrate [--status|--baseline]`. Chi tiết: `backend/docs/DATABASE.md`.
+
+File mới đặt ở `infra/db/migrations/NNNN_ten.sql`; không sửa file đã chạy. Sau khi chạy: sinh lại `infra/db/schema.sql`, cập nhật `backend/internal/platform/database/db-map.json`.
 
 **Thêm cột thông số sản phẩm:**
 
 1. Chọn bảng: cột dùng cho từ 2 ngành trở lên thì vào `products`; cột riêng một ngành thì vào `product_<ngành>_specs`.
 2. Viết migration: `alter table ... add column ...`, rồi `drop view product_catalog` và tạo lại view (chép định nghĩa trong `schema.sql`, thêm cột mới).
-3. Thêm cặp tên vào `db_san_pham.columns` trong `server/db-map.json`.
-4. `npm run migrate`, khởi động lại server, chạy `npm run test:db` (có kiểm tra view đủ cột).
+3. Thêm cặp tên vào `db_san_pham.columns` trong `backend/internal/platform/database/db-map.json`.
+4. `go run ./cmd/migrate` (từ `backend/`; công cụ in cảnh báo nếu view `product_catalog` thiếu cột), rồi khởi động lại server.
 
 **Ngành sản phẩm mới:** tạo bảng `product_<ngành>_specs (product_id bigint primary key references products(id) on delete cascade, ...)`, thêm vào view và vào `parts` của `db_san_pham` trong `db-map.json`.
 
@@ -122,14 +125,13 @@ File mới đặt ở `infra/db/migrations/NNNN_ten.sql`; không sửa file đã
 
 - Từ bộ xuất: `psql -d <db trống> -f infra/export/qspro_dev.sql` (cấu trúc + dữ liệu). Bộ `export/supabase-2026-10-07/sql-en2/` cũ (dữ liệu ngày 2026-10-12) đã thay bằng file này và chuyển khỏi repo ngày 2026-10-15.
 - Chỉ cấu trúc: `psql -d <db trống> -f infra/db/schema.sql`.
-- Từ Supabase: `DATABASE_URL=<db trống> node infra/scripts/sync-from-supabase.js --yes`.
 
-**Test trên database thật:** tạo bản sao (`pg_dump <db> | psql <db>_test`), rồi `TEST_DATABASE_URL=.../<db>_test npm run test:db` và `npm run test:api`. `test:api` để lại dữ liệu thử trong bản sao; dùng xong xoá bản sao.
+**Test trên database thật:** chỉ dùng database thử (`qspro_gotest`, đặt lại từ seed), không dùng database ở `.env`. Từ `backend/`: `TEST_DATABASE_URL=.../qspro_gotest go test -count=1 -p 1 ./...`; E2E trên server Go đang chạy: `node backend/tests/e2e/test-api-go.js` (từ gốc repo, biến `BASE_URL` + `TEST_DATABASE_URL`), để lại dữ liệu thử trong database. Chi tiết: mục Kiểm thử của `backend/README.md`.
 
 ## 8. Việc còn lại
 
 1. Người dùng thử trên trình duyệt qua các tab chính, đặc biệt: nhập sản phẩm 4 ngành, bóc tách, tờ bìa, mua hàng, đề xuất, xuất Excel.
 2. Quyết định về 13 dòng bóc tách trong khu cách ly (mục 3).
-3. Kế hoạch cắt chuyển production: cần máy chủ PostgreSQL mà Render truy cập được; xem [migration-plan.md](migration-plan.md) mục 9.
+3. Kế hoạch cắt chuyển production: production nay chạy trên VPS CloudFly (backend Go + PostgreSQL, không còn Render); xem [trien-khai-vps-cloudfly.md](../../04-van-hanh/trien-khai-vps-cloudfly.md) và [migration-plan.md](migration-plan.md) mục 9.
 4. Các điểm bảo mật không thuộc phạm vi database, vẫn còn nguyên: `AUTH_SECRET` có giá trị dự phòng trong source, project Supabase cũ còn mở, đọc sản phẩm chéo công ty qua combo, webhook Lark dùng chung. Xem [tenant-security.md](tenant-security.md).
 5. Xoá 8 cột `DEPRECATED` còn trong danh sách D-09 (ban đầu 12; `delete_requests.note`, `product_combos.note`, `companies.last_reminder_date`, `reminder_milestone` đã ra khỏi danh sách ngày 2026-10-15). Transaction (D-13) đã xong ngày 2026-10-15 trên backend Go; còn mở: gộp cả lần gửi nhiều đơn mua hàng vào 1 transaction (cần `clock_timestamp()`).

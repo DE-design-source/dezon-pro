@@ -1,6 +1,8 @@
 # Quyết định thiết kế database
 
 > **Cập nhật 2026-10-12:** đề xuất này ĐÃ được triển khai trên database local `qspro_en2`, có điều chỉnh. Cấu trúc đang chạy: [schema-hien-hanh.md](schema-hien-hanh.md). Những gì đã làm và khác gì so với bản dưới đây: [ket-qua-trien-khai.md](ket-qua-trien-khai.md). Nội dung bên dưới là bản đề xuất gốc, giữ lại để tra lý do.
+>
+> **Ghi chú 2026-11-06:** viết khi còn app Node (đã gỡ ở commit `5fa5d52`); đường dẫn `server/*.js`, `public/*.js`, `render.yaml` và lệnh `npm ...` trong tài liệu này là mã / cách làm cũ. Hiện nay: migration chạy bằng `go run ./cmd/migrate` (trong `backend/`), `db-map.json` duy nhất ở `backend/internal/platform/database/db-map.json`, bảng tự lọc công ty khai trong `TenantTables` (`backend/internal/platform/database/postgres.go`).
 
 - Trạng thái: **ĐÃ TRIỂN KHAI** trên `qspro_en2` (2026-10-12), trừ bước xoá cột của D-09. D-13 (transaction) đã làm trên backend Go ngày 2026-10-15 (xem mục D-13). D-04 được làm theo hướng mạnh hơn: bỏ hẳn `company_id` ở 7 bảng con thay vì khoá ngoại kép. Chi tiết: [ket-qua-trien-khai.md](ket-qua-trien-khai.md).
 - Mỗi quyết định ghi: bối cảnh có bằng chứng, các phương án đã cân nhắc, đề xuất, tác động tới code.

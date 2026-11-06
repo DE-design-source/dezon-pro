@@ -38,14 +38,15 @@ Mọi đường dẫn tương đối tính từ THƯ MỤC ĐANG ĐỨNG (không
 
 ### Quy tắc kế thừa `.env` (đọc kỹ trước khi chạy thử)
 
-Server đọc `backend/.env` rồi `../.env` - file cấu hình THẬT của bản Node. Với TỪNG biến, giá trị lấy theo thứ tự:
+Server đọc `backend/.env` rồi `../.env` (`.env` ở gốc repo, đã gitignore; không có thì bỏ qua). `DOTENV=0` thì không đọc file nào.
+Với TỪNG biến, giá trị lấy theo thứ tự:
 
 1. biến đã có trong môi trường (kể cả đặt rỗng) - không bao giờ bị file đè;
 2. `backend/.env`;
-3. `../.env` của bản Node;
+3. `../.env` (gốc repo, nếu có);
 4. mặc định trong code.
 
-Hệ quả: chỉ truyền `PORT` và `DATABASE_URL` thì `AUTH_SECRET`, webhook Lark, khoá Lark vẫn lấy từ `../.env`,
+Hệ quả: chỉ truyền `PORT` và `DATABASE_URL` thì `AUTH_SECRET`, webhook Lark, khoá Lark vẫn lấy từ các file `.env` trên,
 và job báo cáo vẫn BẬT. Một lượt chạy thử trên database thử vẫn có thể gửi tin vào group Lark thật.
 
 Khi đích là database THỬ, LUÔN truyền đủ bộ biến an toàn sau (giá trị phải KHÁC RỖNG: `PURCHASE_WEBHOOK` rỗng nghĩa là
@@ -91,25 +92,23 @@ webhook Lark thật ghi sẵn trong code):
 - `CORS_ORIGINS` (có sẵn) cũng là danh sách origin được mở WebSocket chat (`/api/v1/chat/ws`, bỏ scheme); cùng host với API luôn được.
 - Route, token, mã lỗi, giao thức WebSocket: [docs/API.md](docs/API.md) mục 2.1 "Chat".
 
-## Chạy song song / thay bản Node
+## Lưu ý khi chạy nhiều server / triển khai
 
 | Điểm | Chi tiết |
 |---|---|
-| Cổng | Cả hai mặc định 3000. Chạy cạnh nhau thì đặt `PORT` khác cho bản Go (ví dụ 3998). |
-| Database | Không có `backend/.env` thì bản Go lấy `DATABASE_URL` từ `../.env` - CÙNG database với bản Node (trên máy phát triển là database thật). Muốn dùng database khác phải đặt `DATABASE_URL` trong `backend/.env` hoặc trong môi trường. |
-| Job báo cáo | `REPORT_JOB` mặc định BẬT: 70 giây sau khi chạy server kiểm tra gửi bù, rồi gửi Lark lúc 8h00 thứ 4 và thứ 7. Hai server cùng database sẽ gửi hai báo cáo (chống trùng qua `audit_log` không chặn được hai tiến trình). Đặt `REPORT_JOB=0` ở ĐÚNG MỘT bên; bản Node không có công tắc này nên khi chạy song song thì tắt ở bản Go. |
-| Webhook | `PURCHASE_WEBHOOK` trống = webhook Lark thật ghi sẵn trong code (giống bản Node); `REPORT_WEBHOOK` trống = dùng chung. Chạy thử thì đặt cả hai thành địa chỉ giả. |
-| Phiên đăng nhập | Token được ký bằng `AUTH_SECRET` (trống = cùng một khoá mặc định ở cả hai bản). Hai bản cùng `AUTH_SECRET` và cùng database thì token đang dùng ở bản Node có hiệu lực ngay trên bản Go, người dùng không phải đăng nhập lại. |
+| Cổng | Mặc định 3000 (biến `PORT`, `backend/internal/config/config.go`). Giao diện đặt `VITE_API_URL` theo `frontend/.env.example` (ví dụ `http://localhost:3000`). Chạy thêm một server trên cùng máy thì đặt `PORT` khác (ví dụ 3998) và trỏ `VITE_API_URL` của giao diện theo. |
+| Database | Server lấy `DATABASE_URL` từ môi trường, rồi `backend/.env`, rồi `../.env` (mục Cấu hình). Trên máy phát triển file `.env` có thể trỏ database THẬT: muốn dùng database khác phải đặt `DATABASE_URL` trong môi trường (hoặc `DOTENV=0`). |
+| Job báo cáo | `REPORT_JOB` mặc định BẬT: 70 giây sau khi chạy server kiểm tra gửi bù, rồi gửi Lark lúc 8h00 thứ 4 và thứ 7. Hai server cùng database sẽ gửi hai báo cáo (chống trùng qua `audit_log` không chặn được hai tiến trình). Đặt `REPORT_JOB=0` ở mọi server trừ ĐÚNG MỘT. |
+| Webhook | `PURCHASE_WEBHOOK` trống = webhook Lark thật ghi sẵn trong code; `REPORT_WEBHOOK` trống = dùng chung. Chạy thử thì đặt cả hai thành địa chỉ giả. |
+| Phiên đăng nhập | Token được ký bằng `AUTH_SECRET` (trống = khoá mặc định trong code). Các server cùng `AUTH_SECRET` và cùng database thì nhận token của nhau. |
 
-Chuyển hẳn sang bản Go (`render.yaml` đã gỡ khỏi repo cùng app Node; cấu hình triển khai bản Go chưa có trong repo):
-
-1. Chạy migration nếu còn file chưa áp dụng (xem [docs/DATABASE.md](docs/DATABASE.md)).
-2. Dựng image (mục Docker bên dưới), đặt biến môi trường giống bản Node, cùng `AUTH_SECRET`.
-3. Tắt bản Node, bật bản Go với `REPORT_JOB` để mặc định (chỉ còn một bên gửi báo cáo).
+Triển khai production (VPS CloudFly, https://dezon.tech) bằng Docker Compose: `bash infra/deploy/deploy.sh`, xem
+`docs/04-van-hanh/trien-khai-vps-cloudfly.md` (cấu hình compose: `infra/deploy/docker-compose.yml`). Migration chạy trong bước triển khai;
+chạy tay thì xem [docs/DATABASE.md](docs/DATABASE.md).
 
 ## Chạy bằng Go cài trên máy (Go 1.25+)
 
-Dùng cấu hình thật của bản Node (database, webhook lấy từ `../.env`; file tải lên ghi vào `UPLOAD_DIR`, mặc định `backend/uploads/`; chỉ dùng khi đã tắt bản Node hoặc đã đặt `REPORT_JOB=0`):
+Dùng cấu hình trong `backend/.env` (rồi `../.env` nếu có; file tải lên ghi vào `UPLOAD_DIR`, mặc định `backend/uploads/`). Nếu cấu hình đó trỏ database / webhook thật thì đặt `REPORT_JOB=0` khi production đang gửi báo cáo, và dùng bộ biến an toàn ở mục Cấu hình khi chạy thử:
 
 ```
 cd backend
@@ -117,7 +116,7 @@ go run ./cmd/api                 # http://localhost:3000
 go run ./cmd/migrate --status    # xem migration
 ```
 
-Chạy cạnh bản Node trên database thử (PowerShell):
+Chạy trên database thử, cổng riêng (PowerShell):
 
 ```
 cd backend
@@ -148,7 +147,7 @@ Dùng database thử RIÊNG `qspro_chattest` (container `qspro-postgres`), KHÔN
    ```
 
 3. Chạy giao diện (từ `frontend/`): `$env:VITE_API_URL = 'http://localhost:3998'; npm run dev` (biến môi trường thắng
-   `frontend/.env.development`, file đó trỏ cổng 3000). Mở `/chat`.
+   giá trị trong file `.env.*` của `frontend/`, vd `frontend/.env.development` tạo ở máy theo `frontend/.env.example`, đã gitignore). Mở `/chat`.
 4. Nhiều người dùng = mỗi tab một tài khoản, ngay trong cùng một cửa sổ: tab 1 đăng nhập số thứ nhất, mở tab 2 (cùng
    `http://localhost:5173/chat`), bấm ảnh đại diện cạnh chữ "Chat" (bộ chuyển tài khoản) -> "Thêm tài khoản" rồi đăng nhập số thứ hai
    (vd `0901234567`, `0912345678`): mã OTP hiện ngay ở cổng đăng nhập (`dev_code`) và trong log server. Mọi tài khoản đã đăng nhập nằm
@@ -219,7 +218,7 @@ docker exec -e PORT=3998 -e DATABASE_URL=postgresql://qspro:<mật khẩu>@host.
 - Container `qspro-go` đã có thì bỏ dòng `docker run` (dùng `docker start qspro-go` nếu nó đang dừng).
 - Trong container, `localhost` là chính container: database chạy trên máy phải gọi qua `host.docker.internal`.
 - Repo được gắn vào `/repo` nên quy tắc kế thừa ở mục Cấu hình áp dụng nguyên vẹn: biến nào không truyền bằng `-e` được lấy từ
-  `/repo/backend/.env` rồi `/repo/.env` (file thật của bản Node).
+  `/repo/backend/.env` rồi `/repo/.env` (nếu có).
 - Chạy nền: build ra file rồi chạy bằng `docker exec -d ... qspro-go sh -c "go build -o /tmp/qsapi ./cmd/api && /tmp/qsapi > /tmp/qsapi.log 2>&1"`;
   dừng bằng `docker exec qspro-go pkill qsapi`.
 
@@ -317,4 +316,4 @@ tests/e2e                test-api-go.js (E2E trên server Go đang chạy)
 docs                     tài liệu
 ```
 
-Migration và Dockerfile nằm ngoài `backend/`: `infra/db/migrations/` (dùng chung với bản Node), `infra/docker/backend.Dockerfile`.
+Migration và Dockerfile nằm ngoài `backend/`: `infra/db/migrations/` (nguồn migration duy nhất), `infra/docker/backend.Dockerfile`.

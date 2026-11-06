@@ -1,6 +1,8 @@
 # Mô hình trạng thái
 
 > **Cập nhật 2026-10-12:** tài liệu này mô tả database `qspro_en` TRƯỚC refactor (mốc audit). Cấu trúc đang chạy: [schema-hien-hanh.md](schema-hien-hanh.md); kết quả triển khai: [ket-qua-trien-khai.md](ket-qua-trien-khai.md).
+>
+> **Ghi chú 2026-11-06:** viết khi còn app Node (đã gỡ ở commit `5fa5d52`); đường dẫn `server/*.js`, `public/*.js`, `render.yaml` và lệnh `npm ...` trong tài liệu này là mã / cách làm cũ. Hiện nay: migration chạy bằng `go run ./cmd/migrate` (trong `backend/`), `db-map.json` duy nhất ở `backend/internal/platform/database/db-map.json`, bảng tự lọc công ty khai trong `TenantTables` (`backend/internal/platform/database/postgres.go`).
 
 - Xác minh từ code commit `83d264e` và dữ liệu `qspro_en` ngày 2026-10-12. Số trong ngoặc là số dòng thực tế.
 - Giá trị trạng thái là **chuỗi tiếng Việt so sánh trực tiếp** ở cả server và client. Không đổi chuỗi khi chưa sửa đồng thời hai phía.

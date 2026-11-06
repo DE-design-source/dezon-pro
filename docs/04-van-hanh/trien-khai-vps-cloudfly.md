@@ -461,7 +461,7 @@ scp -r root@<IP máy chủ>:/opt/qspro-backups/qspro-media .
 ## Lưu ý
 
 - **Bảo mật:** file `.env` chứa mật khẩu database và khoá ký token, chỉ root đọc được. Không gửi file này qua chat / email, không commit.
-- **Server cũ trên Render:** sau khi người dùng chuyển hẳn sang tên miền mới, tắt service `qs-pro` trên Render.
+- **Server cũ trên Render** (app Node, mã đã gỡ khỏi repo ở commit `5fa5d52`, kể cả `render.yaml`): sau khi người dùng chuyển hẳn sang tên miền mới, tắt service `qs-pro` trên Render.
 - **Trang `/qs-pro` của giao diện React** vẫn nhúng app cũ trên Render (`frontend/src/pages/QSPro/QSPro.jsx`, `QS_PRO_URL`). Tắt Render thì trang này trống;
   module QS dùng thật là trang `/qs`.
 - **Các trang khác của giao diện SiteFlow** (Chat, Marketing, HR, Tài chính...) đang là dữ liệu mẫu trong `frontend/src/data`, chưa nối backend.

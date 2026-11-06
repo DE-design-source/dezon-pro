@@ -1,6 +1,8 @@
 # Audit - danh mục chi tiết từng bảng
 
 > **Cập nhật 2026-10-12:** tài liệu này mô tả database `qspro_en` TRƯỚC refactor (mốc audit). Cấu trúc đang chạy: [schema-hien-hanh.md](schema-hien-hanh.md); kết quả triển khai: [ket-qua-trien-khai.md](ket-qua-trien-khai.md).
+>
+> **Ghi chú 2026-11-06:** viết khi còn app Node (đã gỡ ở commit `5fa5d52`); đường dẫn `server/*.js`, `public/*.js`, `render.yaml` và lệnh `npm ...` trong tài liệu này là mã / cách làm cũ. Hiện nay: migration chạy bằng `go run ./cmd/migrate` (trong `backend/`), `db-map.json` duy nhất ở `backend/internal/platform/database/db-map.json`, bảng tự lọc công ty khai trong `TenantTables` (`backend/internal/platform/database/postgres.go`).
 
 > Sinh tự động từ catalog và dữ liệu của database `qspro_en` (PostgreSQL 17, local) ngày 2026-10-12. Không gõ tay.
 > Tên trong ngoặc là tên bảng/cột code đang dùng (tiếng Việt, qua `server/db-map.json`).

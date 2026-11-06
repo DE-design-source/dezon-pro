@@ -50,7 +50,7 @@ Activate: when the user wants Claude to work concisely, save context, and avoid 
 7. **No error handling for cases that cannot happen** (internal code, framework guarantees).
 8. **3 similar lines beat a premature abstraction** — don't over-DRY.
 9. **Read the file before editing** — never edit blind.
-10. **Test code before saying "done"** — don't declare complete without verifying. Here: `npm test`, plus `node --check public/<file>.js` for an edited frontend file. The dev `.env` points `DATABASE_URL` at the real database and webhooks at real Lark, so never verify by writing through a locally running server. Test on real Postgres only via `TEST_DATABASE_URL=... npm run test:db` / `npm run test:api` against a throwaway database (name contains `test`/`tmp`).
+10. **Test code before saying "done"** — don't declare complete without verifying. Here: backend Go -> from `backend/`: `go test -count=1 -p 1 ./...` (tests needing a database skip without `TEST_DATABASE_URL`); frontend React -> from `frontend/`: `npm run build`; edited `*-spec.js` -> `node backend/scripts/gen-specs.js` then `go test ./internal/shared/specs ./internal/server`. The dev `.env` points `DATABASE_URL` at the real database and webhooks at real Lark, so never verify by writing through a locally running server (when running `go run ./cmd/api` for a check, set `REPORT_JOB=0` and fake `PURCHASE_WEBHOOK` / `REPORT_WEBHOOK`, see `backend/README.md`). Test on real Postgres only via `TEST_DATABASE_URL=...` pointing at a throwaway database (name contains `test`/`tmp`, never the same as `DATABASE_URL`).
 
 ---
 

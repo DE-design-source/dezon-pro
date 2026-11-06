@@ -1,7 +1,12 @@
 # QS Pro backend (Go + Gin) - Kiến trúc và HỢP ĐỒNG VIẾT MODULE
 
-Backend này là bản chuyển 1:1 của `server/` (Node + Express). Mã Node là CHUẨN GỐC: cùng đầu vào thì
-cùng JSON trả về (kể cả thứ tự khoá), cùng thông báo lỗi tiếng Việt, cùng tác động lên database.
+App Node (`server/`, `public/`) đã gỡ khỏi repo ở commit `5fa5d52`: mọi tham chiếu `server/*.js`, `public/*.js` (kể cả số dòng
+kiểu `store_supa.js:535`, `S:29`) trong tài liệu này là tới mã cũ trong lịch sử git (`git show 83d264e:<đường dẫn>`). Số dòng
+chỉ gần đúng ở `83d264e`; một số tên trong mục 11.1 (`HD_MIG`, `DA_MAT`, `khongCoCha_`) không có ở bất kỳ commit nào của repo.
+
+Backend này là bản chuyển 1:1 của `server/` (Node + Express). Lúc chuyển, mã Node là CHUẨN GỐC: cùng đầu vào thì
+cùng JSON trả về (kể cả thứ tự khoá), cùng thông báo lỗi tiếng Việt, cùng tác động lên database. Các hàm đã chuyển vẫn giữ luật này
+qua golden do Node sinh (mục 12.1).
 Giao diện cũ `public/` (đã gỡ khỏi repo cùng app Node) gọi `POST /api/<tênHàm>` với thân `{"args":[...]}`; cổng này giữ nguyên.
 Giao diện React (`frontend/src/pages/QS`) dùng REST `/api/v1` và tải file nhúng trong binary (mục 10.4): hiện dùng 3 file
 `*-spec.js`, `/logo.svg`, `/mau-nhap-hang-loat.xlsx` và `/mau-nhap-cong-tac.xlsx` (nút "Tải file mẫu" ở Nhập dữ liệu > Phần thô, M5.1).
@@ -17,7 +22,7 @@ File `.env` đọc bằng `config.LoadDotenv` - bản chuyển của gói dotenv
 
 ```
 cmd/api/main.go                  điểm khởi chạy server
-cmd/migrate/main.go              chạy migration (bản chuyển của infra/scripts/migrate.js)
+cmd/migrate/main.go              chạy migration - lệnh migrate duy nhất (bản chuyển của infra/scripts/migrate.js cũ, đã gỡ)
 cmd/vapid/main.go                in cặp khoá VAPID (CHAT_VAPID_PUBLIC_KEY / CHAT_VAPID_PRIVATE_KEY) cho Web Push của chat
 internal/config/                 biến môi trường, đọc file .env
 internal/server/server.go        gin engine, khớp route kiểu Express, tắt êm
@@ -57,7 +62,7 @@ tests/e2e/                       test-api-go.js (E2E trên server Go đang chạ
 docs/                            ARCHITECTURE, API, DATABASE, PORTING_MAP (bảng đối chiếu hàm Node -> module Go, bảng làm việc lúc chuyển mã)
 ```
 
-Ngoài `backend/` (thư mục `infra/` ở gốc repo): `infra/db/migrations/` (NNNN_ten.sql, dùng chung với bản Node), `infra/db/schema.sql`,
+Ngoài `backend/` (thư mục `infra/` ở gốc repo): `infra/db/migrations/` (NNNN_ten.sql, nguồn migration duy nhất), `infra/db/schema.sql`,
 `infra/docker/backend.Dockerfile` + `backend.Dockerfile.dockerignore` (BuildKit tự đọc file ignore đặt cạnh Dockerfile).
 
 ## 2. Luật trung thành (bắt buộc)
@@ -1016,7 +1021,7 @@ materials:
   CORS, giới hạn tần suất, Redis mặc định tắt; `CORS_ORIGINS` cũng là danh sách origin được mở WebSocket chat (bỏ scheme).
 - `TRUSTED_PROXIES` mặc định không tin proxy nào: đứng sau reverse proxy mà không đặt thì mọi client chung một giới hạn tần suất.
   Ảnh hưởng: không có khi `RATE_LIMIT_RPS` tắt (mặc định).
-- Đọc `backend/.env` trước rồi mới tới `../.env` của bản Node; `DOTENV=0` trong môi trường thì không đọc file nào (mặc định: đọc cả hai).
+- Đọc `backend/.env` trước rồi mới tới `../.env` ở gốc repo; `DOTENV=0` trong môi trường thì không đọc file nào (mặc định: đọc cả hai).
 - Tắt êm: gateway chat báo `reconnect` + đóng WebSocket (tối đa 5 giây), chờ request đang chạy (tổng tối đa 15 giây), dừng job nền và
   worker push chat, đóng pool database.
 - File nhúng (go:embed) thay cho `public/`: `/vs-spec.js`, `/son-spec.js`, `/ct-spec.js` (module categories phục vụ, nguồn
@@ -1146,7 +1151,9 @@ func NowISO() string              // nowIso() S:29
 
 `throw colErr_(e)` -> `return nil, apperr.ColErr(err)`;
 `if (khongCoCha_(e)) throw new Error(DA_MAT)` -> `if apperr.KhongCoCha(err) { return nil, apperr.New(apperr.DAMat) }`.
-Giá trị mong đợi của test lấy từ mã Node thật: `node internal/shared/errors/testdata/gen.js > internal/shared/errors/testdata/colerr.json`.
+Các thông báo thiếu bảng / cột (`HDMig` và chuỗi tương tự trong module, cả `platform/database/catalog.go`) còn ghi `npm run migrate`,
+lệnh này không còn tồn tại. Lệnh migrate hiện hành là `go run ./cmd/migrate` (từ `backend/`, mục 12.1).
+`colerr.json` được sinh từ mã Node (`gen.js`, đã gỡ cùng app Node); không sinh lại được, không sửa tay (mục 12.1).
 
 ### 11.2 Thứ tự nối trong `internal/server/routes.go`
 
@@ -1266,7 +1273,7 @@ App Node đã gỡ khỏi repo (commit cuối còn Node: `83d264e`): mọi fixtu
 - Nguồn gốc file seed `/tmp/qspro_seed.sql` (trong container `qspro-postgres`) CHƯA RÕ; bản sao bền đã có ở `infra/export/qspro_seed.sql`
   (cùng md5), chưa có script sinh.
 - Job báo cáo tự động (Node `server/index.js:554-594`, Go `internal/jobs`) chưa có bước so vi sai đầu-cuối: chỉ chạy thứ 4 / thứ 7 sau 8h00 và
-  không có cách kích hoạt; cần đồng hồ tiêm vào được ở phía Node. Bộ so vi sai hiện chặn job của Node (mục 10.6).
+  không có cách kích hoạt; cần đồng hồ tiêm vào được ở phía Node. Bộ so vi sai (đã gỡ) từng chặn job của Node (mục 10.6).
 - Nhánh chỉ chạy khi database THIẾU CỘT (`nguoi_tao`, `nguoi_sua`, `nhom_bt`, `da_duyet`, `dung_sp_dezon`, `ui_prefs`, `phong_ban`, `perms`,
   `colErr_` của projects) chưa có bước so vi sai: cần một database dựng không có các migration đó. Nhánh thiếu BẢNG đã có (`area3/08`).
 - Giới hạn chưa chạm tới trong bộ so vi sai: `getProjects` 2000 dòng, `getProjData` 50 khoá mỗi nguồn, đếm user quá 1000 của `adminCreateUser`,
@@ -1288,6 +1295,4 @@ App Node đã gỡ khỏi repo (commit cuối còn Node: `83d264e`): mọi fixtu
   `backend/migrations/`. Bản sao để khôi phục: `C:/demo/qs-unused-backup-2026-10-15/` (`MANIFEST.txt`). Dữ liệu mong đợi đã sinh vẫn trong
   repo nên `go test` không bị ảnh hưởng. Còn giữ: `scripts/gen-specs.js`, `tests/e2e/test-api-go.js` (cần gói `pg`, `bcryptjs` cài riêng,
   xem `backend/README.md`), `tests/fixtures/jsref.js`, `quotations/testdata/gen-case.js`.
-- `docs/README.md` ở gốc repo chưa nhắc tới `backend/` (`README.md` gốc đã có bảng thư mục trỏ tới `backend/README.md`; `render.yaml` đã gỡ
-  cùng app Node; ngoài phạm vi sửa của `backend/`; đề xuất 1 dòng mục lục trong `docs/README.md` trỏ tới `backend/README.md`).
 - `docs/PORTING_MAP.md` vẫn là bảng làm việc tiếng Anh (đã ghi rõ ở đầu file).

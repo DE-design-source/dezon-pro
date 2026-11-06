@@ -22,10 +22,10 @@
 
 Build a private project dictionary. Read on demand, cheapest first, stop when enough:
 1. `CLAUDE.md`, `README*`, `docs/README.md` index, existing `docs/03-san-pham/flows/*` (reuse their codes and style).
-2. Data model: `db/*.sql` (hand-run migrations) and the `*.repository.js` / `san-pham.mapper.js` row mappers.
-3. Roles and permissions: permission lists in `server/components/*/*.routes.js` (`public` / `actor` / `admin` / `super`), `...Gated` functions in `*.service.js`, `users.perms`.
-4. Existing features: `server/components/<domain>/`, the matching tab file in `public/`, existing flows.
-5. Cross-cutting behavior: no realtime; notifications = in-app `notifications` table + Lark webhooks; audit = `server/components/thong-bao/audit.js`; background job = `bao-cao.job.js`.
+2. Data model: `infra/db/schema.sql` (current schema), `infra/db/migrations/*.sql`, `backend/internal/platform/database/db-map.json` (code name <-> DB name), `backend/docs/DATABASE.md`, and the `postgres.go` / `service_format.go` row mappers in `backend/internal/modules/<module>/`.
+3. Roles and permissions: `reg.Register(name, perm, ...)` in each module's `handler.go` `RegisterRPC` (`rpc.Login` / `rpc.Public` / `rpc.Admin` / `rpc.Super`, see `backend/docs/ARCHITECTURE.md` 3.8), `...Gated` functions in the module `service*.go`, `users.perms`.
+4. Existing features: `backend/internal/modules/<module>/`, `backend/docs/API.md`, the matching page / component in `frontend/src/pages/`, existing flows.
+5. Cross-cutting behavior: realtime only in chat (`backend/internal/modules/chat/realtime/`); notifications = in-app `notifications` table (module `notifications`) + Lark webhooks; audit = `Audit` in `backend/internal/modules/users/service.go` (table `audit_logs`); background jobs = `backend/internal/jobs/worker.go`.
 
 Produce internally:
 - **Glossary**: everyday word -> system term (e.g. "thẻ" -> `Card`).

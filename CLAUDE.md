@@ -3,86 +3,94 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 QS Pro (Dezon Pro): web app bóc tách khối lượng / báo giá, nhiều công ty dùng chung (multi-tenant).
-Node.js + Express (CommonJS, không TypeScript, không bundler), dữ liệu trên PostgreSQL qua `DATABASE_URL`;
-file ảnh / tài liệu lưu trên ổ đĩa máy chủ (thư mục `UPLOAD_DIR`, phục vụ ở `/files/...`). Quy tắc chi tiết trong `.claude/rules/` (tự nạp).
-Tên trong code, chú thích, chuỗi giao diện là tiếng Việt: giữ nguyên khi sửa. `export/` chứa dump dữ liệu thật, đã gitignore, không commit.
+Backend Go + Gin (`backend/`, go.mod riêng), giao diện React + Vite (`frontend/`, `siteflow-ui`), dữ liệu trên PostgreSQL qua `DATABASE_URL`;
+file ảnh / tài liệu lưu trên ổ đĩa máy chủ (`UPLOAD_DIR`, phục vụ ở `/files/...`), tệp chat trên MinIO (`CHAT_S3_*`).
+App Node cũ (`server/`, `public/`) đã gỡ khỏi repo (commit cuối còn Node: `83d264e`).
+Tên trong code, chú thích, chuỗi giao diện là tiếng Việt: giữ nguyên khi sửa. `export/` và `infra/export/` chứa dump dữ liệu thật,
+đã gitignore, không commit.
 Sửa thông số theo ngành (`backend/internal/shared/specs/js/*-spec.js`): dùng skill `thiet-bi-ve-sinh`; sửa xong chạy
 `node backend/scripts/gen-specs.js` rồi `go test ./internal/shared/specs ./internal/server` (từ `backend/`).
 
 ## Lệnh
 
 ```bash
+# backend (chạy từ backend/; Go 1.25+, hoặc trong container golang:1.25 - xem backend/README.md)
+go run ./cmd/api                          # http://localhost:3000
+go run ./cmd/migrate --status             # xem migration; bỏ --status = chạy file chưa áp dụng
+go run ./cmd/migrate --url=postgresql://...   # chỉ định database, không đọc .env
+go run ./cmd/vapid                        # sinh cặp khoá VAPID cho Web Push của chat
+go build ./... && go vet ./... && gofmt -l .  # gofmt -l phải in rỗng
+go test -count=1 ./...                    # không có TEST_DATABASE_URL: test cần database tự bỏ qua
+TEST_DATABASE_URL=postgresql://.../qspro_gotest go test -race -count=1 -p 1 ./...   # -p 1 BẮT BUỘC khi có database
+
+# frontend (chạy từ frontend/)
 npm install
-npm start                      # http://localhost:3000 (cần .env có DATABASE_URL)
-npm run dev                    # node --watch
-npm test                       # test-core + check-load + test-vs: hàm thuần, thứ tự nạp script, luồng nhập VS/sơn (DB giả)
-node scripts/test-core.js      # chạy riêng 1 test: gọi thẳng file trong scripts/
-node --check public/<file>.js  # kiểm cú pháp file giao diện vừa sửa
+npm run dev                               # Vite; VITE_API_URL trỏ backend (frontend/.env.development: http://localhost:3000)
+npm run build
 
-TEST_DATABASE_URL=postgresql://.../qspro_test npm run test:db    # tầng dữ liệu trên Postgres THẬT (database tạm)
-TEST_DATABASE_URL=postgresql://.../qspro_test npm run test:api   # server thật + gọi API qua HTTP
-
-npm run migrate                # chạy migration chưa áp dụng trên DATABASE_URL
-node infra/scripts/migrate.js --status
+node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau khi sửa *-spec.js
 ```
 
-- `test:db` / `test:api` từ chối chạy nếu `TEST_DATABASE_URL` trùng `DATABASE_URL` hoặc tên DB không chứa `test`/`tmp`.
-  `test:api` để lại dữ liệu rác, chỉ dùng bản sao bỏ đi được.
-- `.env` ở máy phát triển trỏ tới database THẬT và webhook Lark thật. Không verify bằng cách ghi dữ liệu qua server đang chạy với `.env` đó.
-- Không có linter / build cho phần Node.
+- `backend/` đọc `backend/.env` rồi `../.env`; hai file này ở máy phát triển có thể trỏ database THẬT và webhook Lark thật.
+  Chạy thử luôn đặt `REPORT_JOB=0`, `PURCHASE_WEBHOOK` / `REPORT_WEBHOOK` về địa chỉ giả khác rỗng (vd `http://127.0.0.1:9/x`;
+  rỗng = webhook thật ghi sẵn trong code), hoặc `DOTENV=0` rồi truyền đủ biến. Xem `backend/README.md` mục Cấu hình.
+- `TEST_DATABASE_URL` chỉ trỏ database THỬ (`qspro_gotest`, `qspro_chattest` trong container `qspro-postgres`): test ghi và xoá dữ liệu.
+  Không verify bằng cách ghi dữ liệu qua server đang chạy với `.env` thật.
+- E2E trên server Go đang chạy: `node backend/tests/e2e/test-api-go.js` (cần gói `pg`, `bcryptjs` cài riêng, xem `backend/README.md` mục Kiểm thử).
 
 ## Kiến trúc
 
-**Server (`server/`, file phẳng - KHÔNG có `server/components/`):**
-- `index.js`: toàn bộ route. Cổng nghiệp vụ duy nhất là `POST /api/:fn`: `fn` phải có trong `REGISTRY`,
-  phân quyền bằng các tập `PUBLIC_FNS` / `ACTOR_FNS` / `ADMIN_FNS` / `SUPER_FNS`, rồi handler chạy trong
-  `tenant.run(...)`. Route lẻ (`/export/*`, `/upload/file`, `/media`, file mẫu `.xlsx`) tự gọi `actorOf_` + `tenant.run`.
-  Thêm hàm API: viết hàm trong `store_supa.js` / `auth.js`, đăng ký vào `REGISTRY` + đúng tập quyền. Tên hàm phải duy nhất.
-  Client gửi body `{args:[...]}`; hàm trong `ACTOR_FNS` nhận thêm actor `{uid, u, r, ct, ...}` làm tham số ĐẦU.
-  Phiên: token `Authorization: Bearer`. Super không có công ty, thấy mọi công ty trừ khi gửi header `x-view-company`.
-  Swagger UI ở `/api-docs` (bật khi chạy ở máy, `SWAGGER_DOCS=0/1` để tắt/bật).
-- `store_supa.js`: nghiệp vụ (sản phẩm, dự án, dòng bóc tách, tờ bìa, công tác, mua hàng). `auth.js`: đăng nhập, phiên, tài khoản, công ty, duyệt.
-- `supa.js`: tầng dữ liệu trên `pg` nhưng giữ giao diện kiểu PostgREST (`select/insert/update/remove` + chuỗi lọc PostgREST như `ma_du_an=eq.X`).
-  Nó dịch tên bảng/cột **tiếng Việt trong code -> tiếng Anh trong DB** theo `db-map.json`, và **tự lọc theo công ty**
-  với bảng trong `TENANT_TABLES` (ngữ cảnh lấy từ `tenant.js` - AsyncLocalStorage). Bảng mới theo công ty PHẢI thêm vào
-  `TENANT_TABLES`, nếu không dữ liệu lộ sang công ty khác. `noScope` bỏ lọc, chỉ dùng cho truy cập xuyên công ty thật sự (đăng nhập, phiên).
-- Sản phẩm (`db_san_pham` trong code) = bảng lõi `products` + 5 bảng thông số theo ngành (đèn, vệ sinh, sơn, công tắc, điện lạnh), đọc qua view `product_catalog`.
-  Thêm cột thông số phải tạo lại view (docs/02-ky-thuat/database/ket-qua-trien-khai.md mục 7).
-- `shared.js`: hàm thuần dùng chung (mẫu tờ bìa, đọc số VN, đọc file nhập). `export.js`: xuất Excel (ExcelJS).
-  `*-template.js`: sinh file mẫu nhập hàng loạt theo ngành.
+**Backend (`backend/`, chi tiết: `backend/docs/ARCHITECTURE.md`, `API.md`, `DATABASE.md`):**
+- `cmd/api` (server), `cmd/migrate` (migration), `cmd/vapid`. `internal/config` (biến môi trường, đọc `.env`).
+- `internal/server/routes.go`: NƠI DUY NHẤT nối các module (khối "MODULE WIRING"). `internal/server/rest.go`: bảng `RestRoutes` /
+  `RootRoutes`. `internal/server/rpc/`: cổng tương thích `POST /api/:fn` (body `{args:[...]}`) + Registry với quyền
+  `Login` / `Public` / `Admin` / `Super` / `SelfAuth`.
+- `internal/modules/<module>/`: nghiệp vụ, mỗi module 1 gói (`service.go`, `repository.go`, `postgres.go`, `dto.go`, `handler.go`, `*_test.go`).
+  Module không import gói module khác (ngoại lệ: gói dữ liệu thuần `categories`): gọi chéo qua interface trong `internal/shared/contracts`, nối trong `routes.go`.
+- Tính năng mới là route REST "chỉ bản Go" dưới `/api/v1` (`reg.RegisterGoRoute` + gắn route gin cùng middleware quyền, `backend/docs/API.md` mục 2.1).
+  KHÔNG thêm hàm `/api/:fn`, không thêm dòng vào `RestRoutes` / `RootRoutes`, không sửa tay fixture / golden do Node sinh
+  (`backend/docs/ARCHITECTURE.md` mục 12.1).
+- `internal/middleware/` (auth, tenant, rbac, cors, rate limit, body). Phiên: token `Authorization: Bearer`, lưu phía máy chủ (`user_sessions`).
+  Super không có công ty, thấy mọi công ty trừ khi gửi header `x-view-company`.
+- `internal/platform/database/`: tầng dữ liệu duy nhất (`Select` / `Insert` / `Update` / `Remove` + chuỗi lọc PostgREST như `ma_du_an=eq.X`,
+  `Tx` cho transaction). Dịch tên bảng/cột **tiếng Việt trong code -> tiếng Anh trong DB** theo `db-map.json` (bản duy nhất, nhúng go:embed),
+  và **tự lọc theo công ty** với bảng trong `TenantTables` (`postgres.go`). Bảng mới theo công ty PHẢI thêm vào `TenantTables`,
+  nếu không dữ liệu lộ sang công ty khác. `NoScope` bỏ lọc, chỉ dùng cho truy cập xuyên công ty thật sự (đăng nhập, phiên).
+  Ngoại lệ có chủ ý: module `chat` viết SQL thô qua `DB.Pool()` (bảng `chat_*` không thuộc công ty).
+- `internal/platform/` còn có `storage` (kho file `UPLOAD_DIR`), `objstore` (MinIO), `webpush`, `mailer`, `redis`, `logger`.
+  `internal/shared/` (omap, jsval, tenant, actor, response, errors, validator, contracts, qscore, specs, httpx). `internal/jobs/` (job nền).
+- Sản phẩm (`db_san_pham` trong code) = bảng lõi `products` + bảng thông số theo ngành `product_*_specs`, đọc qua view `product_catalog`.
+  Thêm cột thông số phải tạo lại view trong cùng migration.
+- File nhúng go:embed phục vụ ở gốc: `/vs-spec.js`, `/son-spec.js`, `/ct-spec.js`, `/dl-spec.js`, `/logo.svg`, `/mau-nhap-hang-loat.xlsx`, `/mau-nhap-cong-tac.xlsx`.
+- Swagger UI ở `/api-docs` (`SWAGGER_DOCS=0/1`; `NODE_ENV=production` thì mặc định tắt).
 
-**Giao diện (`public/`):** script thuần dùng chung biến toàn cục, nạp theo thứ tự thẻ `<script>` trong `index.html`:
-`app.js` (lõi: object trạng thái `S`, `api()`, quyền, công thức giá, cây hạng mục `TREE`) -> mỗi tab 1 file -> `main.js` cuối cùng.
-Code chạy ngay lúc nạp chỉ được gọi file nạp trước (`scripts/check-load.js` kiểm). Hàm dùng từ 2 tab trở lên đặt ở `app.js`.
-`*-spec.js` (vs, son, ct, dl) là UMD, dùng cả client lẫn server.
+**Giao diện (`frontend/src/`):** `App.jsx`, `main.jsx`, `pages/<Trang>/` (QS, Chat, DuAn, MuaHang, ChamCong, ...), `components/` (layout, ui, hr, kanban),
+`services/`, `context/`. QS Pro ở `pages/QS/`: `api/` (gọi REST `/api/v1`, `http.js`), `lib/` (hàm thuần: `calc.js`, `format.js`, `tree.js`...),
+`state/`, `session/`, `components/`.
 
 **Bất biến dễ vỡ:**
-- Công thức giá 1 dòng có 2 bản: server `calc_()` (store_supa.js) và client `recalcLine_()` / `giaDaiLy_()` / `donGiaCK_()`. Sửa bên này phải sửa bên kia.
-- Đọc số người dùng gõ bằng `tkNum_()` (client) / `toNumber_()` (server), hai hàm phải cho cùng kết quả (test-core kiểm).
-- Chèn dữ liệu vào `onclick` bằng `escJs_()`, vào `href` bằng `safeUrl_()`.
-- Đổi dự án chỉ qua `openProject_()`. Mã tờ bìa = mã cây hạng mục `TREE`.
-- `scripts/test-core.js` trích hàm client bằng regex: hàm đó phải là `function tên(` ở cấp cao nhất.
+- Công thức giá 1 dòng có 2 bản: server `calc` (`backend/internal/modules/takeoff/service.go`) và client `recalcLine_()` / `giaDaiLy_()` /
+  `donGiaCK_()` (`frontend/src/pages/QS/lib/calc.js`). Sửa bên này phải sửa bên kia.
+- Đọc số người dùng gõ: client `tkNum_()` (`frontend/src/pages/QS/lib/format.js`), server `qscore.ToNumber`; hai hàm phải cho cùng kết quả.
+- Mã tờ bìa = mã cây hạng mục `TREE` (`frontend/src/pages/QS/lib/tree.js`).
+- Backend giữ hành vi của bản Node: JSON ra client qua `response` / `omap` (giữ thứ tự khoá, không dùng `c.JSON`), ép kiểu qua `jsval`,
+  thông báo lỗi tiếng Việt giữ nguyên (`backend/docs/ARCHITECTURE.md` mục 2).
 
 ## Database / migration
 
-- Hạ tầng gom ở `infra/`: `infra/db/` (migration, `schema.sql`, `baseline.sql`), `infra/docker/` (Dockerfile bản Go),
-  `infra/scripts/` (migrate, sao lưu / khôi phục database + kho file). `render.yaml` giữ ở gốc vì Render đọc Blueprint ở gốc.
+- Hạ tầng gom ở `infra/`: `infra/db/` (migration, `schema.sql`, `baseline.sql`), `infra/docker/` (Dockerfile backend / frontend / minio),
+  `infra/deploy/` (triển khai VPS), `infra/scripts/` (sao lưu / khôi phục database + kho file, `create-super.sh`, seed demo).
 - Thêm cột / bảng: file mới `infra/db/migrations/NNNN_ten.sql` (không sửa file đã chạy, migrate kiểm checksum)
-  -> `go run ./cmd/migrate` (từ `backend/`) -> sinh lại `infra/db/schema.sql` -> thêm cặp `"ten_trong_code": "name_in_db"` vào
-  `backend/internal/platform/database/db-map.json` (bản duy nhất; bản Node `server/db-map.json` đã gỡ).
+  -> `go run ./cmd/migrate --url=<database>` (từ `backend/`) -> sinh lại `infra/db/schema.sql` (bản `pg_dump`) -> thêm cặp
+  `"ten_trong_code": "name_in_db"` vào `backend/internal/platform/database/db-map.json` -> bảng theo công ty thêm vào `TenantTables`.
+- Server Go KHÔNG tự migrate: migrate trước rồi mới khởi động bản mới; server đang chạy phải khởi động lại để nạp lại danh mục cột.
 - Bảng con không có `company_id`: công ty lấy qua bảng cha (khoá `tenant` trong `db-map.json`).
 - Quy tắc thiết kế bảng: `docs/02-ky-thuat/database/database-rules.md`. Schema đang chạy: `docs/02-ky-thuat/database/schema-hien-hanh.md`.
 
-## Thư mục khác
+## Deploy
 
-- `backend/`: bản chuyển server sang Go + Gin, chạy độc lập, dùng lại `public/`. Có README và `backend/docs/ARCHITECTURE.md` riêng;
-  chạy từ `backend/` (`go run ./cmd/api`, `go test -count=1 -p 1 ./...`). Nó kế thừa `../.env` - khi chạy thử phải đặt
-  `REPORT_JOB=0`, `PURCHASE_WEBHOOK`/`REPORT_WEBHOOK` về địa chỉ giả (xem backend/README.md).
-- `frontend/`: app React + Vite riêng (`siteflow-ui`), không được server Node phục vụ.
-- Deploy: Render (`render.yaml`, vẫn là bản Node), tự deploy khi push `main`.
+- Production: VPS CloudFly, https://dezon.tech. Docker Compose ở `infra/deploy/` (`docker-compose.yml`, `Caddyfile`, `.env` từ `.env.example`).
+- Máy chủ mới: `bash infra/deploy/setup-server.sh` (1 lần). Cập nhật: `bash infra/deploy/deploy.sh` (git pull + build + sao lưu database +
+  migration + khởi động lại) hoặc `--no-pull`. Hướng dẫn đầy đủ: `docs/04-van-hanh/trien-khai-vps-cloudfly.md`.
 
-## Lưu ý về nhánh
-
-`.claude/rules/` mô tả layout của nhánh `ed_data` (server phẳng, PostgreSQL). Nhánh `refactor/Dung` đã tách server thành
-`server/components/<domain>/` + `server/libraries/`; khi gộp hai nhánh phải sửa lại `folder-structure.md`, `naming-conventions.md` và mục Server ở trên.
 Roadmap: `docs/03-san-pham/roadmap.md` (cập nhật theo `roadmap-sync.md`).

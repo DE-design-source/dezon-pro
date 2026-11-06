@@ -75,7 +75,7 @@ lỗi trả về giữ nguyên, nhưng phần đã ghi của thao tác được 
   Hai lời gọi `setBienThe` / `setCombo` cùng lúc gặp deadlock: 1 bên lưu, bên kia nhận lỗi "Có người khác đang sửa cùng các sản phẩm này..."
   (không thay đổi gì, máy chủ không tự chạy lại).
 
-### Quyền của từng hàm (theo `server/index.js`)
+### Quyền của từng hàm (giữ như `server/index.js` của app Node cũ, đóng băng trong `tests/fixtures/registry.json`)
 
 - Không cần đăng nhập: `login`.
 - Chỉ super: `listCongTy`, `createCongTy`, `deleteCongTy`, `listCongTyUsers`, `createCongTyUser`, `baoCaoNhapSP`.

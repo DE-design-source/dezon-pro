@@ -4,7 +4,7 @@
 
 > Sinh từ catalog `qspro_en` ngày 2026-10-12 (kiểu, NULL, mặc định, ràng buộc, chú thích cột trong DB) + chú giải từ truy vết code.
 > Cột "Ý nghĩa" lấy nguyên văn `COMMENT ON COLUMN` trong database (tiếng Anh, viết khi đổi tên 2026-10-07; 39 cột Công tắc - Ổ cắm chỉ ghi tên cũ).
-> Cột "Tên trong code" là khoá mà `server/*.js` dùng; API trả về client bằng khoá camelCase riêng (xem [database-dependencies.md](database-dependencies.md)).
+> Cột "Tên trong code" là khoá mà backend Go dùng khi gọi lớp dữ liệu (`backend/internal/platform/database`, dịch sang tên database theo `db-map.json`); API trả về client bằng khoá camelCase riêng (xem [database-dependencies.md](database-dependencies.md)).
 > Đây là từ điển của schema HIỆN TẠI. Thay đổi đề xuất ghi ở cột "Phân loại / ghi chú" và ở [proposed-schema.md](proposed-schema.md).
 
 **Phân loại dư thừa:** A = dữ liệu gốc, B = snapshot tại thời điểm, C = dẫn xuất / tổng lưu sẵn, D = dư thừa không có lý do. Cột không ghi gì = A.
@@ -1336,7 +1336,7 @@ Dòng của phiếu đề xuất — ĐA HÌNH: dòng sản phẩm (ck) hoặc �
 
 ## Cấu trúc JSON trong `project_data_entries.data_value`
 
-Khoá hợp lệ do server kiểm (`PROJ_DATA_KEYS`, store_supa.js:1117). Mỗi lần ghi thay toàn bộ giá trị. Số dòng thực tế ngày 2026-10-12 trong ngoặc.
+Khoá hợp lệ do server kiểm (`projDataKeys` trong `backend/internal/modules/projects/model.go`). Mỗi lần ghi thay toàn bộ giá trị. Số dòng thực tế ngày 2026-10-12 trong ngoặc.
 
 | Khoá | Phạm vi | Kiểu | Cấu trúc | Quan hệ ngầm |
 |---|---|---|---|---|
@@ -1351,5 +1351,5 @@ Khoá hợp lệ do server kiểm (`PROJ_DATA_KEYS`, store_supa.js:1117). Mỗi 
 | `ptInfo` (0) | CÔNG TY (`__cty:<id>`) | object | Khoá = tên công tác viết thường; `{model, anh, ts, gc, pv, tl}` | Chồng lấn với cột của `work_items` |
 | `bgOrg` (0) | CÔNG TY | object | `{ten, logo, diaChi, sdt, email, web, xuong}` | Hồ sơ công ty in trên báo giá |
 
-`users.ui_preferences`: khoá cho phép `tkCols, cpCols, daCols, spCols` (auth.js:270-279); dữ liệu thực có thêm khoá cũ `tkColSets`.
+`users.ui_preferences`: khoá cho phép `tkCols, cpCols, daCols, spCols, tkPresets, tkQuick, tkOrder, tkLastCols, bgBiaMau` (`prefKeys` trong `backend/internal/modules/auth/model.go`); dữ liệu thực ngày 2026-10-12 có thêm khoá cũ `tkColSets`.
 

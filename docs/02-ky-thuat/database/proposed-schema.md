@@ -1,6 +1,8 @@
 # Schema đề xuất
 
 > **Cập nhật 2026-10-12:** đề xuất này ĐÃ được triển khai trên database local `qspro_en2`, có điều chỉnh. Cấu trúc đang chạy: [schema-hien-hanh.md](schema-hien-hanh.md). Những gì đã làm và khác gì so với bản dưới đây: [ket-qua-trien-khai.md](ket-qua-trien-khai.md). Nội dung bên dưới là bản đề xuất gốc, giữ lại để tra lý do.
+>
+> **Ghi chú 2026-11-06:** viết khi còn app Node (đã gỡ ở commit `5fa5d52`); đường dẫn `server/*.js`, `public/*.js`, `render.yaml` và lệnh `npm ...` trong tài liệu này là mã / cách làm cũ. Hiện nay: migration chạy bằng `go run ./cmd/migrate` (trong `backend/`), `db-map.json` duy nhất ở `backend/internal/platform/database/db-map.json`, bảng tự lọc công ty khai trong `TenantTables` (`backend/internal/platform/database/postgres.go`).
 
 - Trạng thái: **ĐỀ XUẤT - chờ duyệt** (2026-10-12). Chưa có gì được tạo trong database.
 - Điểm xuất phát: schema hiện tại của `qspro_en` (xem [audit-catalog.md](audit-catalog.md)). Tài liệu này chỉ mô tả **phần thay đổi**; mọi bảng, cột không nhắc tới giữ nguyên.

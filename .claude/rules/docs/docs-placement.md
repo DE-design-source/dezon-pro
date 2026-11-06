@@ -67,7 +67,7 @@ Những file `.md` sau **giữ nguyên vị trí**, tuyệt đối không di chu
 - File `.md` mà một tool/framework yêu cầu ở path cố định (vd docs site generator).
 - `backend/README.md` và `backend/docs/*.md` — tài liệu riêng của bản Go, đặt cạnh code (như README của package/module).
 - Migration / schema `.sql` (`infra/db/migrations/`, `infra/db/schema.sql`, `infra/db/baseline.sql`) và file
-  `.xlsx` (`public/mau-nhap-hang-loat.xlsx`, `db/bao-gia-phan-tho.xlsx`) không phải tài liệu — giữ nguyên chỗ.
+  `.xlsx` (`backend/internal/modules/categories/assets/mau-nhap-hang-loat.xlsx`) không phải tài liệu — giữ nguyên chỗ.
 
 > Nghi ngờ 1 file có phải instruction/convention-fixed không → **giữ nguyên chỗ cũ + hỏi user**,
 > không tự chuyển.

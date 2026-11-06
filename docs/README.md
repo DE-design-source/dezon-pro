@@ -4,7 +4,8 @@ Mục lục mọi tài liệu trong `docs/`. Cập nhật file này mỗi khi th
 
 ## 02-ky-thuat / database
 
-Bộ tài liệu audit và tái thiết kế database (2026-10-12). Refactor **đã triển khai trên database local `qspro_en2`**; production chưa chuyển. Đọc hai tài liệu đầu bảng trước.
+Bộ tài liệu audit và tái thiết kế database (2026-10-12). Refactor **đã triển khai trên database local `qspro_en2`**; 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (backend Go, https://dezon.tech - xem roadmap N2). Đọc hai tài liệu đầu bảng trước.
+Các tài liệu loại "Mốc audit" / "Đề xuất gốc" viết khi còn app Node (đã gỡ ở commit `5fa5d52`): đường dẫn `server/*.js`, `public/*.js` trong đó là mã cũ; bản đang chạy là backend Go (`backend/`) + giao diện React (`frontend/`).
 
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
