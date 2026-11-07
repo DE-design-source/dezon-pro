@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import Pop, { PopHead } from '../breakdown/sheet/Pop'
 import Icon from '../../../../components/ui/Icon'
 import { DezonChip } from '../project/PCard'
@@ -18,7 +18,6 @@ export const BAR_COLS = [
   { key: 'kh', label: 'Khách hàng', def: 200, min: 90 },
   { key: 'pt', label: 'Phụ trách', def: 150, min: 90 },
   { key: 'src', label: 'Nguồn', def: 120, min: 80 },
-  { key: 'st', label: 'Trạng thái', def: 130, min: 80 },
   { key: 'val', label: 'Giá trị báo giá', def: 170, min: 110 },
   { key: 'date', label: 'Ngày tạo', def: 110, min: 80 },
   { key: 'n', label: 'Bản nháp', def: 90, min: 70 },
@@ -47,15 +46,18 @@ export function BarHeader({ widths, onResize }) {
     <div className="qs-dash-row-main qs-dash-bar-head" role="row">
       <span className="qs-dash-bar-sp" />
       {BAR_COLS.map(c => (
-        <span key={c.key} className={'qs-dash-bar-th c-' + c.key} role="columnheader">
-          {c.label}
-          <span className="qs-dash-bar-rz" title="Kéo để đổi độ rộng cột · nhấp đúp: mặc định"
-            onPointerDown={e => down(e, c)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-            onDoubleClick={() => onResize(c.key, c.def)} />
-        </span>
+        <Fragment key={c.key}>
+          <span className={'qs-dash-bar-th c-' + c.key} role="columnheader">
+            {c.label}
+            <span className="qs-dash-bar-rz" title="Kéo để đổi độ rộng cột · nhấp đúp: mặc định"
+              onPointerDown={e => down(e, c)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+              onDoubleClick={() => onResize(c.key, c.def)} />
+          </span>
+          {/* cột Thao tác đứng ngay sau Nguồn (chỗ cột Trạng thái cũ) */}
+          {c.key === 'src' && <span className="qs-dash-bar-th c-acts" role="columnheader">Thao tác</span>}
+        </Fragment>
       ))}
       <span className="qs-dash-bar-th" role="columnheader">Nhà cung cấp</span>
-      <span className="qs-dash-bar-th c-acts" role="columnheader">Thao tác</span>
     </div>
   )
 }
@@ -107,14 +109,15 @@ export function PtCell({ ds, users, canEdit, onChange }) {
   )
 }
 
+const NCC_MAX = 3   // số nhà cung cấp hiện đủ chữ ở cột Nhà cung cấp; dư thì nút +N mở rộng
 export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt }) {
   const key = g.drafts[0].maDA
   const hasCur = g.drafts.some(d => d.maDA === curMa)
   const [open, setOpen] = useState(hasCur)
   const last = g.drafts[g.drafts.length - 1]
-  const tt = last.trangThai || 'Bản nháp'
   const stop = e => e.stopPropagation()
   const ncc = (st && st.ncc) || []
+  const [nccAll, setNccAll] = useState(false)   // hiện đủ nhà cung cấp (mặc định NCC_MAX ô đầu + nút +N)
   return (
     <div className={`qs-dash-row${hasCur ? ' cur' : ''}${open ? ' open' : ''}`}>
       <div className="qs-dash-row-main" onClick={() => setOpen(o => !o)} title={open ? 'Thu gọn bản nháp' : 'Xem các bản nháp'}>
@@ -130,19 +133,7 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
         </div>
         <PtCell ds={pt || []} users={users || []} canEdit={!!canEditPt} onChange={onPt || (() => {})} />
         <div className="qs-dash-row-st">{kd != null && <span className={'qs-dash-src-pill ' + (kd ? 'kd' : 'qs')}>{kd ? 'Kinh doanh' : 'Phòng QS'}</span>}</div>
-        <div className="qs-dash-row-st">
-          {hasCur ? <span className="qs-dash-using"><Icon name="check" size={13} stroke={2.4} />Đang dùng</span>
-            : <span className={'qs-dash-tt' + (tt === 'Hoàn thành' ? ' done' : tt === 'Đang thực hiện' ? ' run' : '')}>{tt}</span>}
-        </div>
-        <div className="qs-dash-row-2 qs-dash-row-val" title={hasCur ? 'Bản nháp đang dùng' : 'Bản nháp mới nhất'}>
-          {st ? (st.n ? <><b>{money(st.tong)} đ</b><small>{st.n} dòng sản phẩm</small></> : <span className="nil">Chưa có báo giá</span>) : <span className="nil">Đang đếm…</span>}
-        </div>
-        <span className="qs-dash-row-date" title="Ngày tạo bản nháp mới nhất">{fmtDate(last.ngayTao)}</span>
-        <div className="qs-dash-row-n"><span className="qs-dash-count">{g.drafts.length} bản</span></div>
-        <div className="qs-dash-row-ncc" title={ncc.join(', ')}>
-          {ncc.slice(0, 4).map(n => <span key={n}>{n}</span>)}
-          {ncc.length > 4 && <em>+{ncc.length - 4}</em>}
-        </div>
+        {/* cột Thao tác ngay sau Nguồn (bỏ cột Trạng thái; bản đang dùng vẫn hiện "Đang dùng" ở dòng bản nháp) */}
         <div className="qs-dash-row-acts">
           {hasCur ? <span className="qs-dash-row-open ph" aria-hidden="true">Mở</span>  /* giữ chỗ để nút link / xoá thẳng cột */
             : <button type="button" className="qs-dash-row-open" title="Mở bản nháp mới nhất ở Bóc tách" onClick={e => { stop(e); pickProject(last.maDA) }}>Mở</button>}
@@ -151,12 +142,32 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
             <Icon name="trash" size={13} />
           </button>
         </div>
+        <div className="qs-dash-row-2 qs-dash-row-val" title={hasCur ? 'Bản nháp đang dùng' : 'Bản nháp mới nhất'}>
+          {st ? (st.n ? <><b>{money(st.tong)} đ</b><small>{st.n} dòng sản phẩm</small></> : <span className="nil">Chưa có báo giá</span>) : <span className="nil">Đang đếm…</span>}
+        </div>
+        <span className="qs-dash-row-date" title="Ngày tạo bản nháp mới nhất">{fmtDate(last.ngayTao)}</span>
+        <div className="qs-dash-row-n"><span className="qs-dash-count">{g.drafts.length} bản</span></div>
+        <div className={'qs-dash-row-ncc' + (nccAll ? ' all' : '')} title={ncc.join(', ')}>
+          {ncc.slice(0, nccAll ? ncc.length : NCC_MAX).map(n => <span key={n}>{n}</span>)}
+          {ncc.length > NCC_MAX && (
+            <button type="button" className="more" onClick={e => { stop(e); setNccAll(v => !v) }}
+              title={nccAll ? 'Thu gọn nhà cung cấp' : 'Xem thêm ' + (ncc.length - NCC_MAX) + ' nhà cung cấp'}>
+              {nccAll ? '−' : '+' + (ncc.length - NCC_MAX)}
+            </button>
+          )}
+        </div>
       </div>
       {open && (
         <div className="qs-dash-project-body qs-dash-row-body">
           {/* bọc từng bản nháp để vẽ đường nối cây cha - con từ biểu tượng dự án xuống từng bản nháp (.qs-dash-tree-i) */}
           {g.drafts.map((d, i) => <div key={d.maDA} className="qs-dash-tree-i"><DraftItem draft={d} index={i} active={d.maDA === curMa} /></div>)}
-          <button type="button" className="qs-dash-add-draft" onClick={() => addDraft(key)}><Icon name="plus" size={14} />Thêm bản nháp</button>
+          {/* "Thêm bản nháp" là 1 nhánh cuối của cây, đồng cấp với các bản nháp: biểu tượng (+) thay biểu tượng tệp */}
+          <div className="qs-dash-tree-i">
+            <button type="button" className="qs-dash-draft qs-dash-add-row" onClick={() => addDraft(key)}>
+              <span className="qs-dash-draft-icon"><Icon name="plus" size={15} stroke={2.4} /></span>
+              <span className="qs-dash-draft-name">Thêm bản nháp</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

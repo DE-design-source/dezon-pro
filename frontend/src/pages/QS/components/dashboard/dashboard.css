@@ -72,7 +72,7 @@ a.qs-dash-link{text-decoration:none;}
 /* Dạng thanh: bảng cột (độ rộng kéo đổi được qua --w-*, ProjectList), bấm dòng mở các bản nháp.
    Cột: mở/thu | biểu tượng | Dự án | Khách hàng | Nguồn | Trạng thái | Giá trị | Ngày tạo | Bản nháp | Nhà cung cấp (giãn) | Mở + link + xoá */
 .qs-dash-rows{display:flex; flex-direction:column; min-width:max-content; padding:0 8px 10px;
-  --bar-cols:22px 32px var(--w-name, 280px) var(--w-kh, 200px) var(--w-pt, 150px) var(--w-src, 120px) var(--w-st, 130px) var(--w-val, 170px) var(--w-date, 110px) var(--w-n, 90px) minmax(180px, 1fr) 150px;
+  --bar-cols:22px 32px var(--w-name, 280px) var(--w-kh, 200px) var(--w-pt, 150px) var(--w-src, 120px) 150px var(--w-val, 170px) var(--w-date, 110px) var(--w-n, 90px) minmax(180px, 1fr);
   --bar-h:56px; --bar-py:8px;}
 .qs-dash-rows.d-compact{--bar-h:42px; --bar-py:4px;}
 .qs-dash-rows.d-wide{--bar-h:72px; --bar-py:14px;}
@@ -470,3 +470,62 @@ html[data-theme="dark"] .qs-sm-more.warn{border-color:#7A2E28; background:#3A1A1
 .qs-dash-ptpop .ds .t b{font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .qs-dash-ptpop .ds .t i{font-style:normal; font-size:11px; color:var(--text-muted);}
 .qs-dash-ptpop .ds p{margin:8px; font-size:12px; color:var(--text-muted);}
+
+/* Cỡ chữ Bảng điều khiển theo bản đánh dấu MarkUp 2026-11-07: 3 bậc cố định, đặt cuối để thắng thang --t-* ở trên.
+   Tiêu đề module 13.5 đậm · chữ chính (nhãn, số, ô bảng, nút lọc) 13 · chữ phụ (phạm vi lọc, số đếm, mã · ngày, SĐT) 11 */
+.qs-scroll-home .qs-sm-h h3, .qs-scroll-home .qs-dash-title, .qs-scroll-home .qs-dash-list-head .qs-dash-title{font-size:13.5px; font-weight:700;}
+.qs-scroll-home .qs-sm-sub, .qs-scroll-home .qs-dash-count, .qs-scroll-home .qs-dash-list-head .qs-dash-count,
+.qs-scroll-home .qs-dash-row-2 > small, .qs-scroll-home .qs-dash-draft-meta{font-size:11px;}
+.qs-scroll-home .qs-sm-chip, .qs-scroll-home .qs-sm-cap, .qs-scroll-home .qs-sm-barl,
+.qs-scroll-home .qs-sm-rows dt, .qs-scroll-home .qs-sm-rows dt em, .qs-scroll-home .qs-sm-rows dd b,
+.qs-scroll-home .qs-sm-g .nm, .qs-scroll-home .qs-sm-g .t b, .qs-scroll-home .qs-dash-quick-item,
+.qs-scroll-home .qs-dash-src .qs-dash-view, .qs-scroll-home .qs-dash-dens .qs-dash-view,
+.qs-scroll-home .qs-dash-tmod .qs-dash-time-btn, .qs-scroll-home .qs-dash-tmod .qs-dash-view,
+.qs-scroll-home .qs-dash-list-head .qs-dash-search input, .qs-scroll-home .qs-dash-list-head .qs-dash-create,
+.qs-scroll-home .qs-dash-bar-th, .qs-scroll-home .qs-dash-row-2 .qs-dash-project-name,
+.qs-scroll-home .qs-dash-row-2 > span, .qs-scroll-home .qs-dash-row-2 > b,
+.qs-scroll-home .qs-dash-row-pt .nm, .qs-scroll-home .qs-dash-row-pt .nil,
+.qs-scroll-home .qs-dash-src-pill, .qs-scroll-home .qs-dash-tt, .qs-scroll-home .qs-dash-using,
+.qs-scroll-home .qs-dash-row-date, .qs-scroll-home .qs-dash-row-main .qs-dash-count,
+.qs-scroll-home .qs-dash-draft-name, .qs-scroll-home .qs-dash-add-draft{font-size:13px;}
+/* Hàng tiêu đề cột Danh sách dự án (MarkUp 2026-11-07 10:06): cao 76 (bớt ~20% từ 96), nền xám nhạt, giữ nền khi rê chuột */
+.qs-scroll-home .qs-dash-row-main.qs-dash-bar-head, .qs-scroll-home .qs-dash-row-main.qs-dash-bar-head:hover{min-height:76px; background:var(--surface-alt);}
+/* nền xám tràn qua lề 8px của .qs-dash-rows (không còn dải trắng 2 bên); đệm 10 + 8 giữ cột thẳng với các dòng dự án */
+.qs-scroll-home .qs-dash-row-main.qs-dash-bar-head{margin:0 -8px; padding-left:18px; padding-right:18px;}
+/* Nhãn cột Nguồn / Trạng thái nhỏ 1 bậc (13 -> 12); "Phòng QS" xanh dương như thanh nhóm lớn nhất, "Bản nháp" xanh lá như thanh Lợi nhuận (MarkUp 10:10) */
+.qs-scroll-home .qs-dash-row-main .qs-dash-src-pill, .qs-scroll-home .qs-dash-row-main .qs-dash-tt,
+.qs-scroll-home .qs-dash-row-main .qs-dash-row-ncc span, .qs-scroll-home .qs-dash-row-main .qs-dash-row-ncc em{font-size:12px;}
+.qs-scroll-home .qs-dash-src-pill.qs{color:var(--dash-bar-2); background:color-mix(in srgb, var(--dash-bar-2) 12%, transparent);}
+.qs-scroll-home .qs-dash-tt:not(.done):not(.run){color:var(--dash-profit); background:var(--dash-profit-tint);}
+/* Cột Nhà cung cấp: tối đa 3 ô hiện đủ chữ (không cắt "…"), nút +N mở rộng hiện hết (xuống dòng), "−" thu lại (MarkUp 10:14) */
+.qs-dash-row-ncc span{max-width:none; overflow:visible; text-overflow:clip;}
+.qs-dash-row-ncc.all{flex-wrap:wrap; row-gap:4px; overflow:visible;}
+.qs-dash-row-ncc .more{flex:none; min-width:26px; height:22px; padding:0 7px; border:1px dashed var(--dash-accent); border-radius:5px; background:none; color:var(--dash-accent); font:inherit; font-size:12px; font-weight:700; line-height:1; cursor:pointer;}
+.qs-dash-row-ncc .more:hover{background:var(--dash-accent-tint); border-style:solid;}
+/* "Thêm bản nháp" (Dạng thanh): nhánh cuối của cây, canh trái như 1 bản nháp, biểu tượng (+) viền chấm màu nhấn (MarkUp 10:19) */
+.qs-dash-add-row{width:100%; min-height:44px; margin:0; font:inherit; color:var(--dash-accent); text-align:left; cursor:pointer;}
+.qs-dash-add-row .qs-dash-draft-icon{border:1.5px dashed var(--dash-accent); background:none; color:var(--dash-accent); box-sizing:border-box;}
+.qs-dash-add-row:hover .qs-dash-draft-icon{border-style:solid; background:var(--dash-accent-tint);}
+.qs-scroll-home .qs-dash-draft.qs-dash-add-row .qs-dash-draft-name, .qs-dash-draft.qs-dash-add-row .qs-dash-draft-name{color:var(--dash-accent); font-weight:600; font-style:normal;}
+/* Bỏ cột Trạng thái, cột Thao tác (150) đứng ngay sau Nguồn (MarkUp 10:25). Nút Dùng / sửa / xoá của bản nháp nằm thẳng dưới cột này:
+   mép trái cột tính từ mép dòng = 10 đệm + 22 + 12 + 32 + 12 + (Dự án + 12) + (Khách hàng + 12) + (Phụ trách + 12) + (Nguồn + 12) = 136 + 4 cột;
+   bản nháp bắt đầu ở 78 (đệm thân 50 + nhánh cây 28) -> left = 58 + 4 cột. Chữ bản nháp dừng trước cột đó 12px. */
+@media (min-width:901px){
+  .qs-dash-rows .qs-dash-row-body .qs-dash-draft-acts{position:absolute; top:0; bottom:0; width:150px; justify-content:center;
+    left:calc(58px + var(--w-name, 280px) + var(--w-kh, 200px) + var(--w-pt, 150px) + var(--w-src, 120px));}
+  /* nhóm nút sửa tên / nhân bản / xoá trong cột Khách hàng, canh trái thẳng mép chữ tên khách (MarkUp 10:38, 10:42): mép trái cột = 10 + 22 + 12 + 32 + 12 + Dự án + 12
+     = 100 + Dự án tính từ mép dòng, trừ 78 của bản nháp -> left = 22 + Dự án. Chữ bản nháp (bắt đầu ở 54) dừng trước cột đó 12px. */
+  .qs-dash-rows .qs-dash-row-body .qs-dash-draft-tools{position:absolute; top:0; bottom:0; left:calc(22px + var(--w-name, 280px)); width:var(--w-kh, 200px); justify-content:flex-start;}
+  .qs-dash-rows .qs-dash-row-body .qs-dash-draft-txt{max-width:calc(var(--w-name, 280px) - 44px);}
+}
+.qs-dash-list-head .qs-dash-create{flex:none; white-space:nowrap;}/* Bản nháp: chữ co theo nội dung, nhóm nút sửa tên / nhân bản / xoá ngay sau chữ (hiện khi rê chuột), nút Dùng đẩy về cuối (MarkUp 10:36) */
+.qs-dash-draft-txt{flex:0 1 auto; min-width:0;}
+.qs-dash-draft-tools{flex:none; display:flex; align-items:center; gap:4px;}
+.qs-dash-draft > .qs-dash-draft-acts{margin-left:auto;}
+/* Bản nháp: bấm biểu tượng = Thông tin chi tiết, bấm tên = mở ở Bóc tách (MarkUp 10:32) */
+button.qs-dash-draft-info{padding:0; border:1px solid transparent; font:inherit; cursor:pointer; transition:border-color .12s, color .12s, background .12s;}
+button.qs-dash-draft-info:hover{border-color:var(--dash-accent-border); background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qs-dash-draft .qs-dash-draft-n{cursor:pointer;}
+.qs-dash-draft .qs-dash-draft-n:hover{background:none; box-shadow:none; color:var(--dash-accent); text-decoration:underline; text-underline-offset:3px;}
+/* 2 nhãn trên có viền cùng màu chữ (MarkUp 10:11) */
+.qs-scroll-home .qs-dash-src-pill.qs, .qs-scroll-home .qs-dash-tt:not(.done):not(.run){border:1px solid currentColor; box-sizing:border-box;}
