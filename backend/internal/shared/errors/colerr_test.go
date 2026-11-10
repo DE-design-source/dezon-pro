@@ -55,14 +55,16 @@ func TestColSQL(t *testing.T) {
 	if len(got) < len(g.Cols) {
 		t.Fatalf("số cột: go %d, node %d", len(got), len(g.Cols))
 	}
-	// phần thêm sau cột của Node: chỉ cột của ngành Điện lạnh (chỉ bản Go)
+	// phần thêm sau cột của Node: chỉ cột của ngành Điện lạnh, Gạch (chỉ bản Go)
 	dl := map[string]bool{}
-	for _, lb := range specs.DL.All {
-		dl[specs.DL.MetricCol(lb)] = true
+	for _, sp := range []*specs.Spec{specs.DL, specs.GACH} {
+		for _, lb := range sp.All {
+			dl[sp.MetricCol(lb)] = true
+		}
 	}
 	for _, c := range got[len(g.Cols):] {
 		if !dl[c] {
-			t.Errorf("cột thêm %q không thuộc dl-spec.js", c)
+			t.Errorf("cột thêm %q không thuộc dl-spec.js / gach-spec.js", c)
 		}
 	}
 	for i := range g.Cols {

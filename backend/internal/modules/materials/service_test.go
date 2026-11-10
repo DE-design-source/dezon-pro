@@ -45,8 +45,18 @@ func loadJSON(t *testing.T, name string) *omap.Map {
 // Node không có: bỏ khi rỗng trước khi so, nên ghi giá trị thật vào các cột này vẫn làm test báo khác.
 var dlRawCols = func() []string {
 	out := []string{}
-	for _, lb := range specs.DL.All {
-		out = append(out, specs.DL.MetricCol(lb))
+	node := map[string]bool{} // cột dùng chung với ngành bản Node (mau_sac, kich_thuoc...) thì golden có sẵn: không bỏ
+	for _, sp := range []*specs.Spec{specs.VS, specs.SON, specs.CT} {
+		for _, lb := range sp.All {
+			node[sp.MetricCol(lb)] = true
+		}
+	}
+	for _, sp := range []*specs.Spec{specs.DL, specs.GACH} { // + cột riêng ngành Gạch (cũng chỉ bản Go)
+		for _, lb := range sp.All {
+			if !node[sp.MetricCol(lb)] {
+				out = append(out, sp.MetricCol(lb))
+			}
+		}
 	}
 	return out
 }()

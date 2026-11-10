@@ -5127,6 +5127,61 @@ COMMENT ON COLUMN public.product_switch_socket_specs.max_wire_cross_section IS '
 
 
 --
+-- Name: product_tile_specs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_tile_specs (
+    product_id bigint NOT NULL,
+    tile_body text,
+    water_absorption text,
+    slip_resistance text,
+    box_packing text
+);
+
+
+--
+-- Name: TABLE product_tile_specs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.product_tile_specs IS 'Tile (Gạch ốp lát) specifications of a product (1-1 with products; row exists only when at least one value is set).';
+
+
+--
+-- Name: COLUMN product_tile_specs.product_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.product_id IS 'Product (products.id); row deleted with the product.';
+
+
+--
+-- Name: COLUMN product_tile_specs.tile_body; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.tile_body IS 'Tile spec (code: xuong_gach)';
+
+
+--
+-- Name: COLUMN product_tile_specs.water_absorption; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.water_absorption IS 'Tile spec (code: do_hut_nuoc)';
+
+
+--
+-- Name: COLUMN product_tile_specs.slip_resistance; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.slip_resistance IS 'Tile spec (code: chong_tron)';
+
+
+--
+-- Name: COLUMN product_tile_specs.box_packing; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.box_packing IS 'Tile spec (code: quy_cach_hop)';
+
+
+--
 -- Name: products; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5650,20 +5705,25 @@ CREATE VIEW public.product_catalog AS
     s4.outdoor_bracket,
     s4.min_clearance,
     s4.installation_note,
-    s4.material_spec
-   FROM (((((public.products p
+    s4.material_spec,
+    s5.tile_body,
+    s5.water_absorption,
+    s5.slip_resistance,
+    s5.box_packing
+   FROM ((((((public.products p
      LEFT JOIN public.product_lighting_specs s0 ON ((s0.product_id = p.id)))
      LEFT JOIN public.product_sanitary_specs s1 ON ((s1.product_id = p.id)))
      LEFT JOIN public.product_paint_specs s2 ON ((s2.product_id = p.id)))
      LEFT JOIN public.product_switch_socket_specs s3 ON ((s3.product_id = p.id)))
-     LEFT JOIN public.product_hvac_specs s4 ON ((s4.product_id = p.id)));
+     LEFT JOIN public.product_hvac_specs s4 ON ((s4.product_id = p.id)))
+     LEFT JOIN public.product_tile_specs s5 ON ((s5.product_id = p.id)));
 
 
 --
 -- Name: VIEW product_catalog; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.product_catalog IS 'products + the 5 per-sector spec tables, one row per product with every column. Read-only: writes go to the base tables (the data layer splits them). Recreate this view (drop + create) whenever a column is added to products or to any product_*_specs table.';
+COMMENT ON VIEW public.product_catalog IS 'products + the 6 per-sector spec tables, one row per product with every column. Read-only: writes go to the base tables (the data layer splits them). Recreate this view (drop + create) whenever a column is added to products or to any product_*_specs table.';
 
 
 --
@@ -8622,6 +8682,14 @@ ALTER TABLE ONLY public.product_switch_socket_specs
 
 
 --
+-- Name: product_tile_specs pk_product_tile_specs; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tile_specs
+    ADD CONSTRAINT pk_product_tile_specs PRIMARY KEY (product_id);
+
+
+--
 -- Name: products pk_products; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9999,6 +10067,14 @@ ALTER TABLE ONLY public.product_switch_socket_specs
 
 
 --
+-- Name: product_tile_specs fk_product_tile_specs_product_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tile_specs
+    ADD CONSTRAINT fk_product_tile_specs_product_id FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
 -- Name: products fk_products_company_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10171,35 +10247,3 @@ ALTER TABLE ONLY public.work_items
 --
 
 
-
-
-
-insert into public.schema_migrations (version, name, checksum) values ('0001', '0001_dealer_price_generated', '88ba91a42e051629a406c974bf01de3e715a9a5ed85fd13d1ccc2296e91b84e2');
-insert into public.schema_migrations (version, name, checksum) values ('0002', '0002_company_settings', '8b7c95337c1b6d0bf4fe5a64752c26cb1271c241cebf15ad6ce2b64c3187ff15');
-insert into public.schema_migrations (version, name, checksum) values ('0003', '0003_quarantine_and_fixes', '950c761b9fbd9e065c5be9f803ea429486ef7d9c6a3ceb08381c1206f913539b');
-insert into public.schema_migrations (version, name, checksum) values ('0004', '0004_keys', '1e3470b91e8eb98e4f39f5b64a5622a36b1c21db544831ce5e1b5d365fcfe91e');
-insert into public.schema_migrations (version, name, checksum) values ('0005', '0005_formula_checks', '185e4985989a78b39e5ea6b9c41d13d599b78b8ccdc50b169f5943ed80bed62b');
-insert into public.schema_migrations (version, name, checksum) values ('0006', '0006_product_spec_tables', '0761dca62f0439fdf132f7d17f351bef3d920c7201377ddb4af313b40cb9e1d6');
-insert into public.schema_migrations (version, name, checksum) values ('0007', '0007_proposal_items_split', 'af1b858be1d21d930b597504ed7bc1e58774fe0d39dbfc805bc8b4c675a45480');
-insert into public.schema_migrations (version, name, checksum) values ('0008', '0008_comments', '6a7979a92ee4e28cad87a95e987c4b05b28625659d09345d78d4f398ee91d9f3');
-insert into public.schema_migrations (version, name, checksum) values ('0009', '0009_purchase_order_resolution', 'af239544eab39f433bf961dec8c61b09af5279cde3524a4fc6253c091bc6fb84');
-insert into public.schema_migrations (version, name, checksum) values ('0010', '0010_delete_request_resolution_note', '37ad60d8fba104ef9a7cfb88ba6744f43f814c83a24f51bf759c7be353103631');
-insert into public.schema_migrations (version, name, checksum) values ('0011', '0011_project_current_condition', '858be4473adf66112e2f45fe67ffc88910bb5b835ba4a40b83deb1d74b17697d');
-insert into public.schema_migrations (version, name, checksum) values ('0012', '0012_expiry_reminder_comments', '862fdbbac3001165bf79be58844a367fe79ad5788bb76c8424e88fc45758b54a');
-insert into public.schema_migrations (version, name, checksum) values ('0013', '0013_comment_updates', '1f2d684d6875a21f92d8c9014d6e87eec2f3d7d5b10723e781914b98377cadf9');
-insert into public.schema_migrations (version, name, checksum) values ('0014', '0014_user_sessions', 'f0c65059ae56509b9415ad2fee06796b0cfa51195779d695cfae9a17074596f1');
-insert into public.schema_migrations (version, name, checksum) values ('0015', '0015_sales_leads', '9bb42a0d1f634091aa91d5925a63dbed8d63cfb57b69d5742ab38bd05ae3f55b');
-insert into public.schema_migrations (version, name, checksum) values ('0016', '0016_delivery_projects', 'd2bda2f4dad97d08595cc412da662c710b43bdcde2bcae08e82c022ee5fd65f4');
-insert into public.schema_migrations (version, name, checksum) values ('0017', '0017_product_hvac_specs', 'ccb5d84fe53050f96e9ddb538a47ff9140ba0cf97b6c4e468dfe92f833fa423f');
-insert into public.schema_migrations (version, name, checksum) values ('0020', '0020_hr_core', '353527b324c92b78c228ae28af05105f50c4295f0baa783ab7324233a0fbb63a');
-insert into public.schema_migrations (version, name, checksum) values ('0021', '0021_hr_attendance', '9a7b025cf29f29eb5558b98c709b38e47cefa99a49a37b900ee7924e0966170f');
-insert into public.schema_migrations (version, name, checksum) values ('0022', '0022_hr_payroll', 'feef064ce3ee2b9f6179d6a1cfda4ce4fe00ad0de089368374dc3f5edf3c0b0d');
-insert into public.schema_migrations (version, name, checksum) values ('0023', '0023_hr_talent', 'e2413450c4d37920500fc974c4e85890924e366891ba0b0807008d2467a80f77');
-insert into public.schema_migrations (version, name, checksum) values ('0024', '0024_hr_security', '041ad5e87083fecb0cb8fa997f397f94f7f02157c70c5466617fca689df28768');
-insert into public.schema_migrations (version, name, checksum) values ('0025', '0025_hr_extras', '5b9680fafc07ca7c8ef8d539478b2f0162853aca54724aa367c0f03f9b25aebe');
-insert into public.schema_migrations (version, name, checksum) values ('0026', '0026_hr_work_sites', 'fd8635b8d47fdac1976fdc021308b40cdc57daa9d124d16b61738b8336ecc1f0');
-insert into public.schema_migrations (version, name, checksum) values ('0027', '0027_hr_ui_restore', 'cb1bda996099b2f33ef3ddacfe0d203634bb608003aa51cbe69c197bc707cedd');
-insert into public.schema_migrations (version, name, checksum) values ('0028', '0028_delivery_ui_restore', 'a21aadc9d8494f70fe3c09c21bbfabfa24f00e66175c0396f09b88886b5c5e32');
-insert into public.schema_migrations (version, name, checksum) values ('0029', '0029_delivery_core_phases', 'd99fc826ea8ced41844771856a480d736ddf71b48832f7d8bda6d1147d05439b');
-insert into public.schema_migrations (version, name, checksum) values ('0030', '0030_delivery_purchase_flow', 'be01e672691f1e250f78ad261785680437517ab7d44688892a6c865623df5561');
-insert into public.schema_migrations (version, name, checksum) values ('0031', '0031_delivery_lead_link', 'd77320eaceccf9262f69472b9fd97500a3d09b66c96489e86cc49819c31d8893');

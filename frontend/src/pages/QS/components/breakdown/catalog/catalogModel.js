@@ -71,7 +71,7 @@ export function pdImgs_(p){ return String(p.anhTatCa||p.hinhAnh||'').split('\n')
 /* Key Product Info (pdMedia_): [[icon, chữ]]; sơn / công tắc / điện lạnh không có khối này (do pdSpecsSon_ / pdSpecsCT_ / pdSpecsDL_ vẽ) */
 export function pdKeyItems_(p, specs){
   var ng=nganhCuaSP_(p, specs);
-  if(ng==='son'||ng==='ct'||ng==='dl') return [];
+  if(ng==='son'||ng==='ct'||ng==='dl'||ng==='gach') return [];
   if(ng==='vs') return vsChip_(p, specs).map(function(x){ return [x[0], x[1]]; });
   var cong=p.congSuat||parseWatt(p.ten), nd=p.nhietDo||parseKelvin(p.ten);
   return [
@@ -88,7 +88,7 @@ export function pdSpecBlocks_(p, specs){
   if(ng==='vs') out=pdSpecsVS_(p, specs);
   else if(ng==='son') out=pdSpecsSon_(p, specs);
   else if(ng==='ct') out=pdSpecsCT_(p, specs);
-  else if(ng==='dl') out=pdSpecsDL_(p, specs);
+  else if(ng==='dl'||ng==='gach') out=pdSpecsDL_(p, specs, ng);
   else {
     out=[sec_('Design Specifications|Thông số thiết kế',[
         ['Chất liệu',p.chatLieu],['Chiều cao',p.chieuCao],['Đường kính',p.duongKinh],
@@ -128,10 +128,10 @@ function pdSpecsSon_(p, specs){
     sec_(SON.TEN_TK, rows(g.tk))];
 }
 /* Điện lạnh: 4 khối theo DL_SPEC.KHOI (Thông tin chính · Hiệu suất · Kết nối · Lắp đặt); vật tư / phụ kiện chỉ có khối đầu
-   (Quy cách · Xuất xứ) - sec_ tự bỏ khối rỗng */
-function pdSpecsDL_(p, specs){
-  var DL=specNganh_('dl', specs); if(!DL) return [];
-  var h=DL.hmOf(p.hangMuc), raw=p.raw||{}, M=h?h.nhom:{chinh:DL.CHINH_ALL,hs:[],ket:[],lap:DL.TK_ALL};
+   (Quy cách · Xuất xứ) - sec_ tự bỏ khối rỗng. Gạch ốp lát (ng='gach'): 1 khối Key Product Info gồm 8 thông số + Dòng SP · Hạng mục · Bảo hành */
+function pdSpecsDL_(p, specs, ng){
+  var DL=specNganh_(ng||'dl', specs); if(!DL) return [];
+  var h=DL.hmOf(p.hangMuc), raw=p.raw||{}, M=h?h.nhom:(ng==='gach'?{chinh:DL.ALL}:{chinh:DL.CHINH_ALL,hs:[],ket:[],lap:DL.TK_ALL});
   function rows(ds){ return ds.map(function(lb){ return DL.dong(lb, function(c){ return raw[c]; })||['','']; }); }
   var chung=[['Dòng sản phẩm',p.dongSanPham||p.nhom],['Hạng mục',DL.chuanHM(p.hangMuc)||p.hangMuc],['Thời gian bảo hành',p.baoHanh]];
   return DL.KHOI.map(function(k,i){ return sec_(k[1], rows(M[k[0]]).concat(i===0?chung:[])); })

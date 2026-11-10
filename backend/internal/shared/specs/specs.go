@@ -72,9 +72,12 @@ var ctJSON []byte
 //go:embed data/dl.json
 var dlJSON []byte
 
+//go:embed data/gach.json
+var gachJSON []byte
+
 // Spec: toàn bộ export của một file *-spec.js.
 type Spec struct {
-	Name string    // "vs" | "son" | "ct" | "dl"
+	Name string    // "vs" | "son" | "ct" | "dl" | "gach"
 	Data *omap.Map // mọi export không phải hàm, đúng thứ tự khoá của object api
 
 	Metric   *omap.Map
@@ -93,10 +96,11 @@ type Spec struct {
 }
 
 var (
-	VS  = load("vs", vsJSON)
-	SON = load("son", sonJSON)
-	CT  = load("ct", ctJSON)
-	DL  = load("dl", dlJSON)
+	VS   = load("vs", vsJSON)
+	SON  = load("son", sonJSON)
+	CT   = load("ct", ctJSON)
+	DL   = load("dl", dlJSON)
+	GACH = load("gach", gachJSON)
 )
 
 func load(name string, raw []byte) *Spec {

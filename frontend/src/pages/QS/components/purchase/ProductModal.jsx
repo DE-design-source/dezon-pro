@@ -82,9 +82,10 @@ function Specs({ p, specs, ng }) {
       </>
     )
   }
-  if (ng === 'dl') {
-    const DL = specs.DL_SPEC, h = DL.hmOf(p.hangMuc), raw = p.raw || {}
-    const M = h ? h.nhom : { chinh: DL.CHINH_ALL, hs: [], ket: [], lap: DL.TK_ALL }
+  if (ng === 'dl' || ng === 'gach') {
+    // Điện lạnh: 4 khối theo DL_SPEC.KHOI · Gạch: 1 khối Key Product Info (8 thông số)
+    const DL = ng === 'gach' ? specs.GACH_SPEC : specs.DL_SPEC, h = DL.hmOf(p.hangMuc), raw = p.raw || {}
+    const M = h ? h.nhom : (ng === 'gach' ? { chinh: DL.ALL } : { chinh: DL.CHINH_ALL, hs: [], ket: [], lap: DL.TK_ALL })
     const rows = ds => ds.map(lb => DL.dong(lb, c => raw[c]) || ['', ''])
     const chung = [['Dòng sản phẩm', p.dongSanPham || p.nhom], ['Hạng mục', DL.chuanHM(p.hangMuc) || p.hangMuc], ['Thời gian bảo hành', p.baoHanh]]
     return (
@@ -142,7 +143,7 @@ function Specs({ p, specs, ng }) {
 /* pdMedia_: gallery + mã + tên + Key Product Info */
 function Media({ p, specs, ng, idx, setIdx, onZoom }) {
   let keyItems
-  if (ng === 'son' || ng === 'ct' || ng === 'dl') keyItems = []
+  if (ng === 'son' || ng === 'ct' || ng === 'dl' || ng === 'gach') keyItems = []
   else if (ng === 'vs') keyItems = vsChip_(p, specs)
   else {
     const cong = p.congSuat || parseWatt(p.ten), nd = p.nhietDo || parseKelvin(p.ten)

@@ -116,7 +116,7 @@ function VarCard({ form, loai }) {
   )
   // chỉ xem trước các ô đang hiện theo ngành
   const shown = { varKelvin: '', varWatt: '', varAngle: '', varColor: v.varColor, varSize: '' }
-  if (loai === 'son' || loai === 'vs') shown.varSize = v.varSize
+  if (loai === 'son' || loai === 'vs' || loai === 'gach') shown.varSize = v.varSize
   else if (loai !== 'ct' && loai !== 'dl') { shown.varKelvin = v.varKelvin; shown.varWatt = v.varWatt; shown.varAngle = v.varAngle }
   const pv = varPreview_(shown)
   return (
@@ -125,6 +125,7 @@ function VarCard({ form, loai }) {
         {/* Ba trục nhiệt độ / công suất / góc chỉ có nghĩa với ĐÈN */}
         {loai === 'ct' || loai === 'dl' ? null : loai === 'son' ? inp('varSize', 'Quy cách (dung tích)', 'VD: 1L, 5L, 18L')
           : loai === 'vs' ? inp('varSize', 'Kích thước', 'VD: L580 x W380, L620 x W390')
+            : loai === 'gach' ? inp('varSize', 'Kích thước', 'VD: 600 x 600 (mm), 600 x 1200 (mm)')
             : <>{inp('varKelvin', 'Nhiệt độ màu (K)', 'VD: 3000, 4000, 6500')}{inp('varWatt', 'Công suất (W)', 'VD: 7, 9, 12')}{inp('varAngle', 'Góc chiếu (°)', 'VD: 24, 36, 60')}</>}
         {inp('varColor', 'Màu sắc', 'VD: Đen, Trắng, Vàng')}
       </div>

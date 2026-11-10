@@ -1,9 +1,9 @@
-/* Sinh dữ liệu + bộ đối chiếu cho gói Go internal/shared/specs từ internal/shared/specs/js/{vs,son,ct,dl}-spec.js.
-   Các file JS đó (UMD, nhúng vào binary và phục vụ ở /vs-spec.js, /son-spec.js, /ct-spec.js, /dl-spec.js) là nguồn DUY NHẤT
+/* Sinh dữ liệu + bộ đối chiếu cho gói Go internal/shared/specs từ internal/shared/specs/js/{vs,son,ct,dl,gach}-spec.js.
+   Các file JS đó (UMD, nhúng vào binary và phục vụ ở /vs-spec.js, /son-spec.js, /ct-spec.js, /dl-spec.js, /gach-spec.js) là nguồn DUY NHẤT
    của thông số ngành: sửa spec xong phải chạy lại file này.
      node backend/scripts/gen-specs.js
    Ghi:
-     internal/shared/specs/data/{vs,son,ct,dl}.json    mọi giá trị export không phải hàm (giữ thứ tự khoá)
+     internal/shared/specs/data/{vs,son,ct,dl,gach}.json   mọi giá trị export không phải hàm (giữ thứ tự khoá)
      internal/shared/specs/testdata/golden.json     kết quả của mọi hàm export trên bộ đầu vào rộng
      internal/shared/specs/testdata/sources.json    sha256 của các file JS (test Go báo khi sửa JS mà quên chạy lại)
    Không đụng database. */
@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const OUT = path.join(__dirname, '..', 'internal', 'shared', 'specs');
 const JS = path.join(OUT, 'js');
 const SPECS = { vs: require(path.join(JS, 'vs-spec.js')), son: require(path.join(JS, 'son-spec.js')), ct: require(path.join(JS, 'ct-spec.js')),
-  dl: require(path.join(JS, 'dl-spec.js')) };
+  dl: require(path.join(JS, 'dl-spec.js')), gach: require(path.join(JS, 'gach-spec.js')) };
 const TEN = Object.keys(SPECS);
 
 fs.mkdirSync(path.join(OUT, 'data'), { recursive: true });
@@ -46,7 +46,7 @@ function uniq(ds) {
   ds.forEach(function (x) { const k = JSON.stringify(x); if (!seen.has(k)) { seen.add(k); out.push(x); } });
   return out;
 }
-const NAMES = uniq([].concat(SPECS.vs.HANG_MUC, SPECS.son.HANG_MUC, SPECS.ct.HANG_MUC, SPECS.dl.HANG_MUC));
+const NAMES = uniq([].concat(SPECS.vs.HANG_MUC, SPECS.son.HANG_MUC, SPECS.ct.HANG_MUC, SPECS.dl.HANG_MUC, SPECS.gach.HANG_MUC));
 function bienThe(n) {
   return [n, n.toUpperCase(), n.toLowerCase(), bo_dau(n), bo_dau(n).toUpperCase(), '  ' + n + '  ', n.replace(/ /g, '   '),
     n.replace(/ /g, ' '), n.replace(/ /g, '\t\n'), n.replace(/ /g, '　'), '﻿' + n + ' ', n.normalize('NFD'),
@@ -57,7 +57,7 @@ const EDGE = ['', ' ', '\t\n', null, 0, 1, 123, -1.5, 0.1, 1e21, true, false, []
   'lavabo', 'LAVABO', 'o cam dien', 'Khác', 'abc', '😀', 'á', 'ö̀', '̀', 'ǰ', 'ŉ', 'ﬁ', 'null', 'undefined',
   'Ổ CẮM TÍN HIỆU (TV / LAN / TEL / HDMI)', 'dung moi & phu gia', 'Dimmer/điều tốc quạt'];
 const INPUTS = uniq([].concat.apply([], NAMES.map(bienThe)).concat(EDGE));
-const LABELS_ALL = uniq([].concat(SPECS.vs.ALL, SPECS.son.ALL, SPECS.ct.ALL, SPECS.dl.ALL));
+const LABELS_ALL = uniq([].concat(SPECS.vs.ALL, SPECS.son.ALL, SPECS.ct.ALL, SPECS.dl.ALL, SPECS.gach.ALL));
 const LB_EDGE = ['', 'xyz', 'màu sắc', ' MÀU SẮC', '@BH', '@KT', null, 5, true];
 
 const rows = [];
@@ -79,7 +79,7 @@ TEN.forEach(function (ten) {
     const lbs = S.labelsOf(v);
     ghi(ten, 'labelsOf', [v], JSON.stringify(lbs) === JSON.stringify(S.ALL) ? '$ALL' : lbs);
   });
-  ['chinh', 'tk', 'req', 'kem'].concat(ten === 'ct' || ten === 'dl' ? ['dong'] : []).forEach(function (k) { ghi(ten, 'gom', [k], S.gom(k)); });
+  ['chinh', 'tk', 'req', 'kem'].concat(ten === 'ct' || ten === 'dl' || ten === 'gach' ? ['dong'] : []).forEach(function (k) { ghi(ten, 'gom', [k], S.gom(k)); });
 
   // optsOf / isReq: mọi hạng mục của spec (+ vài biến thể, giá trị lạ) x mọi nhãn của mọi spec
   const vs2 = uniq(S.HANG_MUC.concat(S.HANG_MUC.slice(0, 3).map(function (n) { return bo_dau(n).toUpperCase(); }),
@@ -101,8 +101,8 @@ TEN.forEach(function (ten) {
 });
 
 // VS.nganhOf
-const NGANH = ['', null, ' ', 'vs', ' den ', 'son', 'ct', 'dl', 0, 5, false, true, [], 'VS'];
-const HM_NGANH = uniq(SPECS.vs.HANG_MUC.slice(0, 3).concat(['bon cau', ' LAVABO ', SPECS.son.HANG_MUC[0], SPECS.ct.HANG_MUC[0], SPECS.dl.HANG_MUC[0], '', null, 'abc', 0]));
+const NGANH = ['', null, ' ', 'vs', ' den ', 'son', 'ct', 'dl', 'gach', 0, 5, false, true, [], 'VS'];
+const HM_NGANH = uniq(SPECS.vs.HANG_MUC.slice(0, 3).concat(['bon cau', ' LAVABO ', SPECS.son.HANG_MUC[0], SPECS.ct.HANG_MUC[0], SPECS.dl.HANG_MUC[0], SPECS.gach.HANG_MUC[0], '', null, 'abc', 0]));
 NGANH.forEach(function (n) { HM_NGANH.forEach(function (hm) { ghi('vs', 'nganhOf', [n, hm], SPECS.vs.nganhOf(n, hm)); }); });
 
 // CT.dong
@@ -138,6 +138,17 @@ const DL_TEN = ['', null, 'Mặt nạ dàn lạnh Cassette', 'PANEL BC', 'Cách 
 ['', 'Điện lạnh', 'Máy lạnh', 'Ống đồng dẫn gas', 'mat na dan lanh', 'xyz', null].forEach(function (hm) {
   DL_TEN.forEach(function (ten) { ghi('dl', 'doanHM', [hm, ten], DL.doanHM(hm, ten)); });
 });
+
+// GACH.dong + GACH.laChung (hạng mục ghi chung "Gạch", "Ốp lát"... -> vẫn là ngành gach)
+const GACH = SPECS.gach;
+function moiCotGach(f) { const r = {}; GACH.ALL.forEach(function (lb) { r[GACH.METRIC[lb][0]] = f(GACH.METRIC[lb][0]); }); r.bao_hanh_nam = f('bao_hanh_nam'); return r; }
+const GACH_ROWS = DONG_ROWS.slice(0, 14).concat([moiCotGach(function (c) { return 'v_' + c; }), moiCotGach(function () { return '  x  '; }),
+  moiCotGach(function () { return null; }), moiCotGach(function () { return 0; }), moiCotGach(function () { return ''; })]);
+GACH_ROWS.forEach(function (r) {
+  GACH.ALL.concat(['@BH', '@KT', '', 'xyz', 'LOẠI MÁY']).forEach(function (lb) { ghi('gach', 'dong', [lb, r], GACH.dong(lb, function (c) { return r[c]; })); });
+});
+uniq(INPUTS.concat(['Gạch', 'GẠCH', 'gach', 'Ốp lát', 'op lat', 'Gạch ốp lát', 'Sàn gạch', 'gạch men', 'Gạch lát nền', 'Gạch lát',
+  'gạchmen', 'Keo dán gạch', 'Chà ron', 'ốp lát đá', 'mặt gạch', 'Gạch ốp tường', 'gach-op'])).forEach(function (v) { ghi('gach', 'laChung', [v], GACH.laChung(v)); });
 
 fs.writeFileSync(path.join(OUT, 'testdata', 'golden.json'), '[\n' + rows.map(function (r) { return JSON.stringify(r); }).join(',\n') + '\n]\n');
 console.log('specs: ghi data/{' + TEN.join(',') + '}.json + testdata/golden.json (' + rows.length + ' ca, ' + INPUTS.length + ' đầu vào)');

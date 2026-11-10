@@ -98,7 +98,7 @@ export async function impParseFile_(f, specs) {
     // File vệ sinh / sơn nước / công tắc mà ô Ngành hàng đang để Thiết bị đèn -> tự nhận theo cột HẠNG MỤC
     if (!nganh && specs && specs.VS_SPEC) {
       const ps = res.products || [], hmRaw = p => (p._raw || {})['HẠNG MỤC'] || p.hangMuc
-      const doan = [['vs', specs.VS_SPEC, 'THIẾT BỊ VỆ SINH', 'Thiết bị vệ sinh'], ['son', specs.SON_SPEC, 'SƠN NƯỚC', 'Sơn nước'], ['ct', specs.CT_SPEC, 'CÔNG TẮC - Ổ CẮM', 'Công tắc - ổ cắm'], ['dl', specs.DL_SPEC, 'ĐIỆN LẠNH', 'Điện lạnh']]
+      const doan = [['vs', specs.VS_SPEC, 'THIẾT BỊ VỆ SINH', 'Thiết bị vệ sinh'], ['son', specs.SON_SPEC, 'SƠN NƯỚC', 'Sơn nước'], ['ct', specs.CT_SPEC, 'CÔNG TẮC - Ổ CẮM', 'Công tắc - ổ cắm'], ['dl', specs.DL_SPEC, 'ĐIỆN LẠNH', 'Điện lạnh'], ['gach', specs.GACH_SPEC, 'GẠCH ỐP LÁT', 'Gạch ốp lát']]
         .filter(x => x[1] && ps.length && ps.filter(p => x[1].chuanHM(hmRaw(p)) || (x[1].laChung && x[1].laChung(hmRaw(p)))).length * 2 >= ps.length)[0]
       if (doan) {
         nganh = doan[0]

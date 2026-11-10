@@ -270,7 +270,11 @@
    "gia_do_dan_nong": "outdoor_bracket",
    "kc_lap_min": "min_clearance",
    "gc_lap_dat": "installation_note",
-   "quy_cach_vt": "material_spec"
+   "quy_cach_vt": "material_spec",
+   "xuong_gach": "tile_body",
+   "do_hut_nuoc": "water_absorption",
+   "chong_tron": "slip_resistance",
+   "quy_cach_hop": "box_packing"
   },
   "view": "product_catalog",
   "parts": {
@@ -278,7 +282,8 @@
    "product_sanitary_specs": "product_id",
    "product_paint_specs": "product_id",
    "product_switch_socket_specs": "product_id",
-   "product_hvac_specs": "product_id"
+   "product_hvac_specs": "product_id",
+   "product_tile_specs": "product_id"
   }
  },
  "db_san_pham_history": {

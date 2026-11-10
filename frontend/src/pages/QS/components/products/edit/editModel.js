@@ -115,9 +115,9 @@ export function speFieldDef_(f, raw, L2C, specs){
    theo ô Ngành của tab Nhập (impLoai_); ở đây dùng ngành của chính SP đang sửa (cùng kết quả khi tab Nhập đang ở ngành đó). */
 export function vsApply_(hmRaw, ng, larks, specs){
   var out={};
-  if(!specs||!specs.VS_SPEC||!specs.SON_SPEC||!specs.CT_SPEC||!specs.DL_SPEC) return out;
+  if(!specs||!specs.VS_SPEC||!specs.SON_SPEC||!specs.CT_SPEC||!specs.DL_SPEC||!specs.GACH_SPEC) return out;
   var SP=specs.SON_SPEC.chuanHM(hmRaw) ? specs.SON_SPEC : (specs.CT_SPEC.chuanHM(hmRaw) ? specs.CT_SPEC
-    : (specs.DL_SPEC.chuanHM(hmRaw) ? specs.DL_SPEC : specNganh_(ng, specs)));
+    : (specs.DL_SPEC.chuanHM(hmRaw) ? specs.DL_SPEC : (specs.GACH_SPEC.chuanHM(hmRaw) ? specs.GACH_SPEC : specNganh_(ng, specs))));
   if(!SP) return out;
   var hm=SP.chuanHM(hmRaw), cho=hm?SP.labelsOf(hm):SP.ALL;
   larks.forEach(function(lb){

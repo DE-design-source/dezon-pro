@@ -91,7 +91,7 @@ func (s *Service) ImportCommit(ctx context.Context, a *actor.Actor, products any
 		tenLoi := jsval.S(data.Val(nhanTen))
 		// Ngành có bộ thông số theo hạng mục -> tự nhận theo hạng mục
 		var ngRow string
-		if ng := p.Val("_nganh"); ng == "vs" || ng == "son" || ng == "ct" || ng == "dl" {
+		if ng := p.Val("_nganh"); ng == "vs" || ng == "son" || ng == "ct" || ng == "dl" || ng == "gach" {
 			ngRow = ng.(string)
 		} else {
 			ngRow = categories.NganhCua(data.Val(nhanNganh), data.Val(nhanHangMuc))

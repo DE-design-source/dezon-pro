@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-04 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-10 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -57,6 +57,7 @@
 | [N4](#xong-n4) | Kho file trên ổ đĩa máy chủ (`/files`) | ✅ | - |
 | [N7](#xong-n7) | Ngành Điện lạnh (đề mục 3.2.7): thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc | 🟡 | [N7](#n7): triển khai lên dezon.tech |
 | [N8](#xong-n8) | HR (`/cham-cong`) chạy dữ liệu thật: hồ sơ nhân sự, sơ đồ tổ chức, kiêm nhiệm, chấm công & phép, lương & bảo hiểm, tuyển dụng, hiệu suất & đào tạo (API Go + PostgreSQL) | 🟡 | [N8](#n8): email / tích hợp bên ngoài, triển khai |
+| [N9](#xong-n9) | Ngành Gạch ốp lát (đề mục 3.2.4 "Ốp lát") theo file "gạch edit.xlsx": thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc, hiển thị | 🟡 | [N9](#n9): triển khai lên dezon.tech, nhập dữ liệu thật |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 
 ---
@@ -75,6 +76,7 @@
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
 | <a id="n8"></a>N8 | HR: còn gửi phiếu lương qua email / chuyển khoản lương, gửi thư mời phỏng vấn, tự đăng tin lên kênh tuyển dụng (cần SMTP / tài khoản kênh 🔑); 2FA, SSO, giới hạn IP; tích hợp máy chấm công (cần API thiết bị 🔑); triển khai migration 0020-0026 lên dezon.tech (nhánh `src_N` đã có 0018-0019 của Chat nên HR đánh số từ 0020) | User | 🟡 |
+| <a id="n9"></a>N9 | Gạch ốp lát: còn triển khai lên VPS dezon.tech (migration 0032) và nhập dữ liệu gạch thật | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt | User | 🟡 |
 ### 2.3 Cần credential 🔑
@@ -104,7 +106,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N9`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N10`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -513,6 +515,16 @@
 - Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
 - Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
 - Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)
+- 🟡 phần còn lại ở 2.2
+
+<a id="xong-n9"></a>
+#### N9 - Ngành Gạch ốp lát (đề mục 3.2.4)
+
+- `gach-spec.js` (chỉ bản Go): 4 hạng mục Gạch lát nền / ốp tường / ngoài trời / trang trí - Mosaic, chung 8 thông số theo file "gạch edit.xlsx": Kích thước*, Bề mặt, Xương gạch, Màu sắc / Vân, Độ dày, Độ hút nước, Chống trơn, Quy cách đóng hộp; hạng mục ghi chung "Gạch", "Ốp lát" vẫn nhận là ngành gạch (`specs.GachLaChung`)
+- Bảng bóc tách: THÔNG TIN CHÍNH = Bề mặt · Xương gạch · Màu sắc / Vân · Dòng SP · Hạng mục · Bảo hành (cột M); THÔNG SỐ THIẾT KẾ = Kích thước · Độ dày · Độ hút nước · Chống trơn · Quy cách đóng hộp (cột O)
+- Bảng `product_tile_specs` (4 cột riêng) + view `product_catalog` 183 cột (migration 0032); Kích thước / Bề mặt / Độ dày / Màu sắc dùng chung cột có sẵn; file mẫu `GET /api/v1/product-templates/gach`
+- Giao diện: ngành "Gạch ốp lát · sản phẩm" ở Nhập dữ liệu (form, biến thể theo kích thước / màu, nút tải file mẫu), bộ lọc Bóc tách 3.2.4, bộ cột Danh sách SP, panel thông tin SP, modal Mua hàng
+- Thử trên máy phát triển 2026-11-10 (database thử): nhập 1 SP gạch qua form, giá đại lý tự tính, lưu đúng bảng tách; file mẫu tải về đúng cột
 - 🟡 phần còn lại ở 2.2
 
 <a id="xong-n8"></a>
