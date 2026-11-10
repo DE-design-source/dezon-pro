@@ -8913,7 +8913,7 @@ CREATE TABLE public.sales_leads (
     CONSTRAINT ck_sales_leads_estimated_value_vnd CHECK ((estimated_value_vnd >= (0)::numeric)),
     CONSTRAINT ck_sales_leads_handoff CHECK (((handoff IS NULL) OR (jsonb_typeof(handoff) = 'object'::text))),
     CONSTRAINT ck_sales_leads_sales_unit CHECK ((sales_unit = ANY (ARRAY['dan-dung'::text, 'du-an'::text]))),
-    CONSTRAINT ck_sales_leads_stage CHECK ((stage = ANY (ARRAY['tiep-can'::text, 'tu-van'::text, 'bao-gia'::text, 'dam-phan'::text, 'chot-hd'::text, 'bao-gia-thi-cong'::text, 'thiet-ke'::text, 'thi-cong'::text, 'truot-thau'::text])))
+    CONSTRAINT ck_sales_leads_stage CHECK ((stage = ANY (ARRAY['tiep-can'::text, 'giao-ns'::text, 'tu-van'::text, 'bao-gia'::text, 'dam-phan'::text, 'chot-hd'::text, 'bao-gia-thi-cong'::text, 'thiet-ke'::text, 'thi-cong'::text, 'khong-tham-gia'::text, 'truot-thau'::text, 'spam'::text])))
 );
 
 

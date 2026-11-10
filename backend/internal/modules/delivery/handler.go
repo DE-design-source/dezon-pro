@@ -40,7 +40,7 @@ var (
 		[2]string{"milestone", "Cột mốc"}, [2]string{"desc", "Mô tả"}, [2]string{"depts", "Bộ phận phụ trách (mảng)"},
 		[2]string{"owners", "Người phụ trách (mảng)"}, [2]string{"finType", "thu / chi / rỗng"}, [2]string{"planStart", "Ngày kế hoạch thu/chi"},
 		[2]string{"amountVnd", "Số tiền thu/chi (đồng)"}, [2]string{"confirmed", "Đã xác nhận thu/chi"}, [2]string{"sortOrder", "Thứ tự"},
-		[2]string{"purchaseItems", "Đơn mua hàng (kanban) [{id, code, item, supplier, qty, value (triệu), due, owner, stage, assignees, dept}]"})
+		[2]string{"purchaseItems", "Đơn mua hàng (kanban) [{id, code, item, supplier, qty, value (triệu), due, owner, stage, assignees, dept, + trường phiếu chi tiết: sample, drawings, workflow, productGroup, payment, note, pm, buyer, accountant, siteManager, pc, createdBy, orderActualPurchasing, orderActualAccounting, orderActualPc, createdAt, leadTime, timeOffset, filesPm, filesContract, filesSample, filesDrawings; actualAtSite, planPc, planBuy, planDueKT, priority, pm, buyer, accountant, siteManager, pc, siteReceiver = tên hoặc danh sách tên}]"})
 	subBody   = body([2]string{"name", "Tên thầu phụ"}, [2]string{"scope", "Phạm vi"}, [2]string{"contact", "Liên hệ"}, [2]string{"phone", "Điện thoại"}, [2]string{"valueVnd", "Giá trị (đồng)"}, [2]string{"status", "active / pending / done"})
 	phaseBody = body([2]string{"name", "Tên giai đoạn"}, [2]string{"sortOrder", "Thứ tự"}, [2]string{"members", "Người phụ trách [{name, role}]"})
 )

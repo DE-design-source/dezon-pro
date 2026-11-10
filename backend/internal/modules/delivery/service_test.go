@@ -237,6 +237,18 @@ func TestDuAnTrienKhaiDB(t *testing.T) {
 	if got := tk.(*omap.Map).Val("purchaseItems").([]any); len(got) != 1 || got[0].(*omap.Map).Val("value") != 756.0 || got[0].(*omap.Map).Has("dept") {
 		t.Errorf("đơn mua hàng: %v", got)
 	}
+	ext := omap.Of("id", "x", "pm", "Dũng", "buyer", []any{"Ý", " ", "Tân"}, "leadTime", "14", "timeOffset", -2, "orderActualPc", "2026-07-13",
+		"filesPm", []any{omap.Of("name", "a.pdf", "url", "/files/a.pdf")})
+	if up, err := sa.UpdateTask(ctxA, aA, id, tk.(*omap.Map).Val("id").(float64), omap.Of("purchaseItems", []any{ext})); err != nil {
+		t.Fatal(err)
+	} else if m := up.(*omap.Map).Val("purchaseItems").([]any)[0].(*omap.Map); m.Val("pm") != "Dũng" || len(m.Val("buyer").([]any)) != 2 || m.Val("leadTime") != 14.0 || m.Val("timeOffset") != -2.0 || m.Val("orderActualPc") != "2026-07-13" || len(m.Val("filesPm").([]any)) != 1 || m.Has("accountant") {
+		t.Errorf("trường phiếu đơn mua hàng: %v", m)
+	}
+	for _, bad := range []*omap.Map{omap.Of("id", "x", "createdAt", "13/07"), omap.Of("id", "x", "leadTime", "abc"), omap.Of("id", "x", "filesPm", []any{omap.Of("url", "javascript:alert(1)")})} {
+		if _, err := sa.UpdateTask(ctxA, aA, id, tk.(*omap.Map).Val("id").(float64), omap.Of("purchaseItems", []any{bad})); status(err) != 400 {
+			t.Errorf("phải 400: %v -> %v", bad, err)
+		}
+	}
 	if _, err := sa.UpdateTask(ctxA, aA, id, tk.(*omap.Map).Val("id").(float64), omap.Of("purchaseItems", []any{omap.Of("id", "x", "due", "30/08")})); status(err) != 400 {
 		t.Errorf("ngày đơn mua hàng sai phải 400: %v", err)
 	}

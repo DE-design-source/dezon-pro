@@ -30,7 +30,10 @@ export function medalK(rank) {
 }
 
 export function stageAccent(stageId) {
+  if (stageId === 'khong-tham-gia') return { border: 'var(--gold)', bg: 'var(--gold-tint)', color: 'var(--gold)' }
+  if (stageId === 'spam') return { border: 'var(--text-muted)', bg: 'var(--surface-alt)', color: 'var(--text-muted)' }
   if (stageId === 'truot-thau') return { border: 'var(--danger)', bg: 'var(--danger-tint)', color: 'var(--danger)' }
+  if (stageId === 'giao-ns') return { border: 'var(--sales)', bg: 'var(--sales-tint)', color: 'var(--sales)' }
   if (stageId === 'dam-phan') return { border: 'var(--gold)', bg: 'var(--gold-tint)', color: 'var(--gold)' }
   if (stageId === 'thiet-ke') return { border: 'var(--primary)', bg: 'var(--primary-tint)', color: 'var(--primary)' }
   if (stageId === 'thi-cong' || stageId === 'tu-van') return { border: 'var(--success)', bg: 'var(--success-tint)', color: 'var(--success)' }

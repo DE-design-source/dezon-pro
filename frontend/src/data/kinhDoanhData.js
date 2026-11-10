@@ -5,11 +5,12 @@
 /* ---------- Pipeline (Kanban) ---------- */
 export const AVATAR_COLORS = ['#2F5DA8', '#2f9160', '#b87a1f', '#7658c2', '#c1443c', '#0E8A82', '#c26fb0', '#6e8fd0']
 
-export const STAGES = ['tiep-can', 'tu-van', 'bao-gia', 'dam-phan', 'chot-hd', 'bao-gia-thi-cong', 'thiet-ke', 'thi-cong', 'truot-thau']
+/* giao-ns = "Nhân sự KD phụ trách": khách hàng chờ / vừa giao nhân sự kinh doanh (migration 0040); lead mới chưa có nhân sự phụ trách vào thẳng đây */
+export const STAGES = ['tiep-can', 'giao-ns', 'tu-van', 'bao-gia', 'dam-phan', 'chot-hd', 'bao-gia-thi-cong', 'thiet-ke', 'thi-cong', 'khong-tham-gia', 'truot-thau', 'spam']   // spam = khách rác / không có nhu cầu thật (migration 0041)
 export const STAGE_LABEL = {
-  'tiep-can': 'Tiếp cận', 'tu-van': 'Tư vấn (Concept)', 'bao-gia': 'Báo giá (Thiết kế - Khái toán)', 'dam-phan': 'Đàm phán',
+  'tiep-can': 'Tiếp cận', 'giao-ns': 'Nhân sự KD phụ trách', 'tu-van': 'Tư vấn (Concept)', 'bao-gia': 'Báo giá (Thiết kế - Khái toán)', 'dam-phan': 'Đàm phán',
   'chot-hd': 'Chốt hợp đồng', 'bao-gia-thi-cong': 'Báo giá (Thi công)', 'thiet-ke': 'Dự án (Thiết kế)', 'thi-cong': 'Dự án (Thi công)',
-  'truot-thau': 'Đã trượt thầu',
+  'khong-tham-gia': 'Không tham gia', 'truot-thau': 'Đã trượt thầu', 'spam': 'Spam',
 }
 /* Các giai đoạn được đồng bộ sang tab Dự án (localStorage siteflow-synced-projects) */
 export const SYNC_STAGES = ['thiet-ke', 'thi-cong', 'tu-van', 'dam-phan']
@@ -85,11 +86,12 @@ export const OV_ITEM_DEFS = {
   'kpi-lost-rate': { kind: 'kpi', x: 4, y: 2, w: 4, h: 2 },
   'kpi-partner-rate': { kind: 'kpi', x: 8, y: 2, w: 4, h: 2 },
   'trend': { kind: 'widget', x: 0, y: 4, w: 6, h: 5, minW: 3, minH: 3, title: 'Doanh số theo thời gian' },
-  'funnel': { kind: 'widget', x: 6, y: 4, w: 6, h: 3, minW: 3, minH: 3, title: 'Phễu bán hàng (Sales Funnel)' },
-  'upcoming': { kind: 'widget', x: 0, y: 9, w: 12, h: 4, minW: 3, minH: 2, title: 'Cơ hội sắp chốt' },
+  'funnel': { kind: 'widget', x: 6, y: 4, w: 6, h: 5, minW: 3, minH: 3, title: 'Phễu bán hàng (Sales Funnel)' },
+  'upcoming': { kind: 'widget', x: 0, y: 9, w: 6, h: 5, minW: 3, minH: 2, title: 'Cơ hội sắp chốt' },
+  'sources': { kind: 'widget', x: 6, y: 9, w: 6, h: 5, minW: 3, minH: 3, title: 'Nguồn khách hàng' },
 }
 export const OV_ITEM_ORDER = Object.keys(OV_ITEM_DEFS)
-export const OV_LAYOUT_KEY = 'siteflow-overview-layout-v1'
+export const OV_LAYOUT_KEY = 'siteflow-overview-layout-v3'
 export const OV_TREND_CHART_OPTIONS = [['line', 'Đường'], ['bar', 'Cột']]
 export const OV_FUNNEL_CHART_OPTIONS = [['bars', 'Thanh ngang'], ['columns', 'Cột dọc'], ['donut', 'Biểu đồ tròn']]
 
@@ -155,14 +157,23 @@ export const HANDOFF_CONFIG = {
 }
 
 /* ---------- Modal thêm khách hàng tiềm năng (3 cấp độ) ---------- */
-export const LEAD_STEPS = ['basic', 'detail', 'advanced']
+/* 2 bước: phần Chi tiết (loại dự án, quy mô, hạng mục, giai đoạn) gộp vào Cơ bản */
+export const LEAD_STEPS = ['basic', 'advanced']
 export const LEAD_STEP_TITLE = { basic: 'Cơ bản', detail: 'Chi tiết', advanced: 'Nâng cao' }
-export const LEAD_STEP_TAB_LABEL = { basic: '1. Cơ bản', detail: '2. Chi tiết', advanced: '3. Nâng cao' }
-export const LEAD_SOURCES = ['Giới thiệu', 'Website', 'Mạng xã hội', 'Sự kiện', 'Khác']
+export const LEAD_STEP_TAB_LABEL = { basic: '1. Cơ bản', detail: '2. Chi tiết', advanced: '2. Nâng cao' }
+/* Khu vực + 34 tỉnh / thành phố (sau sắp xếp 2025) theo miền; chọn tỉnh thì tự điền khu vực */
+export const LEAD_REGIONS = ['Miền Bắc', 'Miền Trung', 'Miền Nam', 'Nước ngoài']
+export const LEAD_PROVINCES = {
+  'Miền Bắc': ['Hà Nội', 'Hải Phòng', 'Quảng Ninh', 'Bắc Ninh', 'Hưng Yên', 'Ninh Bình', 'Phú Thọ', 'Thái Nguyên', 'Tuyên Quang', 'Lào Cai', 'Cao Bằng', 'Lạng Sơn', 'Sơn La', 'Điện Biên', 'Lai Châu'],
+  'Miền Trung': ['Thanh Hóa', 'Nghệ An', 'Hà Tĩnh', 'Quảng Trị', 'Huế', 'Đà Nẵng', 'Quảng Ngãi', 'Gia Lai', 'Khánh Hòa', 'Đắk Lắk', 'Lâm Đồng'],
+  'Miền Nam': ['TP. Hồ Chí Minh', 'Cần Thơ', 'Đồng Nai', 'Tây Ninh', 'Vĩnh Long', 'Đồng Tháp', 'An Giang', 'Cà Mau'],
+}
+export const regionOfProvince = t => Object.keys(LEAD_PROVINCES).find(r => LEAD_PROVINCES[r].indexOf(t) >= 0) || ''
+export const LEAD_SOURCES = ['Zalo', 'Hotline', 'Facebook', 'Email', 'Website']
 export const LEAD_PROJECT_TYPES = ['Nhà phố', 'Biệt thự', 'Chung cư', 'Văn phòng', 'Khác']
 export const LEAD_DEPT_OPTIONS = [['dan-dung', 'Phòng KD Dân dụng'], ['du-an', 'Phòng KD Dự Án']]
 export const LEAD_STAGE_OPTIONS = [
-  ['tiep-can', 'Tiếp cận'], ['tu-van', 'Tư vấn (Concept)'], ['bao-gia', 'Báo giá'], ['dam-phan', 'Đàm phán'], ['chot-hd', 'Chốt hợp đồng'],
+  ['tiep-can', 'Tiếp cận'], ['giao-ns', 'Nhân sự KD phụ trách'], ['tu-van', 'Tư vấn (Concept)'], ['bao-gia', 'Báo giá'], ['dam-phan', 'Đàm phán'], ['chot-hd', 'Chốt hợp đồng'],
 ]
 export const LEAD_CATEGORY_GROUPS = [
   { title: 'Thiết kế', items: ['Thiết kế kiến trúc', 'Thiết kế nội thất', 'Thiết kế cảnh quan'] },

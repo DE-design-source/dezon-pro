@@ -45,3 +45,32 @@
 .dp-foot button{padding:6px 8px !important; border-radius:8px; color:var(--dp-accent) !important; font-size:14px !important; font-weight:600;}
 .dp-foot button:hover:not(:disabled){background:var(--dp-tint);}
 .dp-foot button:disabled{opacity:.35; cursor:default;}
+
+/* variant="card": lịch dạng thẻ */
+.dp-pop.dp-card{--dp-accent:#F05A4F; --dp-tint:color-mix(in srgb, #F05A4F 12%, transparent); width:300px; padding:22px 20px 12px; border-radius:26px; background:var(--surface, #fff);
+  border:1px solid color-mix(in srgb, var(--border, #D1D5DB) 60%, transparent); box-shadow:0 18px 48px rgba(15,23,42,.16), 0 2px 8px rgba(15,23,42,.06);}
+.dp-card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+.dp-card-date{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.dp-card-date > b{font-size:34px; font-weight:700; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums;}
+.dp-card-date > span{display:flex; align-items:center; gap:2px;}
+.dp-card-month{padding:2px 0 !important; font-size:16px !important; font-weight:500; color:var(--text-muted, #8A8F98) !important;}
+.dp-card-month:hover{color:var(--dp-accent) !important;}
+.dp-card-nav{display:grid; place-items:center; width:24px; height:24px; border-radius:50%; color:var(--text-muted, #8A8F98) !important;}
+.dp-card-nav:not(.nx) svg{transform:rotate(180deg);}
+.dp-card-nav:hover{background:var(--dp-tint); color:var(--dp-accent) !important;}
+.dp-card-ic{flex:none; position:relative; width:46px; height:46px; padding:0 !important; border-radius:11px; overflow:hidden; background:var(--surface, #fff) !important;
+  border:1px solid color-mix(in srgb, var(--border, #D1D5DB) 80%, transparent) !important; box-shadow:0 2px 6px rgba(15,23,42,.10);}
+.dp-card-ic i{position:absolute; left:0; right:0; top:0; height:13px; background:var(--dp-accent);}
+.dp-card-ic em{position:absolute; left:8px; right:8px; top:19px; display:grid; grid-template-columns:repeat(4, 1fr); gap:3px 4px;}
+.dp-card-ic em s{width:4px; height:4px; border-radius:50%; background:color-mix(in srgb, var(--text-muted, #8A8F98) 55%, transparent); text-decoration:none;}
+.dp-card-ic em s:nth-child(7){background:var(--dp-accent);}
+.dp-card-ic.on, .dp-card-ic:hover{box-shadow:0 0 0 3px var(--dp-tint), 0 2px 6px rgba(15,23,42,.10);}
+.dp-card-bar{position:relative; height:4px; margin:14px 0 16px; border-radius:99px; background:color-mix(in srgb, var(--text-muted, #8A8F98) 16%, transparent); overflow:hidden;}
+.dp-card-bar i{position:absolute; left:0; top:0; bottom:0; border-radius:99px; background:var(--dp-accent); transition:width .2s ease;}
+.dp-card .dp-week span{font-size:13px; font-weight:500; text-transform:none; color:var(--text-muted, #8A8F98); padding-bottom:6px;}
+.dp-card .dp-grid{row-gap:4px;}
+.dp-card .dp-day{width:34px; height:30px; border-radius:8px; font-size:15px !important;}
+.dp-card .dp-day.on{box-shadow:0 2px 6px color-mix(in srgb, var(--dp-accent) 40%, transparent);}
+.dp-card .dp-months button{height:44px; border-radius:10px; font-size:14px !important;}
+.dp-card .dp-foot{margin-top:10px; padding-top:8px;}
+.dp-card .dp-foot button{font-size:13px !important;}

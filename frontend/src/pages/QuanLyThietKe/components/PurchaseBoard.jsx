@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   PO_STAGES, PO_PEOPLE, PO_DEPTS, PO_FLOW_TEMPLATES, TODAY, STATUS_LABEL, avatarColor, initials, parseD, dayDiff, fmt, fmtFull, statusOf, fmtMillion,
 } from '../../../data/quanLyThietKeData'
+import PoDetailFields, { PoViewSwitch, usePoView, newPoItem } from './PoDetailFields'
 
 const STEP_COLORS = ['var(--notstarted)', 'var(--accent)', 'var(--progress)', '#8b6fd6', '#2a9bb0', 'var(--done)', '#d9822b', '#c2185b', 'var(--overdue)']
 const STEP_KIND = [
@@ -81,7 +82,8 @@ function SearchAdd({ placeholder, options, onPick }) {
 
 /* Trang chi tiết mua hàng dạng kanban — mở khi bấm công việc thuộc giai đoạn "Mua hàng & cung ứng".
    Mỗi đơn có người & phòng ban phụ trách; quy trình (các bước) chỉnh sửa / khởi tạo từ mẫu được cho từng công việc. */
-export default function PurchaseBoard({ task, items, open, onClose, onMove, onUpdateItems, onSaveFlow }) {
+export default function PurchaseBoard({ task, items, open, projectName, meName, onClose, onMove, onUpdateItems, onSaveFlow }) {
+  const [pdView, pickView] = usePoView() // chế độ xem phiếu chi tiết đơn: default | columns | groups
   const [dragId, setDragId] = useState(null)
   const [overStage, setOverStage] = useState(null)
   const [detailId, setDetailId] = useState(null) // đơn đang xem chi tiết
@@ -150,6 +152,17 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
     setToast(`Đã giao ${it.code} cho ${name} · đã gửi thông báo`)
   }
   const removeAssignee = (it, name) => updateItem(it.id, { assignees: assigneesOf(it).filter(n => n !== name) })
+  function addItem() {
+    const it = newPoItem(list, stages, meName, task)
+    onUpdateItems(task.id, l => [...(l || []), it])
+    setDetailId(it.id)
+    setPicker(null)
+  }
+  function removeItem(it) {
+    if (!window.confirm('Xoá đơn ' + it.code + ' - ' + it.item + '?')) return
+    setDetailId(null)
+    onUpdateItems(task.id, l => l.filter(x => x.id !== it.id))
+  }
   function setDept(it, dept) {
     updateItem(it.id, { dept })
     if (!dept) return
@@ -232,6 +245,7 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
             <h2>{task ? task.name : '—'}</h2>
           </div>
           <span className="tk-pb-grow" />
+          {task && <button className="tk-pb-btn primary" onClick={addItem} title="Tạo đơn mua hàng mới cho công việc này">{IcPlus}Thêm đơn mua hàng</button>}
           {task && <button className="tk-pb-btn" onClick={() => openFlow(false)} title="Chỉnh sửa / khởi tạo quy trình mua hàng">{IcFlow}Quy trình</button>}
           <div className="tk-pb-bell-wrap">
             <button className={`tk-pb-btn icon${bellOpen ? ' on' : ''}`} onClick={() => setBellOpen(o => !o)} title="Thông báo đã gửi">
@@ -296,7 +310,9 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
                     <span>{stepOwners(stage).length ? (stepOwners(stage).length > 1 ? `${stepOwners(stage)[0]} +${stepOwners(stage).length - 1}` : stepOwners(stage)[0]) : 'Chưa giao người phụ trách'}{stepDepts(stage).length ? <em> · {stepDepts(stage).join(', ')}</em> : null}</span>
                   </button>
                   <div className="tk-pb-cards">
-                    {cards.length === 0 && <div className="tk-pb-empty">Kéo thả đơn vào đây</div>}
+                    {cards.length === 0 && (si === 0 && list.length === 0
+                      ? <button type="button" className="tk-pb-empty add" onClick={addItem}>+ Thêm đơn mua hàng</button>
+                      : <div className="tk-pb-empty">Kéo thả đơn vào đây</div>)}
                     {cards.map(it => {
                       const late = isPending(it) && parseD(it.due) < TODAY
                       const soon = !late && isPending(it) && dayDiff(TODAY, parseD(it.due)) <= 7
@@ -345,14 +361,17 @@ export default function PurchaseBoard({ task, items, open, onClose, onMove, onUp
           </div>
 
           {detail && (
-            <aside className="tk-pb-detail">
+            <aside className={`tk-pb-detail v-${pdView}`}>
               <div className="tk-pb-detail-head">
                 <div><span className="mono tk-pb-code">{detail.code}</span><h3>{detail.item}</h3></div>
-                <button className="tk-pb-btn icon" onClick={() => setDetailId(null)} title="Đóng">{IcX}</button>
+                <span className="tk-pd-headbtns">
+                  <button className="tk-pb-btn icon" onClick={() => removeItem(detail)} title="Xoá đơn">{IcTrash}</button>
+                  <button className="tk-pb-btn icon" onClick={() => setDetailId(null)} title="Đóng">{IcX}</button>
+                </span>
               </div>
-              <div className="tk-pb-kv"><span>Nhà cung cấp</span><b>{detail.supplier}</b></div>
-              <div className="tk-pb-kv"><span>Khối lượng · Giá trị</span><b className="mono">{detail.qty} · {fmtMillion(detail.value)}</b></div>
-              <div className="tk-pb-kv"><span>Ngày giao dự kiến</span><b className="mono">{fmtFull(parseD(detail.due))}</b></div>
+              <PoViewSwitch view={pdView} onPick={pickView} />
+              <PoDetailFields item={detail} task={task} projectName={projectName} stage={byKey[detail.stage]} view={pdView} onPatch={p => updateItem(detail.id, p)} suppliers={list.map(it => it.supplier)} />
+              <div className="tk-pd-sub">Quy trình &amp; phụ trách</div>
               <label className="tk-pb-field">
                 <span>Bước hiện tại</span>
                 <select value={detail.stage} onChange={e => moveTo(detail, e.target.value)}>

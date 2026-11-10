@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { STAGES, STAGE_LABEL, DEPT_LABEL } from '../../../data/kinhDoanhData'
+import { useKdMap, saveKdOptions } from './ShortlistSelect'
 import { fmtTy, stageAccent, lmInitials } from '../utils'
 
 /* Trang khách hàng riêng: hồ sơ, tiến trình pipeline, lịch sử chăm sóc & chi tiết từng lần tương tác */
@@ -64,6 +65,28 @@ function FlowStrip({ stageKey, children }) {
   )
 }
 
+/* Đánh giá tiềm năng 1-5 sao (lưu chung công ty: kdOptions.rating {mã lead: số sao}); bấm lại đúng số sao đang chọn = bỏ đánh giá.
+   small: bản gọn trên thẻ Pipeline (không nhãn chữ, bấm không mở thẻ / không kéo thẻ) */
+const RATE_LABEL = ['', 'Rất thấp', 'Thấp', 'Trung bình', 'Cao', 'Rất cao']
+export function RatingStars({ id, small }) {
+  const map = useKdMap('rating')
+  const v = Number(map[id]) || 0
+  const [hov, setHov] = useState(0)
+  const set = n => { const m = { ...map }; if (n === v) delete m[id]; else m[id] = n; saveKdOptions('rating', m) }
+  const show = hov || v
+  return (
+    <span className={'kd-cp-stars' + (small ? ' sm' : '')} onMouseLeave={() => setHov(0)} title={v ? 'Tiềm năng: ' + RATE_LABEL[v] + ' (bấm lại để bỏ)' : 'Đánh giá tiềm năng'}
+      onClick={small ? e => e.stopPropagation() : undefined} draggable={small ? false : undefined} onDragStart={small ? e => { e.preventDefault(); e.stopPropagation() } : undefined}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <button key={n} type="button" className={n <= show ? 'on' : ''} onMouseEnter={() => setHov(n)} onClick={() => set(n)} aria-label={n + ' sao'}>
+          <svg width={small ? 13 : 16} height={small ? 13 : 16} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
+        </button>
+      ))}
+      {!small && <em>{show ? RATE_LABEL[show] : 'Chưa đánh giá'}</em>}
+    </span>
+  )
+}
+
 const Ic = ({ d, size = 15 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 
 export default function CustomerPage({ lead: l, interactions, onAddInteraction, onBack, onEdit, onMove, me }) {
@@ -83,7 +106,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   const list = interactions.filter(x => filter === 'all' || x.type === filter)
   const upcoming = interactions.filter(x => x.next).map(x => ({ date: x.next, note: x.nextNote || `Theo dõi sau: ${x.title}`, from: x })).sort((a, b) => a.date.localeCompare(b.date))
   const last = interactions[0]
-  const flow = STAGES.filter(s => s !== 'truot-thau')
+  const flow = STAGES.filter(s => s !== 'khong-tham-gia' && s !== 'truot-thau' && s !== 'spam')
   const cur = flow.indexOf(l.stage)
   const counts = Object.fromEntries(Object.keys(INTERACTION_TYPES).map(k => [k, interactions.filter(x => x.type === k).length]))
   function save() {
@@ -96,15 +119,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
     <div className="kd-cp">
       <div className="kd-cp-head">
         <button className="kd-cp-back" onClick={onBack} title="Quay lại (Esc)"><Ic d="M19 12H5M12 19l-7-7 7-7" />Khách hàng</button>
-        <span className="kd-cp-avatar">{lmInitials(l.name)}</span>
         <div className="kd-cp-title">
           <h2>{l.name}</h2>
           <div><span className="kd-cp-stage" style={{ background: accent ? accent.bg : 'var(--sales-tint)', color: accent ? accent.color : 'var(--sales)' }}>{STAGE_LABEL[l.stage]}</span><span>{l.type} · {fmtTy(l.value)} · {DEPT_LABEL[l.dept]}</span></div>
         </div>
         <span style={{ flex: 1 }} />
         {l.phone && <a className="kd-cp-btn" href={`tel:${l.phone.replace(/\s/g, '')}`}><Ic d={INTERACTION_TYPES.call.icon} size={14} />Gọi</a>}
-        <button className="kd-cp-btn" onClick={onEdit}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />Sửa thông tin</button>
-        <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác</button>
       </div>
 
       {/* tiến trình pipeline */}
@@ -115,17 +135,24 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           </button>
         ))}
         {l.stage === 'truot-thau' && <span className="kd-cp-lost">Đã trượt thầu</span>}
+        {l.stage === 'spam' && <span className="kd-cp-lost">Spam</span>}
+        {l.stage === 'khong-tham-gia' && <span className="kd-cp-lost">Không tham gia</span>}
       </FlowStrip>
 
       <div className="kd-cp-body">
         <aside className="kd-cp-side">
           <section>
-            <h4>Thông tin liên hệ</h4>
+            <h4>Thông tin liên hệ
+              <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin" onClick={onEdit}>
+                <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
+              </button>
+            </h4>
             <dl>
               <dt>Điện thoại</dt><dd>{l.phone || '—'}</dd>
               <dt>Email</dt><dd>{l.email || '—'}</dd>
               <dt>Địa chỉ</dt><dd>{l.address || '—'}</dd>
               <dt>Nguồn</dt><dd>{l.source || '—'}</dd>
+              <dt>Tiềm năng</dt><dd><RatingStars id={String(l.id)} /></dd>
             </dl>
           </section>
           <section>
@@ -191,12 +218,21 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           <div className="kd-cp-card">
             <div className="kd-cp-tl-head">
               <h3>Lịch sử chăm sóc</h3>
+              <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác</button>
+              <span style={{ flex: 1 }} />
               <div className="kd-cp-filter">
                 <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tất cả ({interactions.length})</button>
                 {Object.entries(INTERACTION_TYPES).filter(([k]) => counts[k]).map(([k, t]) => <button key={k} className={filter === k ? 'active' : ''} onClick={() => setFilter(k)}>{t.label} ({counts[k]})</button>)}
               </div>
             </div>
-            {list.length === 0 && <div className="kd-cp-empty">Chưa có tương tác nào{filter !== 'all' ? ' thuộc loại này' : ''}. Bấm "Ghi nhận tương tác" để thêm.</div>}
+            {list.length === 0 && (
+              <div className="kd-cp-empty">
+                <span className="ic"><Ic d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" size={22} /></span>
+                <b>Chưa có tương tác nào{filter !== 'all' ? ' thuộc loại này' : ''}</b>
+                <span>Ghi lại cuộc gọi, tin nhắn, buổi gặp… để cả nhóm theo dõi quá trình chăm sóc khách hàng.</span>
+                <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác đầu tiên</button>
+              </div>
+            )}
             <ol className="kd-cp-tl">
               {list.map(x => {
                 const t = INTERACTION_TYPES[x.type] || INTERACTION_TYPES.note

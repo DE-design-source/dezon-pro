@@ -51,8 +51,9 @@ func protoCol(k string) (string, bool) {
 // ntkInfo: hồ sơ nhà thiết kế (mảng {id, loai: kts|studio, ten, ...}), lưu theo công ty - trang Nhà thiết kế.
 // nccInfo: hồ sơ nhà cung cấp {thương hiệu: {gioiThieu, ..., doiTac: [...], catalogue: [...]}}, lưu theo công ty - tab Giới thiệu / Đối tác / Catalogue.
 // daPhuTrach: nhân sự phụ trách từng dự án {mã bản nháp đầu của dự án: [tên đăng nhập]}, lưu theo công ty ('__cty') - cột Phụ trách ở Danh sách dự án (Bảng điều khiển).
+// kdOptions: mục tự thêm vào danh sách chọn của form khách hàng tiềm năng (Kinh doanh) {source: [...], manager: [...]}, lưu theo công ty ('__cty').
 // mhExtra: phần sửa tay của tab Mua hàng theo NCC {ncc: {rows: [{id, ten, dvt, sl, donGia, ghiChu}], cols: [{id, ten}], vals: {khoá dòng: {id cột: chữ}}, note}} - hàng thêm cộng vào tổng + gửi kèm đơn NCC.
-var projDataKeys = []string{"phanTho", "area", "ptInfo", "ptVat", "cpCfg", "bgCfg", "bgHist", "bgOrg", "mhPay", "btFmt", "anhDuAn", "boqFiles", "nccLogo", "nccInfo", "ntkInfo", "bgTuy", "vatHm", "mkAds", "mhExtra", "daPhuTrach"}
+var projDataKeys = []string{"phanTho", "area", "ptInfo", "ptVat", "cpCfg", "bgCfg", "bgHist", "bgOrg", "mhPay", "btFmt", "anhDuAn", "boqFiles", "nccLogo", "nccInfo", "ntkInfo", "bgTuy", "vatHm", "mkAds", "mhExtra", "daPhuTrach", "kdOptions"}
 
 // daDataHD = DA_DATA_HD (store_supa.js:1098).
 const daDataHD = "Bảng du_an_data chưa được cấp quyền ghi — kiểm tra quyền của tài khoản database trong DATABASE_URL rồi thử lại."

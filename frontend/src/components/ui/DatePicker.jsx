@@ -1,6 +1,7 @@
 /* Ô chọn ngày dùng chung, lịch kiểu iOS thay cho lịch của trình duyệt (không đổi được font / màu).
    <DatePicker value="2026-11-04" onChange={iso => ...} min max clearable ariaLabel /> — giá trị dạng YYYY-MM-DD như input type=date.
-   Lịch vẽ trong cây DOM của ô (position:fixed) nên ăn font / màu của trang chứa nó. */
+   Lịch vẽ trong cây DOM của ô (position:fixed) nên ăn font / màu của trang chứa nó.
+   variant="card": lịch dạng thẻ (số ngày lớn + tháng, biểu tượng lịch, thanh tiến độ trong tháng, ngày chọn ô vuông đỏ). */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import './DatePicker.css'
@@ -12,7 +13,7 @@ const parse = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return
 const today = () => { const n = new Date(); return toIso(n.getFullYear(), n.getMonth(), n.getDate()) }
 const POP_W = 312, POP_H = 380
 
-export default function DatePicker({ value, onChange, min, max, clearable, ariaLabel, className, placeholder = 'dd/mm/yyyy' }) {
+export default function DatePicker({ value, onChange, min, max, clearable, ariaLabel, className, placeholder = 'dd/mm/yyyy', variant }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(null)    // {y, m}: tháng đang xem
   const [mode, setMode] = useState('day')   // 'day' | 'month': bảng chọn tháng / năm
@@ -91,7 +92,33 @@ export default function DatePicker({ value, onChange, min, max, clearable, ariaL
         <Icon name="calendar" size={15} />
       </button>
       {open && view && (
-        <div ref={popRef} className="dp-pop" role="dialog" aria-label={ariaLabel || 'Chọn ngày'} style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}>
+        <div ref={popRef} className={'dp-pop' + (variant === 'card' ? ' dp-card' : '')} role="dialog" aria-label={ariaLabel || 'Chọn ngày'} style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}>
+          {variant === 'card' ? (() => {
+            const t = parse(today())
+            const inView = x => x && x.y === view.y && x.m === view.m
+            const day = inView(v) ? v.d : inView(t) ? t.d : null
+            const n = new Date(view.y, view.m + 1, 0).getDate()
+            return (
+              <>
+                <div className="dp-card-head">
+                  <div className="dp-card-date">
+                    <b>{day || '–'}</b>
+                    <span>
+                      <button type="button" className="dp-card-month" onClick={() => setMode(m => (m === 'day' ? 'month' : 'day'))} title="Chọn tháng / năm">
+                        {mode === 'day' ? 'Tháng ' + (view.m + 1) + ', ' + view.y : 'Năm ' + view.y}
+                      </button>
+                      <button type="button" className="dp-card-nav" title={mode === 'day' ? 'Tháng trước' : 'Năm trước'} onClick={() => shift(mode === 'day' ? -1 : -12)}><Icon name="chevron" size={14} stroke={2.5} /></button>
+                      <button type="button" className="dp-card-nav nx" title={mode === 'day' ? 'Tháng sau' : 'Năm sau'} onClick={() => shift(mode === 'day' ? 1 : 12)}><Icon name="chevron" size={14} stroke={2.5} /></button>
+                    </span>
+                  </div>
+                  <button type="button" className={'dp-card-ic' + (mode === 'month' ? ' on' : '')} onClick={() => setMode(m => (m === 'day' ? 'month' : 'day'))} title="Chọn tháng / năm">
+                    <i /><em>{Array.from({ length: 12 }, (_, k) => <s key={k} />)}</em>
+                  </button>
+                </div>
+                <div className="dp-card-bar" aria-hidden="true"><i style={{ width: (day ? Math.round((day / n) * 100) : 0) + '%' }} /></div>
+              </>
+            )
+          })() : (
           <div className="dp-head">
             <button type="button" className={'dp-title' + (mode === 'month' ? ' on' : '')} onClick={() => setMode(m => (m === 'day' ? 'month' : 'day'))}>
               {mode === 'day' ? 'Tháng ' + (view.m + 1) + ' ' + view.y : view.y}<Icon name="chevron" size={15} stroke={2.5} />
@@ -101,6 +128,7 @@ export default function DatePicker({ value, onChange, min, max, clearable, ariaL
               <button type="button" title={mode === 'day' ? 'Tháng sau' : 'Năm sau'} onClick={() => shift(mode === 'day' ? 1 : 12)}><Icon name="chevron" size={18} stroke={2.5} /></button>
             </span>
           </div>
+          )}
           {body}
           <div className="dp-foot">
             <button type="button" disabled={off(today())} onClick={() => pick(today())}>Hôm nay</button>

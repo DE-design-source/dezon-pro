@@ -3,7 +3,7 @@ import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
 import {
   SALES_TABS, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, DEPT_LABEL,
-  DESIGN_STAGES, DESIGN_LABEL, DESIGN_COLOR, CONSTRUCTION_STAGES, CONSTRUCTION_LABEL, CONSTRUCTION_COLOR,
+  DESIGN_STAGES, DESIGN_LABEL, DESIGN_COLOR, CONSTRUCTION_STAGES, CONSTRUCTION_LABEL, CONSTRUCTION_COLOR, STAGE_LABEL,
 } from '../../data/kinhDoanhData'
 import { fmtTy, matchesTimeFilter } from './utils'
 import { addKdRequest } from '../../services/kdRequestService'
@@ -12,6 +12,9 @@ import PipelineTab from './components/PipelineTab'
 import SubBoard from './components/SubBoard'
 import TasksTab from './components/TasksTab'
 import LeadModal from './components/LeadModal'
+import StaffRequestModal from './components/StaffRequestModal'
+import ConfirmDelete from './components/ConfirmDelete'
+import { useKdMap, saveKdOptions } from './components/ShortlistSelect'
 import CustomerPage from './components/CustomerPage'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
@@ -81,9 +84,24 @@ function KinhDoanhPage() {
   }
 
   /* ---------- Chuyển giai đoạn (moveLead) ---------- */
+  const geoMap = useKdMap('geo')
+  /* Kéo thẻ vào "Nhân sự KD phụ trách": hiện phiếu yêu cầu nhân sự trước, xác nhận mới chuyển giai đoạn */
+  const [staffReq, setStaffReq] = useState({ open: false, leadId: null, seq: 0 })
+  function confirmStaffReq(newAssignees, note) {
+    const lead = leads.find(l => sameId(l.id, staffReq.leadId))
+    setStaffReq(r => ({ ...r, open: false }))
+    if (!lead) return
+    patchLead(lead.id, { stage: 'giao-ns', ...(newAssignees.length ? { assignees: [...(lead.assignees || []), ...newAssignees] } : null) })
+    const ten = newAssignees.map(a => a.name).join(', ')
+    if (note || ten) {
+      const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      addInteraction(lead, { type: 'note', date: iso, by: meName, title: 'Yêu cầu nhân sự KD phụ trách', content: [ten ? 'Giao: ' + ten : '', note].filter(Boolean).join('\n'), outcome: 'good', next: '', nextNote: '' })
+    }
+  }
   function moveLead(id, newStage) {
     const lead = leads.find(l => sameId(l.id, id))
     if (!lead || lead.stage === newStage) return
+    if (newStage === 'giao-ns') { setStaffReq(r => ({ open: true, leadId: lead.id, seq: r.seq + 1 })); return }
     /* tu-van / dam-phan / thiet-ke: máy chủ tạo / cập nhật dự án ở Quản lý thiết kế + Quản lý dự án; giai đoạn khác: gỡ */
     patchLead(lead.id, { stage: newStage })
     const cfg = HANDOFF_CONFIG[newStage]
@@ -91,22 +109,34 @@ function KinhDoanhPage() {
     if (cfg) setHandoff(h => ({ open: true, leadId: lead.id, stageKey: newStage, seq: h.seq + 1 }))
   }
 
+  /* Xoá khách hàng: hộp xác nhận ở giữa màn hình (ConfirmDelete) thay window.confirm */
+  const [delId, setDelId] = useState(null)
+  const delLead = delId != null ? leads.find(l => sameId(l.id, delId)) : null
   function deleteLead(id) {
-    const lead = leads.find(l => sameId(l.id, id))
+    if (leads.find(l => sameId(l.id, id))) setDelId(id)
+  }
+  function doDelete() {
+    const lead = delLead
+    setDelId(null)
     if (!lead) return
-    if (!window.confirm('Xoá lead "' + lead.name + '"? Hành động này không thể hoàn tác.')) return
     kdApi.deleteLead(lead.id).then(() => {
       setLeads(prev => prev.filter(l => !sameId(l.id, lead.id)))
     }, e => alert('Không xoá được: ' + e.message))
   }
 
   /* ---------- Modal thêm / sửa lead ---------- */
-  const openLeadModal = id => setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 }))
+  const openLeadModal = id => { setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 })); if (scrollRef.current) scrollRef.current.scrollTop = 0 }
   const closeLeadModal = () => setLeadModal(m => ({ ...m, open: false }))
-  async function saveLead(data) {
+  async function saveLead(input) {
+    const { _geo: geo, ...data } = input   // Khu vực / Tỉnh-TP: lưu riêng kdOptions.geo (máy chủ chưa có cột)
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
+      if (geo) {
+        const m = { ...geoMap }
+        if (geo.kv || geo.tinh) m[String(saved.id)] = geo; else delete m[String(saved.id)]
+        saveKdOptions('geo', m)
+      }
       setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [...prev, saved]))
       closeLeadModal()
     } catch (e) {
@@ -223,6 +253,9 @@ function KinhDoanhPage() {
 
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
       <div ref={scrollRef} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
+        {/* Thêm / sửa khách hàng tiềm năng: trang đầy đủ thay chỗ nội dung tab (không còn hộp nổi) */}
+        <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} onClose={closeLeadModal} onSave={saveLead} />
+        <div style={leadModal.open ? { display: 'none' } : { display: 'contents' }}>
         {detail.open && detailLead && (
           <CustomerPage
             lead={detailLead}
@@ -242,7 +275,7 @@ function KinhDoanhPage() {
         </div>
 
         {/* ================= TAB: PIPELINE ================= */}
-        <div style={panel('pipeline', 14)}>
+        <div className="kd-pl-panel" style={panel('pipeline', 14)}>
           <PipelineTab
             leads={filteredLeads} dept={dept} onDeptChange={setDept} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter}
             scrollRef={scrollRef} onMove={moveLead} onDelete={deleteLead}
@@ -273,10 +306,14 @@ function KinhDoanhPage() {
           <DeptStaff units={['kddd', 'kdda']} title="Kinh doanh" />
         </div>
         </div>
+        </div>
       </div>
 
       {/* ---------- Modal (render bên trong .kd-page để dùng chung biến màu) ---------- */}
-      <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} onClose={closeLeadModal} onSave={saveLead} />
+      <StaffRequestModal key={`srq-${staffReq.seq}`} open={staffReq.open} lead={staffReq.leadId ? leads.find(l => sameId(l.id, staffReq.leadId)) : null}
+        onClose={() => setStaffReq(r => ({ ...r, open: false }))} onConfirm={confirmStaffReq} />
+      <ConfirmDelete open={!!delLead} name={delLead ? delLead.name : ''} detail={delLead ? [delLead.type, STAGE_LABEL[delLead.stage]].filter(Boolean).join(' · ') : ''}
+        onCancel={() => setDelId(null)} onConfirm={doDelete} />
       <HandoffModal key={`handoff-${handoff.seq}`} open={handoff.open} lead={handoffLead} stageKey={handoff.stageKey} onClose={closeHandoff} onSend={sendHandoff} onSelf={selfQuote} />
       <TaskModal key={`task-${taskModal.seq}`} open={taskModal.open} steps={steps} onClose={() => setTaskModal(m => ({ ...m, open: false }))} onSubmit={createTask} />
 

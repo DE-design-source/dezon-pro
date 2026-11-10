@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom'
 import { useWorkSession } from '../../../services/workSession'
 import DatePicker from '../../../components/ui/DatePicker'
 import * as qsApi from '../../QS/api/qsApi'
+import { LEAD_SOURCES } from '../../../data/kinhDoanhData'
+import { useKdOptions } from '../../KinhDoanh/components/ShortlistSelect'
+import AdsLeadDash from './AdsLeadDash'
 
 /* Tab "Chi tiêu quảng cáo": chi tiêu hằng ngày theo kênh (Facebook, Google Ads...). Gồm: ô số tổng · BẢNG NHẬP (ngày x kênh, gõ thẳng) ·
    chi theo ngày · chi theo kênh; nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
@@ -248,6 +251,17 @@ export default function AdsSpendTab({ visible }) {
   /* nút + thêm kênh: căn đúng giữa cột trống cuối bảng (đo vị trí ô th.them so với khung, đo lại khi đổi cỡ / cuộn ngang) */
   const boxRef = useRef(null)
   const [themX, setThemX] = useState(null)
+  /* + thêm kênh: danh sách xổ gợi ý từ "Nguồn khách hàng" của tab Kinh doanh (mặc định + nguồn công ty tự thêm), gõ tên khác để thêm kênh mới */
+  const kdNguon = useKdOptions('source')
+  const [themMo, setThemMo] = useState(false)
+  const [themQ, setThemQ] = useState('')
+  const themRef = useRef(null)
+  useEffect(() => {
+    if (!themMo) return undefined
+    const out = e => { if (themRef.current && !themRef.current.contains(e.target) && !(e.target.closest && e.target.closest('.mk-ads-themk'))) setThemMo(false) }
+    document.addEventListener('mousedown', out)
+    return () => document.removeEventListener('mousedown', out)
+  }, [themMo])
   useEffect(() => {
     const box = boxRef.current
     if (!box) return undefined
@@ -344,6 +358,10 @@ export default function AdsSpendTab({ visible }) {
   const xemTong = ptDs_({ t: data.xemTong }, 't')
   // cột Tổng ngày: Tổng quan = quản trị + người được giao xem; Trang nhập = luôn có (tổng các kênh của chính người đó)
   const thayTong = trang === 'nhap' || quanTri || xemTong.some(u => u.toLowerCase() === toi)
+  /* người được xem báo cáo "Hiệu quả kênh" (xemHq, quản trị giao). Luôn xem được: quản trị (admin / super) và quản lý
+     = người được xem cột Tổng ngày (xemTong, vd BOD / trưởng phòng Marketing). Người khác không thấy báo cáo. */
+  const xemHq = ptDs_({ t: data.xemHq }, 't')
+  const thayHq = !online || quanTri || xemTong.some(u => u.toLowerCase() === toi) || xemHq.some(u => u.toLowerCase() === toi)
   const tenNguoi = u => { const x = users.find(y => String(y.username).toLowerCase() === String(u).toLowerCase()); return x ? (x.hoTen || x.username) : u }
   /* đặt danh sách người phụ trách của kênh k (mảng rỗng = chưa giao) */
   function giaoKenh(k, ds) { const m = { ...pt }; if (ds && ds.length) m[k] = ds; else delete m[k]; setData({ ...data, phuTrach: m }) }
@@ -399,9 +417,10 @@ export default function AdsSpendTab({ visible }) {
     setData({ ...data, ngay: ngay.filter(x => x.v.some(y => y != null)) })
     setNhanh({ ...nhanh, so: {} }); setLoi('')
   }
-  function themKenh() {
-    const ten = (window.prompt('Tên kênh mới (vd: TikTok Ads)') || '').trim()
+  function themKenh(ten) {
+    ten = String(ten || '').trim()
     if (!ten) return
+    setThemMo(false); setThemQ('')
     if (data.kenh.indexOf(ten) >= 0) { setLoi('Kênh "' + ten + '" đã có'); return }
     setData({ ...data, kenh: data.kenh.concat([ten]), ngay: data.ngay.map(x => ({ d: x.d, v: x.v.concat([null]) })) })
   }
@@ -643,9 +662,47 @@ export default function AdsSpendTab({ visible }) {
             <tfoot><tr><td>Tổng</td>{thayTong && <td className="num b k tong">{fmt(v.tong)}</td>}{kenhThay.map(i => <td key={data.kenh[i]} className="num k">{fmt(v.tkI[i])}</td>)}<td /></tr></tfoot>
           </table>
         </div>
-        {ql && <button type="button" className="mk-ads-themk" style={themX != null ? { left: themX, right: 'auto' } : undefined} title="Thêm kênh (cột) mới" aria-label="Thêm kênh" onClick={themKenh}>+</button>}
+        {ql && <button type="button" className="mk-ads-themk" style={themX != null ? { left: themX, right: 'auto' } : undefined} title="Thêm kênh (cột) mới" aria-label="Thêm kênh" onClick={() => { setThemMo(o => !o); setThemQ('') }}>+</button>}
+        {ql && themMo && (() => {
+          const q = themQ.trim()
+          const ql_ = q.toLowerCase()
+          const nguon = [...LEAD_SOURCES, ...kdNguon.filter(x => LEAD_SOURCES.indexOf(x) < 0)]
+          const goiY = nguon.filter(x => data.kenh.indexOf(x) < 0 && (!ql_ || x.toLowerCase().indexOf(ql_) >= 0))
+          const co = data.kenh.some(k => k.toLowerCase() === ql_) || goiY.some(x => x.toLowerCase() === ql_)
+          return (
+            <div ref={themRef} className="mk-ads-thempop" style={themX != null ? { left: themX } : { right: 12 }}>
+              <input autoFocus value={themQ} placeholder="Gõ tên kênh mới hoặc chọn nguồn…" onChange={e => setThemQ(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && q) { e.preventDefault(); themKenh(goiY.find(x => x.toLowerCase() === ql_) || q) }
+                  if (e.key === 'Escape') setThemMo(false)
+                }} />
+              <div className="hd">Nguồn khách hàng · Kinh doanh</div>
+              <div className="ls">
+                {goiY.map(x => <button key={x} type="button" onClick={() => themKenh(x)}><i />{x}</button>)}
+                {!goiY.length && <div className="em">{q ? 'Không có nguồn trùng' : 'Các nguồn đã có đủ trong bảng'}</div>}
+              </div>
+              {q && !co && <button type="button" className="add" onClick={() => themKenh(q)}>+ Thêm kênh "{q}"</button>}
+            </div>
+          )
+        })()}
         </div>
       </div>
+
+      {/* hiệu quả kênh: chi tiêu (bảng trên) ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
+      {thayHq && <AdsLeadDash
+        visible={visible}
+        access={quanTri && online ? (
+          <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
+            {xemHq.map(u => (
+              <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
+                onClick={() => { if (window.confirm('Bỏ quyền xem báo cáo Hiệu quả kênh của ' + tenNguoi(u) + '?')) setData({ ...data, xemHq: xemHq.filter(x => x !== u) }) }}>{avChu(tenNguoi(u))}</button>
+            ))}
+            {users.length > 0 && <PtPicker ds={xemHq} users={users} onChange={m => setData({ ...data, xemHq: m })} />}
+          </div>
+        ) : null}
+        data={data}
+        kenh={v.theoKenh.map(x => x.k)}
+      />}
 
       {/* chi theo kênh: bấm để bật / tắt kênh khỏi tổng (ô số, biểu đồ) */}
       <div className="mk-ads-card">
