@@ -44,8 +44,8 @@ export function prodHmuc_(p, specs){ var h=(p&&p.hangMuc)||'';
 export function hmucOptions(products, node, specs){ var s={}, ngF=vsFltNganh_(node);   // đề mục có spec riêng: chỉ liệt kê hạng mục của ngành đó
   (products||[]).forEach(function(p){ if(ngF&&nganhCuaSP_(p, specs)!==ngF) return; var n=prodHmuc_(p, specs); if(n) s[n]=(s[n]||0)+1; }); return s; }
 
-/* Đề mục có bộ thông số riêng: 3.2.5 vệ sinh · 3.2.2 sơn nước · 3.2.6.2 công tắc - ổ cắm · 3.2.7 điện lạnh */
-export const VS_FLT_NODE={'3.2.5':'vs','3.2.2':'son','3.2.6.2':'ct','3.2.7':'dl'};
+/* Đề mục có bộ thông số riêng: 3.2.5 vệ sinh · 3.2.2 sơn nước · 3.2.6.2 công tắc - ổ cắm · 3.2.7 điện lạnh · 3.2.4 gạch ốp lát */
+export const VS_FLT_NODE={'3.2.5':'vs','3.2.2':'son','3.2.6.2':'ct','3.2.7':'dl','3.2.4':'gach'};
 export function vsFltNganh_(node){ return VS_FLT_NODE[node]||''; }
 export function vsFltOn_(node){ return !!vsFltNganh_(node); }
 export function vsFltSpec_(node, specs){ return specNganh_(vsFltNganh_(node)||'vs', specs); }
@@ -57,7 +57,7 @@ export function vsFltHM_(fNhomSet, node, specs){
 }
 export function vsFltKeys_(fNhomSet, node, specs){
   var SP=vsFltSpec_(node, specs), hm=vsFltHM_(fNhomSet, node, specs);
-  if(!hm) return (vsFltNganh_(node)==='son')?['BỀ MẶT HOÀN THIỆN','KÍCH THƯỚC']:((vsFltNganh_(node)==='ct')?['LOẠI CẤU KIỆN','MÀU SẮC','KIỂU LẮP ĐẶT']:((vsFltNganh_(node)==='dl')?['LOẠI MÁY','CHẾ ĐỘ VẬN HÀNH','CÔNG NGHỆ MÁY NÉN','MÔI CHẤT LẠNH (GAS)']:['MÀU SẮC','KIỂU LẮP ĐẶT']));
+  if(!hm) return (vsFltNganh_(node)==='son')?['BỀ MẶT HOÀN THIỆN','KÍCH THƯỚC']:((vsFltNganh_(node)==='ct')?['LOẠI CẤU KIỆN','MÀU SẮC','KIỂU LẮP ĐẶT']:((vsFltNganh_(node)==='dl')?['LOẠI MÁY','CHẾ ĐỘ VẬN HÀNH','CÔNG NGHỆ MÁY NÉN','MÔI CHẤT LẠNH (GAS)']:((vsFltNganh_(node)==='gach')?['KÍCH THƯỚC','BỀ MẶT HOÀN THIỆN','XƯƠNG GẠCH','CHỐNG TRƠN']:['MÀU SẮC','KIỂU LẮP ĐẶT'])));
   return SP.labelsOf(hm).filter(function(lb){ return SP.METRIC[lb][2]==='sel'; });
 }
 export function vsProds_(products, node, specs){ var ng=vsFltNganh_(node)||'vs'; return (products||[]).filter(function(p){ return nganhCuaSP_(p, specs)===ng; }); }

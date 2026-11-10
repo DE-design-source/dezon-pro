@@ -158,7 +158,7 @@ func decodeBase64(s string) []byte {
 }
 
 // specOf: bộ thông số theo hạng mục của ngành - 'vs' (thiết bị vệ sinh) · 'son' (sơn nước) · 'ct' (công tắc - ổ cắm)
-// · 'dl' (điện lạnh, chỉ bản Go)
+// · 'dl' (điện lạnh) · 'gach' (gạch ốp lát) - hai ngành chỉ bản Go
 func specOf(nganh any) *specs.Spec {
 	switch nganh {
 	case "vs":
@@ -169,6 +169,8 @@ func specOf(nganh any) *specs.Spec {
 		return specs.CT
 	case "dl":
 		return specs.DL
+	case "gach":
+		return specs.GACH
 	}
 	return nil
 }

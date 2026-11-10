@@ -6724,6 +6724,61 @@ COMMENT ON COLUMN public.product_switch_socket_specs.max_wire_cross_section IS '
 
 
 --
+-- Name: product_tile_specs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_tile_specs (
+    product_id bigint NOT NULL,
+    tile_body text,
+    water_absorption text,
+    slip_resistance text,
+    box_packing text
+);
+
+
+--
+-- Name: TABLE product_tile_specs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.product_tile_specs IS 'Tile (Gạch ốp lát) specifications of a product (1-1 with products; row exists only when at least one value is set).';
+
+
+--
+-- Name: COLUMN product_tile_specs.product_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.product_id IS 'Product (products.id); row deleted with the product.';
+
+
+--
+-- Name: COLUMN product_tile_specs.tile_body; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.tile_body IS 'Tile spec (code: xuong_gach)';
+
+
+--
+-- Name: COLUMN product_tile_specs.water_absorption; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.water_absorption IS 'Tile spec (code: do_hut_nuoc)';
+
+
+--
+-- Name: COLUMN product_tile_specs.slip_resistance; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.slip_resistance IS 'Tile spec (code: chong_tron)';
+
+
+--
+-- Name: COLUMN product_tile_specs.box_packing; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.product_tile_specs.box_packing IS 'Tile spec (code: quy_cach_hop)';
+
+
+--
 -- Name: products; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -7247,20 +7302,25 @@ CREATE VIEW public.product_catalog AS
     s4.outdoor_bracket,
     s4.min_clearance,
     s4.installation_note,
-    s4.material_spec
-   FROM (((((public.products p
+    s4.material_spec,
+    s5.tile_body,
+    s5.water_absorption,
+    s5.slip_resistance,
+    s5.box_packing
+   FROM ((((((public.products p
      LEFT JOIN public.product_lighting_specs s0 ON ((s0.product_id = p.id)))
      LEFT JOIN public.product_sanitary_specs s1 ON ((s1.product_id = p.id)))
      LEFT JOIN public.product_paint_specs s2 ON ((s2.product_id = p.id)))
      LEFT JOIN public.product_switch_socket_specs s3 ON ((s3.product_id = p.id)))
-     LEFT JOIN public.product_hvac_specs s4 ON ((s4.product_id = p.id)));
+     LEFT JOIN public.product_hvac_specs s4 ON ((s4.product_id = p.id)))
+     LEFT JOIN public.product_tile_specs s5 ON ((s5.product_id = p.id)));
 
 
 --
 -- Name: VIEW product_catalog; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.product_catalog IS 'products + the 5 per-sector spec tables, one row per product with every column. Read-only: writes go to the base tables (the data layer splits them). Recreate this view (drop + create) whenever a column is added to products or to any product_*_specs table.';
+COMMENT ON VIEW public.product_catalog IS 'products + the 6 per-sector spec tables, one row per product with every column. Read-only: writes go to the base tables (the data layer splits them). Recreate this view (drop + create) whenever a column is added to products or to any product_*_specs table.';
 
 
 --
@@ -10339,6 +10399,14 @@ ALTER TABLE ONLY public.product_switch_socket_specs
 
 
 --
+-- Name: product_tile_specs pk_product_tile_specs; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tile_specs
+    ADD CONSTRAINT pk_product_tile_specs PRIMARY KEY (product_id);
+
+
+--
 -- Name: products pk_products; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -12172,6 +12240,14 @@ ALTER TABLE ONLY public.product_sanitary_specs
 
 ALTER TABLE ONLY public.product_switch_socket_specs
     ADD CONSTRAINT fk_product_switch_socket_specs_product_id FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_tile_specs fk_product_tile_specs_product_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tile_specs
+    ADD CONSTRAINT fk_product_tile_specs_product_id FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
 
 
 --

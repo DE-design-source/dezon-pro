@@ -19,7 +19,8 @@ export function impFlat_(loai, specs) { return flat_(impGroups_(loai, specs)) }
 export function vsApply_(hmRaw, loai, specs) {
   if (!specs || !specs.SON_SPEC) return { SPEC: null, hm: '', cho: [] }
   const SPEC = specs.SON_SPEC.chuanHM(hmRaw) ? specs.SON_SPEC : (specs.CT_SPEC.chuanHM(hmRaw) ? specs.CT_SPEC
-    : (specs.DL_SPEC && specs.DL_SPEC.chuanHM(hmRaw) ? specs.DL_SPEC : specNganh_(loai, specs)))
+    : (specs.DL_SPEC && specs.DL_SPEC.chuanHM(hmRaw) ? specs.DL_SPEC
+      : (specs.GACH_SPEC && specs.GACH_SPEC.chuanHM(hmRaw) ? specs.GACH_SPEC : specNganh_(loai, specs))))
   const hm = SPEC.chuanHM(hmRaw)
   return { SPEC, hm, cho: hm ? SPEC.labelsOf(hm) : [] }
 }
@@ -51,7 +52,7 @@ export function varCombos_(vars) {
 export function varsOfLoai_(vars, loai) {
   const v = { varKelvin: '', varWatt: '', varAngle: '', varColor: vars.varColor || '', varSize: '' }
   if (loai === 'ct' || loai === 'dl') return v
-  if (loai === 'son' || loai === 'vs') return { ...v, varSize: vars.varSize || '' }
+  if (loai === 'son' || loai === 'vs' || loai === 'gach') return { ...v, varSize: vars.varSize || '' }
   return { ...v, varKelvin: vars.varKelvin || '', varWatt: vars.varWatt || '', varAngle: vars.varAngle || '' }
 }
 export const btLabel_ = x => [x.w ? x.w + 'W' : '', x.k ? x.k + 'K' : '', x.a ? x.a + '°' : '', x.c || '', x.z || ''].filter(Boolean).join(' · ')
@@ -106,7 +107,7 @@ export async function tdSave_(specs, setBtn) {
   const ten = String(data['TÊN SẢN PHẨM'] || '').trim(); if (!ten) { toast('Nhập Tên sản phẩm'); return }
   const vars = varsOfLoai_(F.vars, ngIn)
   if (laVS) {
-    if (!hmVS) { toast('Chọn Hạng mục ' + (ngIn === 'son' ? 'sơn nước' : (ngIn === 'ct' ? 'công tắc - ổ cắm' : (ngIn === 'dl' ? 'điện lạnh' : 'thiết bị vệ sinh')))); return }
+    if (!hmVS) { toast('Chọn Hạng mục ' + (ngIn === 'son' ? 'sơn nước' : (ngIn === 'ct' ? 'công tắc - ổ cắm' : (ngIn === 'dl' ? 'điện lạnh' : (ngIn === 'gach' ? 'gạch ốp lát' : 'thiết bị vệ sinh'))))); return }
     let thieu = SPEC.HM[hmVS].req.filter(lb => !data[lb])
     // biến thể theo màu / kích thước điền ở khối Biến thể thì không tính là thiếu
     if (varList_(vars.varColor).length) thieu = thieu.filter(lb => lb !== 'MÀU SẮC')
@@ -144,8 +145,8 @@ export async function tdSave_(specs, setBtn) {
     if (g.on && !maDAs.length) { toast('Đã tick "Thêm vào dự án" nhưng chưa chọn dự án — bấm ô Dự án để chọn'); return 'focusProj' }
     if (g.on && maDAs.length) {
       const gia = Number(data['GIÁ BÁN LẺ']) || 0, qty = Math.max(1, Number(g.qty) || 1)
-      // Đề mục theo NGÀNH đang nhập: sơn 3.2.2, công tắc 3.2.6.2, điện lạnh 3.2.7, vệ sinh 3.2.5, đèn 3.2.6.1
-      const ndGhi = ngIn === 'son' ? '3.2.2' : (ngIn === 'ct' ? '3.2.6.2' : (ngIn === 'dl' ? '3.2.7' : (ngIn === 'vs' ? '3.2.5' : '3.2.6.1')))
+      // Đề mục theo NGÀNH đang nhập: sơn 3.2.2, công tắc 3.2.6.2, điện lạnh 3.2.7, gạch 3.2.4, vệ sinh 3.2.5, đèn 3.2.6.1
+      const ndGhi = ngIn === 'son' ? '3.2.2' : (ngIn === 'ct' ? '3.2.6.2' : (ngIn === 'dl' ? '3.2.7' : (ngIn === 'gach' ? '3.2.4' : (ngIn === 'vs' ? '3.2.5' : '3.2.6.1'))))
       items[0].ghi = { maDA: maDAs[0], maDAs, qty, prod: { ten, ma: data['MÃ SẢN PHẨM'] || '', thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '',
         moTa: data['MÔ TẢ'] || '', kichThuoc: data['KÍCH THƯỚC'] || '', dvt: data['ĐƠN VỊ TÍNH'] || 'Cái', hinhAnh: data['ẢNH SẢN PHẨM'] || '',
         donGiaVon: gia, donGiaBan: gia, nhom: ndGhi, hangMuc: nodeName(ndGhi), loai: nodeName(ndGhi), tang: '', extra: { nganh: data['DÒNG SẢN PHẨM'] || '' } } }

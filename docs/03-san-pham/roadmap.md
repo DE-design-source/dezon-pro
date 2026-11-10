@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-10 · **Phiên bản mới nhất:** 1.0.0 (chưa có changelog)
+> **Cập nhật:** 2026-11-10 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -60,6 +60,7 @@
 | [N10](#n10) | Trang Danh sách dự án (lưới thẻ) | 🟡 | [N10](#n10): chạy migration 0036 - 0039, thử trên app, ảnh bìa |
 | [N11](#n11) | Trang Nhà cung cấp | 🟡 | [N11](#n11): thử trên app |
 | [N12](#n12) | Trang Nhà thiết kế (Kiến trúc sư / Studio) | 🟡 | [N12](#n12): thử trên app |
+| [N13](#xong-n13) | Ngành Gạch ốp lát (đề mục 3.2.4 "Ốp lát") theo file "gạch edit.xlsx": thông số theo hạng mục, nhập liệu, file mẫu, bộ lọc, hiển thị | 🟡 | [N13](#n13): triển khai lên dezon.tech, nhập dữ liệu thật |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 | [N8](#xong-n8) | Chat realtime MVP: đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push | 🟡 | [N8](#n8): thấy thông báo push trên Chrome thường, người dùng thử, triển khai production; [N8.1](#n8-1) SMS thật, [N8.2](#n8-2) FCM / APNs, [N8.3](#n8-3) giai đoạn 2-3 (giai đoạn 2 đã code: tệp, trả lời / chuyển tiếp / thu hồi / sửa, reaction, tìm kiếm, đa thiết bị + QR - còn thử trên trình duyệt; còn gọi, E2E), [N8.4](#n8-4) đăng nhập / kết bạn bằng email, [N8.5](#n8-5) chat nhóm nâng cao (đã code, còn thử trên trình duyệt) |
 
@@ -92,6 +93,7 @@
 | <a id="n12"></a>N12 | Trang "Nhà thiết kế" (nút trên thanh đầu QS, trước Nhà cung cấp; quyền = tab Dự án): 2 tab con Kiến trúc sư / Studio, gom từ cột Kiến trúc sư / Công ty của dự án + đối tác ở tab Đối tác của nhà cung cấp; thẻ: số dự án, nhà cung cấp đã dùng, tổng báo giá; chi tiết: Hồ sơ / Dự án / Nhà cung cấp đã dùng / Thương hiệu tin dùng; nút "Tạo hồ sơ" (hộp gần toàn màn hình: ảnh / logo, Kiến trúc sư / Studio, thông tin cơ bản theo loại, liên hệ, mạng xã hội, quan hệ hợp tác + đánh giá sao, chuyên môn dạng chip, giới thiệu; KTS có "Quá trình làm việc" kiểu LinkedIn - lưu dữ liệu công ty `ntkInfo`), sửa / xoá hồ sơ ở trang chi tiết. Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="n11"></a>N11 | Trang "Nhà cung cấp" (nút trên thanh đầu QS): nhà cung cấp = thương hiệu trong danh mục; lưới / danh sách thẻ (ảnh ghép sản phẩm, ngành hàng, số sản phẩm, khoảng giá, số dự án đang dùng), lọc ngành hàng, tìm; trang chi tiết tab Sản phẩm (lọc hạng mục) / Dự án đang dùng / Nhà phân phối / Giới thiệu / Đối tác ("Được tin dùng bởi" KTS, studio…; gợi ý từ KTS + studio của dự án đang dùng) / Catalogue (kéo thả file / cả thư mục, chọn file, chụp ảnh, dán Ctrl+V file / ảnh / link, dán link nhận biết Google Drive / OneDrive / Dropbox / flipbook, lấy từ tài liệu kỹ thuật của sản phẩm cùng thương hiệu; hàng đợi tải lên, lọc theo loại) - hồ sơ lưu dữ liệu công ty `nccInfo`. Đã code + build, còn thử trên app thật | User | 🟡 |
 | <a id="n10"></a>N10 | Trang "Danh sách dự án" dạng lưới thẻ (tham khảo dezon.vn/du-an): ô tìm, lọc Nền tảng / Trạng thái / Khu vực / Phân khúc, chip "Dự án có báo giá"; bấm thẻ mở trang chi tiết dự án (ảnh ghép từ ảnh sản phẩm, bảng thông tin, tab Thông tin / Hình ảnh (ảnh gom theo phòng, mỗi phòng 1 dải ảnh cuộn ngang như dezon.vn; ảnh lưu `{url, phong}` trong `anhDuAn`; thêm ảnh bằng chọn ảnh / chọn thư mục (thư mục con = phòng) / kéo thả file, thư mục / Ctrl+V / dán link / ảnh sản phẩm trong dự án / chụp ảnh) / Sản phẩm / Nhà cung cấp / Dự án liên quan, nút Mở ở Bóc tách); liên kết từ bảng Ghi danh nhiều dự án (có nút "Ghi danh dự án mới": tạo dự án rồi ghi danh SP vào đó); nút "Nhập dự án" mở trang nhập đủ trường (chỉ thêm vào danh sách, không mở thành dự án đang làm), ô đầu là Kiến trúc sư (migration 0036 `projects.architect`): gợi ý dự án KTS đã tham gia, trùng KTS + tên thì chuyển về dự án đã có; khối BOQ (tải file PDF / Excel đính vào dự án, hoặc "Tạo BOQ từ Dezon Pro" = tạo dự án ở Bảng điều khiển rồi chuyển sang đó); trang chi tiết có nút Sửa thông tin / Yêu cầu sửa - sửa tại chỗ ngay trên bảng Thông tin của trang chi tiết (cùng các mục, thêm Studio = migration 0038 `projects.studio`; tab Thông tin = thẻ Thông tin cơ bản kiểu dezon.vn - Dự án, Công ty, Địa điểm, Nhóm thiết kế, Kiến trúc sư, Nhiếp ảnh gia, Nhà thầu thi công, Năm hoàn thiện (migration 0039) - + Thông tin nâng cao thu gọn) (migration 0037 `project_edit_requests`): admin / tài khoản có quyền `da_duyet` lưu thẳng, người khác gửi phiếu chờ duyệt (báo người duyệt, Duyệt & áp dụng / Từ chối ngay trên trang chi tiết). Đã code + build + test Go, còn: chạy migration 0036 - 0039, sinh lại schema.sql, thử trên app thật, ảnh bìa dự án, trường người tạo dự án (cần migration) | User | 🟡 |
+| <a id="n13"></a>N13 | Gạch ốp lát: còn triển khai lên VPS dezon.tech (migration 0043) và nhập dữ liệu gạch thật | User | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; Kinh doanh (2026-11-09, đã code + build, còn thử trên app thật): form "Thêm khách hàng tiềm năng" mở thành trang đầy đủ, Người khởi tạo = tài khoản đang đăng nhập, Quản lý mặc định = trưởng phòng ban (dữ liệu HR mẫu), "Nhân sự phụ trách" + "Admin Kinh doanh" (lưu trong phu_trach vai trò Admin Kinh doanh), Nguồn / Quản lý là danh sách xổ tự thêm mục (`__cty` khoá `kdOptions`); Tổng quan có bộ lọc nguồn + thẻ "Nguồn khách hàng"; trang khách hàng: băng xanh 1 dòng, cột trái kiểu QS, thanh giai đoạn dạng bước; giai đoạn mới "Nhân sự KD phụ trách" (`giao-ns`, migration 0040, lead mới chưa có nhân sự phụ trách vào thẳng giai đoạn này); nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt | User | 🟡 |
 ### 2.3 Cần credential 🔑
@@ -123,7 +125,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N13`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N14`), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -534,6 +536,16 @@
 - Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
 - Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
 - Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)
+- 🟡 phần còn lại ở 2.2
+
+<a id="xong-n13"></a>
+#### N13 - Ngành Gạch ốp lát (đề mục 3.2.4)
+
+- `gach-spec.js` (chỉ bản Go): 4 hạng mục Gạch lát nền / ốp tường / ngoài trời / trang trí - Mosaic, chung 8 thông số theo file "gạch edit.xlsx": Kích thước*, Bề mặt, Xương gạch, Màu sắc / Vân, Độ dày, Độ hút nước, Chống trơn, Quy cách đóng hộp; hạng mục ghi chung "Gạch", "Ốp lát" vẫn nhận là ngành gạch (`specs.GachLaChung`)
+- Bảng bóc tách: THÔNG TIN CHÍNH = Bề mặt · Xương gạch · Màu sắc / Vân · Dòng SP · Hạng mục · Bảo hành (cột M); THÔNG SỐ THIẾT KẾ = Kích thước · Độ dày · Độ hút nước · Chống trơn · Quy cách đóng hộp (cột O)
+- Bảng `product_tile_specs` (4 cột riêng) + view `product_catalog` 183 cột (migration 0043, số 0032 trên nhánh feat/hr); Kích thước / Bề mặt / Độ dày / Màu sắc dùng chung cột có sẵn; file mẫu `GET /api/v1/product-templates/gach`
+- Giao diện: ngành "Gạch ốp lát · sản phẩm" ở Nhập dữ liệu (form, biến thể theo kích thước / màu, nút tải file mẫu), bộ lọc Bóc tách 3.2.4, bộ cột Danh sách SP, panel thông tin SP, modal Mua hàng
+- Thử trên máy phát triển 2026-11-10 (database thử): nhập 1 SP gạch qua form, giá đại lý tự tính, lưu đúng bảng tách; file mẫu tải về đúng cột
 - 🟡 phần còn lại ở 2.2
 
 <a id="xong-n9"></a>

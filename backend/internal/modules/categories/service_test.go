@@ -69,7 +69,7 @@ func TestNganhCuaGolden(t *testing.T) {
 }
 
 func TestSpecNganhVaMuc(t *testing.T) {
-	for ng, want := range map[string]*specs.Spec{"vs": specs.VS, "son": specs.SON, "ct": specs.CT, "dl": specs.DL, "den": nil, "": nil, "VS": nil, " vs": nil} {
+	for ng, want := range map[string]*specs.Spec{"vs": specs.VS, "son": specs.SON, "ct": specs.CT, "dl": specs.DL, "gach": specs.GACH, "den": nil, "": nil, "VS": nil, " vs": nil} {
 		if got := SpecNganh(ng); got != want {
 			t.Errorf("SpecNganh(%q) sai", ng)
 		}
@@ -77,11 +77,11 @@ func TestSpecNganhVaMuc(t *testing.T) {
 	got := []any{}
 	MucNganh.Each(func(k string, v any) { got = append(got, []any{k, v}) })
 	g := loadGolden(t)
-	// golden của Node chưa có dl (ngành chỉ bản Go, nối cuối): so phần Node + kiểm riêng dl
-	if js(t, got[len(got)-1]) != js(t, []any{"dl", "Điện lạnh"}) || Muc("dl") != "Điện lạnh" {
-		t.Errorf("MUC_NGANH thiếu dl ở cuối: %s", js(t, got))
+	// golden của Node chưa có dl, gach (ngành chỉ bản Go, nối cuối): so phần Node + kiểm riêng 2 ngành này
+	if js(t, got[len(got)-2:]) != js(t, []any{[]any{"dl", "Điện lạnh"}, []any{"gach", "Ốp lát"}}) || Muc("dl") != "Điện lạnh" || Muc("gach") != "Ốp lát" {
+		t.Errorf("MUC_NGANH thiếu dl, gach ở cuối: %s", js(t, got))
 	}
-	got = got[:len(got)-1]
+	got = got[:len(got)-2]
 	if a, b := js(t, got), js(t, g.Val("mucNganh")); a != b {
 		t.Errorf("MUC_NGANH\n go:   %s\n node: %s", a, b)
 	}
@@ -96,16 +96,16 @@ func TestSpecNganhVaMuc(t *testing.T) {
 	}
 }
 
-// nodePart: bảng nhãn <-> cột của Go = bảng của Node + nhãn Điện lạnh nối cuối (ngành chỉ bản Go).
-// Trả phần đầu dài n để so với golden; mọi phần thêm phải là nhãn của dl-spec.js (lbAt = vị trí nhãn trong cặp).
+// nodePart: bảng nhãn <-> cột của Go = bảng của Node + nhãn Điện lạnh, Gạch nối cuối (ngành chỉ bản Go).
+// Trả phần đầu dài n để so với golden; mọi phần thêm phải là nhãn của dl-spec.js / gach-spec.js (lbAt = vị trí nhãn trong cặp).
 func nodePart(t *testing.T, ds []any, n, lbAt int) []any {
 	t.Helper()
 	if len(ds) < n {
 		t.Fatalf("bảng ngắn hơn bản Node: %d < %d", len(ds), n)
 	}
 	for _, x := range ds[n:] {
-		if lb := jsval.AsString(jsval.AsArray(x)[lbAt]); specs.DL.Metric.Val(lb) == nil {
-			t.Errorf("thêm ngoài bản Node mà không phải nhãn Điện lạnh: %s", js(t, x))
+		if lb := jsval.AsString(jsval.AsArray(x)[lbAt]); specs.DL.Metric.Val(lb) == nil && specs.GACH.Metric.Val(lb) == nil {
+			t.Errorf("thêm ngoài bản Node mà không phải nhãn Điện lạnh / Gạch: %s", js(t, x))
 		}
 	}
 	return ds[:n]

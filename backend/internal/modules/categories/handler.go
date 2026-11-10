@@ -15,6 +15,9 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "mauNhapDienLanh", Method: "GET", Path: "/product-templates/dien-lanh", Perm: rpc.Public,
 		Tag: "Sản phẩm", Summary: "File mẫu nhập hàng loạt Điện lạnh (.xlsx), tạo động từ dl-spec.js",
 		Fields: []rpc.GoField{{Name: "hm", In: "query", Desc: "Hạng mục (vd Điều hoà không khí); trống = mọi hạng mục"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "mauNhapGach", Method: "GET", Path: "/product-templates/gach", Perm: rpc.Public,
+		Tag: "Sản phẩm", Summary: "File mẫu nhập hàng loạt Gạch ốp lát (.xlsx), tạo động từ gach-spec.js",
+		Fields: []rpc.GoField{{Name: "hm", In: "query", Desc: "Hạng mục (vd Gạch lát nền); trống = mọi hạng mục"}}})
 }
 
 // RegisterRoutes: GET /api/v1/product-templates/dien-lanh, công khai như các file mẫu ở gốc.
@@ -26,6 +29,14 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 			buf, err = BuildDlTemplate(hm)
 		}
 		sendTemplate(c, "Mau-nhap-dien-lanh", buf, err)
+	})
+	v1.GET("/product-templates/gach", func(c *gin.Context) {
+		hm, err := queryHM(c)
+		var buf []byte
+		if err == nil {
+			buf, err = BuildGachTemplate(hm)
+		}
+		sendTemplate(c, "Mau-nhap-gach", buf, err)
 	})
 }
 
