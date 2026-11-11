@@ -142,3 +142,13 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 @keyframes qsc-spl-run{0%{left:-40%;} 100%{left:100%;}}
 @keyframes qsc-spl-glow{0%, 100%{opacity:.75; transform:translate(-50%, -50%) scale(1);} 50%{opacity:1; transform:translate(-50%, -50%) scale(1.06);}}
 @media (prefers-reduced-motion:reduce){ .qsc-spl-glow, .qsc-spl-bar span{animation:none;} .qsc-spl-bar span{left:30%;} }
+
+/* Xem ảnh lớn: phóng to / thu nhỏ */
+.qsc-iv img{transition:transform .12s ease-out; transform-origin:center center; user-select:none;}
+.qsc-iv img.zoomed{cursor:grab;}
+.qsc-iv img.zoomed:active{cursor:grabbing;}
+.qsc-iv-zoom{position:fixed; bottom:22px; right:26px; display:flex; gap:2px; padding:3px; border-radius:22px; background:rgba(0,0,0,.5); cursor:default;}
+.qsc-iv-zoom button{min-width:34px; height:30px; border:none; border-radius:16px; background:transparent; color:#fff; font-size:18px; font-weight:600; cursor:pointer;}
+.qsc-iv-zoom button.pct{font-size:12.5px; min-width:54px;}
+.qsc-iv-zoom button:hover:not(:disabled){background:rgba(255,255,255,.18);}
+.qsc-iv-zoom button:disabled{opacity:.4; cursor:default;}

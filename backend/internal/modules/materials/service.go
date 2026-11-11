@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"qspro-backend/internal/config"
 	"qspro-backend/internal/platform/database"
@@ -31,6 +32,9 @@ type Deps struct {
 	Admins   contracts.AdminLister
 	Uploader contracts.Uploader
 	Repo     Repository
+	// DuyetDelay > 0 (chỉ bản Go): gom thao tác thêm / sửa SP của tài khoản không phải admin trong khoảng này rồi báo
+	// người duyệt 1 lần (notify_duyet.go). 0 = tắt (test golden không có thông báo này).
+	DuyetDelay time.Duration
 }
 
 // Service: nghiệp vụ danh mục sản phẩm.
@@ -52,6 +56,10 @@ type Service struct {
 
 	// _hasWhoCol === false (S:488): đã biết database thiếu cột nguoi_tao / ngay_tao / nguoi_sua. Không bao giờ bật lại.
 	whoColMissing atomic.Bool
+
+	duyetDelay time.Duration
+	duyetMu    sync.Mutex
+	duyetPend  map[string]*duyetBatch
 }
 
 var (
@@ -69,7 +77,8 @@ func New(d Deps) *Service {
 	}
 	return &Service{repo: repo, cfg: d.Cfg, aud: d.Auditor, users: d.Users, userFmt: d.UserFmt,
 		notifier: d.Notifier, admins: d.Admins, uploader: d.Uploader, db: d.DB,
-		cache: map[string][]any{}, cacheAt: map[string]float64{}}
+		cache: map[string][]any{}, cacheAt: map[string]float64{},
+		duyetDelay: d.DuyetDelay, duyetPend: map[string]*duyetBatch{}}
 }
 
 // tx: chạy fn trong 1 transaction (D-13). Không có DB (repo giả trong test unit) -> chạy thẳng.

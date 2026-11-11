@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { MrootPortal } from '../common/Mroot'
 import { useQs } from '../../state/QsData'
-import { currentGroup, draftName_, dezonUrl_ } from '../../lib/dashModel.js'
+import { currentGroup, draftName_, dezonUrl_, TT_DU_AN, ttChuan_ } from '../../lib/dashModel.js'
 import { safeUrl_ } from '../../lib/format.js'
 import {
   addDraftForCur, saveProjectShared, saveDraftInfo, saveProgress, removeProject,
@@ -13,7 +13,8 @@ import './project.css'
 /* Hộp "Thông tin dự án" (port projInfoModal / projInfoInner_, PUB/app.js:2117-2172; shot modal-project-info.png).
    Luôn hiện bản nháp ĐANG MỞ (cur): projInfoModal(maDA) mở bản nháp trước rồi mới mở hộp.
    Props: onClose(). Chọn tab bản nháp khác = mở bản đó và ở lại hộp (openDraft). */
-const TRANG_THAI = ['Bản nháp', 'Đang thực hiện', 'Hoàn thành']
+// Phân loại dự án ở Danh sách dự án (TT_DU_AN, lib/dashModel); giá trị cũ Bản nháp / Hoàn thành được đổi tên khi mở
+const TRANG_THAI = TT_DU_AN
 const s = v => (v == null ? '' : String(v))
 
 export default function ProjectInfoModal({ onClose }) {
@@ -122,8 +123,8 @@ function DraftCard({ p, idx, many, onSaved }) {
   const [prog, setProg] = useState(Number(p.tienDo) || 0)
   const [busy, setBusy] = useState(false)
   const set = k => v => setF(x => ({ ...x, [k]: v }))
-  /* Trạng thái lạ (không thuộc 3 lựa chọn): như bản gốc, ô chọn hiện và lưu lựa chọn đầu */
-  const tt = TRANG_THAI.indexOf(f.trangThai) >= 0 ? f.trangThai : TRANG_THAI[0]
+  /* Trạng thái cũ / lạ quy về 1 trong 3 loại (ttChuan_): Bản nháp -> Đang báo giá, Hoàn thành -> Đã thực hiện */
+  const tt = ttChuan_(f.trangThai)
   async function save() { setBusy(true); const ok = await saveDraftInfo({ ...f, trangThai: tt }, p); setBusy(false); onSaved(ok) }
   return (
     <div className="qs-pi-card">

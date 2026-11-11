@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import QsIcon from '../common/QsIcon'
 import { useQs } from '../../state/QsData'
 import { pad2 } from '../../lib/format'
 import { mediaUrl } from '../../api/files'
 import ProductEditModal from '../products/edit/ProductEditModal'
+import ImportStatsModal from './ImportStatsModal'
 import { useImp } from './importStore'
+import { useQsStore } from '../../state/store'
 import { pendingDel_, pendingEdit_, pendingCommit_, impFindSessionProduct_, impSyncSession_ } from './importLogic'
 
 /* Panel phải "Sản phẩm vừa nhập (phiên này)" (port impRecentList / impDateTime_ / impEditSession_, PUB/nhap.js:471-522, 664-692):
@@ -21,8 +23,60 @@ function impDateTime_(iso) {
 const img1 = v => mediaUrl(String(v || '').split('\n')[0].trim())
 const hideImg = e => { e.currentTarget.style.visibility = 'hidden' }
 
+/* Lịch sử nhập: SP trong Database theo NGƯỜI TẠO (nguoi_tao = tài khoản) và NGÀY TẠO, chia khối theo ngày (mới trước).
+   Lấy từ danh mục đã tải nên xem được ở mọi máy / mọi phiên. ponytail: hiện tối đa 300 SP gần nhất của lựa chọn. */
+const LS_HIST = 'qs_imp_hist_who'
+const ngayVN_ = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => (n < 10 ? '0' : '') + n; return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() }
+const gioVN_ = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => (n < 10 ? '0' : '') + n; return p(d.getHours()) + ':' + p(d.getMinutes()) }
+function HistoryList({ products, me, onEdit }) {
+  const toi = String((me && me.username) || '')
+  const [who, setWhoSt] = useState(() => { try { return localStorage.getItem(LS_HIST) || 'me' } catch (e) { return 'me' } })
+  const setWho = v => { setWhoSt(v); try { localStorage.setItem(LS_HIST, v) } catch (e) { /* bỏ qua */ } }
+  const [stats, setStats] = useState(false)
+  const ai = useMemo(() => [...new Set((products || []).map(p => p.nguoiTao).filter(Boolean))].sort(), [products])
+  const ds = useMemo(() => (products || [])
+    .filter(p => p.ngayTao && !p.spChung && (who === '*' ? true : (p.nguoiTao || '') === (who === 'me' ? toi : who)))
+    .sort((a, b) => String(b.ngayTao).localeCompare(String(a.ngayTao))), [products, who, toi])
+  const hom = ngayVN_(new Date().toISOString())
+  const khoi = []
+  ds.slice(0, 300).forEach(p => {
+    const d = ngayVN_(p.ngayTao)
+    if (!khoi.length || khoi[khoi.length - 1].d !== d) khoi.push({ d, ds: [] })
+    khoi[khoi.length - 1].ds.push(p)
+  })
+  return (
+    <div className="qsi-hist">
+      <label className="qsi-hist-who">Tài khoản
+        <select value={who} onChange={e => setWho(e.target.value)}>
+          <option value="me">Tôi{toi ? ' (' + toi + ')' : ''}</option>
+          <option value="*">Mọi tài khoản</option>
+          {ai.filter(u => u !== toi).map(u => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <span>{ds.length} SP</span>
+      </label>
+      <button type="button" className="qsi-btn qsi-sm qsi-hist-stats" onClick={() => setStats(true)}><QsIcon name="list" size={13} /> Bảng thống kê theo nhân sự / ngày</button>
+      {stats && <ImportStatsModal products={products} onClose={() => setStats(false)} />}
+      {khoi.length ? khoi.map(k => (
+        <div key={k.d} className="qsi-hist-day">
+          <div className="qsi-pc-hd qsi-done">{k.d === hom ? 'Hôm nay · ' + k.d : k.d} <span>{k.ds.length}</span></div>
+          {k.ds.map(p => (
+            <div className="qsi-hist-r" key={p.recordId} title="Bấm để sửa sản phẩm này" onClick={() => onEdit(p)}>
+              {String(p.hinhAnh || '').split('\n')[0] ? <img className="qsi-rth" src={img1(p.hinhAnh)} alt="" onError={hideImg} /> : <span className="qsi-rth" />}
+              <div className="qsi-hist-mid"><b title={p.ten || ''}>{p.ten || ''}</b><i>{[p.ma, p.thuongHieu, who === 'me' ? '' : p.nguoiTao].filter(Boolean).join(' · ')}</i></div>
+              <span className="qsi-hist-t">{gioVN_(p.ngayTao)}</span>
+            </div>
+          ))}
+        </div>
+      )) : <div className="qsi-empty">Chưa có sản phẩm nào được nhập{who === 'me' ? ' bởi tài khoản này' : ''}.</div>}
+      {ds.length > 300 ? <div className="qsi-hist-more">Đang hiện 300 / {ds.length} sản phẩm gần nhất — xem đủ ở Danh sách sản phẩm (lọc cột Người tạo / Ngày tạo).</div> : null}
+    </div>
+  )
+}
+
 export default function RecentPanel({ specs, onEditOpen }) {
   const { navigate, products } = useQs()
+  const me = useQsStore(s => s.me)
+  const [tab, setTab] = useState('phien')
   const pd = useImp(s => s.pending)
   const ps = useImp(s => s.sessionAdded)
   const pendEdit = useImp(s => s.pendEdit)
@@ -51,7 +105,7 @@ export default function RecentPanel({ specs, onEditOpen }) {
           {p.loi ? <div className="qsi-pc-loi">{p.loi}</div> : null}
           <span className="qsi-pc-tag">{dangSua ? 'Đang sửa' : (p.loi ? 'Lỗi — sửa lại' : 'Chờ lưu')}</span>
           {p.combo && p.combo.length ? <span className="qsi-pc-tag">+ combo {p.combo.length}</span> : null}
-          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ dự án ×{p.ghi.qty || 1}</span> : null}
+          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ {(p.ghi.maDAs || [p.ghi.maDA]).length > 1 ? (p.ghi.maDAs.length + ' dự án') : 'dự án'} ×{p.ghi.qty || 1}</span> : null}
         </div>
         <div className="qsi-pc-act">
           <button className="qsi-pc-btn" title="Sửa — mở lại trong form" onClick={async () => { if (await pendingEdit_(p, specs) && onEditOpen) onEditOpen() }}><QsIcon name="edit" size={14} /></button>
@@ -62,8 +116,13 @@ export default function RecentPanel({ specs, onEditOpen }) {
   })
   return (
     <div className="qsi-recent">
-      <div className="qsi-recent-h">Sản phẩm vừa nhập (phiên này) <span className="qsi-rcount">{pad2(pd.length + ps.length)}</span></div>
-      <div className="qsi-recent-note">Danh sách này chỉ ghi lại thao tác của <b>phiên đang mở</b> — tải lại trang sẽ trống. Sản phẩm đã lưu <b>vẫn nằm trong Database</b>: <a onClick={() => navigate('sanpham')}>xem Danh sách sản phẩm →</a></div>
+      <div className="qsi-recent-h">Sản phẩm vừa nhập <span className="qsi-rcount">{pad2(pd.length + ps.length)}</span></div>
+      <div className="qsi-recent-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'phien'} className={tab === 'phien' ? 'on' : ''} onClick={() => setTab('phien')}>Phiên này</button>
+        <button type="button" role="tab" aria-selected={tab === 'ls'} className={tab === 'ls' ? 'on' : ''} onClick={() => setTab('ls')}>Lịch sử nhập</button>
+      </div>
+      {tab === 'ls' ? <div className="qsi-recent-b"><HistoryList products={products} me={me} onEdit={p => setEditP(p)} /></div> : <>
+      <div className="qsi-recent-note">Danh sách chờ và sản phẩm vừa lưu được <b>giữ lại khi tải lại trang</b> (trên máy này, theo tài khoản). Sản phẩm đã lưu <b>nằm trong Database</b>: <a onClick={() => navigate('sanpham')}>xem Danh sách sản phẩm →</a> · tab <b>Lịch sử nhập</b> xem theo ngày, theo tài khoản.</div>
       <div className="qsi-recent-b">
         {pd.length ? <><div className="qsi-pc-hd">Chờ lưu <span>{pd.length}</span><i>Chưa vào Database</i></div><div className="qsi-pc-list">{cards}</div></> : null}
         {pd.length && ps.length ? <div className="qsi-pc-hd qsi-done">Đã lưu vào Database <span>{ps.length}</span></div> : null}
@@ -87,6 +146,7 @@ export default function RecentPanel({ specs, onEditOpen }) {
           </table>
         ) : null}
       </div>
+      </>}
       <div className="qsi-rfoot">
         {pd.length ? <div className="qsi-rfoot-note"><b>{pd.length}</b> sản phẩm đang chờ — <b>chưa</b> lưu vào Database</div> : null}
         <button className="qsi-btn qsi-blue qsi-block" disabled={!pd.length || committing} onClick={() => pendingCommit_()}>

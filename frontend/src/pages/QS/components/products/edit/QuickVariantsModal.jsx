@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from '../../../api/qsApi'
 import { getState, setState } from '../../../state/store'
 import { tkNum_, spNorm_ } from '../../../lib/format'
-import { dbLabelMaps_ } from '../../../lib/productFields'
+import { dbLabelMaps_, nganhCuaSP_ } from '../../../lib/productFields'
+import { mediaUrl } from '../../../api/files'
+import { upFilesSeq_, pickFiles_ } from '../../importer/imgUpload'
 import QsIcon from '../../common/QsIcon'
 import { MrootPortal } from '../../common/Mroot'
 import { qsToast } from '../../common/dialogs'
@@ -35,6 +37,11 @@ export default function QuickVariantsModal({ product, specs, onClose, onDone }) 
   }, [rows.length])
 
   const sua = (k, f, v) => setRows(rs => rs.map((r, i) => i === k ? { ...r, [f]: v } : r))
+  // Sơn đo theo dung tích; ngành khác (gạch, vệ sinh, đèn…) là kích thước - cùng cột kich_thuoc
+  const ktLb = nganhCuaSP_(p, specs) === 'son' ? 'Dung tích' : 'Kích thước'
+  /* Ảnh riêng của biến thể (r.anh): tải như khối ảnh Nhập dữ liệu (ảnh tạm data: trong lúc tải); dòng xác định theo vị trí */
+  const anhAcc = k => ({ main: (rows[k] || {}).anh || '', list: [],
+    put: fn => setRows(rs => rs.map((r, i) => i === k ? { ...r, anh: fn({ main: r.anh || '', list: [] }).main } : r)) })
   function them() {
     setRows(rs => { const a = rs[rs.length - 1] || {}; return rs.concat([spNbtDong_(p, { ma: a.ma, bm: a.bm, kt: a.kt })]) })
     focusLast.current = 'last'
@@ -50,6 +57,7 @@ export default function QuickVariantsModal({ product, specs, onClose, onDone }) 
 
   async function luu() {
     if (busy) return
+    if (rows.some(r => String(r.anh || '').indexOf('data:') === 0)) return setErr('Đợi ảnh biến thể tải lên xong rồi bấm lại.')
     const ds = rows.filter(r => [r.mau, r.gia].some(v => String(v || '').trim()) || (String(r.ma || '').trim() && String(r.ma).trim() !== p.ma))
     if (!ds.length) return setErr('Nhập ít nhất 1 biến thể.')
     const thieu = ds.filter(r => !String(r.ma || '').trim() || !(tkNum_(r.gia) > 0))
@@ -74,6 +82,8 @@ export default function QuickVariantsModal({ product, specs, onClose, onDone }) 
       const r = tao[j]; setBusy('Đang tạo ' + (j + 1) + '/' + tao.length + '…')
       const d = Object.assign({}, goc, { 'MÃ SẢN PHẨM': String(r.ma).trim(), 'MÀU SẮC': String(r.mau || '').trim(), 'KÍCH THƯỚC': String(r.kt || '').trim(), 'GIÁ BÁN LẺ': tkNum_(r.gia) })
       if (String(r.bm || '').trim()) d['BỀ MẶT HOÀN THIỆN'] = String(r.bm).trim()
+      // ảnh riêng của biến thể làm ảnh đại diện, ảnh của SP gốc xếp sau
+      if (r.anh) d['ẢNH SẢN PHẨM'] = [r.anh].concat(String(goc['ẢNH SẢN PHẨM'] || '').split('\n').map(x => x.trim()).filter(x => x && x !== r.anh)).join('\n')
       if (d['MÃ SẢN PHẨM'] !== p.ma) khacMa = true
       try { const rs = await api.saveDbProduct(d); ok++; if (rs && rs.id != null) moiIds.push(String(rs.id)) }
       catch (e) { loi.push((r.ma || r.mau) + ': ' + String(e.message || e).slice(0, 60)) }
@@ -113,20 +123,28 @@ export default function QuickVariantsModal({ product, specs, onClose, onDone }) 
           </div>
           <p className="qspe-ask-note">Mỗi dòng là 1 biến thể — giữ nguyên hãng, thông số, ảnh của sản phẩm gốc; chỉ đổi phần khác nhau và nhập giá riêng.{' '}
             Bề mặt khác nhau (Bóng / Mờ…) thường có <b>mã riêng</b> (VD Mờ GJ8 · Bóng GJ8B) — sửa ô Mã cho đúng bảng giá.{' '}
-            Dán từ Excel vào ô đầu: <i>Mã ⇥ Màu ⇥ Bề mặt ⇥ Dung tích ⇥ Giá</i> (hoặc chỉ Màu ⇥ Giá).</p>
+            Dán từ Excel vào ô đầu: <i>Mã ⇥ Màu ⇥ Bề mặt ⇥ {ktLb} ⇥ Giá</i> (hoặc chỉ Màu ⇥ Giá).{' '}
+            Ô <b>Ảnh</b>: bấm hoặc kéo ảnh riêng của biến thể vào — để trống thì dùng ảnh của sản phẩm gốc.</p>
           <datalist id="qspeNbtBmList">{NBT_BM.map(x => <option key={x} value={x} />)}</datalist>
           <div className="qspe-nbt-tbl">
-            <div className="qspe-nbt-h"><span>Mã SP</span><span>Màu sắc</span><span>Bề mặt</span><span>Dung tích</span><span>Giá bán lẻ (đ) *</span><span></span></div>
+            <div className="qspe-nbt-h"><span>Ảnh</span><span>Mã SP</span><span>Màu sắc</span><span>Bề mặt</span><span>{ktLb}</span><span>Giá bán lẻ (đ) *</span><span></span></div>
             <div>
               {rows.map((r, k) => {
                 const c = spMauCss_(r.mau)
                 return (
                   <div className="qspe-nbt-r" key={k}>
+                    <div className={'qspe-nbt-anh' + (r.anh ? ' on' : '')} tabIndex={0} title={r.anh ? 'Bấm để đổi ảnh' : 'Bấm hoặc kéo ảnh biến thể vào'}
+                      onClick={() => pickFiles_(false, 'image/*', fs => upFilesSeq_('main', fs, anhAcc(k)))}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => { e.preventDefault(); const fs = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []).filter(f => !f.type || /^image\//.test(f.type)); if (fs.length) upFilesSeq_('main', fs.slice(0, 1), anhAcc(k)) }}>
+                      {r.anh ? <img src={mediaUrl(r.anh)} alt="" /> : <QsIcon name="camera" size={15} />}
+                      {r.anh ? <button type="button" title="Bỏ ảnh" onClick={e => { e.stopPropagation(); sua(k, 'anh', '') }}>✕</button> : null}
+                    </div>
                     <input className="qspe-nbt-ma" value={r.ma} placeholder="Mã" onChange={e => sua(k, 'ma', e.target.value)} onPaste={e => dan(e, k)} />
                     <label className="qspe-nbt-mauw"><i style={c ? { background: c } : undefined} className={c ? undefined : 'qspe-mau-x'} />
                       <input value={r.mau} placeholder="VD: Trắng" onChange={e => sua(k, 'mau', e.target.value)} /></label>
                     <input value={r.bm} placeholder="VD: Bóng" list="qspeNbtBmList" onChange={e => sua(k, 'bm', e.target.value)} />
-                    <input value={r.kt} placeholder="VD: 5L" onChange={e => sua(k, 'kt', e.target.value)} />
+                    <input value={r.kt} placeholder={ktLb === 'Dung tích' ? 'VD: 5L' : 'VD: 600 x 600'} onChange={e => sua(k, 'kt', e.target.value)} />
                     <input className="num" value={r.gia} placeholder="0" inputMode="numeric" onChange={e => sua(k, 'gia', e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); them() } }} />
                     <button type="button" className="qspe-cb-del" title="Bỏ dòng" onClick={() => bo(k)}><QsIcon name="x" size={14} /></button>

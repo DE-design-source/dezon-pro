@@ -13,6 +13,7 @@ import { PtFilters, PtLibrary, usePtLibCount } from './phantho/PtLibrary'
 import PtDetail from './phantho/PtDetail'
 import ProductThumb from './common/ProductThumb'
 import ImgViewer from './common/ImgViewer'
+import ProductModal from './purchase/ProductModal'
 import DocsPopover from './common/DocsPopover'
 import { mediaUrl } from '../api/files'
 import { COLS, PHONG_LIST, colPlain, cellSortVal_, tkSheetCo_, tkSheetOf_, TK_SHEETS } from '../lib/columns.js'
@@ -127,6 +128,7 @@ export default function BreakdownTab() {
   }, [toolSlot])
   const [rowEdit, setRowEdit] = useState(false)   // Bảng thường: cột nút xoá / kéo dòng ở mép phải (bấm nút sửa trên khối công cụ mới hiện)
   const [imgView, setImgView] = useState('')
+  const [xemSP, setXemSP] = useState(null)        // xem nhanh SP của 1 dòng (ảnh lớn + thông số), bấm ảnh dòng để mở
   const sheetApi = useRef(null)
 
   const ptLoai = usePtLoai()
@@ -345,7 +347,7 @@ export default function BreakdownTab() {
     if (c.key === 'hinhAnh') {
       if (!l.hinhAnh) return ''
       const src = img1(l.hinhAnh)
-      return <ProductThumb product={l} size={120} src={src} onClick={() => setImgView(src)} title="Bấm để xem ảnh lớn" className="qs-tk-img" />
+      return <ProductThumb product={l} size={120} src={src} onClick={() => setXemSP(l)} title="Bấm để xem nhanh sản phẩm (ảnh lớn, thông số)" className="qs-tk-img" />
     }
     if (c.key === 'taiLieu') {
       const dl = lineDocs_(l, products)
@@ -895,6 +897,8 @@ export default function BreakdownTab() {
           onPlus={l => { mutate.updateLine(l.lineId, { soLuong: (Number(l.soLuong) || 0) + 1 }); toast('+1 số lượng: ' + l.ten) }} />
       )}
       {visible && imgView && <ImgViewer src={imgView} onClose={() => setImgView('')} />}
+      {visible && xemSP && <ProductModal ctx="du-an" line={(lines || []).find(x => x.lineId === xemSP.lineId) || xemSP} products={products} onClose={() => setXemSP(null)}
+        onOpenBoc={() => { setXemSP(null); navigate('boc') }} />}
       {bulkLines.length > 0 && (
         <BulkBar lines={bulkLines} floors={floorNames} sheetCo={sheetCo} act={A} onClear={clearSel} />
       )}

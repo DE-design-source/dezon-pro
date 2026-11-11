@@ -26,7 +26,7 @@ import {
   lsJson, lsSet, spKey_, spPanelHidden_, foldCols_, foldColsToggle_, spNganhCur_, spPTMode_, spAllCols_, spSkuMap_, spSkuCount_,
   spColsNg_, spColScope_, spColsLoad_, spCfgLoad_, spCfgSave_, spQuickLoad_, spOrder_, spColOn_, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
   SP_PER, spPageNums_, spNodeCount_, spScopeProducts_, SP_FLT_EMPTY, spFltCount_, spAnyFilter_, spSortNext_,
-  spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_,
+  spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_, spTrungSet_, spTrungK_,
 } from './spModel'
 import {
   spFav, spFavBulk, spDuyet, spDuyetBulk, undoSubscribe, undoGet, spUndo_, spExportXlsx, spAddManyToProject_, spAddToProject,
@@ -278,7 +278,8 @@ export default function ProductList() {
     if (bo.length) setU(s => { const sel = { ...s.sel }; bo.forEach(k => { delete sel[k] }); return { sel } })
   }, [PT, fullKeys, U.sel])
 
-  const groups = useMemo(() => spVarGroups2_(full), [full])
+  // xem trùng: mỗi bản 1 dòng riêng (không gộp biến thể) để tick xoá bản dư
+  const groups = useMemo(() => (U.view === 'trung' ? full.map(p => ({ key: '', head: p, kids: [] })) : spVarGroups2_(full)), [full, U.view])
   const cbData = {}
   Object.keys(U.cbOpen).forEach(k => { const c = combo[k]; if (c && c.list) cbData[k] = c.list; else if (c && c.error) cbData[k] = { err: c.error } })
   const pr = spPageRows_(groups, U.page, U.per, U.btOpen, U.cbOpen, cbData)
@@ -485,8 +486,11 @@ export default function ProductList() {
     if (!cur) { toast('Chưa chọn dự án — chọn ở ô "Sản phẩm trong dự án" bên trái'); return }
     spAddManyToProject_(list); clearSel()
   }
+  // thanh tiến độ sửa / xoá hàng loạt: {t, i, n}; xong (kể cả lỗi) thì tắt
+  const [prog, setProg] = useState(null)
+  const chay = async (t, fn) => { try { return await fn((i, n) => setProg({ t, i, n })) } finally { setProg(null) } }
   async function bulkDelete() {
-    if (isAdmin) { if (await spBulkDelete(selProds(), nSel)) clearSel() }
+    if (isAdmin) { if (await chay('Đang xoá sản phẩm', cb => spBulkDelete(selProds(), nSel, cb))) clearSel() }
     else if (await spBulkRequest(selKeys.filter(k => U.sel[k]))) clearSel()
   }
 
@@ -510,11 +514,13 @@ export default function ProductList() {
   /* ---------- Vẽ ---------- */
   const fltN = spFltCount_(f)
   const chua = scope.filter(p => !p.daDuyet).length
+  const trungN = useMemo(() => { const t = spTrungSet_(scope); return scope.filter(p => t.has(spTrungK_(p))).length }, [scope])
   const viewTabs = [
     ['all', 'Tất cả', scope.length ? String(scope.length) : ''],
     ['chua', 'Chưa duyệt', chua ? String(chua) : ''],
     ['da', 'Đã duyệt', (scope.length - chua) ? String(scope.length - chua) : ''],
   ]
+  if (trungN || U.view === 'trung') viewTabs.push(['trung', 'Trùng mã', trungN ? String(trungN) : ''])
   const favN = scope.filter(p => p.yeuThich).length
   const catLabel = node ? (node + '.' + nodeName(node)) : 'Tất cả hạng mục'
   const catCnt = node ? nodeCount(node) : (products || []).length
@@ -566,8 +572,9 @@ export default function ProductList() {
                 </div>
                 <div className="qspl-vtabs qspl-mod">
                   {viewTabs.map(t => (
-                    <button type="button" key={t[0]} className={`qspl-vt${U.view === t[0] ? ' on' : ''}${t[0] === 'chua' ? ' warn' : (t[0] === 'fav' ? ' fav' : '')}`}
-                      onClick={() => setU({ view: t[0], page: 1 })}>
+                    <button type="button" key={t[0]} className={`qspl-vt${U.view === t[0] ? ' on' : ''}${t[0] === 'chua' ? ' warn' : (t[0] === 'fav' ? ' fav' : (t[0] === 'trung' ? ' trung' : ''))}`}
+                      title={t[0] === 'trung' ? 'Sản phẩm trùng mã + nhà cung cấp — giữ 1 bản, xoá bản dư' : undefined}
+                      onClick={() => { setU({ view: t[0], page: 1 }); if (t[0] === 'trung' && trungN) toast(trungN + ' sản phẩm trùng mã + NCC (các bản trùng xếp cạnh nhau) — tick bản dư rồi bấm Xoá') }}>
                       {t[1]}{t[2] && <span className="n">{t[2]}</span>}
                     </button>
                   ))}
@@ -765,9 +772,18 @@ export default function ProductList() {
         <CatPop anchor={pop.anchor} node={node} total={(products || []).length} count={nodeCount} onPick={catPick} onClose={() => setPop(null)}
           dock={!PT} top={!PT && tbRef.current && tbRef.current.parentElement ? tbRef.current.parentElement.offsetHeight + 12 : 0} />
       )}
+      {prog && (
+        <MrootPortal>
+          <div className="qspl-prog" role="status" aria-live="polite">
+            <div className="h"><b>{prog.t}</b><span>{prog.i}/{prog.n} · {prog.n ? Math.round(prog.i * 100 / prog.n) : 0}%</span></div>
+            <div className="bar"><i style={{ width: (prog.n ? prog.i * 100 / prog.n : 0) + '%' }} /></div>
+            <small>Đừng đóng trang cho tới khi xong.</small>
+          </div>
+        </MrootPortal>
+      )}
       {pop && pop.kind === 'bbedit' && nSel > 0 && (
         <BulkEditPop anchor={pop.anchor} fields={spBulkFields_(ng, specs)} n={nSel} toast={toast} onClose={() => setPop(null)}
-          onApply={(fld, val, label) => spBulkApply(selNhom(), fld, val, label, spLabel2Col_(specs, fld))} />
+          onApply={(fld, val, label) => chay('Đang sửa "' + label + '"', cb => spBulkApply(selNhom(), fld, val, label, spLabel2Col_(specs, fld), cb))} />
       )}
       {pop && pop.kind === 'bbmore' && nSel > 0 && (
         <MorePop anchor={pop.anchor} n={nSel} canDuyet={canDuyet} isAdmin={isAdmin} onClose={() => setPop(null)}

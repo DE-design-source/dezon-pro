@@ -5,6 +5,8 @@ import PaymentPlan from './purchase/PaymentPlan'
 import HmPicker from './purchase/HmPicker'
 import ProposalDetail from './purchase/ProposalDetail'
 import ProductModal from './purchase/ProductModal'
+import AddRowModal from './purchase/AddRowModal'
+import { addProdBuild_ } from '../lib/calc'
 import ChangeInput from './purchase/ChangeInput'
 import { MH_MEMO, mhMemoSet, useMhMemo, fmtDateTime_, imgSrc1_, foldGet_, foldToggle_, payLsGet_, payLsSet_ } from './purchase/purchaseUi'
 import './purchase/purchase.css'
@@ -31,11 +33,13 @@ import {
    tải lại khi đổi dự án và bằng nút tải lại. Mọi công thức ở lib/purchase.js.
    Ý định điều hướng (từ thông báo de_xuat*, M13.1): {dxDetail: ma} mở chi tiết phiếu - kể cả khi chưa mở dự án nào. */
 const TAB = 'muahang'
+// Tiến độ hàng của dòng (extra.tienDo); '' = chưa đặt
+const MH_TIEN_DO = ['', 'Đã đặt', 'Đang sản xuất', 'Đang giao', 'Đã nhận đủ', 'Giao thiếu']
 const loadState = () => ({ ma: null, list: [], loading: false, err: '' })
 
 export default function PurchaseTab() {
   const {
-    cur, lines, products, projData, setProjData, hmNode, setHmNode, mutate, toast, confirm, navigate, panelVisible, status,
+    cur, lines, products, projData, setProjData, hmNode, setHmNode, mutate, toast, confirm, ask, navigate, panelVisible, status,
     visibleSeq, consumeIntent,
   } = useQs()
   const { isAdmin } = useQsSession()
@@ -52,6 +56,7 @@ export default function PurchaseTab() {
   const [hmPop, setHmPop] = useState(null)
   const [dxOpen, setDxOpen] = useState(null)
   const [prodLine, setProdLine] = useState(null)
+  const [addFor, setAddFor] = useState(null)
   const [foldTot, setFoldTot] = useState(() => !!foldGet_().totals)
   const refs = { nguoiGui: useRef(null), phongBan: useRef(null) }
   const maRef = useRef(ma)
@@ -181,6 +186,34 @@ export default function PurchaseTab() {
   const setDxAll = (g, v) => {
     const p = mhPctIn_(v)
     g.items.forEach(l => mutate.updateLine(l.lineId, { extra: mhDxExtra_(l, p) }))
+  }
+  /* Ngày cần đặt hàng / tiến độ hàng của dòng (chỉ bản Go): lưu ở extra.ngayCanDat / extra.tienDo, áp cho mọi vị trí gộp của dòng */
+  const setMh = (ids, k, v) => {
+    mhIds_(ids).forEach(id => { const l = lineOf(id); if (!l) return; const ex = { ...(l.extra || {}) }; if (v) ex[k] = v; else delete ex[k]; mutate.updateLine(id, { extra: ex }) })
+  }
+  /* Thêm dòng vào nhóm NCC (chỉ bản Go): chọn SP có sẵn (dòng như thêm từ catalog Bóc tách) hoặc vật tư ngoài danh mục;
+     cùng đề mục với nhóm, kèm ngày cần đặt / tiến độ hàng */
+  const addRow = async ({ p, ten, dvt, gia, moTa, sl, ngay, td }) => {
+    const g = addFor
+    const nd = String((g.items[0] && g.items[0].nhom) || hmNode || '3.2')
+    const n = Math.max(1, Math.round(Number(sl) || 1))
+    const ex = { themTuMuaHang: 1 }
+    if (ngay) ex.ngayCanDat = ngay
+    if (td) ex.tienDo = td
+    let prod
+    if (p) {
+      prod = addProdBuild_(p, products, nd, '', n, '', nd, '').prod
+      prod.extra = { ...prod.extra, ...ex }
+    } else {
+      const v = Number(gia) || 0
+      prod = { ten: String(ten).trim(), ma: '', ncc: g.ncc, thuongHieu: (g.items[0] && g.items[0].thuongHieu) || '', moTa: String(moTa || '').trim(),
+        kichThuoc: '', dvt: String(dvt || '').trim() || 'Cái', hinhAnh: '', donGiaVon: v, donGiaBan: v,
+        nhom: nd, hangMuc: nodeName(nd), loai: nodeName(nd), tang: '', extra: ex }
+    }
+    const l = await mutate.addLine(prod, n)
+    if (!l) return
+    setAddFor(null)
+    toast('Đã thêm "' + prod.ten + '"' + (prod.ncc && prod.ncc !== g.ncc ? ' vào nhóm ' + prod.ncc : '') + ' (cũng hiện ở Bóc tách)')
   }
 
   /* VAT của dự án (pgSetVat_ -> setVat, PUB/app.js:1950-1958): VAT phần thô đi theo */
@@ -352,7 +385,7 @@ export default function PurchaseTab() {
               onPayDel={i => { const arr = payEdit(g.ncc, mhTot_(g.items, vatPct)); if (arr.length <= 1) { toast('Cần ít nhất 1 đợt'); return } arr.splice(i, 1); paySave() }}
               onPayChia={k => { payAll()[g.ncc] = mhPayChia_(mhTot_(g.items, vatPct), k); paySave() }}
               onPaySend={() => sendPay(g)} busy={busy}
-              onSend={() => send(g)} onSendDx={() => sendDx(g)} />
+              onSend={() => send(g)} onSendDx={() => sendDx(g)} onMh={setMh} onAddRow={() => setAddFor(g)} />
           ))}
           {!groups.length && (
             <div className="qs-card qs-po-empty">Chưa có sản phẩm trong hạng mục này.<br />Vào tab <b>Bóc tách</b> thêm sản phẩm trước.</div>
@@ -450,6 +483,7 @@ export default function PurchaseTab() {
         <ProductModal line={lineOf(prodLine.lineId) || prodLine} products={products} onClose={() => setProdLine(null)}
           onOpenBoc={() => { setProdLine(null); navigate('boc') }} />
       )}
+      {addFor && <AddRowModal g={addFor} products={products} tienDo={MH_TIEN_DO} onAdd={addRow} onClose={() => setAddFor(null)} />}
     </>
   )
 }
@@ -467,7 +501,7 @@ function LoadMsg({ st, onRetry }) {
 
 /* Thẻ một nhà cung cấp (muahangCard, PUB/muahang.js:34-89) */
 function SupplierCard({ g, gi, vatPct, on, dons, onToggle, onProd, onDisc, onDiscAll, onDx, onDxAll, pay, payOpen, onPayToggle,
-  onPaySet, onPayAdd, onPayDel, onPayChia, onPaySend, busy, onSend, onSendDx }) {
+  onPaySet, onPayAdd, onPayDel, onPayChia, onPaySend, busy, onSend, onSendDx, onMh, onAddRow }) {
   const ncc = g.ncc, items = g.items
   let sub = 0
   const rows = mhGop_(items).map((G, i) => {
@@ -497,6 +531,9 @@ function SupplierCard({ g, gi, vatPct, on, dons, onToggle, onProd, onDisc, onDis
         <td className="c"><label className="qs-po-pct propose" title="Mức giảm giá phòng mua hàng đề xuất với nhà cung cấp"><ChangeInput type="number" min="0" max="100" placeholder="0" value={mhDx_(l) || ''} onCommit={v => onDx(G.ids, v)} />%</label></td>
         <td className="c"><label className="qs-po-pct"><ChangeInput type="number" min="0" max="100" placeholder="0" value={pct || ''} onCommit={v => onDisc(G.ids, v)} />%</label></td>
         <td className="r after">{money(ttCK)}</td>
+        <td className="c"><input type="date" className="qs-po-date" title="Ngày cần đặt hàng" value={(l.extra && l.extra.ngayCanDat) || ''} onChange={e => onMh(G.ids, 'ngayCanDat', e.target.value)} /></td>
+        <td className="c"><select className={'qs-po-td t' + MH_TIEN_DO.indexOf((l.extra && l.extra.tienDo) || '')} title="Tiến độ hàng" value={(l.extra && l.extra.tienDo) || ''} onChange={e => onMh(G.ids, 'tienDo', e.target.value)}>
+          <option value="">— Chưa đặt —</option>{MH_TIEN_DO.slice(1).map(x => <option key={x} value={x}>{x}</option>)}</select></td>
       </tr>
     )
   })
@@ -517,12 +554,14 @@ function SupplierCard({ g, gi, vatPct, on, dons, onToggle, onProd, onDisc, onDis
             <th className="c" title="Mức giảm giá phòng mua hàng đề xuất với nhà cung cấp">Đề xuất giảm (%)<ChangeInput className="qs-po-bulk" type="number" min="0" max="100" placeholder="%" value="" title="Đề xuất % cho tất cả dòng" onCommit={onDxAll} /></th>
             <th className="c" title="Mức giảm giá nhà cung cấp đã chốt">Giảm giá NCC (%)<ChangeInput className="qs-po-bulk" type="number" min="0" max="100" placeholder="%" value="" title="Áp dụng % cho tất cả dòng" onCommit={onDiscAll} /></th>
             <th className="r">Thành tiền sau CK</th>
+            <th className="c" title="Ngày cần đặt hàng với nhà cung cấp">Ngày cần đặt</th><th className="c" title="Tiến độ của hàng">Tiến độ hàng</th>
           </tr>
         </thead>
-        <tbody>{rows.length ? rows : <tr><td colSpan={10} className="c">—</td></tr>}</tbody>
+        <tbody>{rows.length ? rows : <tr><td colSpan={12} className="c">—</td></tr>}</tbody>
         <tfoot>
-          <tr><td colSpan={9} className="r">VAT {vatPct}%</td><td className="r">{money(vat)}</td></tr>
-          <tr className="grand"><td colSpan={9} className="r">Tổng</td><td className="r">{money(tot)}</td></tr>
+          <tr><td colSpan={12} className="qs-po-addrow"><button type="button" onClick={onAddRow}><Icon name="plus" size={13} /> Thêm dòng</button></td></tr>
+          <tr><td colSpan={9} className="r">VAT {vatPct}%</td><td className="r">{money(vat)}</td><td colSpan={2} /></tr>
+          <tr className="grand"><td colSpan={9} className="r">Tổng</td><td className="r">{money(tot)}</td><td colSpan={2} /></tr>
         </tfoot>
       </table>
       <PaymentPlan arr={pay.arr} tot={pay.tot} open={payOpen} busy={!!busy['pay:' + ncc]} onToggle={onPayToggle}

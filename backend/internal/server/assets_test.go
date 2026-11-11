@@ -18,7 +18,7 @@ var embeddedWant = []struct{ path, blob, ctype, cache string }{
 	{"/vs-spec.js", "4e4e1251b21ae70fe0f329c9e196b6e9607ff3dd", "application/javascript; charset=UTF-8", "no-cache"},
 	{"/son-spec.js", "5ea484e438ccddc6af67ea895e058fdfc5c92f26", "application/javascript; charset=UTF-8", "no-cache"},
 	{"/ct-spec.js", "4e5fe093f783c1c37c5c4ba92af822af942c1d54", "application/javascript; charset=UTF-8", "no-cache"},
-	{"/dl-spec.js", "2e3b7652d6e4592025b928a64a2a0687d3ca42cd", "application/javascript; charset=UTF-8", "no-cache"}, // chép từ QS Pro ea787b6 (chỉ bản Go)
+	{"/dl-spec.js", "2e3b7652d6e4592025b928a64a2a0687d3ca42cd", "application/javascript; charset=UTF-8", "no-cache"},   // chép từ QS Pro ea787b6 (chỉ bản Go)
 	{"/gach-spec.js", "aa06a13526803687e75408c7984244d655629c0c", "application/javascript; charset=UTF-8", "no-cache"}, // ngành Gạch ốp lát (chỉ bản Go)
 	{"/logo.svg", "37a0c5cdd5f94eefb3d8d45b99fe3a57194e7b7f", "image/svg+xml", "public, max-age=0"},
 	{"/mau-nhap-hang-loat.xlsx", "ab186d8a9b83398a31bf0e5520a3001896497d4c",

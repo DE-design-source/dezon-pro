@@ -5,6 +5,7 @@ import { useLinesSheet } from '../state/useLinesSheet'
 import SheetBody from './breakdown/SheetBody'
 import ProductThumb from './common/ProductThumb'
 import ImgViewer from './common/ImgViewer'
+import ProductModal from './purchase/ProductModal'
 import DocsPopover from './common/DocsPopover'
 import { mediaUrl } from '../api/files'
 import { useTkCols, setColW } from './breakdown/sheet/tkCols'
@@ -68,6 +69,7 @@ export default function ProjectsTab() {
   const [xls, setXls] = useState(false)
   const [flash, setFlash] = useState(null)
   const [imgView, setImgView] = useState('')
+  const [xemSP, setXemSP] = useState(null)        // xem nhanh SP của 1 dòng (ảnh lớn + thông số), bấm ảnh dòng để mở
 
   useEffect(() => { if (visible) setViewState(btMode()) }, [visible, seq])
   function setView(v) {
@@ -125,7 +127,7 @@ export default function ProjectsTab() {
     if (c.key === 'hinhAnh') {
       if (!l.hinhAnh) return ''
       const src = img1(l.hinhAnh)
-      return <ProductThumb product={l} size={view === 'plain' ? 72 : 44} src={src} onClick={() => setImgView(src)} title="Bấm để xem ảnh lớn" className="qs-tk-img" />
+      return <ProductThumb product={l} size={view === 'plain' ? 72 : 44} src={src} onClick={() => setXemSP(l)} title="Bấm để xem nhanh sản phẩm (ảnh lớn, thông số)" className="qs-tk-img" />
     }
     if (c.key === 'taiLieu') {
       const dl = lineDocs_(l, products)
@@ -301,6 +303,8 @@ export default function ProjectsTab() {
           onPlus={l => { mutate.updateLine(l.lineId, { soLuong: (Number(l.soLuong) || 0) + 1 }); toast('+1 số lượng: ' + l.ten) }} />
       )}
       {visible && imgView && <ImgViewer src={imgView} onClose={() => setImgView('')} />}
+      {visible && xemSP && <ProductModal ctx="du-an" line={(lines || []).find(x => x.lineId === xemSP.lineId) || xemSP} products={products} onClose={() => setXemSP(null)}
+        onOpenBoc={() => { setXemSP(null); navigate('boc') }} />}
     </>
   )
 }

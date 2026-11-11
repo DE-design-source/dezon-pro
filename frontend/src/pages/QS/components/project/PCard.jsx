@@ -3,7 +3,7 @@ import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
 import { cpTong_ } from '../../lib/totals.js'
 import { money, safeUrl_ } from '../../lib/format.js'
-import { dezonUrl_ } from '../../lib/dashModel.js'
+import { dezonUrl_, ttChuan_ } from '../../lib/dashModel.js'
 import { useFold, foldToggle_, projCtx_, usePdState, pdRetry_ } from './projectShell'
 import { projInfoModal, dezonSet_ } from './projectActions'
 import { useQsStore } from '../../state/store'
@@ -59,7 +59,7 @@ export default function PCard() {
       <div className="qs-bd-bar qs-pc-folded">
         <span className="qs-pc-proj-f" onClick={stop}>{sel}</span>
         <button type="button" className="qs-pc-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án" onClick={openInfo}><Icon name="edit" size={13} /></button>
-        <span className="qs-bd-bar-status">{p.trangThai || 'Bản nháp'}</span>
+        <span className="qs-bd-bar-status">{ttChuan_(p.trangThai)}</span>
         {dz}
         <span style={{ flex: 1 }} />
         <span className="qs-bd-bar-pct">{pct}%</span>
@@ -76,7 +76,7 @@ export default function PCard() {
         style={tab === 'boc' && alignX ? { '--pc-align': Math.max(170, alignX - 37) + 'px' } : undefined}>
         <div className="qs-pc-top">
           <span className="qs-pc-proj" onClick={stop}>{sel}</span>
-          <span className="qs-pc-status">{p.trangThai || 'Bản nháp'}</span>
+          <span className="qs-pc-status">{ttChuan_(p.trangThai)}</span>
           <button type="button" className="qs-pc-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án" onClick={openInfo}><Icon name="edit" size={14} /></button>
         </div>
       </div>

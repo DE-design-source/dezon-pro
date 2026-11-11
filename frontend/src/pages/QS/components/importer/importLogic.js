@@ -89,9 +89,14 @@ export function pendFormOf_(it, loai, specs) {
   form.combo = (it.combo || []).map(x => Object.assign({}, x))
   const imgs = String(d['ẢNH SẢN PHẨM'] || it.hinhAnh || '').split('\n').map(x => x.trim()).filter(Boolean)
   form.imgMain = imgs[0] || ''; form.imgList = imgs.slice(1)
-  if (it.ghi) form.ghi = { on: true, maDA: it.ghi.maDA, qty: String(it.ghi.qty) }
+  if (it.ghi) form.ghi = { on: true, ds: (it.ghi.maDAs || [it.ghi.maDA]).filter(Boolean), qty: String(it.ghi.qty) }
   return form
 }
+
+/* Đề mục ghi danh theo NGÀNH: sơn 3.2.2, công tắc 3.2.6.2, điện lạnh 3.2.7, gạch 3.2.4, vệ sinh 3.2.5, đèn 3.2.6.1 */
+export function ndOfNganh_(ng) { return ng === 'son' ? '3.2.2' : (ng === 'ct' ? '3.2.6.2' : (ng === 'dl' ? '3.2.7' : (ng === 'gach' ? '3.2.4' : (ng === 'vs' ? '3.2.5' : '3.2.6.1')))) }
+/* Dự án ghi danh của form: ghi.ds; chưa chọn lần nào (null) = dự án đang mở */
+export function ghiDs_(g, cur) { return (g.ds == null ? (cur && cur.maDA ? [cur.maDA] : []) : g.ds).filter(Boolean) }
 
 /* ===== tdSave (nhap.js:1332-1401): form -> danh sách chờ ===== */
 export async function tdSave_(specs, setBtn) {
@@ -104,11 +109,18 @@ export async function tdSave_(specs, setBtn) {
     const v = String(F.vals[f[0]] || '').trim(); if (v) data[f[0]] = v
   })
   data['NGÀNH HÀNG'] = laVS ? ngIn : 'den'   // đóng dấu ngành -> SP về đúng đề mục trên cây
+  // Thương hiệu / NCC gõ khác hoa-thường / khoảng trắng so với giá trị đã có -> dùng đúng chính tả đã có (đồng bộ dữ liệu)
+  ;[['THƯƠNG HIỆU', 'thuongHieu'], ['NHÀ CUNG CẤP', 'ncc']].forEach(([lb, pk]) => {
+    const k = String(data[lb] || '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(); if (!k) return
+    const m = (getState().products || []).find(p => String(p[pk] || '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim() === k)
+    if (m) data[lb] = String(m[pk]).trim()
+  })
   const ten = String(data['TÊN SẢN PHẨM'] || '').trim(); if (!ten) { toast('Nhập Tên sản phẩm'); return }
   const vars = varsOfLoai_(F.vars, ngIn)
   if (laVS) {
-    if (!hmVS) { toast('Chọn Hạng mục ' + (ngIn === 'son' ? 'sơn nước' : (ngIn === 'ct' ? 'công tắc - ổ cắm' : (ngIn === 'dl' ? 'điện lạnh' : (ngIn === 'gach' ? 'gạch ốp lát' : 'thiết bị vệ sinh'))))); return }
-    let thieu = SPEC.HM[hmVS].req.filter(lb => !data[lb])
+    const hmTuDien = !hmVS && String(F.vals['HẠNG MỤC'] || '').trim()   // "Khác — tự điền": không có bộ thông số, bỏ kiểm bắt buộc
+    if (!hmVS && !hmTuDien) { toast('Chọn Hạng mục ' + (ngIn === 'son' ? 'sơn nước' : (ngIn === 'ct' ? 'công tắc - ổ cắm' : (ngIn === 'dl' ? 'điện lạnh' : (ngIn === 'gach' ? 'gạch ốp lát' : 'thiết bị vệ sinh'))))); return }
+    let thieu = hmVS ? SPEC.HM[hmVS].req.filter(lb => !data[lb]) : []
     // biến thể theo màu / kích thước điền ở khối Biến thể thì không tính là thiếu
     if (varList_(vars.varColor).length) thieu = thieu.filter(lb => lb !== 'MÀU SẮC')
     if (varList_(vars.varSize).length) thieu = thieu.filter(lb => lb !== 'KÍCH THƯỚC')
@@ -127,27 +139,35 @@ export async function tdSave_(specs, setBtn) {
     const combos = varCombos_(vars), items = []
     if (combos.length) {
       // BIẾN THỂ: 1 sản phẩm cho mỗi tổ hợp (cùng mã SP, khác nhiệt độ/công suất/góc/màu/kích thước)
+      const varImg = F2.varImg || {}, varMeta = F2.varMeta || {}
       combos.forEach(c => {
         const d2 = Object.assign({}, data)
+        // Mã SP / giá bán lẻ riêng của biến thể (bảng biến thể); để trống = theo mã / giá chung ở trên
+        const vm = varMeta[btLabel_(c)] || {}
+        if (String(vm.ma || '').trim()) d2['MÃ SẢN PHẨM'] = String(vm.ma).trim()
+        if (tkNum_(vm.gia) > 0) d2['GIÁ BÁN LẺ'] = String(tkNum_(vm.gia))
+        // Ảnh riêng của biến thể (khối Nhập biến thể) làm ảnh đại diện, ảnh chung của SP xếp sau
+        const vi = varImg[btLabel_(c)]
+        if (vi && vi.indexOf('data:') !== 0) d2['ẢNH SẢN PHẨM'] = [vi].concat(imgs.filter(x => x !== vi)).join('\n')
         if (c.k) d2['NHIỆT ĐỘ MÀU (K)'] = c.k
         if (c.w) d2['CÔNG SUẤT (W)'] = c.w
         if (c.a) d2['GÓC CHIẾU (°)'] = c.a
         if (c.c) d2['MÀU SẮC'] = c.c
         if (c.z) d2['KÍCH THƯỚC'] = c.z
-        items.push(Object.assign({ kind: 'form', data: d2, ten, bienThe: btLabel_(c), ma: data['MÃ SẢN PHẨM'] || '' }, meta))
+        items.push(Object.assign({ kind: 'form', data: d2, ten, bienThe: btLabel_(c), ma: d2['MÃ SẢN PHẨM'] || '' }, meta, { hinhAnh: d2['ẢNH SẢN PHẨM'] || '' }))
       })
     } else items.push(Object.assign({ kind: 'form', data, ten, ma: data['MÃ SẢN PHẨM'] || '' }, meta))
     const cbo = (F2.combo || []).map(x => Object.assign({}, x))
     if (cbo.length) items.forEach(x => { x.combo = cbo })          // mỗi biến thể cùng bộ đi kèm
     const g = F2.ghi, cur = getState().cur
-    const maDA = g.maDA == null ? ((cur && cur.maDA) || '') : g.maDA
+    const maDAs = ghiDs_(g, cur)
     // Tick ghi danh mà chưa chọn dự án -> báo ngay
-    if (g.on && !maDA) { toast('Đã tick "Thêm vào dự án" nhưng chưa chọn dự án — chọn dự án ở ô bên cạnh'); return 'focusProj' }
-    if (g.on && maDA) {
+    if (g.on && !maDAs.length) { toast('Đã tick "Thêm vào dự án" nhưng chưa chọn dự án — chọn dự án ở ô bên cạnh'); return 'focusProj' }
+    if (g.on && maDAs.length) {
       const gia = Number(data['GIÁ BÁN LẺ']) || 0, qty = Math.max(1, Number(g.qty) || 1)
       // Đề mục theo NGÀNH đang nhập: sơn 3.2.2, công tắc 3.2.6.2, điện lạnh 3.2.7, gạch 3.2.4, vệ sinh 3.2.5, đèn 3.2.6.1
-      const ndGhi = ngIn === 'son' ? '3.2.2' : (ngIn === 'ct' ? '3.2.6.2' : (ngIn === 'dl' ? '3.2.7' : (ngIn === 'gach' ? '3.2.4' : (ngIn === 'vs' ? '3.2.5' : '3.2.6.1'))))
-      items[0].ghi = { maDA, qty, prod: { ten, ma: data['MÃ SẢN PHẨM'] || '', thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '',
+      const ndGhi = ndOfNganh_(ngIn)
+      items[0].ghi = { maDAs, qty, prod: { ten, ma: data['MÃ SẢN PHẨM'] || '', thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '',
         moTa: data['MÔ TẢ'] || '', kichThuoc: data['KÍCH THƯỚC'] || '', dvt: data['ĐƠN VỊ TÍNH'] || 'Cái', hinhAnh: data['ẢNH SẢN PHẨM'] || '',
         donGiaVon: gia, donGiaBan: gia, nhom: ndGhi, hangMuc: nodeName(ndGhi), loai: nodeName(ndGhi), tang: '', extra: { nganh: data['DÒNG SẢN PHẨM'] || '' } } }
     }
@@ -239,7 +259,10 @@ async function pendingCommitRun_(ds) {
       const bad = {}; ((r && r.errors) || []).forEach(e => { if (e.i != null) bad[e.i] = e.error })
       file.forEach((it, fi) => {
         if (bad[fi] != null) { loi++; it.loi = String(bad[fi]).slice(0, 160); conLai.push(it) }
-        else { ok++; sessionAdd_({ ten: it.ten, ma: it.ma, thuongHieu: it.thuongHieu, ncc: it.ncc, hinhAnh: it.hinhAnh }) }
+        else {
+          ok++; sessionAdd_({ ten: it.ten, ma: it.ma, thuongHieu: it.thuongHieu, ncc: it.ncc, hinhAnh: it.hinhAnh })
+          if (it.ghi) ghiDs.push({ ghi: it.ghi, rid: '', ten: it.ten, ma: it.ma })   // dòng nhập file: tìm SP theo mã + tên sau khi tải lại
+        }
       })
     } catch (e) { file.forEach(it => { loi++; it.loi = String(e.message || '').slice(0, 160); conLai.push(it) }) }
   }
@@ -252,13 +275,18 @@ async function pendingCommitRun_(ds) {
     const g = ghiDs[gi]
     let pr = g.ghi.prod
     const nd = String(pr.nhom || '3.2.6.1')
-    const real = g.rid ? (getState().products || []).filter(x => String(x.recordId || '') === g.rid)[0] : null
+    const real = g.rid ? (getState().products || []).filter(x => String(x.recordId || '') === g.rid)[0]
+      : (g.ma ? (getState().products || []).filter(x => x.ma === g.ma && x.ten === g.ten)[0] : null)
+    if (!g.rid && !real) { toast('Lưu "' + g.ten + '" OK nhưng chưa tìm thấy SP để ghi danh dự án — thêm tay ở Danh sách sản phẩm'); continue }
     if (real) pr = Object.assign({}, real, { nhom: nd, hangMuc: nodeName(nd), loai: nodeName(nd), tang: '', extra: { nganh: real.nhom || '' } })
-    try {
-      await api.addLine(g.ghi.maDA, pr, g.ghi.qty); ghiN++
-      const cur = getState().cur
-      if (cur && cur.maDA === g.ghi.maDA) await reloadLines()
-    } catch (e3) { toast('Lưu "' + g.ten + '" OK nhưng ghi danh dự án lỗi: ' + e3.message) }
+    // 1 sản phẩm ghi vào MỌI dự án đã chọn (bản cũ trong danh sách chờ chỉ có maDA)
+    for (const maDA of (g.ghi.maDAs || [g.ghi.maDA]).filter(Boolean)) {
+      try {
+        await api.addLine(maDA, pr, g.ghi.qty); ghiN++
+        const cur = getState().cur
+        if (cur && cur.maDA === maDA) await reloadLines()
+      } catch (e3) { toast('Lưu "' + g.ten + '" OK nhưng ghi danh dự án lỗi: ' + e3.message) }
+    }
   }
   const msg = 'Đã lưu ' + ok + ' sản phẩm vào Database' + (ghiN ? (' · ghi danh ' + ghiN + ' vào dự án') : '')
   const baoLoi = () => qsAlert({ title: loi + ' sản phẩm chưa lưu được', ok: 'Đã hiểu',

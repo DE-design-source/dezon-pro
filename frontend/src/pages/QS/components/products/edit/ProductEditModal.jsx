@@ -4,10 +4,10 @@ import { loadSpecs } from '../../../api/specs'
 import { isAbort } from '../../../api/http'
 import { useQsStore, getState, reloadProducts } from '../../../state/store'
 import { fmtDate, spNorm_ } from '../../../lib/format'
-import { groupsCuaSP_, nganhCuaSP_, coSpec_, dbLabelMaps_ } from '../../../lib/productFields'
+import { groupsCuaSP_, groupsOfNganh_, nganhCuaSP_, coSpec_, dbLabelMaps_, specNganh_, IMP_LOAI } from '../../../lib/productFields'
 import { MrootPortal } from '../../common/Mroot'
 import QsIcon from '../../common/QsIcon'
-import { qsToast, qsConfirm, qsAlert } from '../../common/dialogs'
+import { qsToast, qsConfirm, qsAlert, qsAsk } from '../../common/dialogs'
 import { clearComboCache } from '../../breakdown/catalog/comboCache'
 import ImgUpBlock from './ImgUpBlock'
 import DocField from './DocField'
@@ -24,6 +24,13 @@ import './productEdit.css'
          'copy' = Sao chép thành sản phẩm mới (mã mới) · 'nbt' = chỉ mở "Tạo nhanh biến thể" (spNhieuBT_)
    Prop tuỳ chọn: product (object SP, nếu không thì tìm theo productKey trong danh mục),
      canDuyet (bool; bỏ trống thì tự hỏi /product-permissions, lỗi thì coi như được duyệt, như sanpham.js:325-330). */
+/* Lỗi trùng khoá của database (23505 - mã + biến thể đã có) -> câu dễ hiểu; lỗi khác giữ nguyên */
+function loiLuu_(e) {
+  const m = String((e && e.message) || e)
+  if (/23505|duplicate key/i.test(m)) return 'Không lưu được: đã có sản phẩm cùng mã và cùng thông số biến thể (màu sắc, kích thước, công suất, nhiệt độ màu, góc chiếu). Đổi một trong các mục này cho khác.'
+  return 'Lỗi lưu: ' + m
+}
+
 export default function ProductEditModal({ productKey, mode, onClose, onSaved, product, canDuyet }) {
   const products = useQsStore(s => s.products)
   const md = mode === 'copy' || mode === 'nbt' || mode === 'variant' ? mode : ((mode === true || mode === 1) ? 'variant' : 'edit')
@@ -109,6 +116,7 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
   const [saving, setSaving] = useState('')
   const [nbtOpen, setNbtOpen] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [ngSel, setNgSel] = useState(null)        // ngành người dùng đổi trong modal (null = giữ ngành hiện có của SP)
   const snapRef = useRef(null)
   const cbSnapRef = useRef('')                     // mốc riêng của sản phẩm đi kèm (số lượng + ghi chú)
   const upN = useRef(0)                           // số ảnh / file đang tải lên (Lưu phải đợi)
@@ -166,7 +174,24 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
   }, [retry])
 
   const defs = useMemo(() => (data ? data.groups.flatMap(gr => gr.f) : []), [data])
-  const ng = useMemo(() => nganhCuaSP_(me, data && data.specs), [me, data])
+  const ng = useMemo(() => ngSel || nganhCuaSP_(me, data && data.specs), [ngSel, me, data])
+
+  /* Đổi NGÀNH HÀNG (SP nhập nhầm ngành, vd đèn vào thiết bị vệ sinh): dựng lại bộ trường theo ngành mới như form Nhập dữ liệu.
+     Ô dùng chung (tên, mã, giá, thương hiệu…) giữ giá trị đang sửa; ô riêng của ngành mới lấy theo dữ liệu đang có trong database.
+     Hạng mục không thuộc ngành mới thì để trống để chọn lại. Lưu thì đóng dấu NGÀNH HÀNG mới. */
+  function doiNganh(n) {
+    if (!data || !n || n === ng) return
+    const groups = groupsOfNganh_(n, data.specs).map(gr => ({ g: gr.g, f: gr.f.map(f => speFieldDef_(f, data.raw, data.L2C, data.specs)).filter(Boolean) })).filter(gr => gr.f.length)
+    setData(d => ({ ...d, groups }))
+    setVals(s => {
+      const v = { ...s }
+      groups.forEach(gr => gr.f.forEach(d => { if (!Object.prototype.hasOwnProperty.call(v, d.col)) v[d.col] = d.init }))
+      const SP = coSpec_(n) ? specNganh_(n, data.specs) : null
+      if (SP && !SP.chuanHM(v.hang_muc)) v.hang_muc = ''
+      return v
+    })
+    setNgSel(n)
+  }
   // Thiết bị vệ sinh / sơn / công tắc: chỉ hiện thông số của hạng mục đang chọn (vsApplyHM_ với hienHetKhiTrong=1)
   const vsSt = useMemo(() => {
     if (!data || !coSpec_(ng)) return {}
@@ -203,6 +228,20 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
 
   async function save(luuVaDuyet) {
     if (!data || saving) return
+    // Ô có dấu * (bắt buộc chung hoặc bắt buộc theo hạng mục đang chọn) mà trống -> không lưu
+    const thieu = defs.filter(d => {
+      if (d.type === 'calc' || d.type === 'doc' || isOff(d)) return false
+      const st = d.vs ? vsSt[d.lark] : null
+      return (st ? st.star : !!d.req) && !String(vals[d.col] == null ? '' : vals[d.col]).trim()
+    })
+    if (thieu.length) {
+      await qsAlert({ title: 'Chưa nhập đủ trường bắt buộc', ok: 'Đã hiểu', nguyHiem: false,
+        note: 'Các ô có dấu * sau đang trống — nhập rồi bấm lưu lại:',
+        dong: thieu.map(d => (d.vs && vsSt[d.lark] && vsSt[d.lark].label) || d.label) })
+      const el = document.querySelector('.qspe-dlg [data-col="' + thieu[0].col + '"]')
+      if (el) el.focus()
+      return
+    }
     const out = {}
     defs.forEach(d => {
       if (d.col === 'gia_dai_ly') return                      // cột tự tính, không gửi
@@ -210,6 +249,7 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
       // thông số KHÔNG thuộc hạng mục đang chọn -> xoá, giữ dữ liệu đúng bộ của hạng mục
       out[lbl] = isOff(d) ? '' : String(vals[d.col] == null ? '' : vals[d.col])
     })
+    if (ngSel) out['NGÀNH HÀNG'] = ngSel             // đã đổi ngành trong modal -> SP về đúng đề mục của ngành đó
     setSaving('Đang lưu…')
     if (upN.current > 0) {
       setSaving('⏳ Đợi tải ảnh…')
@@ -278,6 +318,19 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
       return
     }
 
+    // Sửa thành đúng mã + thông số biến thể (màu, kích thước, công suất…) của 1 SP KHÁC -> database từ chối (trùng). Báo trước.
+    {
+      const goc = data.raw || {}, maMoi = String(out['MÃ SẢN PHẨM'] || p0.ma || '').trim(), chuan = v => String(v == null ? '' : v).trim().toLowerCase()
+      const dung = prods.filter(x => !x.spChung && x.ma === maMoi && String(x.recordId) !== String(editKey)
+        && BT_TRUC.every(t => { const v = valOf(t[0]); return chuan(v != null ? v : goc[t[0]]) === chuan((x.raw || {})[t[0]]) }))[0]
+      if (dung) {
+        lai()
+        await qsAlert({ title: 'Trùng với biến thể khác', ok: 'Đã hiểu', nguyHiem: false,
+          note: 'Mã ' + maMoi + ' đã có một biến thể khác đúng các thông số này ("' + (dung.ten || '') + '"). Đổi ít nhất một mục sau cho khác, hoặc mở biến thể kia ra để sửa:',
+          dong: BT_TRUC.map(t => t[1] + ': ' + ((valOf(t[0]) != null ? valOf(t[0]) : String(goc[t[0]] == null ? '' : goc[t[0]])).trim() || '(trống)')) })
+        return
+      }
+    }
     try {
       const r = await api.updateDbProductTracked(editKey, out)
       const relLoi = []
@@ -318,7 +371,7 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
       await reloadProducts()
       if (onSaved) onSaved({ kind: 'update', key: editKey, ma: p0.ma, result: r })
       close(true)
-    } catch (e) { qsToast('Lỗi lưu: ' + (e.message || e)); lai() }
+    } catch (e) { qsToast(loiLuu_(e)); lai() }
   }
 
   const title = copy ? 'Sao chép — tạo sản phẩm mới' : (moi ? 'Nhân bản — tạo biến thể mới' : 'Cập nhật sản phẩm')
@@ -339,9 +392,18 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
     let inner
     if (d.type === 'hm') {
       inner = (
-        <select data-col={d.col} value={v} onChange={e => setVal(d.col, e.target.value)}>
+        <select data-col={d.col} value={v} onChange={async e => {
+          const x = e.target.value
+          if (x !== '__khac__') { setVal(d.col, x); return }
+          // "Khác — tự điền": hạng mục chưa có trong danh sách (vd Remote) - SP vẫn thuộc ngành hiện tại, không có bộ thông số riêng
+          const r = await qsAsk({ title: 'Hạng mục khác', label: 'Tên hạng mục', placeholder: 'VD: Remote', value: d.opts.indexOf(v) < 0 ? v : '', ok: 'Dùng hạng mục này' })
+          const t = String((r && r.v != null ? r.v : r) || '').trim()
+          if (t) setVal(d.col, t)
+        }}>
           <option value="">— Chọn hạng mục —</option>
           {d.opts.map(o => <option key={o} value={o}>{o}</option>)}
+          {v && d.opts.indexOf(v) < 0 ? <option value={v}>{v} (tự điền)</option> : null}
+          <option value="__khac__">＋ Khác — tự điền…</option>
         </select>
       )
     } else if (d.type === 'area') {
@@ -388,6 +450,18 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
                   <div className="qspe-note-new"><QsIcon name="bell" size={14} />
                     <span>Đang tạo <b>biến thể mới</b> cho mã <b>{p0.ma || ''}</b> — đổi phần khác biệt ({BT_TRUC.map(t => t[1]).join(' · ')}) rồi bấm Tạo biến thể.</span></div>
                 ) : null}
+                <div className="qspe-grp qspe-nganh">
+                  <div className="qspe-grp-h">Ngành hàng</div>
+                  <div className="qspe-fields">
+                    <div className="qspe-f"><label>Ngành hàng</label>
+                      <select value={ng === 'den' || !coSpec_(ng) ? 'den' : ng} onChange={e => doiNganh(e.target.value)}>
+                        {IMP_LOAI.filter(x => x[0] !== 'pt').map(x => <option key={x[0]} value={x[0] === 'sp' ? 'den' : x[0]}>{x[1].split(' · ')[0]}</option>)}
+                      </select></div>
+                    <div className="qspe-nganh-note">{ngSel
+                      ? <>Đã đổi ngành — các ô bên dưới đã chuyển sang bộ trường của ngành này. Chọn lại <b>Hạng mục</b> nếu đang trống, rồi lưu.</>
+                      : 'Nhập nhầm ngành? Chọn đúng ngành ở đây, các ô thông số tự chuyển theo ngành đó.'}</div>
+                  </div>
+                </div>
                 <ImgUpBlock imgs={imgs} setImgs={setImgs} busy={busy} />
                 {data.groups.map(gr => (
                   <div className="qspe-grp" key={gr.g}>

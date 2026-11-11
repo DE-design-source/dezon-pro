@@ -132,6 +132,32 @@ export async function createFromForm(form) {
   } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)); return false }
 }
 
+/* Hỏi form "Tạo dự án mới" (#mCreate, doCreate app.js:450-461) rồi tạo + mở luôn dự án. Trả Project, huỷ / lỗi -> null.
+   Dùng ở ô chọn dự án của Danh sách sản phẩm (ProjPanel) và khối Ghi danh vào dự án của Nhập dữ liệu. */
+export async function askCreateProject() {
+  const r = await qsAsk({
+    title: 'Tạo dự án mới', ok: 'Lưu dự án', required: false,   // chỉ Tên bắt buộc, kiểm ngay dưới
+    fields: [
+      { key: 'ten', label: 'Tên dự án *', placeholder: 'VD: Nhà phố anh Thành' },
+      { key: 'khachHang', label: 'Khách hàng' },
+      { key: 'sdt', label: 'Số điện thoại' },
+      { key: 'diaChi', label: 'Địa chỉ' },
+      { key: 'linkDezon', label: 'Link dự án trên Dezon (tuỳ chọn)', placeholder: 'https://dezon.vn/…' },
+      { key: 'vat', label: 'VAT (%)', type: 'number', value: '0' },
+    ],
+  })
+  if (!r) return null
+  const ten = String(r.ten || '').trim()
+  if (!ten) { toast('Nhập tên dự án'); return null }
+  try {
+    const link = String(r.linkDezon || '').trim()
+    const p = await createProject({ ten, khachHang: r.khachHang || '', sdt: r.sdt || '', diaChi: r.diaChi || '',
+      linkDezon: link ? dezonUrl_(link) : '', vat: Number(r.vat) || 0 })
+    toast('Đã tạo bản nháp')
+    return p
+  } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)); return null }
+}
+
 /* Lưu thông tin dự án -> áp cho MỌI bản nháp cùng nhóm */
 export async function saveProjectShared(f) {
   const shared = { ten: f.ten, khachHang: f.khachHang, sdt: f.sdt, diaChi: f.diaChi, linkDezon: String(f.linkDezon || '').trim() }

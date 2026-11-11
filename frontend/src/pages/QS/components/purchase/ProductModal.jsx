@@ -244,7 +244,8 @@ function Combo({ p }) {
   )
 }
 
-export default function ProductModal({ line, products, onClose, onOpenBoc }) {
+/* ctx: 'mua' (mặc định, tab Mua hàng) | 'du-an' (xem nhanh từ Dự án / Bóc tách / panel SP trong dự án) - chỉ đổi chữ của khối số liệu dòng */
+export default function ProductModal({ line, products, onClose, onOpenBoc, ctx = 'mua' }) {
   const l = line
   const p = mhFindProd_(l, products)
   const [specs, setSpecs] = useState(specsNow)
@@ -295,9 +296,9 @@ export default function ProductModal({ line, products, onClose, onOpenBoc }) {
               {specErr ? <StatusView kind="specsMissing" message={specErr.replace(/^Không tải được thông số ngành\s*\(?([^)]*)\)?$/, '$1')} /> : null}
               {cho ? <div className="qs-po-dx-empty">Đang tải…</div> : <Specs p={p} specs={specs} ng={ng} />}
               <div className="qs-po-pm-box">
-                <div className="qs-po-pd-sec">Trong đơn mua hàng này</div>
+                <div className="qs-po-pd-sec">{ctx === 'mua' ? 'Trong đơn mua hàng này' : 'Trong dự án này'}</div>
                 {o('Số lượng', ptQty(sl) + ' ' + (l.dvt || 'Cái'))}
-                {o('Đơn giá mua', money(dg) + ' đ')}
+                {o(ctx === 'mua' ? 'Đơn giá mua' : 'Đơn giá', money(dg) + ' đ')}
                 {pctDx ? o('Đề xuất giảm', pctDx + '%', 'dx') : null}
                 {pctCK ? o('Giảm giá NCC đã chốt', pctCK + '%') : null}
                 {o('Thành tiền sau CK', money(sl * mhPriceCK_(l)) + ' đ', 'tot')}

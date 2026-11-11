@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-10 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-11 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -137,6 +137,7 @@
 <a id="xong-2"></a>
 #### M2 - Bảng điều khiển
 
+- Phân loại Danh sách dự án: lọc Đang báo giá / Đang thực hiện / Đã thực hiện (theo ô Trạng thái của bản nháp; Bản nháp cũ = Đang báo giá, Hoàn thành = Đã thực hiện), chọn năm, danh sách chia khối theo năm
 - Thẻ "Đang làm việc" cho bản nháp đang mở
 - 5 ô số liệu: số dòng, giá vốn, giá bán chưa VAT, tổng thanh toán gồm VAT, lợi nhuận và biên
 - Biểu đồ giá trị theo nhóm hạng mục
@@ -151,6 +152,7 @@
 <a id="xong-3"></a>
 #### M3 - Dự án
 
+- Xuất Excel Sản phẩm trong dự án / Bảng chi phí: nhúng ảnh sản phẩm, viền bảng, canh giữa theo chiều dọc, số nguyên không còn dấu chấm thừa, độ rộng cột theo màn hình (cờ `dep` của /export/bang, chỉ bản Go)
 - Tạo dự án mới (tên, khách hàng, số điện thoại, địa chỉ, link Dezon, VAT)
 - Thêm bản nháp mới cho một dự án
 - Mở bản nháp và nạp dòng bóc tách cùng dữ liệu rời
@@ -265,6 +267,8 @@
 <a id="xong-9"></a>
 #### M9 - Mua hàng & đề xuất
 
+- Thêm dòng ngay trong nhóm NCC (vật tư phát sinh, thành dòng của dự án); cột "Ngày cần đặt" và "Tiến độ hàng" (Chưa đặt / Đã đặt / Đang sản xuất / Đang giao / Đã nhận đủ / Giao thiếu) cho từng dòng
+- Hộp "Thêm dòng" chọn sản phẩm có sẵn trong danh mục (tìm không dấu, mặc định SP của NCC đó) hoặc vật tư ngoài danh mục; nhập luôn SL, ngày cần đặt, tiến độ hàng
 - Xem sản phẩm bóc tách của dự án gom theo nhà cung cấp, có VAT và tổng tiền
 - Nhập giảm giá nhà cung cấp theo từng dòng hoặc cho cả nhà cung cấp
 - Chọn / bỏ chọn nhà cung cấp và gửi một hoặc nhiều đơn cùng lúc
@@ -284,6 +288,13 @@
 <a id="xong-10"></a>
 #### M10 - Danh sách sản phẩm
 
+- Xem nhanh sản phẩm (ảnh lớn + thông số) từ panel "Sản phẩm trong dự án", ảnh dòng ở tab Dự án và bảng Bóc tách; khung xem ảnh lớn phóng to / thu nhỏ (lăn chuột, nút − / +, phím + − 0, bấm đúp, kéo ảnh)
+- Cột "Mã sản phẩm" riêng (ngay sau Sản phẩm, bật sẵn): sửa mã hàng loạt ở chế độ Edit, rời ô là lưu
+- Sửa hàng loạt: ô tìm trường (gõ không dấu được), danh sách trường xếp theo chữ cái
+- Thanh tiến độ % khi sửa / xoá hàng loạt
+- Tab "Trùng mã": lọc sản phẩm trùng mã + NCC, mỗi bản 1 dòng xếp cạnh nhau để xoá bản dư; form Nhập dữ liệu báo đỏ mã đã có (trùng cả NCC thì ghi rõ)
+- Thông báo "Sản phẩm chờ duyệt" cho admin + tài khoản có quyền duyệt khi nhân viên thêm / sửa SP (gom 1 phút thành 1 thông báo, chỉ bản Go)
+- Chế độ Edit đi bằng bàn phím như bảng tính: ↑ ↓ sang dòng trên / dưới cùng cột, Enter lưu + xuống dòng (Shift+Enter lên), ← → ở đầu / cuối chữ sang ô bên cạnh, Tab như cũ
 - Xem danh mục theo bốn khung nhìn: Tất cả, Chưa duyệt, Đã duyệt, Yêu thích
 - Sửa sản phẩm trong hộp Cập nhật, kèm lịch sử thay đổi từng trường
 - Sửa nhanh ngay trên bảng và hoàn tác (Ctrl+Z, tối đa 50 bước)
@@ -306,14 +317,24 @@
 
 - Chọn ngành hàng: Thiết bị đèn, Thiết bị vệ sinh, Sơn nước
 - Form nhập theo ngành, thông số hiện theo hạng mục
+- Thương hiệu / Nhà cung cấp: gợi ý từ giá trị đã có, tự đổi về đúng chính tả đã có (khác hoa-thường / khoảng trắng); chưa có thì báo "Mới" và tạo thêm
+- Hạng mục "Khác — tự điền" (mọi ngành có bộ thông số, cả modal Cập nhật SP): nhân sự gõ hạng mục chưa có (vd Remote máy lạnh), SP vẫn thuộc ngành đang nhập, không có bộ thông số riêng
 - Thêm ảnh bằng chọn file, kéo-thả, dán Ctrl+V hoặc dán link
 - Tải tài liệu hoặc dán link tài liệu cho sản phẩm
 - Giá đại lý tự tính từ giá bán lẻ và % chiết khấu
 - Chọn sản phẩm đi kèm ngay lúc nhập
+- Ghi danh vào NHIỀU dự án cùng lúc cho 1 sản phẩm (chọn thêm từng dự án, tạo dự án mới kèm link Dezon / thông tin dự án, bỏ bằng ✕), số lượng áp cho mỗi dự án
+- Ghi danh vào dự án: tạo dự án mới ngay trong ô chọn dự án ("＋ Tạo dự án mới…"), tạo xong chọn sẵn dự án và bật "Thêm sản phẩm này vào dự án"; hộp tạo dự án chỉ bắt buộc Tên (trước đây bắt nhập đủ mọi ô)
 - Nhập biến thể: tự nhân tổ hợp thành nhiều sản phẩm
+- Cập nhật sản phẩm: đổi NGÀNH HÀNG cho SP nhập nhầm ngành — form chuyển sang bộ trường của ngành mới (giữ ô chung, hạng mục chọn lại), lưu thì SP về đúng ngành / đề mục
+- Cập nhật sản phẩm: chặn lưu khi ô có dấu * còn trống; báo trước khi sửa trùng mã + thông số với biến thể khác (thay lỗi database 23505)
+- Bảng biến thể (mọi ngành): mỗi tổ hợp biến thể 1 dòng Ảnh · Mã sản phẩm · Giá bán lẻ riêng (để trống = theo ảnh / mã / giá chung); ảnh thành hình đại diện của SP biến thể; "Tạo nhanh biến thể" ở Danh sách SP cũng có cột Ảnh, cột Kích thước / Dung tích đổi tên theo ngành
 - Danh sách chờ lưu: thêm, sửa, bỏ trước khi ghi vào danh mục
+- Bảng thống kê nhập liệu: số SP đã nhập theo ngày × nhân sự, tách theo ngành, số đã duyệt, lọc khoảng ngày / nhân sự (tab Lịch sử nhập)
+- Form đang gõ, danh sách chờ và danh sách vừa nhập được giữ khi tải lại trang (trình duyệt, theo tài khoản + công ty); tab "Lịch sử nhập" xem SP đã nhập theo ngày, lọc theo tài khoản (theo Người tạo / Ngày tạo trong Database)
 - Tải file mẫu theo ngành (sơn nước theo hạng mục)
 - Đọc file Excel/CSV, tự dò cột và tự nhận ngành
+- Nhập file: ghi danh CẢ LÔ vào 1 / nhiều dự án (chọn hoặc tạo dự án mới), số lượng mỗi SP như nhau
 - Bảng xem trước: sửa ô, gắn ảnh từng dòng, đánh dấu ô thiếu
 - Cảnh báo trùng trước khi lưu, cho chọn cập nhật đè hoặc xem lại
 - Lưu vào danh mục kèm ghi danh vào dự án; dòng lỗi ở lại kèm lý do

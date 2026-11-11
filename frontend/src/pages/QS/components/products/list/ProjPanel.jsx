@@ -6,6 +6,8 @@ import { money } from '../../../lib/format.js'
 import { inNode_, nodeName } from '../../../lib/tree.js'
 import { dezonUrl_, dezonLinkIn_ } from '../../../lib/dashModel.js'
 import { spRemoveFromProject } from './spActions'
+import { askCreateProject } from '../../project/projectActions'
+import ProductModal from '../../purchase/ProductModal'
 import { lsJson, lsSet } from './spModel'
 
 /* Panel trái "Sản phẩm trong dự án" (renderSpProjPanel_, spSwitchProject, dezonChip_/dezonSet_ - PUB/sanpham.js:46-79, dash.js:11-38).
@@ -20,7 +22,8 @@ const PP_LAYOUTS = [
 ]
 
 export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
-  const { cur, projects, lines, selectProject, mutate, toast, ask, confirm } = qs
+  const { cur, projects, lines, products, selectProject, mutate, toast, ask, confirm, navigate } = qs
+  const [xem, setXem] = useState(null)   // xem nhanh SP của dòng trong dự án
   const [over, setOver] = useState(false)
   const [lay, setLaySt] = useState(() => { const v = lsJson('qs_pplayout', 'card'); return PP_LAYOUTS.some(x => x[0] === v) ? v : 'card' })
   const setLay = v => { setLaySt(v); lsSet('qs_pplayout', JSON.stringify(v)) }
@@ -30,32 +33,9 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
   const n = shown.length
 
   async function switchProject(v) {
-    if (v === '__new__') { await createProject(); return }
+    if (v === '__new__') { await askCreateProject(); return }
     if (!v) return
     await selectProject(v)
-  }
-  /* Form "Tạo dự án mới" của bản gốc (#mCreate, index.html:6798-6808 · doCreate app.js:450-461) */
-  async function createProject() {
-    const r = await ask({
-      title: 'Tạo dự án mới', ok: 'Lưu dự án',
-      fields: [
-        { key: 'ten', label: 'Tên dự án *', placeholder: 'VD: Nhà phố anh Thành' },
-        { key: 'khachHang', label: 'Khách hàng' },
-        { key: 'sdt', label: 'Số điện thoại' },
-        { key: 'diaChi', label: 'Địa chỉ' },
-        { key: 'linkDezon', label: 'Link dự án trên Dezon (tuỳ chọn)', placeholder: 'https://dezon.vn/…' },
-        { key: 'vat', label: 'VAT (%)', type: 'number', value: '0' },
-      ],
-    })
-    if (!r) return
-    const ten = String(r.ten || '').trim()
-    if (!ten) { toast('Nhập tên dự án'); return }
-    try {
-      const link = String(r.linkDezon || '').trim()
-      await mutate.createProject({ ten, khachHang: r.khachHang || '', sdt: r.sdt || '', diaChi: r.diaChi || '',
-        linkDezon: link ? dezonUrl_(link) : '', vat: Number(r.vat) || 0 })
-      toast('Đã tạo bản nháp')
-    } catch (e) { toast('Lỗi: ' + ((e && e.message) || e)) }
   }
   async function setLink() {
     const p = cur
@@ -117,9 +97,9 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
                 const sub = [l.kichThuoc, l.tang].map(x => String(x || '').trim()).filter(Boolean).join(' · ')
                 const tip = sub ? (l.ten || '') + '\n' + sub : (l.ten || '')
                 const qty = Number(l.soLuong) || 0
-                const del = <button type="button" className="qspl-pp-del" title="Bỏ khỏi dự án" onClick={() => spRemoveFromProject(l)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+                const del = <button type="button" className="qspl-pp-del" title="Bỏ khỏi dự án" onClick={ev => { ev.stopPropagation(); spRemoveFromProject(l) }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
                 if (lay === 'list') return (
-                  <div className="qspl-pp-row" key={l.lineId} title={tip}>
+                  <div className="qspl-pp-row" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
                     <ProductThumb product={l} size={32} src={img1(l.hinhAnh)} className="qspl-pp-img" />
                     <span className="qspl-pp-rn">{l.ten || ''}</span>
                     <b className="qspl-pp-rp">{money(l.donGiaBan)} đ</b>
@@ -128,14 +108,14 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
                   </div>
                 )
                 if (lay === 'grid') return (
-                  <div className="qspl-pp-tile" key={l.lineId} title={tip}>
+                  <div className="qspl-pp-tile" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
                     <div className="qspl-pp-timg"><ProductThumb product={l} size={88} src={img1(l.hinhAnh)} /><span className="qspl-pp-tq">×{qty}</span>{del}</div>
                     <div className="qspl-pp-tn">{l.ten || ''}</div>
                     <b className="qspl-pp-tp">{money(l.donGiaBan)} đ</b>
                   </div>
                 )
                 return (
-                  <div className="qs-bd-product qspl-pp-prod" key={l.lineId} title={tip}>
+                  <div className="qs-bd-product qspl-pp-prod" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
                     <span className="qs-bd-product-no">{i + 1}</span>
                     <div className="qs-bd-product-thumb"><ProductThumb product={l} size={76} src={img1(l.hinhAnh)} /></div>
                     <div className="qs-bd-product-main">
@@ -155,6 +135,8 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
             </div>
           </>
         )}
+      {xem && <ProductModal ctx="du-an" line={(lines || []).find(x => x.lineId === xem.lineId) || xem} products={products} onClose={() => setXem(null)}
+        onOpenBoc={() => { setXem(null); navigate && navigate('boc') }} />}
     </div>
   )
 }

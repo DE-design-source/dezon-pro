@@ -3,7 +3,8 @@ import QsIcon from '../common/QsIcon'
 import { qsToast } from '../common/dialogs'
 import { coSpec_ } from '../../lib/productFields'
 import { mediaUrl, templateUrl } from '../../api/files'
-import { useImp } from './importStore'
+import { useImp, impSet } from './importStore'
+import GhiPicker from './GhiPicker'
 import { impUploadFiles_, pickFiles_ } from './imgUpload'
 import { impParseFile_, impVsCheck_, impSpec_, impImgs_, impCommitBulk_ } from './importActions'
 import DbCard from './DbCard'
@@ -154,6 +155,12 @@ export default function BulkImport({ specs, loai, hmVal }) {
       <div className="qsi-preview">
         {bulk.msg ? <div className={bulk.msg.kind === 'err' ? 'qsi-pv-err' : 'qsi-pv-msg'}>{bulk.msg.text}</div>
           : (bulk.res && bulk.res.count ? <Preview key={bulk.ver} bulk={bulk} specs={specs} /> : null)}
+      </div>
+      {/* Ghi danh CẢ LÔ: chọn 1 / nhiều dự án (hoặc tạo dự án mới) - áp cho mọi SP của file khi bấm Đưa vào danh sách chờ */}
+      <div className="qsi-bulk-ghi">
+        <div className="qsi-bulk-ghi-h"><QsIcon name="building" size={14} /> Ghi danh cả lô vào dự án <i>(tuỳ chọn — áp cho mọi sản phẩm trong file)</i></div>
+        <GhiPicker g={bulk.ghi || { on: false, ds: null, qty: '1' }} put={fn => impSet(s => ({ bulk: { ...s.bulk, ghi: fn(s.bulk.ghi || { on: false, ds: null, qty: '1' }) } }))}
+          qtyLabel="Số lượng mỗi sản phẩm (mỗi dự án)" checkLabel="Thêm toàn bộ sản phẩm của file vào dự án đã chọn sau khi lưu" />
       </div>
     </DbCard>
   )

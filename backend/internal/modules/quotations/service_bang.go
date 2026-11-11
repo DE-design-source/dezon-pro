@@ -1,7 +1,9 @@
 package quotations
 
 import (
+	"context"
 	"math"
+	"strings"
 
 	"qspro-backend/internal/shared/jsval"
 )
@@ -26,6 +28,10 @@ func buildBang(b any) (*xBook, error) {
 		return nil, err
 	}
 	n := len(cols)
+	// dep (chỉ bản Go, client mới gửi true): bảng có viền, canh giữa theo chiều dọc, số nguyên không còn dấu chấm thừa,
+	// cột {img: true} nhúng ảnh theo url trong ô, cột {w: số} đặt độ rộng. Không có dep = đúng file của bản Node.
+	dep := jsval.Truthy(prop(b, "dep"))
+	isImg := make([]bool, n)
 	r := 1
 	if ten := prop(b, "ten"); jsval.Truthy(ten) {
 		ws.cell(r, 1).set(jsval.ToString(ten))
@@ -55,6 +61,16 @@ func buildBang(b any) (*xBook, error) {
 		default:
 			ws.widths[i+1] = 34
 		}
+		if dep {
+			isImg[i] = jsval.Truthy(prop(c, "img"))
+			cell.align(xAlign{V: "middle", Wrap: true, H: "center"})
+			cell.border()
+			if w := jsval.Num0(prop(c, "w")); w >= 4 && w <= 120 {
+				ws.widths[i+1] = w
+			} else if isImg[i] {
+				ws.widths[i+1] = 12
+			}
+		}
 	}
 	ws.row(r).ht = 30
 	ws.ySplit = r
@@ -66,6 +82,12 @@ func buildBang(b any) (*xBook, error) {
 				c.set(jsval.ToString(g))
 				c.font(xFont{Bold: true, Color: bangNavy})
 				c.fill("FFEEF2F7")
+				if dep {
+					c.align(xAlign{V: "middle"})
+					for i := 1; i <= n; i++ {
+						ws.cell(r, i).border()
+					}
+				}
 				if n > 1 {
 					ws.merge(r, 1, r, n)
 				}
@@ -77,8 +99,21 @@ func buildBang(b any) (*xBook, error) {
 		if jsval.Truthy(row) {
 			cells = jsval.AsArray(prop(row, "cells"))
 		}
+		if dep {
+			for i := 1; i <= n; i++ {
+				ws.cell(r, i).border()
+			}
+		}
 		for i, v := range cells[:min(len(cells), n)] {
 			cell := ws.cell(r, i+1)
+			if dep && isImg[i] {
+				// ô ảnh: không ghi chữ, chờ BuildBangXlsx tải + nhúng ảnh đầu tiên
+				if u := jsval.Trim(strings.SplitN(jsval.StrOr(v, ""), "\n", 2)[0]); u != "" {
+					ws.pend = append(ws.pend, pendImg{r, i + 1, u})
+					ws.row(r).ht = 52
+				}
+				continue
+			}
 			f, laSo := v.(float64)
 			_, laChu := v.(string)
 			if (laSo && !math.IsInf(f, 0) && !math.IsNaN(f)) || laChu {
@@ -90,6 +125,18 @@ func buildBang(b any) (*xBook, error) {
 				cell.numFmt("#,##0.##")
 			}
 			cell.align(xAlign{V: "top", Wrap: !isNum[i]})
+			if dep {
+				h := "left"
+				if laSo {
+					h = "right"
+					if f == math.Trunc(f) {
+						cell.numFmt("#,##0") // "#,##0.##" hiện "255,000." với số nguyên
+					}
+				} else if i == 0 {
+					h = "center"
+				}
+				cell.align(xAlign{V: "middle", Wrap: !isNum[i], H: h})
+			}
 		}
 		r++
 	}
@@ -112,11 +159,19 @@ func buildBang(b any) (*xBook, error) {
 }
 
 // BuildBangXlsx = buildBangXlsx (X:527-567): 1 bảng do client dựng sẵn -> file Excel.
-// b = {ten, sheet, cols: [{label, num}], rows: [{cells: []} | {group: ""}], tong: [[nhãn, số]]}. Không đọc database.
-func (s *Service) BuildBangXlsx(b any) ([]byte, error) {
+// b = {ten, sheet, cols: [{label, num, img?, w?}], rows: [{cells: []} | {group: ""}], tong: [[nhãn, số]], dep?}. Không đọc database;
+// ảnh của cột img (chỉ khi dep) tải như file báo giá (fetchImage, best-effort: ảnh lỗi thì bỏ trống ô).
+func (s *Service) BuildBangXlsx(ctx context.Context, b any) ([]byte, error) {
 	wb, err := buildBang(b)
 	if err != nil {
 		return nil, err
+	}
+	for _, ws := range wb.sheets {
+		for _, p := range ws.pend {
+			if data := s.fetchImage(ctx, p.url); data != nil {
+				ws.addImage(data.buf, data.ext, float64(p.col-1)+0.1, float64(p.row-1)+0.1)
+			}
+		}
 	}
 	return wb.write()
 }

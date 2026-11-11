@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
-import { dashSearch_ } from '../../lib/dashModel.js'
+import { dashSearch_, TT_DU_AN, groupStatus_, groupYear_ } from '../../lib/dashModel.js'
 import { openProjDlg } from '../project/projectActions'
 import ProjectCard from './ProjectCard'
 import { ProjectRow, ProjectTile, BarHeader, BAR_COLS, BAR_DENSITY } from './ProjectViews'
@@ -40,22 +40,38 @@ export default function ProjectList({ groups, curMa }) {
   const resizeCol = (k, px) => setCols(c => { const n = { ...c, [k]: px }; saveLs_(COLS_LS, JSON.stringify(n)); return n })
   const [density, setDensitySt] = useState(readDensity_)
   const setDensity = v => { setDensitySt(v); saveLs_(DENS_LS, v) }
+  /* Phân loại: theo trạng thái dự án (Đang báo giá / Đang thực hiện / Đã thực hiện) và theo năm tạo; danh sách chia khối theo năm.
+     Lựa chọn nhớ trong máy (qs_dash_tt, qs_dash_year) */
+  const [tt, setTtSt] = useState(() => { try { const v = localStorage.getItem('qs_dash_tt') || ''; return TT_DU_AN.indexOf(v) >= 0 ? v : '' } catch (e) { return '' } })
+  const setTt = v => { setTtSt(v); saveLs_('qs_dash_tt', v) }
+  const [year, setYearSt] = useState(() => { try { return localStorage.getItem('qs_dash_year') || '' } catch (e) { return '' } })
+  const setYear = v => { setYearSt(v); saveLs_('qs_dash_year', v) }
   const q = query.toLowerCase().trim()
-  const shown = dashSearch_(groups, query)
+  const found = dashSearch_(groups, query)
+  const years = [...new Set(groups.map(groupYear_))].sort((a, b) => b.localeCompare(a))
+  const yr = years.indexOf(year) >= 0 ? year : ''
+  const inYear = found.filter(g => !yr || groupYear_(g) === yr)
+  const dem = v => inYear.filter(g => !v || groupStatus_(g) === v).length
+  const shown = inYear.filter(g => !tt || groupStatus_(g) === tt)
+  // khối theo năm, năm mới trước; dự án không có ngày tạo vào khối "Chưa rõ năm"
+  const blocks = years.map(y => ({ y, ds: shown.filter(g => groupYear_(g) === y) })).filter(b => b.ds.length)
 
-  let list = null
-  if (view === 'bar') {
-    const vars = {}
-    BAR_COLS.forEach(c => { vars['--w-' + c.key] = cols[c.key] + 'px' })
-    list = (
-      <div className={`qs-dash-rows d-${density}`} style={vars}>
+  const vars = {}
+  if (view === 'bar') BAR_COLS.forEach(c => { vars['--w-' + c.key] = cols[c.key] + 'px' })
+  const listOf = ds => (view === 'bar'
+    ? <div className={`qs-dash-rows d-${density}`} style={vars}>
         <BarHeader widths={cols} onResize={resizeCol} />
-        {shown.map(g => <ProjectRow key={g.drafts[0].maDA} group={g} curMa={curMa} />)}
+        {ds.map(g => <ProjectRow key={g.drafts[0].maDA} group={g} curMa={curMa} />)}
       </div>
-    )
-  }
-  else if (view === 'icon') list = <div className="qs-dash-tiles">{shown.map(g => <ProjectTile key={g.drafts[0].maDA} group={g} curMa={curMa} />)}</div>
-  else list = <div className="qs-dash-project-grid">{shown.map(g => <ProjectCard key={g.drafts[0].maDA} group={g} curMa={curMa} />)}</div>
+    : view === 'icon'
+      ? <div className="qs-dash-tiles">{ds.map(g => <ProjectTile key={g.drafts[0].maDA} group={g} curMa={curMa} />)}</div>
+      : <div className="qs-dash-project-grid">{ds.map(g => <ProjectCard key={g.drafts[0].maDA} group={g} curMa={curMa} />)}</div>)
+  const list = blocks.map(b => (
+    <div className="qs-dash-yblock" key={b.y || 'none'}>
+      {(years.length > 1 || !b.y) && <div className="qs-dash-yhead">{b.y ? 'Năm ' + b.y : 'Chưa rõ năm'} <span>{b.ds.length} dự án</span></div>}
+      {listOf(b.ds)}
+    </div>
+  ))
 
   return (
     <div className="qs-card qs-dash-list">
@@ -86,11 +102,26 @@ export default function ProjectList({ groups, curMa }) {
         </div>
         <button type="button" className="qs-dash-create" onClick={() => openProjDlg('create')}><Icon name="plus" size={14} />Tạo dự án</button>
       </div>
+      <div className="qs-dash-filter">
+        <div className="qs-dash-tt" role="radiogroup" aria-label="Phân loại dự án">
+          {[''].concat(TT_DU_AN).map(v => (
+            <button key={v || 'all'} type="button" role="radio" aria-checked={tt === v} className={'qs-dash-tt-b' + (tt === v ? ' on' : '')} onClick={() => setTt(v)}>
+              {v || 'Tất cả'} <span>{dem(v)}</span></button>
+          ))}
+        </div>
+        <span style={{ flex: 1 }} />
+        <label className="qs-dash-year">Năm
+          <select value={yr} onChange={e => setYear(e.target.value)}>
+            <option value="">Tất cả năm</option>
+            {years.filter(Boolean).map(y => <option key={y} value={y}>{y}</option>)}
+          </select></label>
+        <span className="qs-dash-tt-hint">Đổi trạng thái ở Thông tin dự án (ô Trạng thái của bản nháp)</span>
+      </div>
       {shown.length
         ? list
         : (
           <div className="qs-dash-empty">
-            {q ? `Không tìm thấy dự án khớp "${q}".` : <>Chưa có dự án. Bấm <b>Tạo dự án</b> để bắt đầu.</>}
+            {q ? `Không tìm thấy dự án khớp "${q}".` : (groups.length ? 'Không có dự án nào thuộc loại / năm đang chọn.' : <>Chưa có dự án. Bấm <b>Tạo dự án</b> để bắt đầu.</>)}
           </div>
         )}
     </div>
