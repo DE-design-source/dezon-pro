@@ -7,6 +7,7 @@ import CampaignDetail from './components/CampaignDetail'
 import CatalogTab from './components/CatalogTab'
 import QuoteTab from './components/QuoteTab'
 import TasksTab from './components/TasksTab'
+import AdsSpendTab from './components/AdsSpendTab'
 import CampaignModal from './components/CampaignModal'
 import CreateTaskModal from './components/CreateTaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
@@ -250,6 +251,7 @@ export default function Marketing() {
           onOpenCreateTask={() => setTaskModal(m => ({ open: true, seq: m.seq + 1 }))}
         />
         <div style={{ display: panel === 'staff' ? 'block' : 'none' }}><DeptStaff units={['marketing']} /></div>
+        <AdsSpendTab visible={panel === 'ads'} />
         {/* Tab tuỳ chỉnh do người dùng thêm — nội dung giữ tên lúc tạo, kể cả khi tab được đổi tên sau đó */}
         {tabs.filter(t => t.custom).map(t => (
           <div key={t.id} style={{ display: panel === t.id ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>

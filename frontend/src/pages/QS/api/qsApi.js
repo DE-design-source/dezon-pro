@@ -39,6 +39,14 @@ export const duplicateProject = (maDA, opts, signal) => post('/projects/' + enc(
 export const getProjData = (maDA, signal) => get('/projects/' + enc(maDA) + '/data', null, signal)
 export const setProjData = (maDA, khoa, giaTri, signal) =>
   put('/projects/' + enc(maDA) + '/data/' + enc(khoa), { giaTri: giaTri === undefined ? null : giaTri }, signal)
+/* Yêu cầu sửa thông tin dự án (chỉ bản Go, migration 0037): người duyệt -> {applied, project}; người khác -> {pending, id} */
+export const requestProjectEdit = (maDA, fields, lyDo, signal) =>
+  post('/projects/' + enc(maDA) + '/edit-requests', withLyDo({ fields: fields || {} }, lyDo), signal)
+/* -> {canApprove, items[{id, maDA, tenDA, requester, changes, oldValues, status, lyDo, at, resolver, resolvedAt, lyDoTuChoi}]} */
+export const listProjectEditRequests = (maDA, status, signal) =>
+  get('/project-edit-requests', { ...(maDA ? { maDA } : {}), ...(status ? { status } : {}) }, signal)
+export const resolveProjectEditRequest = (id, approve, lyDo, signal) =>
+  post('/project-edit-requests/' + enc(id) + '/resolve', withLyDo({ approve: truthy(approve) }, lyDo), signal)
 
 /* ---- Dòng bóc tách ---- */
 export const getLines = (maDA, signal) => get('/projects/' + enc(maDA) + '/lines', null, signal)

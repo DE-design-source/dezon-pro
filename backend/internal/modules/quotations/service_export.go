@@ -195,8 +195,19 @@ func buildCoverSheet(ws *xSheet, p *omap.Map, cover []any, o *exportOpts, logo *
 		}
 		return false
 	})
+	// cột NO: số đánh lại liên tục (opts.soLai) hoặc mã gốc
+	disp := map[string]string{}
+	if o != nil && o.soLai {
+		disp = coverSoLai(sorted)
+	}
+	noOf := func(stt any) any {
+		if d, ok := disp[jsval.ToString(stt)]; ok {
+			return d
+		}
+		return stt
+	}
 	if ncol == 6 {
-		buildCoverM1(ws, sorted, cost, total, r)
+		buildCoverM1(ws, sorted, cost, total, r, noOf)
 		return
 	}
 	for _, cv := range sorted {
@@ -208,7 +219,7 @@ func buildCoverSheet(ws *xSheet, p *omap.Map, cover []any, o *exportOpts, logo *
 			indent = strings.Repeat("    ", lvl-1)
 		}
 		name := plus(indent, jsval.Or(jsval.Get(cv, "hangMuc"), ""))
-		ws.cell(r, 1).set(stt)
+		ws.cell(r, 1).set(noOf(stt))
 		ws.cell(r, 1).align(xAlign{H: "center"})
 		ws.cell(r, 1).font(xFont{Name: "Arial", Bold: lvl == 1})
 		nameCell := ws.cell(r, 2)
@@ -255,6 +266,27 @@ func buildCoverSheet(ws *xSheet, p *omap.Map, cover []any, o *exportOpts, logo *
 	tVal.align(xAlign{H: "right"})
 	tVal.fill(mauNavy2)
 	ws.cell(r, 4).fill(mauNavy2)
+	// khối tổng như bản xem trước: VAT (theo % từng hạng mục, client tính) + TỔNG CHI PHÍ DỰ KIẾN (GỒM VAT)
+	if o != nil && o.vatBia != nil {
+		dong := func(nhan string, v float64, nen, chu string, size float64) {
+			r++
+			ws.merge(r, 1, r, 2)
+			l := ws.cell(r, 1)
+			l.set(nhan)
+			l.font(xFont{Name: "Arial", Bold: true, Color: chu})
+			l.align(xAlign{H: "right"})
+			l.fill(nen)
+			c := ws.cell(r, 3)
+			c.set(v)
+			c.numFmt(fmtInt)
+			c.font(xFont{Name: "Arial", Bold: true, Size: size, Color: chu})
+			c.align(xAlign{H: "right"})
+			c.fill(nen)
+			ws.cell(r, 4).fill(nen)
+		}
+		dong("VAT "+o.vatBia.nhan, o.vatBia.vat, "FFEEF1F5", "FF12233A", 11)
+		dong("TỔNG CHI PHÍ DỰ KIẾN (GỒM VAT)", total+o.vatBia.vat, mauNavy2, mauWhite, 12)
+	}
 
 	for rr := headerRow; rr <= r; rr++ {
 		for cc := 1; cc <= 4; cc++ {
@@ -427,7 +459,8 @@ func jsAdd(a, b any) any {
 }
 
 // buildDetailSheet (X:234-324): 1 sheet của 1 nhóm, gom theo Tầng, nhúng ảnh (lỗi ảnh thì bỏ qua ảnh đó).
-func (s *Service) buildDetailSheet(ctx context.Context, ws *xSheet, items []any, p *omap.Map, excols []exCol, catName string) error {
+// vatPct < 0: không in dòng VAT (không có opts.vatHm - đúng bố cục Node)
+func (s *Service) buildDetailSheet(ctx context.Context, ws *xSheet, items []any, p *omap.Map, excols []exCol, catName string, vatPct float64) error {
 	ncol := len(excols)
 	colIdx := func(key string) int {
 		for i, c := range excols {
@@ -613,6 +646,24 @@ func (s *Service) buildDetailSheet(ctx context.Context, ws *xSheet, items []any,
 	ws.cell(r, ttCol).set(catTotal)
 	ws.cell(r, ttCol).numFmt(fmtInt)
 	ws.cell(r, ttCol).font(xFont{Name: "Arial", Bold: true, Size: 11, Color: "FF8F6F42"})
+	// VAT của riêng hạng mục (% đặt ở Bóc tách) + THÀNH TIỀN (VAT), như 3 ô ở đầu trang hạng mục trên bản xem trước
+	if vatPct >= 0 {
+		vat := qscore.Round0(nz(catTotal) * vatPct / 100)
+		dong := func(nhan string, v float64, nen, chu string) {
+			r++
+			for t := 1; t <= ncol; t++ {
+				ws.cell(r, t).fill(nen)
+			}
+			ws.cell(r, lbl).set(nhan)
+			ws.cell(r, lbl).font(xFont{Name: "Arial", Bold: true, Color: chu})
+			ws.cell(r, lbl).align(xAlign{H: "right"})
+			ws.cell(r, ttCol).set(v)
+			ws.cell(r, ttCol).numFmt(fmtInt)
+			ws.cell(r, ttCol).font(xFont{Name: "Arial", Bold: true, Size: 11, Color: chu})
+		}
+		dong("VAT "+jsval.ToString(vatPct)+"%", vat, "FFEEF1F5", "FF12233A")
+		dong("THÀNH TIỀN (VAT)", nz(catTotal)+vat, mauNavy2, mauWhite)
+	}
 	lastRow := r
 
 	for rr := headerRow; rr <= lastRow; rr++ {
@@ -913,7 +964,7 @@ func (s *Service) buildBaoGia(ctx context.Context, maDA, cols, nodes, phanTho, a
 	}
 
 	wb := &xBook{}
-	// mục lớn người dùng đã ẩn khỏi tờ bìa -> file Excel cũng bỏ, khớp bản PDF
+	// mục người dùng đã ẩn khỏi tờ bìa (mục lớn hoặc mục con; ẩn 1 mục = ẩn cả mục con) -> file Excel cũng bỏ, khớp bản PDF (bgHidden, lib/quote.js)
 	an := map[string]bool{}
 	for _, k := range jsval.AsArray(anMuc) {
 		an[jsval.ToString(k)] = true
@@ -925,7 +976,12 @@ func (s *Service) buildBaoGia(ctx context.Context, maDA, cols, nodes, phanTho, a
 	cover := []any{}
 	for _, c := range all {
 		// an là {} của JS: mục có đoạn đầu của stt trùng tên thuộc tính của Object.prototype luôn bị coi là đã ẩn
-		if k := strings.Split(jsval.ToString(jsval.Get(c, "stt")), ".")[0]; !an[k] && !protoKeys[k] {
+		parts := strings.Split(jsval.ToString(jsval.Get(c, "stt")), ".")
+		hide := protoKeys[parts[0]]
+		for i := 1; i <= len(parts) && !hide; i++ {
+			hide = an[strings.Join(parts[:i], ".")]
+		}
+		if !hide {
 			cover = append(cover, c)
 		}
 	}
@@ -985,7 +1041,7 @@ func (s *Service) buildBaoGia(ctx context.Context, maDA, cols, nodes, phanTho, a
 		if ws, err = wb.addWorksheet("Báo giá"); err != nil {
 			return nil, nil, err
 		}
-		if err := s.buildDetailSheet(ctx, ws, nil, p, excols, "Báo giá"); err != nil {
+		if err := s.buildDetailSheet(ctx, ws, nil, p, excols, "Báo giá", -1); err != nil {
 			return nil, nil, err
 		}
 	} else {
@@ -1002,7 +1058,22 @@ func (s *Service) buildBaoGia(ctx context.Context, maDA, cols, nodes, phanTho, a
 			if ws, err = wb.addWorksheet(nm); err != nil {
 				return nil, nil, err
 			}
-			if err := s.buildDetailSheet(ctx, ws, c.items, p, excols, c.name); err != nil {
+			// cột riêng của hạng mục (opts.colsHm[mã]) nếu có và hợp lệ, không thì cột chung
+			cc := excols
+			if o != nil && o.colsHm != nil {
+				if v := o.colsHm.Val(c.name); v != nil && jsval.Truthy(jsval.Get(v, "length")) {
+					if x, e := exCols(v); e == nil && len(x) > 0 {
+						cc = x
+					}
+				}
+			}
+			vp := -1.0
+			if o != nil && o.vatHm != nil {
+				if v := o.vatHm.Val(c.name); jsval.IsNumber(v) {
+					vp = jsval.ToNumber(v)
+				}
+			}
+			if err := s.buildDetailSheet(ctx, ws, c.items, p, cc, c.name, vp); err != nil {
 				return nil, nil, err
 			}
 		}

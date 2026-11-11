@@ -380,17 +380,19 @@ var (
 	reTime    = regexp.MustCompile(`\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d(:\d\d)?)`)
 )
 
-// Cột chỉ bản Go (migration 0011, M8.3: projects.current_condition = du_an.hien_trang): golden Node không có
+// Cột chỉ bản Go (migration 0011, M8.3: projects.current_condition = du_an.hien_trang; migration 0036:
+// projects.architect = du_an.kien_truc_su; migration 0038: projects.studio = du_an.studio; migration 0039: design_team,
+// photographer, contractor, completion_year): golden Node không có
 // -> bỏ khỏi kết quả và khỏi chi tiết lỗi "Failing row contains" trước khi so (backend/docs/ARCHITECTURE.md 10.4).
 // Chỉ bỏ khi giá trị là null (goonly.StripNull): cột chỉ ghi khi client gửi khoá, ca golden không gửi, nên giá trị
 // khác null = ghi sai và phép so báo khác.
 //
-// Khoá kết quả chỉ bản Go: hienTrang (projToObj đọc từ hien_trang). Ca golden không ghi cột này nên khoá luôn là chuỗi rỗng;
+// Khoá kết quả chỉ bản Go: goOnlyResultKeys (projToObj đọc từ các cột goOnlyKeys, cùng thứ tự). Ca golden không ghi cột này nên khoá luôn là chuỗi rỗng;
 // stripGoOnlyResult kiểm điều đó rồi mới bỏ khoá (giá trị khác rỗng = đọc / ghi sai, test báo lỗi).
 var (
-	goOnlyKeys       = []string{"hien_trang"}
-	goOnlyCols       = map[string]int{"projects": 1}
-	goOnlyResultKeys = []string{"hienTrang"}
+	goOnlyKeys       = []string{"hien_trang", "kien_truc_su", "studio", "nhom_thiet_ke", "nhiep_anh_gia", "nha_thau_thi_cong", "nam_hoan_thien"}
+	goOnlyCols       = map[string]int{"projects": 7}
+	goOnlyResultKeys = []string{"hienTrang", "kienTrucSu", "studio", "nhomThietKe", "nhiepAnhGia", "nhaThauThiCong", "namHoanThien"}
 )
 
 // stripGoOnlyResult: khoá kết quả chỉ bản Go phải rỗng ở mọi chỗ, rồi bỏ khỏi v trước khi so với golden.
@@ -657,7 +659,8 @@ func TestDiffDB(t *testing.T) {
 	}
 }
 
-// Route REST: đăng ký không panic (trùng tham số / trùng đường dẫn) và đủ 8 route của PORTING_MAP mục A.
+// Route REST: đăng ký không panic (trùng tham số / trùng đường dẫn) và đủ 8 route của PORTING_MAP mục A
+// + 3 route chỉ bản Go của yêu cầu sửa dự án (migration 0037).
 func TestRESTRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	e := gin.New()
@@ -667,7 +670,8 @@ func TestRESTRoutes(t *testing.T) {
 		got[r.Method+" "+r.Path] = true
 	}
 	want := []string{"GET /api/v1/bootstrap", "GET /api/v1/projects", "POST /api/v1/projects", "PATCH /api/v1/projects/:id",
-		"DELETE /api/v1/projects/:id", "POST /api/v1/projects/:id/duplicate", "GET /api/v1/projects/:id/data", "PUT /api/v1/projects/:id/data/:khoa"}
+		"DELETE /api/v1/projects/:id", "POST /api/v1/projects/:id/duplicate", "GET /api/v1/projects/:id/data", "PUT /api/v1/projects/:id/data/:khoa",
+		"POST /api/v1/projects/:id/edit-requests", "GET /api/v1/project-edit-requests", "POST /api/v1/project-edit-requests/:rid/resolve"}
 	if len(got) != len(want) {
 		t.Errorf("số route = %d, cần %d", len(got), len(want))
 	}

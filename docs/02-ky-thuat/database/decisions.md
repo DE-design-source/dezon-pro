@@ -1,6 +1,8 @@
 # Quyết định thiết kế database
 
 > **Cập nhật 2026-10-12:** đề xuất này ĐÃ được triển khai trên database local `qspro_en2`, có điều chỉnh. Cấu trúc đang chạy: [schema-hien-hanh.md](schema-hien-hanh.md). Những gì đã làm và khác gì so với bản dưới đây: [ket-qua-trien-khai.md](ket-qua-trien-khai.md). Nội dung bên dưới là bản đề xuất gốc, giữ lại để tra lý do.
+>
+> **Ghi chú 2026-11-06:** viết khi còn app Node (đã gỡ ở commit `5fa5d52`); đường dẫn `server/*.js`, `public/*.js`, `render.yaml` và lệnh `npm ...` trong tài liệu này là mã / cách làm cũ. Hiện nay: migration chạy bằng `go run ./cmd/migrate` (trong `backend/`), `db-map.json` duy nhất ở `backend/internal/platform/database/db-map.json`, bảng tự lọc công ty khai trong `TenantTables` (`backend/internal/platform/database/postgres.go`).
 
 - Trạng thái: **ĐÃ TRIỂN KHAI** trên `qspro_en2` (2026-10-12), trừ bước xoá cột của D-09. D-13 (transaction) đã làm trên backend Go ngày 2026-10-15 (xem mục D-13). D-04 được làm theo hướng mạnh hơn: bỏ hẳn `company_id` ở 7 bảng con thay vì khoá ngoại kép. Chi tiết: [ket-qua-trien-khai.md](ket-qua-trien-khai.md).
 - Mỗi quyết định ghi: bối cảnh có bằng chứng, các phương án đã cân nhắc, đề xuất, tác động tới code.
@@ -24,6 +26,9 @@
 | D-12 | Lớp tương thích và công cụ migration | Giữ `supa.js` + `db-map.json`; migration SQL đánh số | 1 | Không |
 | D-13 | Transaction cho thao tác nhiều bước | Thêm ở đợt 2 | 2 | Không |
 | D-14 | Vị trí tài liệu | `docs/02-ky-thuat/database/` | - | Không |
+| D-15 | Chat MVP (2026-10-30): danh tính riêng, SQL thô, chỉ PostgreSQL | Bảng `chat_*` không theo công ty; SQL qua `DB.Pool()`; chưa dùng Redis / Cassandra / Kafka | - | Không (đã chốt) |
+| D-16 | Chat đăng nhập bằng email (2026-11-02) | Danh tính = số HOẶC email, tài khoản riêng, chưa liên kết; OTP email qua SMTP | - | Không (đã chốt) |
+| D-17 | Chat gửi ảnh / video / tệp / tin thoại (2026-11-02) | MinIO + presigned PUT vào khoá tạm, server chép + kiểm; presigned GET 60 phút; chống trùng theo người tải | - | Không (đã chốt) |
 
 ---
 
@@ -164,3 +169,100 @@
 ## D-14. Vị trí tài liệu
 
 Yêu cầu ghi `docs/database/*.md`; quy tắc bắt buộc của repo (`.claude/rules/docs/docs-placement.md`) yêu cầu tài liệu kỹ thuật nằm ở `docs/02-ky-thuat/`, tên file kebab-case. Đã đặt ở `docs/02-ky-thuat/database/`. Bảng đối chiếu tên file: [docs/README.md](../../README.md).
+
+## D-15. Chat MVP: danh tính riêng, SQL thô qua `Pool()`, chỉ PostgreSQL (2026-10-30)
+
+- **Bối cảnh:** Chat MVP (`backend/CHAT.md`, roadmap N8) đăng nhập bằng số điện thoại + OTP và dùng chung giữa mọi công ty (như Zalo).
+  CHAT.md mục 4 thiết kế PostgreSQL (người dùng, nhóm) + Cassandra / ScyllaDB (tin nhắn) + Redis (online, `seq`, đang soạn, OTP), nhưng ghi
+  "Giai đoạn đầu có thể dùng PostgreSQL cho tất cả, giữ nguyên cấu trúc bên dưới để sau này tách ra"; mục 16 (Lộ trình) đặt MVP là
+  "WebSocket một gateway", còn tách gateway, Kafka, Cassandra để "khi có tăng trưởng". Production (VPS dezon.tech) chỉ có PostgreSQL, không có Redis.
+- **Quyết định 1 - danh tính riêng:** bảng `chat_users` (khoá nghiệp vụ = số điện thoại E.164), KHÔNG dùng `users` của QS, KHÔNG có
+  `company_id`, không vào `TenantTables` (quy tắc 25: user-owned, không theo công ty; `chat_otp_codes` là bảng hệ thống). Token riêng: access
+  JWT HS256 15 phút (`typ = "chat"`, `did` = thiết bị) + refresh token mờ 30 ngày lưu sha256, xoay vòng, phát hiện dùng lại. Phiên QS và token
+  chat không dùng lẫn được. Phương án bị loại: gắn chat vào `users` - tài khoản QS thuộc một công ty, đăng nhập bằng tên + mật khẩu, người
+  ngoài công ty (khách, thầu phụ) không có tài khoản.
+- **Quyết định 2 - SQL thô qua `database.DB.Pool()`:** lớp `database.DB` kiểu PostgREST không diễn đạt được `UPDATE ... SET last_seq = last_seq + 1
+  RETURNING` (cấp `seq` nguyên tử dưới khoá dòng), `GREATEST(...)` cho con trỏ đã nhận / đã xem, upsert `ON CONFLICT`, `SELECT ... FOR UPDATE`,
+  khoá `pg_advisory_xact_lock` theo số điện thoại / cặp người dùng và các câu nối của danh sách hội thoại; bảng chat cũng không cần lọc công ty.
+  Module chat viết SQL tên tiếng Anh, transaction riêng (`pgx.BeginFunc`), ép kiểu tham số tường minh (pool chạy simple protocol). Ngoại lệ
+  này ghi ở `backend/docs/ARCHITECTURE.md` mục 10.4; `db-map.json` vẫn có 9 mục `chat_*` (quy tắc 17), không có khoá `tenant`.
+- **Quyết định 3 - PostgreSQL thay Redis / Cassandra / Kafka ở MVP:**
+
+  | Thành phần của CHAT.md | MVP dùng |
+  |---|---|
+  | Bảng `messages` trên Cassandra | `chat_messages`, cùng khoá đọc `(conversation_id, seq)` |
+  | `message_dedup` (TTL 1 ngày) | unique `(conversation_id, sender_id, client_msg_id)`, không TTL |
+  | Redis `seq:{conversation_id}` (`INCR`) | `chat_conversations.last_seq` + `UPDATE ... RETURNING` trong transaction gửi |
+  | Redis `otp:{phone}` (TTL 5 phút) | `chat_otp_codes` (lưu HMAC; giới hạn gửi đếm bằng số dòng trong 1 giờ) |
+  | Redis `conn`, `presence`, `typing`, `members` | bộ nhớ của gateway `realtime.Hub` + cache thành viên 30 giây trong service |
+  | Kafka (phân phối theo thứ tự) | bộ chạy tuần tự trong tiến trình `Hub.Submit(conversation_id, job)` (cùng khoá = cùng worker) |
+
+  Tin được commit TRƯỚC khi phân phối; tiến trình chết giữa hai bước thì client bù bằng phát hiện hở `seq` + `GET /chat/sync`.
+- **Giới hạn chấp nhận:** chỉ một tiến trình server (gateway trong bộ nhớ, chưa chia tải ngang); khởi động lại thì mọi WebSocket nối lại.
+  Khi cần nhiều gateway: làm theo CHAT.md mục 16 bước 4 (tách gateway, Redis cho presence / định tuyến, Kafka, Cassandra); khoá
+  `(conversation_id, seq)` giữ nguyên nên dữ liệu chuyển được.
+- **Tác động code:** `infra/db/migrations/0018_chat.sql`, `backend/internal/modules/chat` (+ gói con `realtime`), `backend/internal/platform/webpush`,
+  quyền mới `rpc.SelfAuth`. Không đổi bảng, hàm hay route nào của QS.
+
+## D-16. Chat đăng nhập / tìm bạn bằng email (2026-11-02)
+
+- **Bối cảnh:** D-15 lấy số điện thoại làm danh tính chat, nhưng SMS thật chưa có (mã ghi log, roadmap N8.1) và nhiều người (khách, đối tác)
+  quen dùng email công ty hơn.
+- **Quyết định:** danh tính `chat_users` = số điện thoại HOẶC email (migration 0019: `phone` thôi NOT NULL, thêm `email` unique, CHECK có ít nhất
+  một). Tài khoản tạo bằng email không có số và ngược lại; cùng một người dùng số và email là HAI tài khoản riêng, CHƯA liên kết / gộp (để sau).
+  Email chuẩn hoá trước khi ghi / tra: bỏ khoảng trắng hai đầu, chữ thường toàn bộ, không bỏ dấu chấm / `+tag` (Go `chat/email.go`
+  `NormalizeEmail` và JS `chatLogic.normalizeEmail` cho cùng kết quả; CHECK `ck_chat_users_email` chặn chữ hoa ở tầng DB).
+- **OTP email cùng giới hạn với SMS:** cùng bảng `chat_otp_codes` (cột `phone` HOẶC `email`), mã 6 số sống 5 phút, gửi lại sau 60 giây,
+  5 mã / giờ / email, 20 mã / giờ / IP đếm chung cả số lẫn email, sai 5 lần khoá 15 phút; khoá advisory `otp:email:<email>`.
+- **Gửi mail:** SMTP thư viện chuẩn (`backend/internal/platform/mailer`, biến `SMTP_HOST`, `SMTP_PORT` mặc định 587, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`, `SMTP_FROM`). Chưa đặt `SMTP_HOST` thì mã OTP email ghi vào log server (giống SMS).
+- **Lộ thông tin:** email chỉ trả cho chính mình, bạn bè và kết quả tra đúng email; tra theo email không lộ số và ngược lại.
+- **Phương án bị loại:** liên kết email vào tài khoản số ngay đợt này - cần luồng xác minh cả hai đích và gộp dữ liệu hai tài khoản đã có.
+
+## D-17. Chat gửi ảnh / video / tệp / tin nhắn thoại qua MinIO (2026-11-02)
+
+- **Bối cảnh:** `backend/CHAT.md` mục 12 thiết kế media theo kiểu S3 + sự kiện bucket kích worker + CDN + chống trùng sha256 toàn hệ thống +
+  tệp tới 1 GB (multipart) + nén video 720p + chuyển lưu trữ lạnh sau 90 ngày. Production chỉ có một VPS (PostgreSQL, Caddy), không Kafka, không
+  CDN, không ffmpeg; kho file QS (`UPLOAD_DIR`, `platform/storage`) là ổ đĩa máy chủ, không dùng cho chat.
+- **Quyết định 1 - MinIO, file không đi qua server Go:** gói mới `backend/internal/platform/objstore` (minio-go v7.3.0, cạnh `mailer` / `webpush`,
+  không đụng `platform/storage`). Luồng: client xin URL (`POST /chat/media/upload-url`) -> PUT thẳng lên khoá tạm `chat/in/...` bằng presigned
+  URL (sống 15 phút) -> gọi `POST /chat/media/:id/complete` -> server nhận dòng (trạng thái `processing`), chép phía server sang khoá cuối
+  `chat/m/...` (khoá cuối không bao giờ được ký PUT), xoá khoá tạm, rồi kiểm trên khoá cuối -> `message.send` chỉ mang `attachments:[media_id]`.
+  Server dùng hai client: `internal` (`CHAT_S3_ENDPOINT`) để đọc / chép / xoá, `signer` (`CHAT_S3_PUBLIC_URL`) chỉ để ký (SigV4 ràng buộc host,
+  trình duyệt phải gọi đúng host đó). Chưa đặt `CHAT_S3_ENDPOINT` thì media tắt, API media trả 503.
+- **Quyết định 2 - ký cả `Content-Type` và `Content-Length` vào URL PUT:** MinIO tự chặn tệp khác loại / khác kích thước đã khai, nên giới hạn
+  kích thước áp được trước khi dữ liệu vào kho. Kết quả thử trên MinIO thật: xem mục "Kết quả thử (spike)" dưới đây.
+- **Quyết định 3 - server tự tính lại sha256, chống trùng theo TỪNG người tải:** khoá chống trùng `(uploader_id, sha256, media_type)`; client khai
+  sha256, `complete` đọc luồng khoá cuối tính lại, lệch thì dòng thành `failed`. Đã có tệp `ready` cùng khoá thì `upload-url` trả `dedup:true` và
+  cùng `media_id`, không tải lại; tên hiển thị nằm ở `chat_messages.file_name` của từng tin. Loại bỏ chống trùng toàn hệ thống: ai biết hash là lấy
+  được tệp của người khác; chống trùng giữa người dùng để làm cùng chức năng chuyển tiếp (chưa làm).
+- **Quyết định 4 - giới hạn kích thước:** ảnh mặc định 25 MB (`CHAT_MEDIA_MAX_IMAGE_MB`), video / tệp mặc định 100 MB (`CHAT_MEDIA_MAX_FILE_MB`,
+  đặt quá 200 thì ép về 200 và ghi log), tin thoại 10 MB / 10 phút, ảnh bìa video 512 KB (cạnh dài 640 px), tổng khai báo 2048 MB / người / 24 giờ
+  (`CHAT_MEDIA_DAILY_MB`). Trần cứng 200 MB khớp CHECK `ck_chat_media_size_bytes`: trình duyệt băm bằng `crypto.subtle.digest` cần cả tệp trong bộ
+  nhớ, 1 GB làm treo tab. Một lần PUT, chưa có multipart / tải tiếp.
+- **Quyết định 5 - xử lý đồng bộ trong `complete`, không worker, không ổ đĩa local:** sự kiện bucket cần hàng đợi / webhook mà hệ thống chưa có.
+  `complete` (tối đa 60 giây) kiểm kích thước, đoán loại theo nội dung, sha256, quét virus qua interface `MediaScanner` (mặc định `logScanner`
+  luôn sạch, ghi log 1 lần lúc khởi động; ClamAV để sau), làm ảnh thu nhỏ 320 px cho ảnh (tối đa 2 ảnh giải mã cùng lúc, chặn ảnh trên 40 triệu
+  điểm ảnh). Mọi thứ đọc / ghi qua luồng MinIO, không ghi tệp tạm ra đĩa. Dòng `processing` treo quá 10 phút được trả lại; janitor (30 phút / lần)
+  xoá object `pending` / `failed` sau 2 giờ, dòng `pending` / `failed` và dòng `ready` không tin nào dùng sau 24 giờ; khoá tạm `chat/in/` còn có
+  ILM hết hạn 1 ngày.
+- **Quyết định 6 - đọc bằng presigned GET sống 60 phút:** `CHAT_MEDIA_URL_TTL_MIN` (mặc định 60, ép trong 5..720), URL ký kèm
+  `response-content-type`, `response-content-disposition`, `response-cache-control=private, max-age=<ttl>`; URL được cache trong tiến trình nửa
+  TTL để chuỗi không đổi và trình duyệt dùng lại cache. **Chấp nhận:** URL là link mang quyền (bearer) - thành viên rời nhóm vẫn mở được URL đã nhận
+  tới khi hết hạn (tối đa TTL).
+- **Để sau (không làm đợt này):** CDN (MinIO phục vụ thẳng qua Caddy ở `{$S3_DOMAIN}`), chuyển lưu trữ lạnh / chính sách lưu giữ sau 90 ngày (MinIO
+  một tầng; lưu giữ là quyết định sản phẩm), nén / chuyển mã video (không ffmpeg; `<video>` lỗi codec thì hiện chip tải về), quét virus thật,
+  tệp trên 200 MB (băm từng phần + multipart tải tiếp), chuyển tiếp tin.
+- **Kết quả thử (spike) trên MinIO thật** (`qspro-minio`, minio-go v7.3.0):
+  1. `PresignHeader` có trong minio-go v7.3.0: CÓ. URL ký `content-length;content-type;host`, ký không cần gọi mạng khi đã đặt region.
+  2. MinIO từ chối PUT khác `Content-Type` đã ký: CÓ (`image/jpeg` với URL ký `image/png` -> 403).
+  3. MinIO từ chối thân lớn hơn / nhỏ hơn `Content-Length` đã ký: CÓ (thừa hoặc thiếu 1 byte -> 403, không tạo object). Vì vậy KHÔNG cần
+     phương án dự phòng presigned POST policy (`content-length-range`); `chatUpload.js` vẫn đọc `upload.method` nên đổi sau được.
+  4. MinIO trả lời CORS preflight trên đường dẫn presigned: CÓ (204, `Access-Control-Allow-Origin` = origin trong `MINIO_API_CORS_ALLOW_ORIGIN`,
+     `Allow-Methods: PUT`, `Allow-Headers: content-type`; origin ngoài danh sách không nhận header CORS). Thử cả qua Caddy với khối `{$S3_DOMAIN}`
+     thật: preflight 204 + `nosniff`, PUT đúng 200, sai loại / sai độ dài 403, GET presigned giữ `Content-Disposition`, không nén lại.
+  Thêm: chép phía server giữ `Content-Type`; presigned GET trả đúng `Content-Type` / `Content-Disposition` / `Cache-Control` đã ký. Object
+  khôi phục từ bản sao lưu mà không có đuôi tệp về `application/octet-stream`, nên mọi presigned GET luôn đặt `response-content-type`.
+- **Tác động code:** `infra/db/migrations/0020_chat_media.sql` (bảng `chat_media`, cột `chat_messages.media_id` / `file_name`),
+  `backend/internal/platform/objstore`, `backend/internal/modules/chat` (`media.go`, `dto_media.go`, `service_media.go`), biến `CHAT_S3_*` /
+  `CHAT_MEDIA_*` trong `config.go`, MinIO trong `infra/deploy` + ảnh `infra/docker/minio.Dockerfile`. Không đổi bảng, hàm hay route nào của QS.

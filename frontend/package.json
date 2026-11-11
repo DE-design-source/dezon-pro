@@ -10,6 +10,8 @@
     "test:hr": "node scripts/check-hr-summary.mjs"
   },
   "dependencies": {
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0"

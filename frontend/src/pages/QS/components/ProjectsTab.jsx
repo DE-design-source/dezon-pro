@@ -14,7 +14,8 @@ import * as bocAct from './breakdown/sheet/bocActions'
 import './breakdown/sheet/sheet.css'
 import { useFold, foldToggle_, projCtx_, usePdState, pdRetry_ } from './project/projectShell'
 import PageHead, { Stat, VatStat, PtNote, LacNote, SaiNote, PtErrNote } from './cost/PageHead'
-import { ColFrame, ColChips, PresetPop } from './cost/ColTools'
+import { ColFrame, ColChips, ColChipsModule, PresetPop, PresetDock } from './cost/ColTools'
+import { useQbSlotEl, useQbQuery, setQbQuery } from './project/qbSlot'
 import CpCtxMenu from './cost/CpCtxMenu'
 import TickStt from './cost/TickStt'
 import TickBar from './cost/TickBar'
@@ -55,12 +56,16 @@ export default function ProjectsTab() {
   const tkCols = useTkCols()
   const pd = usePdState(cur, status)
   const foldCols = useFold('cols')
+  const [dock, setDock] = useState(false)   // khung "Chọn nhanh cột" bên trái vùng bảng (nút bộ cột trên băng)
+  const colsOnBar = !!useQbSlotEl('pc:duan')    // băng dự án mở rộng: Cột hiển thị lên băng (PageHead)
   const foldTools = useFold('tools')
   const ticks = useTicks(cur && cur.maDA)
   const sheetBox = useRef(null)
 
   const [view, setViewState] = useState(btMode)
-  const [q, setQ] = useState('')
+  // chữ tìm = ô tìm của thanh công cụ nhanh (QuickBar, Ctrl K) - gộp 2 ô tìm làm 1
+  const q = useQbQuery('duan')
+  const setQ = v => setQbQuery('duan', v)
   const [sort, setSort] = useState({ key: '', dir: 'asc' })
   const [closed, setClosed] = useState(() => new Set())
   const [panel, setPanel] = useState(null)
@@ -203,6 +208,17 @@ export default function ProjectsTab() {
   const cycleSort = k => setSort(s => (s.key !== k ? { key: k, dir: 'asc' } : s.dir === 'asc' ? { key: k, dir: 'desc' } : { key: '', dir: 'asc' }))
   const colMarks = useMemo(() => (sort.key ? { [sort.key]: 'sort' } : {}), [sort.key])
 
+  /* Trên băng: nút bộ cột mở khung dọc + dải chip cột (như Bóc tách), đóng bên nào cũng đóng cả hai; băng gập: hộp nổi như cũ */
+  const dockOn = dock && colsOnBar
+  const closeDock = () => { setDock(false); if (!foldCols) foldToggle_('cols') }
+  const colFrame = bar => (
+    <ColFrame t="da" cols={colSet.cols} foldCols={foldCols} bar={bar}
+      onFoldCols={() => { if (!foldCols) setDock(false); foldToggle_('cols') }}
+      presetOpen={bar ? dockOn : !!pop && pop.kind === 'preset'}
+      onPreset={bar
+        ? () => { if (dockOn) closeDock(); else { setDock(true); if (foldCols) foldToggle_('cols') } }
+        : e => { const at = e.currentTarget; setPop(p => (p && p.kind === 'preset' ? null : { kind: 'preset', anchor: at })) }} />
+  )
   if (!cur) {
     return (
       <div className="qs-card qs-cp-empty">
@@ -226,68 +242,68 @@ export default function ProjectsTab() {
 
   return (
     <>
-      <PageHead n={scope.length} hm={hmNode} lines={lines} onHm={code => setHmNode(code)} view={view} onView={setView} stats={stats} />
+      <PageHead n={scope.length} hm={hmNode} lines={lines} onHm={code => setHmNode(code)} view={view} onView={setView} stats={stats} slotKey="duan"
+        colTools={colsOnBar ? colFrame(true) : null} />
       <PtNote hm={hmNode} onBoc={() => navigate('boc')} />
       {pd.ready && <PtErrNote msg={ptErr} />}
       <SaiNote lines={lines} products={products} />
       <LacNote lines={lines} hm={hmNode} soHien={visibleLines.length} onHm={code => setHmNode(code)} />
 
-      <div className={`qs-card qs-ct-filters qs-cp-tools${plain && foldTools ? ' folded' : ''}`}>
-        {plain && toolHr()}
-        {!(plain && foldTools) && <>
-        <div className="qs-ct-filters-main">
-          <div className={`qs-ct-search qs-cp-search${q ? ' has-q' : ''}`}>
-            <Icon name="search" size={15} />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm tên · mã · thương hiệu · phòng…" />
-            {q && <button type="button" className="qs-cp-x" title="Xoá tìm kiếm" onClick={() => setQ('')}>✕</button>}
+      {/* hàng: khung "Chọn nhanh cột" (bên trái, khi mở) | khối công cụ + bảng */}
+      <div className="qs-cp-dockrow">
+        {visible && dockOn && <PresetDock t="da" cols={colSet.cols} onEdit={() => { if (foldCols) foldToggle_('cols') }} onClose={closeDock} />}
+        <div className="qs-cp-dockmain">
+        {/* dải chip cột: module riêng phía trên khối công cụ, như Bóc tách; đóng = đóng cả khung Chọn nhanh cột */}
+        {!foldCols && <ColChipsModule t="da" cols={colSet.cols} onClose={() => { setDock(false); foldToggle_('cols') }} />}
+        <div className={`qs-card qs-ct-filters qs-cp-tools${plain && foldTools ? ' folded' : ''}`}>
+          {plain && toolHr()}
+          {!(plain && foldTools) && <>
+          <div className="qs-ct-filters-main">
+            {q && <span className="qs-cp-found">{visibleLines.length} / {scope.length} dòng</span>}
+            {sort.key && <button className="qs-ct-btn outline" title="Bỏ sắp xếp" onClick={() => setSort({ key: '', dir: 'asc' })}><Icon name="x" size={13} />Bỏ sắp xếp</button>}
+            <span style={{ flex: 1 }} />
+            <button className="qs-ct-btn" disabled={xls} title="Bảng đang xem (đúng cột, tìm, sắp xếp) ra file Excel" onClick={xuatExcel}><Icon name="download" size={14} />Xuất Excel</button>
           </div>
-          {q && <span className="qs-cp-found">{visibleLines.length} / {scope.length} dòng</span>}
-          {sort.key && <button className="qs-ct-btn outline" title="Bỏ sắp xếp" onClick={() => setSort({ key: '', dir: 'asc' })}><Icon name="x" size={13} />Bỏ sắp xếp</button>}
-          <span style={{ flex: 1 }} />
-          <button className="qs-ct-btn" disabled={xls} title="Bảng đang xem (đúng cột, tìm, sắp xếp) ra file Excel" onClick={xuatExcel}><Icon name="download" size={14} />Xuất Excel</button>
+          {!colsOnBar && <div className="qs-ct-filters-cols">{colFrame(false)}</div>}
+          </>}
         </div>
-        <div className="qs-ct-filters-cols">
-          <ColFrame t="da" cols={colSet.cols} foldCols={foldCols} onFoldCols={() => foldToggle_('cols')}
-            presetOpen={!!pop && pop.kind === 'preset'} onPreset={e => { const at = e.currentTarget; setPop(p => (p && p.kind === 'preset' ? null : { kind: 'preset', anchor: at })) }} />
-        </div>
-        {!foldCols && <ColChips t="da" cols={colSet.cols} />}
-        </>}
-      </div>
 
-      <div ref={sheetBox} className={`qs-card qs-bd-sheet qs-ct-sheet qs-pj-sheet${full ? ' full' : ''}`}>
-        <SheetBody
-          sheet={facade}
-          plain={plain}
-          hiddenCols={hiddenCols} onHiddenCols={onHiddenCols}
-          panel={panel} onPanel={setPanel}
-          favorites={NO_FAVS}
-          onTarget={() => {}}
-          onAddRow={() => {}}
-          full={full} onFull={() => setFull(f => !f)}
-          flash={flash} onClearMark={() => setFlash(f => (f && f.mark ? { ...f, mark: false } : f))}
-          fileName={'du-an-' + cur.maDA}
-          printTitle={(cur.ten || cur.maDA) + ' — Sản phẩm trong dự án'}
-          columns={columns} flatten={flatten} initialSel={INITIAL_SEL} rowClass={rowClass} onToggleGroupOverride={toggleGroup}
-          footer={false}
-          adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv']} extraTools={extraTools}
-          onRenameGroup={(g, name) => { if (g.id !== CHUA_PHAN_TANG) bocAct.renameFloor(g.id, name) }}
-          onInsertRow={e => (e.type === 'item' ? bocAct.insertRowBelow(e.r.lineId, e.r.nhom || hmNode || qs.node, '') : null)}
-          onDuplicate={ids => bocAct.dupRows(ids)}
-          onSort={(key, dir, label) => { setSort({ key, dir }); toast('Sắp xếp ' + (dir === 'asc' ? 'A → Z' : 'Z → A') + ' theo "' + label + '"') }}
-          onDownload={xuatExcel}
-          onApplyEdits={(info, cells) => applyCells(info, cells, plain)}
-          onReplaceAll={(fq, rep) => replaceAll(fq, rep, visibleLines, keys)}
-          onCellContext={plain ? null : ctx => setPop({ kind: 'ctx', at: { x: ctx.ev.clientX, y: ctx.ev.clientY }, entry: ctx.entry, col: ctx.col, ids: ctx.ids, keys: ctx.keys })}
-          plainTools={() => null}
-          onDeleteRows={ids => (ids.length ? mutate.deleteLines(ids, { confirm: true }) : toast('Chọn ô ở các dòng cần xoá'))}
-          onColResize={setColW} onColMove={(from, to, before) => { if (from !== 'stt' && to !== 'stt') moveCol('da', from, to, before) }}
-          onColMenu={key => { if (key !== 'stt') cycleSort(key) }} colMarks={colMarks}
-          rowDrag={rowDrag} plainFmt={false} datalists={DATALISTS}
-          renderCell={renderCell}
-          gridClass={`qs-tk-grid qs-cp-grid${plain ? ' qs-tk-plain' : ''}`} emptyNode={emptyNode}
-          colCount={{ shown: keys.length, total: DA_KEYS.length }}
-          colsPanel={<ColChips t="da" cols={colSet.cols} />}
-        />
+        <div ref={sheetBox} className={`qs-card qs-bd-sheet qs-ct-sheet qs-pj-sheet${full ? ' full' : ''}`}>
+          <SheetBody
+            sheet={facade}
+            plain={plain}
+            hiddenCols={hiddenCols} onHiddenCols={onHiddenCols}
+            panel={panel} onPanel={setPanel}
+            favorites={NO_FAVS}
+            onTarget={() => {}}
+            onAddRow={() => {}}
+            full={full} onFull={() => setFull(f => !f)}
+            flash={flash} onClearMark={() => setFlash(f => (f && f.mark ? { ...f, mark: false } : f))}
+            fileName={'du-an-' + cur.maDA}
+            printTitle={(cur.ten || cur.maDA) + ' — Sản phẩm trong dự án'}
+            columns={columns} flatten={flatten} initialSel={INITIAL_SEL} rowClass={rowClass} onToggleGroupOverride={toggleGroup}
+            footer={false}
+            adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv']} extraTools={extraTools}
+            onRenameGroup={(g, name) => { if (g.id !== CHUA_PHAN_TANG) bocAct.renameFloor(g.id, name) }}
+            onInsertRow={e => (e.type === 'item' ? bocAct.insertRowBelow(e.r.lineId, e.r.nhom || hmNode || qs.node, '') : null)}
+            onDuplicate={ids => bocAct.dupRows(ids)}
+            onSort={(key, dir, label) => { setSort({ key, dir }); toast('Sắp xếp ' + (dir === 'asc' ? 'A → Z' : 'Z → A') + ' theo "' + label + '"') }}
+            onDownload={xuatExcel}
+            onApplyEdits={(info, cells) => applyCells(info, cells, plain)}
+            onReplaceAll={(fq, rep) => replaceAll(fq, rep, visibleLines, keys)}
+            onCellContext={plain ? null : ctx => setPop({ kind: 'ctx', at: { x: ctx.ev.clientX, y: ctx.ev.clientY }, entry: ctx.entry, col: ctx.col, ids: ctx.ids, keys: ctx.keys })}
+            plainTools={() => null}
+            onDeleteRows={ids => (ids.length ? mutate.deleteLines(ids, { confirm: true }) : toast('Chọn ô ở các dòng cần xoá'))}
+            onColResize={setColW} onColMove={(from, to, before) => { if (from !== 'stt' && to !== 'stt') moveCol('da', from, to, before) }}
+            onColMenu={key => { if (key !== 'stt') cycleSort(key) }} colMarks={colMarks}
+            rowDrag={rowDrag} plainFmt={false} datalists={DATALISTS}
+            renderCell={renderCell}
+            gridClass={`qs-tk-grid qs-cp-grid${plain ? ' qs-tk-plain' : ''}`} emptyNode={emptyNode}
+            colCount={{ shown: keys.length, total: DA_KEYS.length }}
+            colsPanel={<ColChips t="da" cols={colSet.cols} />}
+          />
+        </div>
+        </div>
       </div>
 
       {visible && <TickBar maDA={cur.maDA} lines={tickLines} keys={keys} shownIds={shownIds} />}

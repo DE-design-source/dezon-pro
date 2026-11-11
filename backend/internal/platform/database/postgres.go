@@ -47,6 +47,7 @@ var TenantTables = map[string]bool{
 	"hr_cau_hinh_luong": true, "hr_dieu_chinh_luong": true, "hr_ky_luong": true, "hr_dinh_phi": true,
 	"hr_jd": true, "hr_tin_tuyen": true, "hr_ung_vien": true, "hr_muc_tieu": true, "hr_danh_gia": true, "hr_ghi_danh": true, "hr_bao_mat": true,
 	"hr_khoa_hoc": true, "hr_lo_trinh": true, "hr_lich_ngay": true, "hr_dia_diem": true,
+	"yeu_cau_sua_du_an": true,
 }
 
 // Config: cấu hình kết nối.

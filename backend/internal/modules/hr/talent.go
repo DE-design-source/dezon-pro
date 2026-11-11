@@ -13,7 +13,7 @@ import (
 	"qspro-backend/internal/shared/omap"
 )
 
-// Tuyển dụng + hiệu suất & đào tạo (migration 0023): thư viện JD (hr_jd), tin tuyển dụng (hr_tin_tuyen), ứng viên kèm đánh giá
+// Tuyển dụng + hiệu suất & đào tạo (migration 0027): thư viện JD (hr_jd), tin tuyển dụng (hr_tin_tuyen), ứng viên kèm đánh giá
 // và lịch phỏng vấn (hr_ung_vien), mục tiêu OKR (hr_muc_tieu), đánh giá theo kỳ (hr_danh_gia), ghi danh khoá học (hr_ghi_danh).
 // Lệnh ghi trả {ok} (thêm mới trả thêm id); giao diện đọc lại GET /hr/talent.
 

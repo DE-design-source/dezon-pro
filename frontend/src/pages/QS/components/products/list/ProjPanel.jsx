@@ -21,9 +21,10 @@ const PP_LAYOUTS = [
   ['grid', 'Lưới ảnh', <svg key="g" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>],
 ]
 
-export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
+/* onOpen(line) (tuỳ chọn): bấm 1 sản phẩm trong danh sách -> mở cột Thông tin sản phẩm (như Bóc tách); activeId = lineId đang mở */
+export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node, onOpen, activeId }) {
   const { cur, projects, lines, products, selectProject, mutate, toast, ask, confirm, navigate } = qs
-  const [xem, setXem] = useState(null)   // xem nhanh SP của dòng trong dự án
+  const [xem, setXem] = useState(null)   // xem nhanh SP của dòng (khi không có cột Thông tin sản phẩm - onOpen)
   const [over, setOver] = useState(false)
   const [lay, setLaySt] = useState(() => { const v = lsJson('qs_pplayout', 'card'); return PP_LAYOUTS.some(x => x[0] === v) ? v : 'card' })
   const setLay = v => { setLaySt(v); lsSet('qs_pplayout', JSON.stringify(v)) }
@@ -97,9 +98,12 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
                 const sub = [l.kichThuoc, l.tang].map(x => String(x || '').trim()).filter(Boolean).join(' · ')
                 const tip = sub ? (l.ten || '') + '\n' + sub : (l.ten || '')
                 const qty = Number(l.soLuong) || 0
-                const del = <button type="button" className="qspl-pp-del" title="Bỏ khỏi dự án" onClick={ev => { ev.stopPropagation(); spRemoveFromProject(l) }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+                const mo = onOpen || setXem
+                const op = { onClick: () => mo(l), role: 'button', tabIndex: 0, onKeyDown: e => { if (e.key === 'Enter') mo(l) } }
+                const on = activeId && String(activeId) === String(l.lineId) ? ' active' : ''
+                const del = <button type="button" className="qspl-pp-del" title="Bỏ khỏi dự án" onClick={e => { e.stopPropagation(); spRemoveFromProject(l) }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
                 if (lay === 'list') return (
-                  <div className="qspl-pp-row" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
+                  <div className={'qspl-pp-row' + on} key={l.lineId} title={tip} {...op}>
                     <ProductThumb product={l} size={32} src={img1(l.hinhAnh)} className="qspl-pp-img" />
                     <span className="qspl-pp-rn">{l.ten || ''}</span>
                     <b className="qspl-pp-rp">{money(l.donGiaBan)} đ</b>
@@ -108,14 +112,14 @@ export default function ProjPanel({ qs, dragOn, onDrop, onHide, part, node }) {
                   </div>
                 )
                 if (lay === 'grid') return (
-                  <div className="qspl-pp-tile" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
+                  <div className={'qspl-pp-tile' + on} key={l.lineId} title={tip} {...op}>
                     <div className="qspl-pp-timg"><ProductThumb product={l} size={88} src={img1(l.hinhAnh)} /><span className="qspl-pp-tq">×{qty}</span>{del}</div>
                     <div className="qspl-pp-tn">{l.ten || ''}</div>
                     <b className="qspl-pp-tp">{money(l.donGiaBan)} đ</b>
                   </div>
                 )
                 return (
-                  <div className="qs-bd-product qspl-pp-prod" key={l.lineId} title={tip + '\nBấm để xem nhanh'} onClick={() => setXem(l)}>
+                  <div className={'qs-bd-product qspl-pp-prod' + on} key={l.lineId} title={tip} {...op}>
                     <span className="qs-bd-product-no">{i + 1}</span>
                     <div className="qs-bd-product-thumb"><ProductThumb product={l} size={76} src={img1(l.hinhAnh)} /></div>
                     <div className="qs-bd-product-main">

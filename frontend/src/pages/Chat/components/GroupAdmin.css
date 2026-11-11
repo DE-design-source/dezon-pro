@@ -1,0 +1,64 @@
+/* Quản trị nhóm trong cột thông tin: ảnh + mô tả, sửa thông tin, cài đặt quyền, link mời, yêu cầu vào nhóm */
+
+.ch-info-hero .ch-avatar-lg.ch-ga-has-img{background:var(--surface-alt) !important; overflow:hidden; padding:0;}
+.ch-info-hero .ch-avatar-lg img{width:100%; height:100%; object-fit:cover; display:block;}
+.ch-ga-desc{font-size:12px; color:var(--text-muted); white-space:pre-wrap; word-break:break-word; line-height:1.45; max-width:100%;}
+.ch-ga-badge{display:inline-block; font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:10px; background:var(--danger-tint); color:var(--danger);}
+
+/* Form sửa thông tin nhóm */
+.ch-ga-form{display:flex; flex-direction:column; gap:8px;}
+.ch-ga-form label{font-size:11px; color:var(--text-muted); font-weight:600;}
+.ch-ga-form input[type=text], .ch-ga-form textarea, .ch-ga-select{
+  width:100%; box-sizing:border-box; padding:7px 9px; border-radius:6px; border:1px solid var(--border);
+  background:var(--surface-alt); color:var(--text); font-size:12.5px; font-family:inherit;
+}
+.ch-ga-form textarea{resize:vertical; min-height:64px;}
+.ch-ga-form input:focus, .ch-ga-form textarea:focus, .ch-ga-select:focus{outline:none; border-color:var(--primary);}
+.ch-ga-counter{font-size:10.5px; color:var(--text-faint); text-align:right; margin-top:-4px;}
+.ch-ga-counter.over{color:var(--danger);}
+.ch-ga-avatar-row{display:flex; align-items:center; gap:10px;}
+.ch-ga-avatar-sm{width:40px; height:40px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; overflow:hidden;}
+.ch-ga-avatar-sm img{width:100%; height:100%; object-fit:cover; display:block;}
+.ch-ga-avatar-btns{display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;}
+.ch-ga-link-btn{border:none; background:none; padding:0; text-align:left; font-size:12px; font-weight:600; font-family:inherit; color:var(--primary); cursor:pointer;}
+.ch-ga-link-btn.danger{color:var(--danger);}
+.ch-ga-link-btn:disabled{opacity:.5; cursor:default;}
+.ch-ga-row-btns{display:flex; gap:6px;}
+
+/* Công tắc cài đặt */
+.ch-ga-toggle{display:flex; align-items:flex-start; gap:9px; padding:6px 0; cursor:pointer; font-size:12.5px; color:var(--text);}
+.ch-ga-toggle input{position:absolute; opacity:0; width:0; height:0;}
+.ch-ga-switch{flex:none; width:30px; height:17px; border-radius:9px; background:var(--border); position:relative; transition:background .15s ease; margin-top:1px;}
+.ch-ga-switch::after{content:''; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:#fff; transition:transform .15s ease;}
+.ch-ga-toggle input:checked + .ch-ga-switch{background:var(--primary);}
+.ch-ga-toggle input:checked + .ch-ga-switch::after{transform:translateX(13px);}
+.ch-ga-toggle input:focus-visible + .ch-ga-switch{box-shadow:0 0 0 2px var(--primary-tint);}
+.ch-ga-toggle input:disabled + .ch-ga-switch{opacity:.5;}
+.ch-ga-toggle.disabled{cursor:default;}
+
+/* Hộp xác nhận / cảnh báo */
+.ch-ga-confirm{display:flex; flex-direction:column; gap:8px; border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--surface-alt);}
+.ch-ga-confirm.danger{border-color:var(--danger); background:var(--danger-tint);}
+.ch-ga-warn{font-size:12px; color:var(--text); line-height:1.45;}
+.ch-ga-confirm.danger .ch-ga-warn b{color:var(--danger);}
+.ch-pjm-btn.danger{border:none; background:var(--danger); color:#fff;}
+
+/* Link mời */
+.ch-ga-link-box{display:flex; gap:6px; align-items:center;}
+.ch-ga-link-url{flex:1; min-width:0; font-size:11.5px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-ga-copy{flex:none; padding:6px 10px; border-radius:6px; border:none; background:var(--primary); color:#fff; font-size:11.5px; font-weight:600; font-family:inherit; cursor:pointer;}
+.ch-ga-copy:disabled{opacity:.5; cursor:default;}
+.ch-ga-meta{font-size:11px; color:var(--text-muted); line-height:1.5; margin-top:6px;}
+.ch-ga-meta .expired{color:var(--danger); font-weight:600;}
+
+/* Yêu cầu vào nhóm */
+.ch-ga-count{display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--danger); color:#fff; font-size:10.5px; font-weight:700; margin-left:6px; letter-spacing:0; vertical-align:middle;}
+.ch-ga-req-row{display:flex; align-items:center; gap:9px; padding:5px 0;}
+.ch-ga-req-row .ch-m-avatar{width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10.5px; font-weight:700; flex:none;}
+.ch-ga-req-info{flex:1; min-width:0;}
+.ch-ga-req-name{font-size:12.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-ga-req-time{font-size:10.5px; color:var(--text-muted);}
+.ch-ga-req-btns{display:flex; gap:4px; flex:none;}
+.ch-ga-req-btns button{border-radius:5px; padding:4px 8px; font-size:11px; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted);}
+.ch-ga-req-btns button.ok{border:none; background:var(--primary); color:#fff;}
+.ch-ga-req-btns button:disabled{opacity:.5; cursor:default;}

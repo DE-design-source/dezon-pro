@@ -11,6 +11,13 @@
 > `purchase_orders.send_result` ghi rõ `pending` / `ok` / `loi` (M9.1).
 > Cập nhật 2026-10-15 (0014): bảng mới `user_sessions` (`phien_dang_nhap`) - phiên đăng nhập lưu phía máy chủ, đăng xuất thu hồi
 > token ngay (M1.2). Theo catalog của `qspro_gotest`; số dòng ghi 0 (bảng mới, `qspro_en2` chưa chạy 0014).
+> Cập nhật 2026-10-30 (0018): 9 bảng `chat_*` của Chat MVP (tài khoản chat theo số điện thoại, KHÔNG theo công ty, không nối bảng QS nào),
+> theo catalog của `qspro_chattest` sau `go run ./cmd/migrate`; số dòng ghi 0 (bảng mới). Mục 3 chỉ thêm 9 bảng này; các bảng của 0015-0017
+> (`sales_*`, `delivery_*`, `product_hvac_specs`) chưa có trong file này, xem [data-dictionary.md](data-dictionary.md).
+> Cập nhật 2026-11-02 (0019): chat đăng nhập / tìm bạn bằng email - `chat_users.email` (unique, chữ thường), `chat_users.phone` thôi NOT NULL
+> (phải có phone HOẶC email); `chat_otp_codes.email`, `chat_otp_codes.phone` thôi NOT NULL (đúng MỘT trong hai). Theo catalog của `qspro_chattest`.
+> Cập nhật 2026-11-02 (0020): chat gửi ảnh / video / tệp / tin thoại - bảng mới `chat_media` (`chat_tep`, tệp trên MinIO); `chat_messages`
+> + `media_id` (FK RESTRICT -> `chat_media`), `file_name`; `message_type` thêm `image` / `video` / `file` / `voice`. Theo catalog của `qspro_chattest`.
 > Ý nghĩa từng cột: chú thích cột trong [infra/db/schema.sql](../../../infra/db/schema.sql).
 > Đây là tài liệu mô tả cấu trúc ĐANG CHẠY. Bối cảnh và lý do: [ket-qua-trien-khai.md](ket-qua-trien-khai.md), [decisions.md](decisions.md).
 
@@ -21,7 +28,7 @@
 | Công ty, tài khoản | `companies` (`cong_ty`) | Công ty (tenant) và gói dịch vụ | 3 | - |
 | Công ty, tài khoản | `company_settings` (`cai_dat_cong_ty`) | Tài liệu cấu hình theo công ty (ptInfo, bgOrg) | 0 | trực tiếp: `company_id` -> `companies` |
 | Công ty, tài khoản | `users` (`users`) | Tài khoản, vai trò, quyền | 8 | trực tiếp: `company_id` -> `companies` |
-| Công ty, tài khoản | `user_sessions` (`phien_dang_nhap`) | Phiên đăng nhập: 1 dòng / lần đăng nhập, token mang id (M1.2) | 0 | xuyên công ty (chỉ truy cập noScope); công ty = công ty của `users` |
+| Công ty, tài khoản | `user_sessions` (`phien_dang_nhap`) | Phiên đăng nhập: 1 dòng / lần đăng nhập, token mang id (M1.2) | 0 | xuyên công ty (chỉ truy cập `NoScope`); công ty = công ty của `users` |
 | Nhật ký, thông báo | `audit_logs` (`audit_log`) | Nhật ký thao tác (chỉ thêm) | 2933 | `company_id` (tham chiếu mềm, không khoá ngoại) |
 | Nhật ký, thông báo | `notifications` (`notifications`) | Thông báo cho từng user | 24 | trực tiếp: `company_id` -> `companies` |
 | Danh mục sản phẩm | `products` (`db_san_pham`) | Sản phẩm / biến thể: định danh, giá, 5 trục biến thể, thuộc tính dùng chung, duyệt | 1093 | trực tiếp: `company_id` -> `companies` |
@@ -44,6 +51,16 @@
 | Mua hàng | `purchase_proposals` (`de_xuat`) | Phiếu đề xuất (ck / tt) | 2 | trực tiếp: `company_id` -> `companies` |
 | Mua hàng | `proposal_discount_items` (`chi_tiet_de_xuat_ck`) | Dòng sản phẩm của phiếu xin chiết khấu (ck) | 0 | qua bảng cha: `proposal_code` -> `purchase_proposals` |
 | Mua hàng | `proposal_payment_installments` (`chi_tiet_de_xuat_tt`) | Đợt thanh toán của phiếu đề xuất thanh toán (tt) | 0 | qua bảng cha: `proposal_code` -> `purchase_proposals` |
+| Chat | `chat_users` (`chat_nguoi_dung`) | Tài khoản chat, danh tính = số điện thoại HOẶC email (không phải `users` của QS) | 0 | không theo công ty (user-owned) |
+| Chat | `chat_devices` (`chat_thiet_bi`) | Thiết bị đã đăng nhập chat + push token; xoá dòng = đăng xuất | 0 | không theo công ty: `user_id` -> `chat_users` |
+| Chat | `chat_refresh_tokens` (`chat_refresh_token`) | Refresh token (lưu băm, xoay vòng) của thiết bị | 0 | không theo công ty: `device_id` -> `chat_devices` |
+| Chat | `chat_otp_codes` (`chat_otp`) | Mã OTP đăng nhập qua SMS hoặc email (lưu băm) + nguồn đếm giới hạn gửi | 0 | không theo công ty (hệ thống; `phone` / `email` tham chiếu mềm) |
+| Chat | `chat_friendships` (`chat_ban_be`) | Bạn bè / lời mời / chặn, có hướng | 0 | không theo công ty: 2 khoá ngoại -> `chat_users` |
+| Chat | `chat_conversations` (`chat_hoi_thoai`) | Hội thoại 1-1 / nhóm, bộ đếm `last_seq` | 0 | không theo công ty |
+| Chat | `chat_conversation_members` (`chat_thanh_vien`) | Thành viên + con trỏ đã nhận / đã xem | 0 | không theo công ty: -> `chat_conversations`, `chat_users` |
+| Chat | `chat_direct_pairs` (`chat_cap_1_1`) | Tối đa 1 hội thoại 1-1 mỗi cặp tài khoản | 0 | không theo công ty: -> `chat_conversations`, `chat_users` |
+| Chat | `chat_messages` (`chat_tin_nhan`) | Tin nhắn (văn bản / hệ thống / ảnh / video / tệp / thoại), `seq` tăng dần theo hội thoại | 0 | không theo công ty: -> `chat_conversations` |
+| Chat | `chat_media` (`chat_tep`) | Tệp đính kèm chat trên MinIO (S3), chống trùng theo người tải + sha256 + loại | 0 | không theo công ty: `uploader_id` -> `chat_users` |
 | Hệ thống | `schema_migrations` | Sổ ghi migration đã chạy | 8 | - |
 
 View: `product_catalog` = `products` nối trái 4 bảng `product_*_specs`, trả đủ 141 cột; code đọc `db_san_pham` qua view này và ghi vào các bảng gốc.
@@ -86,9 +103,23 @@ erDiagram
     users ||--o{ work_item_histories : "changed_by_id SET NULL"
     companies ||--o{ work_item_histories : "company_id CASCADE"
     companies ||--o{ work_items : "company_id CASCADE"
+    chat_users ||--o{ chat_devices : "user_id CASCADE"
+    chat_devices ||--o{ chat_refresh_tokens : "device_id CASCADE"
+    chat_users ||--o{ chat_friendships : "user_id CASCADE"
+    chat_users ||--o{ chat_friendships : "friend_id CASCADE"
+    chat_users ||--o{ chat_conversations : "created_by RESTRICT"
+    chat_conversations ||--o{ chat_conversation_members : "conversation_id CASCADE"
+    chat_users ||--o{ chat_conversation_members : "user_id CASCADE"
+    chat_conversations ||--o| chat_direct_pairs : "conversation_id CASCADE"
+    chat_users ||--o{ chat_direct_pairs : "user_low CASCADE"
+    chat_users ||--o{ chat_direct_pairs : "user_high CASCADE"
+    chat_conversations ||--o{ chat_messages : "conversation_id CASCADE"
+    chat_users ||--o{ chat_messages : "sender_id RESTRICT"
+    chat_users ||--o{ chat_media : "uploader_id RESTRICT"
+    chat_media ||--o{ chat_messages : "media_id RESTRICT"
 ```
 
-Tham chiếu mềm (cố ý không có khoá ngoại): `purchase_orders.project_code`, `purchase_proposals.project_code`, mọi `product_code` trên dòng báo giá / mua hàng / lịch sử, `audit_logs.user_id`, `audit_logs.company_id`, `work_item_histories.work_item_id`, `notifications.ref_id`. Lý do ghi trong chú thích cột và ở [decisions.md](decisions.md) D-04.
+Tham chiếu mềm (cố ý không có khoá ngoại): `purchase_orders.project_code`, `purchase_proposals.project_code`, mọi `product_code` trên dòng báo giá / mua hàng / lịch sử, `audit_logs.user_id`, `audit_logs.company_id`, `work_item_histories.work_item_id`, `notifications.ref_id`, `chat_otp_codes.phone`, `chat_otp_codes.email`. Lý do ghi trong chú thích cột và ở [decisions.md](decisions.md) D-04 (`chat_otp_codes.phone` / `email`: tài khoản chat có thể chưa có khi xin mã).
 
 ## 3. Chi tiết từng bảng
 
@@ -904,6 +935,257 @@ Dòng sản phẩm của phiếu xin chiết khấu (ck). 0 dòng.
 | `amount` | numeric | có | 0 |
 | `due_date` | date | có |  |
 | `note` | text | có |  |
+
+### `chat_users` (`chat_nguoi_dung`)
+
+Tài khoản chat, danh tính = số điện thoại E.164 HOẶC email chữ thường (migration 0018, email từ 0019; không phải `users` của QS,
+không theo công ty). Tài khoản tạo bằng email không có số và ngược lại. 0 dòng.
+
+- CHECK `ck_chat_users_display_name`: `CHECK (((btrim(display_name) <> ''::text) AND (char_length(display_name) <= 100)))`
+- CHECK `ck_chat_users_email`: `CHECK (((email IS NULL) OR ((email = lower(email)) AND (char_length(email) <= 254) AND (email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'::text))))`
+- CHECK `ck_chat_users_phone`: `CHECK ((phone ~ '^\+[1-9][0-9]{7,14}$'::text))`
+- CHECK `ck_chat_users_phone_email`: `CHECK (((phone IS NOT NULL) OR (email IS NOT NULL)))`
+- PK `pk_chat_users`: `PRIMARY KEY (id)`
+- UNIQUE `uq_chat_users_email`: `UNIQUE (email)`
+- UNIQUE `uq_chat_users_phone`: `UNIQUE (phone)`
+- INDEX `INDEX idx_chat_users_phone_hash (phone_hash)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `phone` | text | có |  |
+| `phone_hash` | text (generated stored) | có | `encode(sha256((phone)::bytea), 'hex'::text)` |
+| `display_name` | text | không |  |
+| `show_read_receipts` | boolean | không | true |
+| `last_seen_at` | timestamp with time zone | có |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `updated_at` | timestamp with time zone | không | now() |
+| `email` | text | có |  |
+
+### `chat_devices` (`chat_thiet_bi`)
+
+Thiết bị đã đăng nhập chat (1 dòng / lần xác thực OTP) + push token; xoá dòng = đăng xuất. 0 dòng.
+
+- CHECK `ck_chat_devices_device_name`: `CHECK ((char_length(device_name) <= 200))`
+- CHECK `ck_chat_devices_platform`: `CHECK ((platform = ANY (ARRAY['ios'::text, 'android'::text, 'web'::text, 'desktop'::text])))`
+- CHECK `ck_chat_devices_push_kind`: `CHECK ((push_kind = ANY (ARRAY['webpush'::text, 'fcm'::text, 'apns'::text])))`
+- CHECK `ck_chat_devices_push_token`: `CHECK (((push_kind IS NULL) = (push_token IS NULL)))`
+- FK `fk_chat_devices_user_id`: `FOREIGN KEY (user_id) REFERENCES chat_users(id) ON DELETE CASCADE`
+- PK `pk_chat_devices`: `PRIMARY KEY (id)`
+- INDEX `INDEX idx_chat_devices_push_token (push_token) WHERE (push_token IS NOT NULL)`
+- INDEX `INDEX idx_chat_devices_user_id (user_id)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `user_id` | bigint | không |  |
+| `platform` | text | không |  |
+| `device_name` | text | không | ''::text |
+| `push_kind` | text | có |  |
+| `push_token` | text | có |  |
+| `last_seen_at` | timestamp with time zone | có |  |
+| `created_at` | timestamp with time zone | không | now() |
+
+### `chat_refresh_tokens` (`chat_refresh_token`)
+
+Refresh token của thiết bị chat (lưu sha256 hex, xoay vòng; dùng lại token đã xoay = thu hồi thiết bị). 0 dòng.
+
+- CHECK `ck_chat_refresh_tokens_token_hash`: `CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))`
+- FK `fk_chat_refresh_tokens_device_id`: `FOREIGN KEY (device_id) REFERENCES chat_devices(id) ON DELETE CASCADE`
+- PK `pk_chat_refresh_tokens`: `PRIMARY KEY (id)`
+- UNIQUE `uq_chat_refresh_tokens_token_hash`: `UNIQUE (token_hash)`
+- INDEX `INDEX idx_chat_refresh_tokens_device_id (device_id)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `device_id` | bigint | không |  |
+| `token_hash` | text | không |  |
+| `expires_at` | timestamp with time zone | không |  |
+| `used_at` | timestamp with time zone | có |  |
+| `created_at` | timestamp with time zone | không | now() |
+
+### `chat_otp_codes` (`chat_otp`)
+
+Mã OTP đăng nhập chat gửi qua SMS (`phone`) hoặc email (`email`), đúng MỘT trong hai (lưu HMAC) + nguồn đếm giới hạn gửi theo số / email / IP;
+`phone` / `email` là tham chiếu mềm (chưa chắc có tài khoản). 0 dòng.
+
+- CHECK `ck_chat_otp_codes_attempts`: `CHECK ((attempts >= 0))`
+- CHECK `ck_chat_otp_codes_email`: `CHECK (((email IS NULL) OR ((email = lower(email)) AND (char_length(email) <= 254))))`
+- CHECK `ck_chat_otp_codes_phone`: `CHECK ((phone ~ '^\+[1-9][0-9]{7,14}$'::text))`
+- CHECK `ck_chat_otp_codes_phone_email`: `CHECK (((phone IS NULL) <> (email IS NULL)))`
+- PK `pk_chat_otp_codes`: `PRIMARY KEY (id)`
+- INDEX `INDEX idx_chat_otp_codes_email_created_at (email, created_at DESC) WHERE (email IS NOT NULL)`
+- INDEX `INDEX idx_chat_otp_codes_phone_created_at (phone, created_at DESC)`
+- INDEX `INDEX idx_chat_otp_codes_request_ip_created_at (request_ip, created_at DESC)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `phone` | text | có |  |
+| `code_hash` | text | không |  |
+| `request_ip` | text | không | ''::text |
+| `attempts` | integer | không | 0 |
+| `expires_at` | timestamp with time zone | không |  |
+| `consumed_at` | timestamp with time zone | có |  |
+| `locked_until` | timestamp with time zone | có |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `email` | text | có |  |
+
+### `chat_friendships` (`chat_ban_be`)
+
+Quan hệ có hướng user -> friend: `pending` (lời mời), `accepted` (bạn bè, cả hai chiều), `blocked` (chặn). 0 dòng.
+
+- CHECK `ck_chat_friendships_friend_id`: `CHECK ((user_id <> friend_id))`
+- CHECK `ck_chat_friendships_status`: `CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'blocked'::text])))`
+- FK `fk_chat_friendships_friend_id`: `FOREIGN KEY (friend_id) REFERENCES chat_users(id) ON DELETE CASCADE`
+- FK `fk_chat_friendships_user_id`: `FOREIGN KEY (user_id) REFERENCES chat_users(id) ON DELETE CASCADE`
+- PK `pk_chat_friendships`: `PRIMARY KEY (user_id, friend_id)`
+- INDEX `INDEX idx_chat_friendships_friend_id_status (friend_id, status)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `user_id` | bigint | không |  |
+| `friend_id` | bigint | không |  |
+| `status` | text | không |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `updated_at` | timestamp with time zone | không | now() |
+
+### `chat_conversations` (`chat_hoi_thoai`)
+
+Hội thoại 1-1 (`direct`) / nhóm (`group`); `last_seq` cấp `seq` cho tin mới bằng `UPDATE ... RETURNING` trong transaction gửi. 0 dòng.
+
+- CHECK `ck_chat_conversations_conversation_type`: `CHECK ((conversation_type = ANY (ARRAY['direct'::text, 'group'::text])))`
+- CHECK `ck_chat_conversations_last_seq`: `CHECK ((last_seq >= 0))`
+- CHECK `ck_chat_conversations_name`: `CHECK ((((conversation_type = 'group'::text) = (name IS NOT NULL)) AND ((name IS NULL) OR ((btrim(name) <> ''::text) AND (char_length(name) <= 100)))))`
+- FK `fk_chat_conversations_created_by`: `FOREIGN KEY (created_by) REFERENCES chat_users(id) ON DELETE RESTRICT`
+- PK `pk_chat_conversations`: `PRIMARY KEY (id)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `conversation_type` | text | không |  |
+| `name` | text | có |  |
+| `last_seq` | bigint | không | 0 |
+| `last_message_at` | timestamp with time zone | có |  |
+| `created_by` | bigint | không |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `updated_at` | timestamp with time zone | không | now() |
+
+### `chat_conversation_members` (`chat_thanh_vien`)
+
+Thành viên hội thoại + con trỏ `last_delivered_seq` / `last_read_seq`; dòng giữ lại khi rời nhóm (`left_at`). 0 dòng.
+
+- CHECK `ck_chat_conversation_members_last_delivered_seq`: `CHECK ((last_delivered_seq >= 0))`
+- CHECK `ck_chat_conversation_members_last_read_seq`: `CHECK ((last_read_seq >= 0))`
+- CHECK `ck_chat_conversation_members_member_role`: `CHECK ((member_role = ANY (ARRAY['owner'::text, 'admin'::text, 'member'::text])))`
+- FK `fk_chat_conversation_members_conversation_id`: `FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE`
+- FK `fk_chat_conversation_members_user_id`: `FOREIGN KEY (user_id) REFERENCES chat_users(id) ON DELETE CASCADE`
+- PK `pk_chat_conversation_members`: `PRIMARY KEY (conversation_id, user_id)`
+- INDEX `INDEX idx_chat_conversation_members_user_id (user_id)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `conversation_id` | bigint | không |  |
+| `user_id` | bigint | không |  |
+| `member_role` | text | không | 'member'::text |
+| `last_read_seq` | bigint | không | 0 |
+| `last_delivered_seq` | bigint | không | 0 |
+| `muted_until` | timestamp with time zone | có |  |
+| `left_at` | timestamp with time zone | có |  |
+| `joined_at` | timestamp with time zone | không | now() |
+| `updated_at` | timestamp with time zone | không | now() |
+
+### `chat_direct_pairs` (`chat_cap_1_1`)
+
+Tối đa 1 hội thoại 1-1 cho mỗi cặp tài khoản (khoá chính trên id nhỏ, id lớn). 0 dòng.
+
+- CHECK `ck_chat_direct_pairs_user_high`: `CHECK ((user_low < user_high))`
+- FK `fk_chat_direct_pairs_conversation_id`: `FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE`
+- FK `fk_chat_direct_pairs_user_high`: `FOREIGN KEY (user_high) REFERENCES chat_users(id) ON DELETE CASCADE`
+- FK `fk_chat_direct_pairs_user_low`: `FOREIGN KEY (user_low) REFERENCES chat_users(id) ON DELETE CASCADE`
+- PK `pk_chat_direct_pairs`: `PRIMARY KEY (user_low, user_high)`
+- UNIQUE `uq_chat_direct_pairs_conversation_id`: `UNIQUE (conversation_id)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `user_low` | bigint | không |  |
+| `user_high` | bigint | không |  |
+| `conversation_id` | bigint | không |  |
+
+### `chat_messages` (`chat_tin_nhan`)
+
+Tin nhắn văn bản / hệ thống / ảnh / video / tệp / thoại (media từ 0020); `(conversation_id, seq)` là thứ tự đọc, `(conversation_id, sender_id, client_msg_id)` chống gửi trùng. 0 dòng.
+Index một phần `idx_chat_messages_media_id (media_id) where media_id is not null` (quyền tải tệp, janitor).
+
+- CHECK `ck_chat_messages_client_msg_id`: `CHECK (((message_type = 'system'::text) = (client_msg_id IS NULL)))`
+- CHECK `ck_chat_messages_content`: `CHECK (((char_length(content) <= 4000) AND CASE WHEN (message_type = ANY (ARRAY['text'::text, 'system'::text])) THEN (btrim(content) <> ''::text) WHEN (message_type = 'voice'::text) THEN (content = ''::text) ELSE true END))`
+- CHECK `ck_chat_messages_file_name`: `CHECK (((file_name IS NULL) OR ((message_type = 'file'::text) AND ((char_length(file_name) >= 1) AND (char_length(file_name) <= 255)) AND (file_name !~ '[/\\[:cntrl:]]'::text))))`
+- CHECK `ck_chat_messages_media_id`: `CHECK (((message_type = ANY (ARRAY['image'::text, 'video'::text, 'file'::text, 'voice'::text])) = (media_id IS NOT NULL)))`
+- CHECK `ck_chat_messages_message_type`: `CHECK ((message_type = ANY (ARRAY['text'::text, 'system'::text, 'image'::text, 'video'::text, 'file'::text, 'voice'::text])))`
+- CHECK `ck_chat_messages_seq`: `CHECK ((seq > 0))`
+- FK `fk_chat_messages_conversation_id`: `FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE`
+- FK `fk_chat_messages_media_id`: `FOREIGN KEY (media_id) REFERENCES chat_media(id) ON DELETE RESTRICT`
+- FK `fk_chat_messages_sender_id`: `FOREIGN KEY (sender_id) REFERENCES chat_users(id) ON DELETE RESTRICT`
+- PK `pk_chat_messages`: `PRIMARY KEY (id)`
+- UNIQUE `uq_chat_messages_conversation_id_sender_id_client_msg_id`: `UNIQUE (conversation_id, sender_id, client_msg_id)`
+- UNIQUE `uq_chat_messages_conversation_id_seq`: `UNIQUE (conversation_id, seq)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `conversation_id` | bigint | không |  |
+| `seq` | bigint | không |  |
+| `client_msg_id` | uuid | có |  |
+| `sender_id` | bigint | không |  |
+| `message_type` | text | không |  |
+| `content` | text | không |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `media_id` | bigint | có |  |
+| `file_name` | text | có |  |
+
+### `chat_media` (`chat_tep`)
+
+Tệp đính kèm chat (ảnh / video / tệp / thoại) trên MinIO, byte không qua API (migration 0020). Một dòng mỗi `(uploader_id, sha256, media_type)`. 0 dòng.
+Index `idx_chat_media_uploader_id_created_at (uploader_id, created_at)` (hạn mức 24 giờ), `idx_chat_media_status_updated_at (status, updated_at)` (janitor).
+
+- CHECK `ck_chat_media_blurhash`: `CHECK (((blurhash IS NULL) OR ((media_type = ANY (ARRAY['image'::text, 'video'::text])) AND ((char_length(blurhash) >= 6) AND (char_length(blurhash) <= 100)))))`
+- CHECK `ck_chat_media_duration_ms`: `CHECK (((duration_ms IS NULL) OR ((duration_ms >= 1) AND (duration_ms <= 86400000))))`
+- CHECK `ck_chat_media_file_name`: `CHECK (((file_name IS NULL) OR (((char_length(file_name) >= 1) AND (char_length(file_name) <= 255)) AND (file_name !~ '[/\\[:cntrl:]]'::text))))`
+- CHECK `ck_chat_media_media_type`: `CHECK ((media_type = ANY (ARRAY['image'::text, 'video'::text, 'file'::text, 'voice'::text])))`
+- CHECK `ck_chat_media_mime_type`: `CHECK (((char_length(mime_type) <= 100) AND (mime_type ~ '^[a-z0-9.+-]+/[a-z0-9.+-]+$'::text) AND ((media_type = 'file'::text) OR ((media_type = 'image'::text) AND (mime_type ~~ 'image/%'::text)) OR ((media_type = 'video'::text) AND (mime_type ~~ 'video/%'::text)) OR ((media_type = 'voice'::text) AND (mime_type ~~ 'audio/%'::text)))))`
+- CHECK `ck_chat_media_object_key`: `CHECK ((object_key ~~ 'chat/m/%'::text))`
+- CHECK `ck_chat_media_sha256`: `CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))`
+- CHECK `ck_chat_media_size_bytes`: `CHECK (((size_bytes > 0) AND (size_bytes <= 209715200)))`
+- CHECK `ck_chat_media_status`: `CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'ready'::text, 'failed'::text, 'blocked'::text])))`
+- CHECK `ck_chat_media_thumb_key`: `CHECK (((thumb_key IS NULL) OR (media_type = ANY (ARRAY['image'::text, 'video'::text]))))`
+- CHECK `ck_chat_media_voice`: `CHECK (((media_type <> 'voice'::text) OR ((duration_ms IS NOT NULL) AND (waveform IS NOT NULL))))`
+- CHECK `ck_chat_media_waveform`: `CHECK (((waveform IS NULL) OR ((media_type = 'voice'::text) AND ((cardinality(waveform) >= 1) AND (cardinality(waveform) <= 128)) AND (array_position(waveform, NULL::smallint) IS NULL) AND (0 <= ALL (waveform)) AND (255 >= ALL (waveform)))))`
+- CHECK `ck_chat_media_width_height`: `CHECK ((((width IS NULL) = (height IS NULL)) AND ((width IS NULL) OR (((width >= 1) AND (width <= 100000)) AND ((height >= 1) AND (height <= 100000))))))`
+- FK `fk_chat_media_uploader_id`: `FOREIGN KEY (uploader_id) REFERENCES chat_users(id) ON DELETE RESTRICT`
+- PK `pk_chat_media`: `PRIMARY KEY (id)`
+- UNIQUE `uq_chat_media_object_key`: `UNIQUE (object_key)`
+- UNIQUE `uq_chat_media_uploader_id_sha256_media_type`: `UNIQUE (uploader_id, sha256, media_type)`
+
+| Cột | Kiểu | NULL | Mặc định |
+|---|---|---|---|
+| `id` | bigint identity | không |  |
+| `uploader_id` | bigint | không |  |
+| `media_type` | text | không |  |
+| `mime_type` | text | không |  |
+| `size_bytes` | bigint | không |  |
+| `sha256` | text | không |  |
+| `file_name` | text | có |  |
+| `object_key` | text | không |  |
+| `thumb_key` | text | có |  |
+| `status` | text | không | 'pending'::text |
+| `width` | integer | có |  |
+| `height` | integer | có |  |
+| `duration_ms` | integer | có |  |
+| `waveform` | smallint[] | có |  |
+| `blurhash` | text | có |  |
+| `created_at` | timestamp with time zone | không | now() |
+| `updated_at` | timestamp with time zone | không | now() |
 
 ### `schema_migrations`
 

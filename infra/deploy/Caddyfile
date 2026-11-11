@@ -46,3 +46,15 @@
 		file_server
 	}
 }
+
+# Kho tệp chat (MinIO, S3): tên miền RIÊNG {$S3_DOMAIN} (vd s3.qs.dezon.vn, cần bản ghi A riêng trỏ về máy chủ).
+# Không dùng tiền tố đường dẫn trên {$DOMAIN}: chữ ký SigV4 của URL tải lên / tải xuống gắn với host + đường dẫn.
+# Caddy giữ nguyên Host khi chuyển tiếp. Không encode (đổi byte làm hỏng Content-Length đã ký, video tua bằng Range),
+# không X-Frame-Options. CORS do MinIO trả (MINIO_API_CORS_ALLOW_ORIGIN trong docker-compose.yml).
+{$S3_DOMAIN} {
+	header {
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	reverse_proxy minio:9000
+}

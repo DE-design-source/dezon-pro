@@ -2,10 +2,12 @@ import { useState } from 'react'
 import {
   STAGE_LABEL, OV_ITEM_DEFS, OV_ITEM_ORDER, OV_LAYOUT_KEY, OV_PERIODS,
   OV_TREND_CHART_OPTIONS, OV_FUNNEL_CHART_OPTIONS,
+  LEAD_SOURCES,
 } from '../../../data/kinhDoanhData'
 import { FONT_STACK, fmtTy } from '../utils'
 import { DeptFilter, TimeFilter } from './Filters'
 import OverviewGrid from './OverviewGrid'
+import { useKdOptions } from './ShortlistSelect'
 import { ovTrendData, TrendLine, TrendBar, FunnelBars, FunnelColumns, FunnelDonut } from './OverviewCharts'
 
 /* ===================== Tab Tổng quan (Overview dashboard) ===================== */
@@ -50,7 +52,18 @@ function ovComputeStats(leads) {
   return { total, closedWon, closedLost, pipelineValue, closedValue, closeRate, lostRate, partnerRate }
 }
 
-export default function OverviewTab({ allLeads, leads, dept, onDeptChange, timeFilter, onTimeFilterChange }) {
+/* Nguồn của 1 lead (lead cũ chưa có nguồn = Khác) */
+const srcOf_ = l => String(l.source || '').trim() || 'Khác'
+const WON_ = { 'chot-hd': 1, 'thiet-ke': 1, 'thi-cong': 1 }
+
+export default function OverviewTab({ allLeads, leads: leadsDept, dept, onDeptChange, timeFilter, onTimeFilterChange }) {
+  /* Bộ lọc nguồn khách hàng (riêng tab Tổng quan): 'all' hoặc tên nguồn; áp cho ô số, phễu, doanh số, cơ hội sắp chốt.
+     Thẻ "Nguồn khách hàng" luôn tính mọi nguồn (theo phòng ban + thời gian) để so sánh, nguồn đang lọc được tô đậm */
+  const [source, setSource] = useState('all')
+  const extraSrc = useKdOptions('source')
+  const srcList = [...new Set([...LEAD_SOURCES, ...extraSrc, ...leadsDept.map(srcOf_)])]
+  const leads = source === 'all' ? leadsDept : leadsDept.filter(l => srcOf_(l) === source)
+  const allLeadsSrc = source === 'all' ? allLeads : allLeads.filter(l => srcOf_(l) === source)
   const [ovPeriod, setOvPeriod] = useState(loadPeriod)
   const [ovChartType, setOvChartType] = useState(loadChartType)
 
@@ -100,13 +113,37 @@ export default function OverviewTab({ allLeads, leads, dept, onDeptChange, timeF
 
   function widgetBody(id) {
     if (id === 'trend') {
-      const data = ovTrendData(allLeads, ovPeriod)
+      const data = ovTrendData(allLeadsSrc, ovPeriod)
       return ovChartType.trend === 'bar' ? <TrendBar {...data} /> : <TrendLine {...data} />
     }
     if (id === 'funnel') {
       if (ovChartType.funnel === 'columns') return <FunnelColumns leads={leads} />
       if (ovChartType.funnel === 'donut') return <FunnelDonut leads={leads} />
       return <FunnelBars leads={leads} />
+    }
+    if (id === 'sources') {
+      /* mỗi nguồn: số cơ hội, giá trị pipeline, tỷ lệ chốt; thanh dài theo nguồn nhiều cơ hội nhất; bấm dòng = lọc theo nguồn đó */
+      const rows = srcList.map(k => {
+        const ls = leadsDept.filter(l => srcOf_(l) === k)
+        const won = ls.filter(l => WON_[l.stage]).length
+        return { k, n: ls.length, val: ls.reduce((t, l) => t + (Number(l.value) || 0), 0), rate: ls.length ? won / ls.length * 100 : 0 }
+      }).filter(r => r.n > 0).sort((a, b) => b.n - a.n || b.val - a.val)
+      const max = rows.reduce((m, r) => Math.max(m, r.n), 0) || 1
+      if (!rows.length) return <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '12px 0' }}>Chưa có khách hàng nào.</div>
+      return (
+        <div className="kd-src">
+          <div className="kd-src-h"><span>Nguồn</span><span>Cơ hội</span><span>Pipeline</span><span>Tỷ lệ chốt</span></div>
+          {rows.map(r => (
+            <button type="button" key={r.k} className={'kd-src-r' + (source === r.k ? ' on' : '')} title={source === r.k ? 'Bỏ lọc nguồn' : 'Lọc theo nguồn ' + r.k}
+              onClick={() => setSource(source === r.k ? 'all' : r.k)}>
+              <span className="nm"><b>{r.k}</b><i><em style={{ width: Math.max(3, r.n / max * 100) + '%' }} /></i></span>
+              <span className="mono n">{r.n}</span>
+              <span className="mono">{fmtTy(r.val)}</span>
+              <span className="mono rt">{r.rate.toFixed(0)}%</span>
+            </button>
+          ))}
+        </div>
+      )
     }
     /* Cơ hội sắp chốt */
     const items = leads.filter(l => l.stage === 'bao-gia' || l.stage === 'dam-phan').sort((a, b) => b.value - a.value).slice(0, 4)
@@ -151,7 +188,15 @@ export default function OverviewTab({ allLeads, leads, dept, onDeptChange, timeF
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Số liệu tổng hợp theo phòng ban &amp; mốc thời gian đã chọn</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label className={'kd-src-flt' + (source !== 'all' ? ' on' : '')} title="Lọc theo nguồn khách hàng">
+            <span>Nguồn</span>
+            <select value={source} onChange={e => setSource(e.target.value)}>
+              <option value="all">Tất cả nguồn</option>
+              {srcList.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </label>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <DeptFilter dept={dept} onChange={onDeptChange} />
           <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} />

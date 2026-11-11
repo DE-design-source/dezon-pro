@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
 import { useRecentNodes, QB_RECENT_N } from '../../state/useRecentNodes'
 import { TREE, nodeName, nodeCount, customGroups, inNode_ } from '../../lib/tree.js'
 import { qbNorm_ } from '../../lib/format.js'
+import { useQbSlotEl, useQbQuery, setQbQuery } from './qbSlot'
 import './project.css'
 
 /* Thanh công cụ nhanh #qbar (port qbRender_ / qbRecentSync_ / qbRightSync_ / qbResults_ / qbSearch_ / qbKey_ / qbPick_,
@@ -13,7 +15,9 @@ import './project.css'
      vì vậy kết quả "Sản phẩm / Công tác - thêm vào ..." (chỉ có khi thanh ở Bóc tách) không bao giờ xuất hiện.
    - Chip hạng mục: Bóc tách đổi `node`, tab khác đổi `hmNode` dùng chung (setHmNode cũng ghi qs_hm + hạng mục gần đây).
    - "Tới dòng": tìm phần tử dòng trong panel đang hiện theo [data-qs-line|data-row|data-id = lineId] rồi cuộn tới + nháy sáng.
-   - Gợi ý phím Ctrl/⌘ K giữ như bản gốc, nhưng không bắt phím (bản gốc chỉ bắt ở Bóc tách, nơi thanh bị ẩn). */
+   - Gợi ý phím Ctrl/⌘ K giữ như bản gốc, nhưng không bắt phím (bản gốc chỉ bắt ở Bóc tách, nơi thanh bị ẩn).
+   - Chi phí / Dự án: chỉ ô tìm kiếm vẽ vào hàng "Hạng mục đã bóc" (PageHead, qbSlot.js); không vẽ thanh chip hạng mục gần đây
+     (trùng nút chọn hạng mục) và nút Xuất báo giá (đã có tab Xuất báo giá). */
 const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')
 
 export default function QuickBar({ tab }) {
@@ -24,7 +28,9 @@ export default function QuickBar({ tab }) {
 function QuickBarIn({ tab }) {
   const { cur, lines, node, hmNode, setNode, setHmNode, navigate } = useQs()
   const recent = useRecentNodes()
-  const [q, setQ] = useState('')
+  // chữ tìm dùng chung với bảng của tab (Chi phí / Dự án lọc dòng theo chữ này, qbSlot useQbQuery)
+  const q = useQbQuery(tab)
+  const setQ = v => setQbQuery(tab, v)
   const [open, setOpen] = useState(false)
   const [sel, setSel] = useState(0)
   const inRef = useRef(null)
@@ -112,21 +118,12 @@ function QuickBarIn({ tab }) {
   }
 
   const shown = open && q.trim()
+  // chỗ ở hàng công cụ của bảng (Chi phí, 'tools:<tab>') ưu tiên hơn chỗ ở hàng "Hạng mục đã bóc" ('<tab>')
+  const toolSlot = useQbSlotEl('tools:' + tab)
+  const headSlot = useQbSlotEl(tab)
+  const slot = toolSlot || headSlot
   let g = ''
-  return (
-    <div className="qs-card qs-ct-top qs-qb">
-      <span className="qs-ct-top-icon" title="Hạng mục gần đây — bấm để chuyển"><Icon name="history" size={15} /></span>
-      <div className="qs-ct-cats">
-        {chips.length ? chips.map(c => {
-          const n = nodeCount(lines, c)
-          return (
-            <button key={c} type="button" className={`qs-ct-cat-chip${c === curCode ? ' on' : ''}`} title={c + '. ' + nodeName(c)} onClick={() => goNode(c)}>
-              <small>{c}</small>{nodeName(c)}{n ? <span>{n}</span> : null}
-            </button>
-          )
-        }) : <span className="qs-qb-empty">Chưa có hạng mục gần đây</span>}
-      </div>
-      <span style={{ flex: 1 }} />
+  const find = (
       <div className="qs-ct-search wide qs-qb-find" ref={boxRef}>
         <Icon name="search" size={15} />
         <input
@@ -136,7 +133,8 @@ function QuickBarIn({ tab }) {
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
-        <kbd>{MAC ? '⌘' : 'Ctrl'} K</kbd>
+        {q ? <button type="button" className="qs-cp-x" title="Xoá tìm kiếm" onMouseDown={e => e.preventDefault()} onClick={() => setQ('')}>✕</button>
+          : <kbd>{MAC ? '⌘' : 'Ctrl'} K</kbd>}
         {shown && (
           <div className="qs-qb-pop">
             {results.length ? results.map((r, i) => {
@@ -158,9 +156,30 @@ function QuickBarIn({ tab }) {
           </div>
         )}
       </div>
+  )
+  const exp = (
       <button type="button" className="qs-ct-btn" title="Sang tab Xuất báo giá" onClick={() => navigate('export')}>
         <Icon name="download" size={14} />Xuất báo giá
       </button>
+  )
+  // có chỗ trên hàng "Hạng mục đã bóc": chỉ đưa ô tìm vào đó; bỏ thanh chip hạng mục gần đây (trùng nút chọn hạng mục) và nút Xuất báo giá
+  if (slot) return createPortal(find, slot)
+  return (
+    <div className="qs-card qs-ct-top qs-qb">
+      <span className="qs-ct-top-icon" title="Hạng mục gần đây — bấm để chuyển"><Icon name="history" size={15} /></span>
+      <div className="qs-ct-cats">
+        {chips.length ? chips.map(c => {
+          const n = nodeCount(lines, c)
+          return (
+            <button key={c} type="button" className={`qs-ct-cat-chip${c === curCode ? ' on' : ''}`} title={c + '. ' + nodeName(c)} onClick={() => goNode(c)}>
+              <small>{c}</small>{nodeName(c)}{n ? <span>{n}</span> : null}
+            </button>
+          )
+        }) : <span className="qs-qb-empty">Chưa có hạng mục gần đây</span>}
+      </div>
+      <span style={{ flex: 1 }} />
+      {find}
+      {exp}
     </div>
   )
 }

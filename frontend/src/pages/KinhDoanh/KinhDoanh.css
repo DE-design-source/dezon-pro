@@ -384,3 +384,286 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-cp-flownav:hover{border-color:var(--sales); color:var(--sales);}
 .kd-cp-flownav.l{left:6px;}
 .kd-cp-flownav.r{right:6px;}
+
+/* Admin Kinh doanh (form khách hàng tiềm năng): ô tròn chữ cái đầu, rê chuột hiện tên, nút x nhỏ khi rê */
+.kd-lm-admins{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.kd-lm-admin{position:relative; width:28px; height:28px; border-radius:50%; background:var(--sales); color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex:none; cursor:default;}
+.kd-lm-admin button{position:absolute; top:-5px; right:-5px; width:15px; height:15px; padding:0; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text-muted); font-size:11px; line-height:1; display:none; align-items:center; justify-content:center; cursor:pointer;}
+.kd-lm-admin:hover button{display:flex;}
+.kd-lm-admin button:hover{color:#b91c1c; border-color:#fecaca;}
+
+/* Ô chọn có danh sách xổ + tự thêm mục (ShortlistSelect): cùng dáng ô nhập .kd-field */
+.kd-sl{position:relative;}
+.kd-sl-btn{width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer; box-sizing:border-box;}
+.kd-sl-btn .ph{color:var(--text-muted);}
+.kd-sl-btn svg{flex:none; color:var(--text-muted); transition:transform .15s;}
+.kd-sl-btn.on{border-color:var(--sales); background:var(--surface);}
+.kd-sl-btn.on svg{transform:rotate(180deg);}
+.kd-sl-pop{position:absolute; z-index:30; top:calc(100% + 4px); left:0; right:0; padding:6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 14px 34px rgba(15,23,42,.18); display:flex; flex-direction:column; gap:4px;}
+.kd-sl-pop > input{height:34px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px;}
+.kd-sl-pop > input:focus{outline:none; border-color:var(--sales);}
+.kd-sl-list{max-height:240px; overflow:auto; display:flex; flex-direction:column; gap:1px;}
+.kd-sl-opt{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border-radius:7px; font-size:13px; cursor:pointer;}
+.kd-sl-opt:hover{background:var(--surface-alt);}
+.kd-sl-opt.on{background:var(--sales-tint); color:var(--sales); font-weight:600;}
+.kd-sl-opt em{font-style:normal;}
+.kd-sl-opt.add{color:var(--sales); font-weight:600;}
+.kd-sl-opt button{width:20px; height:20px; padding:0; border:0; border-radius:50%; background:none; color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer;}
+.kd-sl-opt button:hover{background:#fee2e2; color:#b91c1c;}
+.kd-sl-none{padding:8px 10px; font-size:12px; color:var(--text-muted);}
+.kd-sl-foot{display:flex; align-items:center; gap:8px; padding-top:6px; border-top:1px solid var(--border); font-size:11px; color:var(--text-muted);}
+.kd-sl-foot button{height:26px; padding:0 10px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;}
+.kd-sl-foot button.on{background:var(--sales); border-color:var(--sales); color:#fff;}
+
+/* Tổng quan: bộ lọc nguồn + thẻ "Nguồn khách hàng" */
+.kd-src-flt{display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 4px 0 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); font-size:11.5px; font-weight:600; color:var(--text-muted);}
+.kd-src-flt select{height:28px; border:0; background:none; color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.kd-src-flt select:focus{outline:none;}
+.kd-src-flt.on{border-color:var(--sales); background:var(--sales-tint); color:var(--sales);}
+.kd-src-flt.on select{color:var(--sales);}
+.kd-src{display:flex; flex-direction:column; gap:2px; font-size:12.5px;}
+.kd-src-h, .kd-src-r{display:grid; grid-template-columns:minmax(0, 1fr) 58px 76px 72px; align-items:center; gap:10px;}
+.kd-src-h{padding:0 8px 6px; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border);}
+.kd-src-h span:not(:first-child), .kd-src-r > span:not(.nm){text-align:right;}
+.kd-src-r{padding:8px; border:0; border-radius:8px; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.kd-src-r:hover{background:var(--surface-alt);}
+.kd-src-r.on{background:var(--sales-tint);}
+.kd-src-r .nm{display:flex; flex-direction:column; gap:5px; min-width:0;}
+.kd-src-r .nm b{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kd-src-r .nm i{display:block; height:6px; border-radius:99px; background:var(--surface-alt);}
+.kd-src-r .nm em{display:block; height:100%; border-radius:99px; background:var(--sales);}
+.kd-src-r .n{font-weight:700;}
+.kd-src-r .rt{color:var(--success); font-weight:700;}
+.kd-ov-widget-body:has(> .kd-src){overflow:auto;}
+
+/* Trang khách hàng: cột trái kiểu cột trái Bảng điều khiển QS - rộng 400, thẻ bo 16 nền trắng bóng nhẹ, tiêu đề đậm,
+   dòng thông tin có vạch ngăn; nút sửa (bút chì) ở góc thẻ Thông tin liên hệ; "Ghi nhận tương tác" ngay cạnh tiêu đề Lịch sử chăm sóc */
+.kd-cp-body{grid-template-columns:400px minmax(0, 1fr); gap:16px;}
+.kd-cp-side{gap:16px;}
+.kd-cp-side section{padding:16px 18px; border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12);}
+.kd-cp-card{border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12);}
+.kd-cp-side h4{display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:15px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--text);}
+.kd-cp-side dl{grid-template-columns:110px 1fr; gap:0; font-size:13px;}
+.kd-cp-side dt, .kd-cp-side dd{padding:9px 0; border-bottom:1px solid var(--border);}
+.kd-cp-side dl > dt:nth-last-child(2), .kd-cp-side dl > dd:last-child{border-bottom:0;}
+.kd-cp-side dd{text-align:right; font-weight:700;}
+.kd-cp-edit{margin-left:auto; width:30px; height:30px; padding:0; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.kd-cp-edit:hover{border-color:var(--sales); background:var(--sales-tint); color:var(--sales);}
+.kd-cp-tl-head{justify-content:flex-start;}
+.kd-cp-tl-head h3{font-size:15px; font-weight:700;}
+@media (max-width:1100px){ .kd-cp-body{grid-template-columns:minmax(0, 1fr);} .kd-cp-side{position:static;} }
+/* Đầu trang khách hàng: băng xanh đậm như băng dự án tab Bóc tách (QS) - chữ trắng, nút trong suốt viền trắng mờ */
+.kd-cp-head{padding:10px 14px; border-radius:12px; background:linear-gradient(90deg, #0B2545, #13406E); color:#fff;}
+.kd-cp-head .kd-cp-back{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff;}
+.kd-cp-head .kd-cp-back:hover{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.16); color:#fff;}
+.kd-cp-head .kd-cp-avatar{background:rgba(255,255,255,.14); color:#fff;}
+.kd-cp-head .kd-cp-title h2{color:#fff;}
+.kd-cp-head .kd-cp-title > div{color:#9fc0e3;}
+.kd-cp-head .kd-cp-btn{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff;}
+.kd-cp-head .kd-cp-btn:hover{border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.16); color:#fff;}
+/* băng đầu trang khách hàng thấp như băng dự án QS (~56px): ảnh đại diện, tên, nút gọn lại */
+.kd-cp-head{min-height:56px; padding:8px 14px; gap:10px; box-sizing:border-box;}
+.kd-cp-head .kd-cp-back, .kd-cp-head .kd-cp-btn{height:32px;}
+.kd-cp-head .kd-cp-avatar{width:34px; height:34px; font-size:12.5px;}
+.kd-cp-head .kd-cp-title h2{font-size:15.5px; line-height:1.2;}
+.kd-cp-head .kd-cp-title > div{margin-top:2px; gap:6px; font-size:11.5px;}
+.kd-cp-head .kd-cp-stage{padding:1px 8px; font-size:10.5px;}
+/* băng đầu trang khách hàng 1 dòng: tên · giai đoạn · loại / giá trị / phòng ban nằm ngang, thấp hơn */
+.kd-cp-head{min-height:48px; padding:7px 12px;}
+.kd-cp-head .kd-cp-title{display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap;}
+.kd-cp-head .kd-cp-title h2{white-space:nowrap;}
+.kd-cp-head .kd-cp-title > div{margin-top:0; font-size:12px;}
+.kd-cp-head .kd-cp-avatar{width:30px; height:30px; font-size:11.5px;}
+.kd-cp-head .kd-cp-back, .kd-cp-head .kd-cp-btn{height:30px;}
+/* loại dự án · giá trị · phòng ban = 1 module có viền trên băng (như .qs-pc-mod của QS) */
+.kd-cp-head .kd-cp-title > div > span:not(.kd-cp-stage){display:inline-flex; align-items:center; height:30px; padding:0 12px; border:1px solid rgba(255,255,255,.18); border-radius:10px; background:rgba(255,255,255,.04); color:#cfe0f3; white-space:nowrap;}
+/* giai đoạn + module thông tin: cùng dáng viên thuốc (bo tròn hết), cùng cao 30, cùng viền */
+.kd-cp-head .kd-cp-title > div > span{box-sizing:border-box; height:30px; border-radius:999px;}
+.kd-cp-head .kd-cp-stage{display:inline-flex; align-items:center; padding:0 12px; border:1px solid rgba(255,255,255,.18); font-size:11.5px;}
+/* 2 viên thuốc thấp lại như chip giai đoạn cũ (22px), bằng nhau */
+.kd-cp-head .kd-cp-title > div > span{height:22px; padding:0 10px; font-size:11.5px; line-height:1;}
+
+/* Thanh tiến trình 8 giai đoạn: dạng bước nối nhau - vòng số trên, tên dưới, vạch nối giữa các bước;
+   đã qua = vòng xanh lá có dấu tích + vạch xanh, hiện tại = vòng màu kinh doanh có quầng + chữ đậm, chưa tới = vòng viền xám */
+.kd-cp-flowwrap{border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12);}
+.kd-cp-flowwrap .kd-cp-flow{gap:0; padding:14px 10px 12px;}
+.kd-cp-flow .kd-cp-step{position:relative; flex:1 0 110px; flex-direction:column; justify-content:flex-start; gap:7px; padding:2px 6px; border:0; border-radius:10px; background:none; color:var(--text-muted); font-size:11.5px; font-weight:600; white-space:normal; text-align:center; line-height:1.3;}
+.kd-cp-flow .kd-cp-step::before{content:""; position:absolute; top:15px; left:calc(-50% + 18px); right:calc(50% + 18px); height:2px; border-radius:2px; background:var(--border);}
+.kd-cp-flow .kd-cp-step:first-child::before{display:none;}
+.kd-cp-flow .kd-cp-step i{position:relative; z-index:1; width:28px; height:28px; border:2px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:11.5px; transition:transform .15s;}
+.kd-cp-flow .kd-cp-step.done{color:var(--text);}
+.kd-cp-flow .kd-cp-step.done i{border-color:var(--success); background:var(--success); color:#fff;}
+.kd-cp-flow .kd-cp-step.done::before, .kd-cp-flow .kd-cp-step.now::before{background:var(--success);}
+.kd-cp-flow .kd-cp-step.now{background:none; color:var(--sales); font-weight:800;}
+.kd-cp-flow .kd-cp-step.now i{border-color:var(--sales); background:var(--sales); color:#fff; box-shadow:0 0 0 4px var(--sales-tint);}
+.kd-cp-flow .kd-cp-step:hover{border-color:transparent; color:var(--sales);}
+.kd-cp-flow .kd-cp-step:hover i{transform:scale(1.08); border-color:var(--sales);}
+.kd-cp-flow .kd-cp-lost{margin-left:10px;}
+/* Lịch sử chăm sóc trống: biểu tượng tròn + tiêu đề + mô tả + nút ghi nhận */
+.kd-cp-empty{display:flex; flex-direction:column; align-items:center; gap:8px; padding:30px 18px 26px; margin-top:4px; border:1.5px dashed var(--border); border-radius:14px; background:var(--surface-alt); text-align:center;}
+.kd-cp-empty .ic{display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:var(--sales-tint); color:var(--sales); margin-bottom:2px;}
+.kd-cp-empty b{font-size:14px; color:var(--text);}
+.kd-cp-empty > span:not(.ic){max-width:420px; font-size:12.5px; line-height:1.5; color:var(--text-muted);}
+.kd-cp-empty .kd-cp-btn{margin-top:6px;}
+
+/* Pipeline: hàng bộ lọc = 1 module xanh đậm; khung kanban cao hết màn hình, thanh cuộn ngang nằm sát đáy */
+.kd-pl-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; border-radius:12px; background:linear-gradient(90deg, #0B2545, #13406E);}
+.kd-pl-bar > div:not(.kd-pl-view){border-color:rgba(255,255,255,.2) !important;}
+.kd-pl-bar button{background:transparent !important; color:#cfe0f3 !important;}
+.kd-pl-bar button:hover{color:#fff !important; background:rgba(255,255,255,.1) !important;}
+.kd-pl-bar button.active{background:#fff !important; color:#0B2545 !important;}
+.kd-pl-bar .kd-pl-view{border-color:rgba(255,255,255,.2) !important;}
+.kd-pl-bar select, .kd-pl-bar input[type=date]{border-color:rgba(255,255,255,.25) !important; background:rgba(255,255,255,.08) !important; color:#fff !important;}
+.kd-pl-bar select option{color:var(--text); background:var(--surface);}
+.kd-pl-bar span{color:#9fc0e3 !important;}
+.kd-pl-panel{min-height:calc(100vh - 64px - 2 * var(--page-gutter, 24px));}
+.kd-pl-panel > .kd-kanban{flex:1 0 auto; align-items:flex-start;}
+.kd-pl-panel > .kd-hscroll{margin-top:auto;}
+
+/* Thanh cuộn ngang Pipeline (đơn giản): khung trắng mảnh trải hết bề ngang, rãnh 6px, con trượt bo tròn; rê chuột / kéo thì dày lên */
+.kd-pl-panel > .kd-hscroll{bottom:10px; padding:6px 8px; gap:10px; border-radius:999px; box-shadow:0 4px 14px rgba(20,25,35,.10);}
+.kd-pl-panel > .kd-hscroll button{width:26px; height:26px; border-radius:50%;}
+.kd-hscroll .kd-hs-slim{height:6px; border-radius:99px; background:var(--surface-alt); transition:height .15s ease;}
+.kd-hscroll .kd-hs-slim .kd-hscroll-thumb{border-radius:99px; background:var(--sales); opacity:.75;}
+.kd-hscroll:hover .kd-hs-slim{height:10px;}
+.kd-hscroll .kd-hs-slim .kd-hscroll-thumb:hover, .kd-hscroll .kd-hs-slim .kd-hscroll-thumb:active{opacity:1;}
+/* nút trợ lý Dezbot dời lên trên thanh cuộn khi đang ở Pipeline (không chạm thanh) */
+.kd-page:has(.kd-pl-panel[style*="display: flex"] .kd-hscroll) .kd-ai-fab{bottom:92px;}
+.kd-pl-panel > .kd-hscroll{margin-right:0;}
+/* Pipeline: mỗi giai đoạn = 1 làn riêng (khung bo góc, nền nhạt, vạch màu giai đoạn trên đầu), các làn cao bằng nhau tới thanh cuộn */
+.kd-pl-panel > .kd-kanban{align-items:stretch; gap:12px !important; padding-bottom:2px !important;}
+.kd-pl-panel .kd-stage-col{gap:8px; padding:0 8px 10px; border:1px solid var(--border); border-radius:14px; background:color-mix(in srgb, var(--surface-alt) 55%, var(--surface)); overflow:hidden;}
+.kd-pl-panel .kd-stage-head{position:sticky; top:0; z-index:1; margin:0 -8px; padding:12px 12px 10px; border-top:4px solid var(--lane); border-bottom:1px solid var(--border); background:var(--surface);}
+.kd-pl-panel .kd-stage-col.drop-hover{background:var(--sales-tint);}
+/* đầu làn cao bằng nhau: tên giai đoạn 1 dòng (dài thì "…", rê chuột xem đủ), cao cố định */
+.kd-pl-panel .kd-stage-head{height:66px; justify-content:center; flex:none;}
+.kd-pl-panel .kd-stage-head > span:first-child{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+/* Pipeline: làn không còn khung chung - đầu làn là 1 thẻ riêng (viền, bo góc, vạch màu), mỗi thẻ khách hàng là 1 module riêng,
+   làn trống có ô nét đứt "Kéo thẻ vào đây"; cả làn vẫn nhận thả thẻ */
+.kd-pl-panel .kd-stage-col{padding:0; border:0; background:none; overflow:visible; gap:10px;}
+.kd-pl-panel .kd-stage-head{position:sticky; top:0; margin:0; border:1px solid var(--border); border-top:4px solid var(--lane); border-radius:12px; box-shadow:0 1px 3px rgba(15,23,42,.05);}
+.kd-stage-body{flex:1; display:flex; flex-direction:column; gap:10px; min-height:60px;}
+.kd-stage-body > *{margin:0 !important;}
+.kd-stage-empty{display:flex; align-items:center; justify-content:center; min-height:120px; border:1.5px dashed var(--border); border-radius:12px; color:var(--text-muted); font-size:12px;}
+.kd-pl-panel .kd-stage-col.drop-hover{background:none; outline:none;}
+.kd-pl-panel .kd-stage-col.drop-hover .kd-stage-body{border-radius:12px; background:var(--sales-tint); outline:2px dashed var(--sales); outline-offset:2px;}
+.kd-pl-panel .kd-stage-col.drop-hover .kd-stage-empty{border-color:transparent; color:var(--sales);}
+/* tên giai đoạn dài xuống tối đa 2 dòng (không cắt "…"); đầu làn cao cố định đủ 2 dòng nên các làn vẫn bằng nhau */
+.kd-pl-panel .kd-stage-head{height:80px; padding:10px 12px;}
+.kd-pl-panel .kd-stage-head > span:first-child{white-space:normal; overflow:hidden; text-overflow:clip; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.25;}
+
+/* Phiếu yêu cầu nhân sự kinh doanh phụ trách (kéo thẻ vào cột "Nhân sự KD phụ trách") */
+.kd-srq-ov{position:fixed; inset:0; z-index:110; display:flex; align-items:center; justify-content:center; background:rgba(15,18,25,.5);}
+.kd-srq{width:560px; max-width:92vw; max-height:88vh; display:flex; flex-direction:column; border-radius:16px; background:var(--surface); box-shadow:0 30px 80px rgba(0,0,0,.35); overflow:hidden;}
+.kd-srq-h{display:flex; align-items:flex-start; gap:12px; padding:16px 18px; background:linear-gradient(90deg, #0B2545, #13406E); color:#fff;}
+.kd-srq-h > div{flex:1; display:flex; flex-direction:column; gap:3px;}
+.kd-srq-h b{font-size:15px;}
+.kd-srq-h span{font-size:12px; color:#9fc0e3;}
+.kd-srq-h .x{width:28px; height:28px; border:1px solid rgba(255,255,255,.25); border-radius:50%; background:rgba(255,255,255,.08); color:#fff; font-size:16px; line-height:1; cursor:pointer;}
+.kd-srq-b{flex:1; overflow:auto; padding:16px 18px; display:flex; flex-direction:column; gap:14px;}
+.kd-srq-sec{display:flex; flex-direction:column; gap:7px;}
+.kd-srq-sec > label{font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+.kd-srq-row{display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr) auto; gap:8px;}
+.kd-srq input, .kd-srq textarea{padding:9px 11px; border:1px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:13px; box-sizing:border-box;}
+.kd-srq input:focus, .kd-srq textarea:focus{outline:none; border-color:var(--sales); background:var(--surface);}
+.kd-srq textarea{resize:vertical;}
+.kd-srq-row button{padding:0 14px; border:1px solid var(--sales); border-radius:8px; background:var(--sales-tint); color:var(--sales); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;}
+.kd-srq-chips{display:flex; flex-wrap:wrap; gap:6px;}
+.kd-srq-chips > span{display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 3px; border:1px solid var(--border); border-radius:99px; background:var(--surface-alt); font-size:12px; font-weight:600;}
+.kd-srq-chips > span.new{border-color:var(--sales); background:var(--sales-tint);}
+.kd-srq-chips i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--sales); color:#fff; font-style:normal; font-size:9px; font-weight:800;}
+.kd-srq-chips em{font-style:normal; font-weight:500; color:var(--text-muted);}
+.kd-srq-chips button{width:16px; height:16px; padding:0; border:0; border-radius:50%; background:none; color:var(--text-muted); cursor:pointer;}
+.kd-srq-f{display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid var(--border);}
+.kd-srq-f span{flex:1; font-size:11.5px; color:var(--text-muted);}
+.kd-srq-f button{height:34px; padding:0 14px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.kd-srq-f button.pri{border-color:var(--sales); background:var(--sales); color:#fff; font-weight:700;}
+.kd-srq-f button:disabled{opacity:.5; cursor:not-allowed;}
+
+/* Đánh giá tiềm năng 1-5 sao (trang khách hàng) */
+.kd-cp-stars{display:inline-flex; align-items:center; gap:1px; justify-content:flex-end; flex-wrap:wrap;}
+.kd-cp-stars button{width:22px; height:22px; padding:0; border:0; background:none; color:var(--border); display:grid; place-items:center; cursor:pointer; transition:transform .1s, color .1s;}
+.kd-cp-stars button.on{color:#F5A524;}
+.kd-cp-stars button:hover{transform:scale(1.15);}
+.kd-cp-stars em{margin-left:6px; font-style:normal; font-size:11.5px; font-weight:600; color:var(--text-muted); white-space:nowrap;}
+.kd-cp-stars.sm button{width:17px; height:17px;}
+/* sao: bỏ phóng to / chuyển màu khi rê (gây nháy qua lại giữa 2 sao ở mép, số sao lệch nhãn) */
+.kd-cp-stars button{transition:none;}
+.kd-cp-stars button:hover{transform:none;}
+.kd-cp-stars button:focus{outline:none;}
+.kd-pl-bar select.kd-pl-star{padding:7px 10px; border:1px solid; border-radius:8px; font:inherit; font-size:12px; font-weight:600; cursor:pointer;}
+.kd-pl-bar select.kd-pl-star.on{border-color:#F5A524 !important; color:#FCD38A !important;}
+/* nhãn mức tiềm năng rộng cố định: đổi chữ khi rê (Cao / Trung bình…) không đẩy hàng sao dịch qua lại (gây rung) */
+.kd-cp-stars{flex-wrap:nowrap;}
+.kd-cp-stars em{display:inline-block; width:82px; text-align:left; flex:none;}
+/* bộ lọc sao 0 -> 5 trên băng Pipeline: dãy nút liền, nút đang chọn nền trắng; ngôi sao màu vàng */
+.kd-pl-stars{display:flex; border:1px solid rgba(255,255,255,.2); border-radius:8px; overflow:hidden;}
+.kd-pl-stars button{display:inline-flex; align-items:center; gap:3px; border:0; padding:7px 9px; font:inherit; font-size:12px; font-weight:700; cursor:pointer;}
+.kd-pl-stars button svg{color:#F5A524;}
+.kd-pl-stars button + button{border-left:1px solid rgba(255,255,255,.12) !important;}
+/* bộ lọc sao dạng nút xổ: danh sách tích chọn 5 -> 0 sao, kèm số khách hàng */
+.kd-pl-sdd{position:relative;}
+.kd-pl-bar .kd-pl-sbtn{display:inline-flex; align-items:center; gap:6px; height:32px; max-width:220px; padding:0 10px; border:1px solid rgba(255,255,255,.25) !important; border-radius:8px; background:rgba(255,255,255,.08) !important; color:#fff !important; font:inherit; font-size:12px; font-weight:600; cursor:pointer;}
+.kd-pl-bar .kd-pl-sbtn span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.kd-pl-bar .kd-pl-sbtn.on{border-color:#F5A524 !important; color:#FCD38A !important;}
+.kd-pl-spop{position:absolute; z-index:40; top:calc(100% + 6px); left:0; width:230px; padding:6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 14px 34px rgba(15,23,42,.22); display:flex; flex-direction:column; gap:1px;}
+.kd-pl-spop label{display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; cursor:pointer; color:var(--text); font-size:12.5px;}
+.kd-pl-spop label:hover{background:var(--surface-alt);}
+.kd-pl-spop label.on{background:var(--sales-tint);}
+.kd-pl-spop input{margin:0; accent-color:var(--sales);}
+.kd-pl-spop .st{flex:1; display:inline-flex; gap:1px; color:#F5A524 !important;}
+.kd-pl-spop .st em{font-style:normal; color:var(--text-muted);}
+.kd-pl-spop label i{font-style:normal; font-size:11px; font-weight:700; color:var(--text-muted) !important;}
+.kd-pl-spop .ft{display:flex; justify-content:flex-end; gap:6px; margin-top:4px; padding-top:6px; border-top:1px solid var(--border);}
+.kd-pl-bar .kd-pl-spop .ft button{height:26px; padding:0 10px; border:1px solid var(--border); border-radius:7px; background:var(--surface) !important; color:var(--text) !important; font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;}
+.kd-pl-bar .kd-pl-spop .ft button.pri{background:var(--sales) !important; border-color:var(--sales); color:#fff !important;}
+.kd-pl-bar .kd-pl-spop .ft button:disabled{opacity:.45;}
+/* ô thả của làn trống cao bằng 1 thẻ khách hàng (205px) cho dễ thả */
+.kd-stage-empty{min-height:205px;}
+
+/* Hộp xác nhận xoá (giữa màn hình) */
+.kd-del-ov{position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,18,25,.45); backdrop-filter:blur(2px); animation:kd-del-in .15s ease;}
+.kd-del{width:400px; max-width:100%; display:flex; flex-direction:column; align-items:center; gap:8px; padding:24px 24px 20px; border-radius:18px; background:var(--surface); box-shadow:0 30px 80px rgba(0,0,0,.35); text-align:center; animation:kd-del-pop .18s ease;}
+.kd-del .ic{display:grid; place-items:center; width:58px; height:58px; margin-bottom:4px; border-radius:50%; background:var(--danger-tint, #fde8e8); color:var(--danger, #c0392b);}
+.kd-del b{font-size:17px; color:var(--text);}
+.kd-del p{margin:0; font-size:13px; line-height:1.55; color:var(--text-muted);}
+.kd-del p strong{color:var(--text);}
+.kd-del .bt{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; margin-top:12px;}
+.kd-del .bt button{height:40px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+.kd-del .bt button:hover{background:var(--surface-alt);}
+.kd-del .bt button.danger{border-color:var(--danger, #c0392b); background:var(--danger, #c0392b); color:#fff;}
+.kd-del .bt button.danger:hover{filter:brightness(1.06);}
+@keyframes kd-del-in{from{opacity:0}}
+@keyframes kd-del-pop{from{opacity:0; transform:scale(.95)}}
+/* đường gạch ngăn giữa tiêu đề và nội dung hộp xoá */
+.kd-del b{padding-bottom:12px; margin-bottom:4px; border-bottom:1px solid var(--border); align-self:stretch;}
+
+/* Giá trị ước tính: ô số · đơn vị tiền tệ · đọc thành chữ */
+.kd-money{display:grid; grid-template-columns:minmax(0, 1.3fr) 92px minmax(0, 1fr); gap:8px; align-items:center;}
+.kd-money input{text-align:right; font-variant-numeric:tabular-nums;}
+.kd-money select{height:100%; min-height:38px;}
+.kd-money .words{display:flex; align-items:center; height:38px; padding:0 12px; border-radius:8px; background:var(--sales-tint); color:var(--sales); font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kd-money-rate{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--text-muted); flex-wrap:wrap;}
+.kd-money-rate input{width:120px; text-align:right;}
+/* Form khách hàng tiềm năng - bước Cơ bản: 4 nhóm thẻ (Khách hàng · Địa điểm | Dự án · Phụ trách), lưới 2 cột */
+.kd-lf-grid{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; align-items:start;}
+.kd-lf-sec{display:flex; flex-direction:column; gap:12px; padding:16px 18px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,.05);}
+.kd-lf-sec > h4{display:flex; align-items:center; gap:8px; margin:0 0 2px; padding-bottom:10px; border-bottom:1px solid var(--border); font-size:13.5px; font-weight:700; color:var(--text);}
+.kd-lf-sec > h4 i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--sales-tint); color:var(--sales); font-style:normal; font-size:11px; font-weight:800;}
+@media (max-width:1100px){ .kd-lf-grid{grid-template-columns:minmax(0, 1fr);} }
+
+/* Ô chọn nhanh: nhóm gợi ý lấy từ nơi khác (kênh Marketing) */
+.kd-sl-grp{padding:8px 10px 4px; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); margin-top:4px;}
+.kd-sl-opt.linked span::before{content:""; display:inline-block; width:6px; height:6px; margin-right:8px; border-radius:50%; background:var(--marketing, #2F5DA8); vertical-align:middle;}
+
+/* Ô chọn nhanh: danh sách xổ cao hơn (hiện đủ nguồn + kênh Marketing), không co mục */
+.kd-sl-list{max-height:min(560px, 62vh);}
+.kd-sl-list > *{flex:none;}
+
+/* Ô chọn nhanh có 2 chip: Marketing | Khác */
+.kd-sl-tabs{display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:3px; border-radius:9px; background:var(--surface-alt, rgba(127,127,127,.08));}
+.kd-sl-tabs button{display:inline-flex; align-items:center; justify-content:center; gap:6px; height:30px; border:0; border-radius:7px; background:none; color:var(--text-muted); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;}
+.kd-sl-tabs button em{font-style:normal; min-width:18px; padding:0 5px; border-radius:99px; background:rgba(127,127,127,.15); font-size:11px;}
+.kd-sl-tabs button:hover{color:var(--text);}
+.kd-sl-tabs button.on{background:var(--surface); color:var(--sales); box-shadow:0 1px 3px rgba(15,23,42,.12);}
+.kd-sl-tabs button.on em{background:var(--sales-tint, rgba(194,104,30,.15)); color:var(--sales);}

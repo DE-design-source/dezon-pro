@@ -22,7 +22,7 @@ import (
 const Tab = "kinhdoanh"
 
 var (
-	stages    = set("tiep-can", "tu-van", "bao-gia", "dam-phan", "chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong", "truot-thau")
+	stages    = set("tiep-can", "giao-ns", "tu-van", "bao-gia", "dam-phan", "chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong", "khong-tham-gia", "truot-thau", "spam")
 	wonStages = set("chot-hd", "thiet-ke", "thi-cong") // = closedWon của giao diện (OverviewTab.jsx)
 	// syncStages = SYNC_STAGES cũ đã lọc như ProjectListTab cũ: khách ở đây có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án
 	syncStages  = set("tu-van", "dam-phan", "thiet-ke")

@@ -53,7 +53,6 @@ html[data-theme="dark"] .qs-ct-cat-pct.qs-cp-pct.neg{color:#f87171;}
 .qs-cp-q{height:26px; flex:none; padding:0 10px; border-radius:7px; border:1px solid var(--dash-accent-border); background:var(--surface); color:var(--dash-accent); font:inherit; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;}
 .qs-cp-q:hover{background:var(--dash-accent-tint);}
 .qs-ct-filters-cols .qs-bd-cols-label.on{color:var(--text);}
-.qs-cp-colchips{width:100%; display:flex; flex-wrap:wrap; gap:6px; padding-top:8px; border-top:1px solid var(--border);}
 
 /* ---------- Đặt nhanh lợi nhuận (cpLnQuick_) ---------- */
 .qs-cp-lnq{flex:none; display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:10px; font-size:12.5px;}
@@ -105,3 +104,61 @@ html[data-theme="dark"] .qs-cp-pos{color:#4ade80;}
 .qs-ct-filters.qs-cp-tools.folded > .qs-tk-toolbox.qs-cp-toolhr{margin-bottom:-8px; border-bottom:none; border-radius:10px;}
 .qs-po-note.qs-cp-errnote{border-color:#F3B4B4; background:#FEF2F2; color:#B91C1C;}
 html[data-theme="dark"] .qs-po-note.qs-cp-errnote{border-color:#7F2A2A; background:#2C1515; color:#F87171;}
+
+/* Khung "Chọn nhanh cột" bên trái khối công cụ + bảng (Chi phí / Dự án, mở từ nút bộ cột trên băng dự án) */
+.qs-cp-dockrow{flex:1 0 auto; display:flex; align-items:stretch; gap:12px; min-width:0; min-height:0;}
+.qs-cp-dockmain{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:12px;}
+.qs-tk-dock.qs-cp-dock{width:360px; margin-right:0; align-self:stretch; max-height:calc(100vh - 160px); position:sticky; top:0;}
+/* Dải chip cột thành module riêng (ColChipsModule), cùng dáng .qs-bd-colmod của Bóc tách; khoảng cách do .qs-cp-dockmain (gap 12px) lo */
+.qs-cp-dockmain > .qs-bd-strip.qs-cp-colmod{margin:0;}
+/* nút thu gọn Tổng quan chi phí: nút tròn chỉ biểu tượng (CostOverview) */
+.qs-bd-round-btn.qs-ct-fold:hover{background:var(--dash-accent-tint); border-color:var(--dash-accent);}
+
+/* Tổng quan chi phí khi mở: không còn hàng tiêu đề (nút thu gọn nổi góc phải trên), ô số thấp gọn hơn;
+   tên hạng mục / nhà cung cấp trong 2 biểu đồ hiện đủ (xuống dòng thay vì "…") */
+.qs-ct-overview.open{position:relative; padding-top:9px;}
+.qs-ct-overview.open > .qs-ct-fold{position:absolute; top:6px; right:6px; z-index:1;}
+.qs-ct-overview.open .qs-ct-tiles{margin-top:0;}
+.qs-ct-overview .qs-ct-tile{min-height:0; padding:6px 10px; gap:1px;}
+.qs-ct-overview .qs-ct-tile b{font-size:14px;}
+.qs-ct-overview .qs-ct-tile > span, .qs-ct-overview .qs-ct-tile small{font-size:10.5px;}
+.qs-ct-overview .qs-ct-tile.warn{padding-right:30px;}
+.qs-ct-overview .qs-ct-cat, .qs-ct-overview .qs-ct-sup{height:auto; min-height:25px; padding:2px 0;}
+.qs-ct-overview .qs-ct-cat-name{width:160px; white-space:normal; overflow:visible; line-height:1.25; overflow-wrap:anywhere;}
+.qs-ct-overview .qs-ct-sup-name{width:170px; white-space:normal; overflow:visible; line-height:1.25; overflow-wrap:anywhere;}
+/* Tổng quan chi phí chỉ còn biểu đồ Theo hạng mục (trọn bề ngang); ô Cảnh báo đã dời xuống hàng chip lọc của khối công cụ */
+.qs-ct-overview.open .qs-ct-charts{grid-template-columns:minmax(0, 1fr); margin-top:0;}
+.qs-ct-overview.open .qs-ct-chart{padding-right:32px;}   /* chừa chỗ nút thu gọn tròn ở góc */
+/* Module Biên trên hàng chip lọc (CostTab): nút cảnh báo "Biên < x% [n]" (đỏ; xanh "Đạt biên" khi không có dòng nào) | ô Biên tối thiểu */
+.qs-cp-bienmod{flex:none; display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 8px 0 3px; border:1px solid var(--border); border-radius:9px; background:var(--surface);}
+.qs-cp-bienmod.warn{border-color:color-mix(in srgb, var(--danger) 40%, var(--border));}
+.qs-cp-bienwarn{display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 8px; border:0; border-radius:6px; font:inherit; font-size:12.5px; font-weight:600; white-space:nowrap; cursor:pointer;}
+.qs-cp-bienmod.warn .qs-cp-bienwarn{background:var(--danger-tint); color:var(--danger);}
+.qs-cp-bienmod.warn .qs-cp-bienwarn:hover{filter:brightness(.97);}
+.qs-cp-bienmod.warn .qs-cp-bienwarn.on{background:var(--danger); color:#fff;}
+.qs-cp-bienwarn b{min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--danger); color:#fff; font-size:11px; line-height:18px; text-align:center;}
+.qs-cp-bienwarn.on b{background:#fff; color:var(--danger);}
+.qs-cp-bienmod.ok .qs-cp-bienwarn{background:var(--success-tint, #E7F6EE); color:var(--success, #1E8E5A); cursor:default;}
+.qs-cp-bienmod-sep{width:1px; height:18px; margin:0 4px; background:var(--border);}
+.qs-cp-bienmod .qs-ct-min{margin:0;}
+
+/* Hộp Biên lợi nhuận mục tiêu (BienMucTieuDialog): 2 ô liên thông Margin ⇄ Markup + xem trước tổng tiền */
+.qsc-dlg.qsc-ask.qs-bmt{width:560px; max-width:calc(100vw - 32px);}
+.qs-bmt-pair{display:grid; grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr); align-items:stretch; gap:8px; margin-bottom:12px;}
+.qs-bmt-f{display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); cursor:text;}
+.qs-bmt-f.on{border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qs-bmt-f .t{font-size:12.5px; font-weight:700; color:var(--text);}
+.qs-bmt-f .t em{margin-left:4px; font-style:normal; font-weight:600; color:var(--text-muted);}
+.qs-bmt-f .in{display:flex; align-items:center; gap:6px;}
+.qs-bmt-f input{flex:1; min-width:0; height:38px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:18px; font-weight:700; text-align:right; outline:none; font-variant-numeric:tabular-nums;}
+.qs-bmt-f input:focus{border-color:var(--dash-accent);}
+.qs-bmt-f .in i{font-style:normal; font-size:15px; font-weight:700; color:var(--text-muted);}
+.qs-bmt-f small{font-size:11px; line-height:1.45; color:var(--text-muted);}
+.qs-bmt-eq{align-self:center; font-size:18px; color:var(--dash-accent);}
+.qs-bmt-pv{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px; padding:10px 12px; border-radius:10px; background:var(--dash-soft); border:1px solid var(--border);}
+.qs-bmt-pv > div{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.qs-bmt-pv span{font-size:11.5px; color:var(--text-muted);}
+.qs-bmt-pv b{font-size:13.5px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums;}
+.qs-bmt-pv .ln b{color:var(--dash-profit);}
+.qs-bmt-skip{margin-top:-4px;}
+@media (max-width:560px){ .qs-bmt-pair{grid-template-columns:minmax(0, 1fr);} .qs-bmt-eq{display:none;} }

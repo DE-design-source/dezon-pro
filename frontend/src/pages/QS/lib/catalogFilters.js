@@ -157,6 +157,8 @@ export function catVarLbl_(x){
 }
 // "Đèn trong dự án": khoá SP đã dùng trong các dòng của 1 dự án (pickInProj)
 export function inProjKeys_(lines){ var keys={}; (lines||[]).forEach(function(l){ var k=String(l.maSP||l.ten||'').toLowerCase().trim(); if(k) keys[k]=1; }); return keys; }
+// Thương hiệu đang lọc: fBrand = mảng (chọn nhiều) hoặc chuỗi (bản cũ / chọn 1) -> luôn trả mảng
+export function brandSel_(st){ var b=(st||{}).fBrand; return Array.isArray(b)?b.filter(Boolean):(b?[b]:[]); }
 // lọc danh mục theo đề mục đang chọn ở cây (setDemucFilter)
 export function demucOf_(code){ var nm=nodeName(code)||''; return {demucKw: code==='X'?'':nm, demucCode: code==='X'?'':code}; }
 
@@ -165,7 +167,7 @@ export function filteredProducts(st, specs){
   var mn=Number(st.min)||0, mx=Number(st.max)||0;
   var watts=selKeys_(st.fWatt), kels=selKeys_(st.fKelvin), angs=selKeys_(st.fAngle);
   var ips=selKeys_(st.fIP), cris=selKeys_(st.fCRI), volts=selKeys_(st.fVolt);
-  var hmucSel=selKeys_(st.fNhomSet);
+  var hmucSel=selKeys_(st.fNhomSet), brandSel=brandSel_(st);
   var dk=(st.demucKw||'').toLowerCase().trim();
   var isVS=vsFltOn_(st.node);
   var usedKeys=null;
@@ -177,7 +179,7 @@ export function filteredProducts(st, specs){
     if(st.fCombo==='khong' &&  (p.comboN>0)) return false;      // chỉ SP đứng riêng
     if(hmucSel.length && hmucSel.indexOf(prodHmuc_(p, specs))<0) return false;
     if(usedKeys){ var uk=String(p.ma||p.ten||'').toLowerCase().trim(); if(!usedKeys[uk]) return false; }
-    if(st.fBrand && p.thuongHieu!==st.fBrand) return false;
+    if(brandSel.length && brandSel.indexOf(p.thuongHieu)<0) return false;   // thương hiệu: chọn nhiều
     if(q && (p.ten+' '+p.ma+' '+p.thuongHieu+' '+(p.ncc||'')+' '+(p.nhom||'')).toLowerCase().indexOf(q)<0) return false;
     if(dk){ var muc=String(p.muc||'').toLowerCase().trim(); if(muc.indexOf(dk)<0) return false; }   // lọc theo cột "Mục"
     var pr=Number(p.donGiaBan)||0; if(mn&&pr<mn) return false; if(mx&&pr>mx) return false;
@@ -198,7 +200,7 @@ export function activeFilterCount(st){
   if(!vsFltOn_(st.node)) ['fWatt','fKelvin','fAngle','fIP','fCRI','fVolt'].forEach(function(k){
     var m=st[k]||{}; if(Object.keys(m).some(function(x){return m[x];})) n++;
   });
-  if(st.fBrand) n++;
+  if(brandSel_(st).length) n++;
   if((+st.min)||(+st.max)) n++;
   return n;
 }
@@ -207,7 +209,7 @@ export function activeFiltCount_(st){
   var n=0;
   if(vsFltOn_(st.node)) n+=vsFltCount_(st.fVs);
   else ['fWatt','fKelvin','fAngle','fIP','fCRI','fVolt'].forEach(function(k){ if(Object.keys(st[k]||{}).some(function(x){return st[k][x];})) n++; });
-  if(st.fBrand) n++;
+  if(brandSel_(st).length) n++;
   if(st.fCombo) n++;
   if(st.fFav) n++;
   if(st.min||st.max) n++;
@@ -234,7 +236,7 @@ export function catActiveTags_(st, specs, SP_COL2LABEL_){
   } else
   [['fWatt','Công suất'],['fKelvin','Nhiệt độ'],['fAngle','Góc chiếu'],['fCRI','CRI'],['fIP','IP'],['fVolt','Điện áp']]
     .forEach(function(x){ var v=selKeys_(st[x[0]]); if(v.length) tag(x[1], v.length>2?(v.length+' giá trị'):v.join(', '), x[0]); });
-  if(st.fBrand) tag('Thương hiệu', st.fBrand, 'brand');
+  var bs=brandSel_(st); if(bs.length) tag('Thương hiệu', bs.length>2?(bs.length+' thương hiệu'):bs.join(', '), 'brand');
   if(st.fFav) tag('Lọc', 'Yêu thích', 'fav');
   if(st.fCombo) tag('Lọc', 'Có combo', 'combo');
   if(st.min||st.max)
@@ -277,7 +279,7 @@ export function fltActiveN_(k, st){
   if(k==='vs_hm') return n(st.fNhomSet);
   if(String(k).indexOf('vs_')===0){ var col=k.slice(3); return n((st.fVs||{})[col]); }
   if(k==='watt') return n(st.fWatt); if(k==='kelvin') return n(st.fKelvin); if(k==='angle') return n(st.fAngle);
-  if(k==='yeuthich') return st.fFav?1:0; if(k==='combo') return st.fCombo?1:0; if(k==='brand') return st.fBrand?1:0;
+  if(k==='yeuthich') return st.fFav?1:0; if(k==='combo') return st.fCombo?1:0; if(k==='brand') return brandSel_(st).length;
   if(k==='price'){ return (st.min||st.max)?1:0; }
   return 0;
 }

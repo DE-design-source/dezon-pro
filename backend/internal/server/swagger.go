@@ -86,6 +86,8 @@ func quyen(p rpc.Perm) string {
 	switch {
 	case p&rpc.Public != 0:
 		return "Công khai (không cần đăng nhập)"
+	case p&rpc.SelfAuth != 0:
+		return "Phiên chat riêng: `Authorization: Bearer <access_token>` do `/api/v1/chat/auth/otp/verify` cấp (không phải phiên QS)"
 	case p&rpc.Super != 0:
 		return "Chỉ quản trị hệ thống (super)"
 	case p&rpc.Admin != 0:
@@ -142,7 +144,9 @@ func stdResponses(p rpc.Perm, moTa500 string) *omap.Map {
 			omap.Of("schema", omap.Of("$ref", "#/components/schemas/KetQua")))),
 		"500", loiResp(moTa500),
 	)
-	if p&rpc.Public == 0 {
+	if p&rpc.SelfAuth != 0 {
+		r.Set("401", loiResp("Thiếu / sai / hết hạn access token của chat (`code: \"CHAT_NOAUTH\"`)"))
+	} else if p&rpc.Public == 0 {
 		r.Set("401", loiResp("Chưa đăng nhập / phiên hết hạn (`code: \"NOAUTH\"`)"))
 		if p&(rpc.Admin|rpc.Super) != 0 {
 			r.Set("403", loiResp("Không đủ quyền"))

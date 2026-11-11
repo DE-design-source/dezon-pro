@@ -14,22 +14,23 @@ import { giaDaiLy_, donGiaCK_, ttBan_, lnVnd_, markup_, margin_ } from '../../li
 import { nodeName } from '../../lib/tree.js'
 import { visCols } from '../../lib/columns.js'
 import {
-  coverCosts, coverDepth, coverSortFn, coverHasChild, bgHidden, bgLines_, bgPTSecs_, bgOrg_, bgOpt_, bgTong_, bgTongKetData_,
+  coverCosts, coverDepth, coverSortFn, coverHasChild, bgHidden, bgSoLaiOn_, coverSoLai_, bgLines_, bgPTSecs_, bgOrg_, bgOpt_, bgTong_, bgVatParts_, vatOf_, bgTongKetData_,
   docSoVN_, fmtVN_, bgNoiBoXuat_, BG_NOI_BO, bgDocW_,
 } from '../../lib/quote.js'
 import { API_BASE } from '../../api/http'
 import { mediaUrl } from '../../api/files'
+import { bgChu_ } from './docCss'
 
 export const ROMAN_ = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV']
 
 /* Tên class tài liệu: .qs-page -> .qsd-pg, .qs-doc -> .qsd-doc, các class chung (qx-*, qp-*, qc-*, qd*, qsum*, qpager, qpg*,
-   qxrsz, qxth) thêm tiền tố qsd- (PLAN 1.8 [F1]). Dùng chung cho HTML và CSS nên hai bên luôn khớp. */
-const DOC_TOK = /^(qx|qp|qc-|qd|qsum|qpager|qpg)/
+   qxrsz, qxth) thêm tiền tố qsd- (PLAN 1.8 [F1]). Dùng chung cho HTML và CSS nên hai bên luôn khớp.
+   Biểu thức nằm TRONG hàm: docCss.js (nhập vòng với file này) gọi docClass_ ngay lúc nạp, khi hằng cấp module chưa khởi tạo. */
 export function docClass_(tok) {
   if (tok === 'qs-page') return 'qsd-pg'
   if (tok === 'qs-doc') return 'qsd-doc'
   if (tok === 'qx-page') return 'qsd-qxpg'     // tên mới không được chứa "-page" (selector toàn cục của SiteFlow, F17)
-  return DOC_TOK.test(tok) ? 'qsd-' + tok : tok
+  return /^(qx|qp|qc-|qd|qsum|qpager|qpg)/.test(tok) ? 'qsd-' + tok : tok
 }
 export function docHtml_(html) {
   return html.replace(/class="([^"]*)"/g, (m, c) => 'class="' + c.split(' ').map(docClass_).join(' ') + '"')
@@ -60,6 +61,11 @@ export function bgDocCols_(ctx, ui) {
   }
   return vis
 }
+/* Cột riêng từng hạng mục (bgCfg.colHm = {mã hạng mục (l.nhom): {khoá cột: true}}): hạng mục chưa đặt riêng dùng chip cột chung (ui.cols).
+   Bản xem trước / PDF áp ở chế độ "mỗi hạng mục một trang"; file Excel (1 sheet / hạng mục) luôn áp (opts.colsHm) */
+export function bgColHm_(bgCfg) { return (bgCfg || {}).colHm || {} }
+export function bgDocColsOf_(ctx, ui, code) { const m = bgColHm_(ctx.bgCfg)[code]; return bgDocCols_(ctx, m ? Object.assign({}, ui, { cols: m }) : ui) }
+export function bgExportColsOf_(ctx, ui, code) { const m = bgColHm_(ctx.bgCfg)[code]; return bgExportCols_(ctx, m ? Object.assign({}, ui, { cols: m }) : ui) }
 export function bgDocTongW_(cols, sttW, bgColW) { return (sttW || 0) + cols.reduce(function (a, c) { return a + bgDocW_(c[0], bgColW) }, 0) }
 export function bgColg_(cols, sttW, bgColW) {
   sttW = (sttW == null ? 30 : sttW)
@@ -77,6 +83,57 @@ export function bgTh_(cols, khongDoiChoCot) {
         + '<span class="qxth">' + esc(String(c[1]).toUpperCase()) + '</span>'
         + '<span class="qxrsz" data-k="' + esc(c[0]) + '"></span></th>'
     }).join('') + '</tr>'
+}
+/* ---- Ước chiều cao 1 dòng bảng chi tiết (px của trang 1123 x 794) để CHIA TRANG THEO CHIỀU CAO: mọi trang giữ cỡ chữ gốc,
+   dòng không vừa trang thì sang trang sau (thay vì thu nhỏ cả trang). Đo chữ bằng canvas, xếp chữ theo bề rộng cột (bgDocW_),
+   ô mô tả tối đa 5 dòng (.qx-desc), tên SP + mã, ảnh ~ vuông theo bề rộng cột (tối đa 240). Ước dư một chút để không tràn. */
+/* Chiều cao ĐO THẬT của dòng bảng (px, chưa thu nhỏ) do bản xem trước đo ở khung ẩn (QuotePreview) ghi vào; khoá = mã băm
+   (bề rộng cột + html dòng), gắn trên dòng ở thuộc tính data-hk. Có số đo thì chia trang theo số đo, chưa có thì theo ước tính.
+   Chỉ tăng (dòng đo cao hơn số cũ mới ghi đè: chia trang không bị lặp qua lại khi cột cân lại theo trang). Số đo mới -> tăng phiên bản để QuoteTab dựng lại trang (useSyncExternalStore). */
+const hDo_ = new Map()
+let hVer_ = 0
+const hSubs_ = new Set()
+export function hDoGhi_(ds) {
+  let doi = false
+  ds.forEach(function (x) { const cu = hDo_.get(x[0]); if (x[0] && x[1] > 0 && (cu == null || x[1] > cu + 1.5)) { hDo_.set(x[0], x[1]); doi = true } })
+  if (doi) { hVer_++; hSubs_.forEach(function (f) { f() }) }
+}
+/* đo ở khung ẩn (QuotePreview): hCho_ = chỗ trống cho cả bảng chi tiết của 1 trang (px, từ mép trên bảng tới mép trên chân trang - 8,
+   không gồm tiêu đề hạng mục). Chỉ ghi khi NHỎ đi: số đo đổi theo cách chia trang, ghi hai chiều có thể chia lại mãi (trang trắng) */
+let hCho_ = null
+/* hCho1_ = chỗ trống cho bảng hạng mục ở tờ bìa (từ mép trên bảng tới mép trên chân trang - 8): chỉ phụ thuộc phần đầu bìa
+   (logo, khung tiêu đề, thông tin dự án), không phụ thuộc cách chia nên ghi theo số đo mới nhất */
+let hCho1_ = null
+export function hChoGhi_(cho, cho1) {
+  let doi = false
+  if (cho > 100 && (hCho_ == null || cho < hCho_ - 1)) { hCho_ = cho; doi = true }
+  if (cho1 > 0 && (hCho1_ == null || Math.abs(cho1 - hCho1_) > 1)) { hCho1_ = cho1; doi = true }
+  if (doi) { hVer_++; hSubs_.forEach(function (f) { f() }) }
+}
+/* gắn mã băm (data-hk) lên thẻ đầu của html để khung ẩn đo chiều cao */
+function ganHk_(html, them) { const k = bam_((them || '') + html); return { k: k, html: html.replace(/^<(\w+)/, '<$1 data-hk="' + k + '"') } }
+export const hDoSub_ = f => { hSubs_.add(f); return () => { hSubs_.delete(f) } }
+export const hDoVer_ = () => hVer_
+function bam_(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) }
+
+let cv_ = null
+function rongChu_(t, px, dam, fam) {
+  if (cv_ == null) { try { cv_ = document.createElement('canvas').getContext('2d') } catch (e) { cv_ = false } }
+  if (!cv_) return String(t).length * px * 0.56
+  cv_.font = (dam ? '700 ' : '400 ') + px + 'px ' + fam
+  return cv_.measureText(String(t)).width
+}
+function soDong_(text, px, dam, fam, w) {
+  const tu = String(text || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, 'x').split(/\s+/).filter(Boolean)
+  if (!tu.length || !(w > 0)) return 0
+  const sp = rongChu_(' ', px, dam, fam)
+  let n = 1, cur = 0
+  tu.forEach(function (x) {
+    const r = rongChu_(x, px, dam, fam)
+    if (r > w) { n += Math.ceil(r / w) - (cur ? 0 : 1); cur = r % w; return }   // chữ dài hơn cột: bẻ giữa chữ
+    if (cur && cur + sp + r > w) { n++; cur = r } else cur = cur ? cur + sp + r : r
+  })
+  return n
 }
 export function bgPerRows_(per, coAnh) { const v = Number(per) || 0; return v > 0 ? v : (coAnh ? 8 : 13) }
 export function bgDocAlign_(k) {
@@ -150,60 +207,113 @@ export function bgMetaTrang_(ten, tienDs) {
 }
 
 /* ---- Tờ bìa cho TRANG 1 (chỉ đọc, theo Mẫu 1 / Mẫu 2) ---- */
+/* Bề rộng cột bảng hạng mục tờ bìa: NO, CHI PHÍ, TỶ TRỌNG vừa đủ số; HẠNG MỤC vừa tên mục; MÔ TẢ nhận phần lớn (chữ dài nhất) */
+const COVER_COLG_ = ws => '<colgroup>' + ws.map(function (w) { return '<col style="width:' + w + '%">' }).join('') + '</colgroup>'
+const COVER_COLG_M1 = COVER_COLG_([6, 14, 20, 13, 8, 39])   // NO · HẠNG MỤC · NỘI DUNG · CHI PHÍ · TỶ TRỌNG · MÔ TẢ
+const COVER_COLG_M2 = COVER_COLG_([7, 26, 14, 9, 44])       // NO · HẠNG MỤC · CHI PHÍ · TỶ TRỌNG · MÔ TẢ
 export function bgCoverPage_(comp, ctx, coverMau) {
+  const P = bgCoverParts_(comp, ctx, coverMau)
+  return P.rong != null ? P.rong : P.ttl + P.open + P.th + P.khoi.map(function (k) { return k.join('') }).join('') + P.tong.join('') + '</table>'
+}
+/* Các phần của bảng hạng mục tờ bìa để chia trang: ttl (tiêu đề) · open (thẻ mở bảng + colgroup) · th (hàng tiêu đề) ·
+   khoi (mỗi khối = các dòng không tách rời: Mẫu 1 một mục lớn vì ô gộp rowspan, Mẫu 2 một dòng) · tong (khối tổng: các dòng
+   TỔNG CHI PHÍ DỰ KIẾN -> chiết khấu -> VAT -> TỔNG GỒM VAT -> bằng chữ, đi liền nhau, chưa có thẻ đóng bảng).
+   Chưa có tờ bìa -> { rong: html thông báo } */
+export function bgCoverParts_(comp, ctx, coverMau) {
   const cost = comp.cost; const total = comp.total
   const rows = (ctx.cover || []).filter(function (c) { return !bgHidden(c.stt, ctx.bgCfg) }).slice().sort(coverSortFn)
-  if (!rows.length) return '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC</div>'
-    + '<div class="qsum-card"><table class="qsum"><tr><td class="nm" style="color:#94a3b8;padding:16px 0">Chưa có tờ bìa — sang chế độ <b>Chỉnh sửa</b> bấm “↻ Nạp mẫu”.</td></tr></table></div>'
+  if (!rows.length) return { rong: '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC</div>'
+    + '<div class="qsum-card"><table class="qsum"><tr><td class="nm" style="color:#94a3b8;padding:16px 0">Chưa có tờ bìa — sang chế độ <b>Chỉnh sửa</b> bấm “↻ Nạp mẫu”.</td></tr></table></div>' }
   const m1 = (coverMau === 'm1')
-  let body
+  // số in ở cột NO: đánh lại liên tục theo các mục đang hiện (bgSoLaiOn_), tắt thì giữ mã gốc
+  const soMap = bgSoLaiOn_(ctx.bgCfg) ? coverSoLai_(rows) : null
+  const no = function (stt) { return soMap && soMap[stt] ? soMap[stt] : stt }
+  const ttl = '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC</div>'
+  /* khối tổng = 1 module duy nhất ở cuối bảng hạng mục (thay hộp tổng tiền riêng, không lặp lại "Tổng cộng"): tính trên tổng tờ bìa */
+  const la = rows.filter(function (c) { return !rows.some(function (x) { return x.stt !== c.stt && String(x.stt).indexOf(c.stt + '.') === 0 }) })
+  const T = bgTong_(total, ctx.bgCfg, ctx.cur && ctx.cur.vat, la.map(function (c) { return { tt: Number(cost[c.stt]) || 0, vp: vatOf_(ctx, c.stt) } }))
+  const o = bgOpt_(ctx.bgCfg)
+  const ghep = m1 ? 3 : 2
+  const dongTong = function (nhan, tien, pct, cls, cuoi) {
+    return '<tr class="sec' + (cls ? ' ' + cls : '') + '"><td colspan="' + ghep + '" style="text-align:right"><b>' + nhan + '</b></td>'
+      + '<td class="num"><b>' + money(tien) + '</b></td><td class="num"><b>' + (pct || '') + '</b></td><td>' + (cuoi || '') + '</td></tr>'
+  }
+  // 3 kiểu dòng (Tuỳ biến > Khối tổng): tg1 = tổng, tg2 = chiết khấu / VAT, tg3 = tổng gồm VAT
+  const tong = [dongTong('TỔNG CHI PHÍ DỰ KIẾN', total, '100%', 'tg1')]
+  if (T.ck) tong.push(dongTong('CHIẾT KHẤU' + (o.ckKieu === 'pct' ? ' ' + o.ck + '%' : ''), -T.ck, '', 'tg2'), dongTong('SAU CHIẾT KHẤU', T.sau, '', 'tg2'))
+  // bằng chữ nằm ở ô MÔ TẢ (đang trống) của dòng tổng gồm VAT: module gọn 3 - 5 dòng, dễ vừa cuối trang
+  tong.push(dongTong('VAT ' + T.vatNhan, T.vat, '', 'tg2'), dongTong('TỔNG CHI PHÍ DỰ KIẾN (GỒM VAT)', T.total, '', 'tg3 grand',
+    '<span class="bchu"><i>Bằng chữ:</i> ' + esc(docSoVN_(T.total)) + '</span>'))
   if (m1) {
     // Mẫu 1: gộp theo mục lớn (một ô HẠNG MỤC dùng chung cho các dòng con)
     const secs = rows.filter(function (c) { return coverDepth(c.stt) === 1 })
-    body = secs.map(function (sec) {
+    const khoi = secs.map(function (sec) {
       let kids = rows.filter(function (c) { return c.stt !== sec.stt && String(c.stt).indexOf(sec.stt + '.') === 0 })
       if (!kids.length) kids = [sec]
       return kids.map(function (c, ki) {
         const val = cost[c.stt] || 0; const pct = total > 0 ? (val / total * 100) : 0
-        const lead = ki === 0 ? '<td class="ct" rowspan="' + kids.length + '">' + esc(sec.stt) + '</td>'
+        const lead = ki === 0 ? '<td class="ct" rowspan="' + kids.length + '">' + esc(no(sec.stt)) + '</td>'
           + '<td class="hm" rowspan="' + kids.length + '">' + esc(sec.hangMuc || '') + '</td>' : ''
         // mục CÓ CON (vd 3.2) là dòng cộng gộp của các mục dưới nó: in đậm; mục con thụt vào + chữ nhạt hơn
         const gop = c !== sec && coverHasChild(ctx.cover, c.stt); const sau = Math.max(0, coverDepth(c.stt) - 2)
         return '<tr>' + lead + '<td style="' + (sau ? 'padding-left:' + (8 + sau * 14) + 'px;color:#5b6b7b' : '') + (gop ? ';font-weight:700' : '') + '">' + esc(c === sec ? '' : (c.hangMuc || '')) + (gop ? ' <i style="font-weight:400;color:#94a3b8">(gồm các mục dưới)</i>' : '') + '</td>'
           + '<td class="num" style="' + (gop ? 'font-weight:700' : (sau ? 'color:#5b6b7b' : '')) + '">' + money(val) + '</td><td class="num" style="' + (sau ? 'color:#5b6b7b' : '') + '">' + pct.toFixed(2) + '%</td>'
           + '<td class="it">' + esc(c.moTa || '') + '</td></tr>'
-      }).join('')
-    }).join('')
-    return '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC</div>'
-      + '<table class="qx-tbl qx-cover"><tr class="qx-h"><th class="ct">NO</th><th>HẠNG MỤC</th><th>NỘI DUNG</th>'
-      + '<th class="num">CHI PHÍ DỰ KIẾN</th><th class="num">TỶ TRỌNG</th><th>MÔ TẢ</th></tr>'
-      + body + '<tr class="sec"><td colspan="3" style="text-align:right"><b>TỔNG CHI PHÍ DỰ KIẾN</b></td>'
-      + '<td class="num"><b>' + money(total) + '</b></td><td class="num"><b>100%</b></td><td></td></tr></table>'
+      })
+    })
+    return {
+      ttl: ttl, open: '<table class="qx-tbl qx-cover">' + COVER_COLG_M1, khoi: khoi, T: T,
+      th: '<tr class="qx-h"><th class="ct">NO</th><th>HẠNG MỤC</th><th>NỘI DUNG</th><th class="num">CHI PHÍ DỰ KIẾN</th><th class="num">TỶ TRỌNG</th><th>MÔ TẢ</th></tr>',
+      tong: tong,
+    }
   }
   // Mẫu 2: danh sách phẳng phân cấp
-  body = rows.map(function (c) {
+  const khoi = rows.map(function (c) {
     const lvl = coverDepth(c.stt); const val = cost[c.stt] || 0; const pct = total > 0 ? (val / total * 100) : 0
-    return '<tr class="lv' + lvl + '"><td class="ct">' + esc(c.stt) + '</td>'
+    return '<tr class="lv' + lvl + '"><td class="ct">' + esc(no(c.stt)) + '</td>'
       + '<td>' + esc(c.hangMuc || '') + '</td>'
       + '<td class="num">' + money(val) + '</td><td class="num">' + pct.toFixed(2) + '%</td>'
       + '<td class="it">' + esc(c.moTa || '') + '</td></tr>'
-  }).join('')
-  return '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC</div>'
-    + '<table class="qx-tbl qx-cover"><tr class="qx-h"><th class="ct">NO</th><th>HẠNG MỤC</th>'
-    + '<th class="num">CHI PHÍ DỰ KIẾN</th><th class="num">TỶ TRỌNG</th><th>MÔ TẢ</th></tr>'
-    + body + '<tr class="sec"><td colspan="2" style="text-align:right"><b>TỔNG CHI PHÍ DỰ KIẾN</b></td>'
-    + '<td class="num"><b>' + money(total) + '</b></td><td class="num"><b>100%</b></td><td></td></tr></table>'
+  }).map(function (r) { return [r] })
+  return {
+    ttl: ttl, open: '<table class="qx-tbl qx-cover">' + COVER_COLG_M2, khoi: khoi, T: T,
+    th: '<tr class="qx-h"><th class="ct">NO</th><th>HẠNG MỤC</th><th class="num">CHI PHÍ DỰ KIẾN</th><th class="num">TỶ TRỌNG</th><th>MÔ TẢ</th></tr>',
+    tong: tong,
+  }
 }
 
-/* ---- Hộp tổng + tiến độ thanh toán + ghi chú + ô ký (trang cuối) ---- */
-export function bgTongKetHTML_(q, org, ctx, me) {
+/* ---- Ô ký (trang bìa sau), bgCfg.ky = {an, ghi, cao, cot: [{hd, nm}]}: an = ẩn cả khối; ghi = dòng "(Ký, ghi rõ họ tên)";
+   cao = chiều cao chỗ ký (px); cot = 2-3 cột, tiêu đề / tên để trống = mặc định (cột 1 khách hàng, cột 2 công ty + người lập) ---- */
+export const KY_CAO_MAC = 90
+export const KY_COT_MAX = 3
+export function bgKy_(bgCfg) {
+  const k = (bgCfg && bgCfg.ky) || {}
+  const cao = Number(k.cao)
+  const cot = (Array.isArray(k.cot) ? k.cot : []).slice(0, KY_COT_MAX).map(function (c) { return { hd: String((c && c.hd) || ''), nm: String((c && c.nm) || '') } })
+  while (cot.length < 2) cot.push({ hd: '', nm: '' })
+  return { an: !!k.an, ghi: !!k.ghi, cao: cao >= 30 && cao <= 240 ? cao : KY_CAO_MAC, cot: cot }
+}
+/* tiêu đề / tên mặc định của cột ký i */
+export function bgKyMac_(i, ctx, org, nguoi) {
+  if (i === 0) return { hd: 'KHÁCH HÀNG / CUSTOMER', nm: (ctx.cur && ctx.cur.khachHang) || '' }
+  if (i === 1) return { hd: String(org.ten || '').toUpperCase(), nm: nguoi ? 'Người lập: ' + nguoi : '' }
+  return { hd: 'ĐẠI DIỆN', nm: '' }
+}
+
+/* ---- Hộp tổng + bằng chữ (cuối tờ bìa) ---- */
+export function bgTongTienHTML_(q, ctx) {
   const o = bgOpt_(ctx.bgCfg)
   function row(nhan, tien, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="lbl">' + nhan + '</td><td class="num">' + money(tien) + ' đ</td></tr>' }
   const tot = '<table class="qx-tbl qx-totbox"><colgroup><col style="width:74%"><col style="width:26%"></colgroup>'
     + row('TỔNG CỘNG:', q.sub)
     + (q.ck ? row('CHIẾT KHẤU' + (o.ckKieu === 'pct' ? ' ' + o.ck + '%' : '') + ':', -q.ck) + row('SAU CHIẾT KHẤU:', q.sau) : '')
-    + row('VAT ' + q.vatPct + '%:', q.vat) + row('THÀNH TIỀN SAU THUẾ:', q.total, 'grand') + '</table>'
+    + row('VAT ' + q.vatNhan + ':', q.vat) + row('THÀNH TIỀN SAU THUẾ:', q.total, 'grand') + '</table>'
     + '<div class="qx-bangchu"><i>Bằng chữ:</i> <b>' + esc(docSoVN_(q.total)) + '</b></div>'
+  return '<div class="qx-biatong">' + tot + '</div>'
+}
+
+/* ---- Hộp tổng tiền + tiến độ thanh toán + ghi chú + ô ký (trang bìa sau = trang cuối, luôn là trang riêng) ---- */
+export function bgTongKetHTML_(q, org, ctx, me) {
   // chữ / số của khối tổng kết: cùng một hàm với opts.tongKet của file Excel (M8.1)
   const tk = bgTongKetData_(q, ctx.bgCfg, me)
   const tt = tk.dot.length ? '<div class="qx-dot"><div class="h">Tiến độ thanh toán</div><table><tr><th>Đợt</th><th>Nội dung</th><th class="num">Tỷ lệ</th><th class="num">Số tiền</th></tr>'
@@ -211,22 +321,34 @@ export function bgTongKetHTML_(q, org, ctx, me) {
     + '</table></div>' : ''
   const notes = '<div class="qx-notes"><div class="h">Ghi chú & điều khoản:</div><ol>' + tk.ghiChu.map(function (x) { return '<li>' + esc(x) + '</li>' }).join('') + '</ol></div>'
   const nguoi = tk.nguoi
-  const sign = '<div class="qx-sign"><div class="col"><div class="hd">KHÁCH HÀNG / CUSTOMER</div><div class="sp"></div>'
-    + '<div class="nm">' + esc((ctx.cur && ctx.cur.khachHang) || '') + '</div></div>'
-    + '<div class="col"><div class="hd">' + esc(String(org.ten).toUpperCase()) + '</div><div class="sp"></div>'
-    + '<div class="nm">' + (nguoi ? 'Người lập: ' + esc(nguoi) : '') + '</div></div></div>'
-  return tot + tt + notes + sign
+  const ky = bgKy_(ctx.bgCfg)
+  const sign = ky.an ? '' : '<div class="qx-sign">' + ky.cot.map(function (c, i) {
+    const mac = bgKyMac_(i, ctx, org, nguoi)
+    return '<div class="col"><div class="hd">' + esc(c.hd.trim() || mac.hd) + '</div>'
+      + (ky.ghi ? '<div class="ghi">(Ký, ghi rõ họ tên)</div>' : '')
+      + '<div class="sp" style="height:' + ky.cao + 'px"></div><div class="nm">' + esc(c.nm.trim() || mac.nm) + '</div></div>'
+  }).join('') + '</div>'
+  /* tổng giá trị báo giá: đặt sau tiến độ thanh toán, cùng tông nhạt với khối tiến độ (không dùng hộp nền đậm) */
+  const o2 = bgOpt_(ctx.bgCfg)
+  const dong = function (nhan, tien, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + nhan + '</td><td class="num">' + money(tien) + ' đ</td></tr>' }
+  const tongNhe = '<div class="qx-dot qx-tongnhe"><div class="h">Tổng giá trị báo giá</div><table>'
+    + dong('Thành tiền (Chưa VAT)', q.sub)
+    + (q.ck ? dong('Chiết khấu' + (o2.ckKieu === 'pct' ? ' ' + o2.ck + '%' : ''), -q.ck) + dong('Sau chiết khấu', q.sau) : '')
+    + dong('VAT ' + q.vatNhan, q.vat) + dong('Thành tiền (Bao gồm VAT)', q.total, 'grand') + '</table>'
+    + '<div class="chu"><i>Bằng chữ:</i> <b>' + esc(docSoVN_(q.total)) + '</b></div></div>'
+  // trang bìa sau: tiến độ thanh toán -> tổng giá trị -> ghi chú & điều khoản -> ô ký
+  return tt + tongNhe + notes + sign
 }
 
 /* Dựng danh sách trang: [tờ bìa] + [các trang chi tiết] + [phần thô] (+ trang "Tổng kết" khi trang cuối đã quá nửa).
    Trả [{html, meta:{trang, ten, dong, tien}}]; html đã đổi tên class (docHtml_). */
 /* Các mục thông tin dự án trên tờ bìa — lấy đúng các ô của hộp "Thông tin dự án" (Bảng điều khiển), cùng tên + thứ tự;
-   in theo cặp 2 cột. BG_TT_MAC = các mục hiện sẵn (như tờ bìa cũ) */
+   in theo cặp 2 cột. BG_TT_MAC = các mục hiện sẵn khi bản nháp chưa tự chọn (bgCfg.hienTT) */
 export const BG_TT_DS = [['ten', 'Tên dự án'], ['kh', 'Khách hàng'], ['sdt', 'Số điện thoại'], ['dc', 'Địa chỉ'], ['ma', 'Mã báo giá'],
   ['qm', 'Quy mô'], ['dt', 'Tổng DT XD'], ['dtbg', 'DT báo giá'], ['nc', 'Nhu cầu'], ['pc', 'Phân khúc'], ['ht', 'Hiện trạng'], ['gc', 'Ghi chú']]
 export const BG_LOGO_MIN = 20
 export const BG_LOGO_MAX = 72
-export const BG_TT_MAC = ['kh', 'ht', 'ten', 'qm', 'dt', 'nc', 'pc', 'dtbg']
+export const BG_TT_MAC = ['ten', 'kh', 'sdt', 'dc']   // mặc định: Tên dự án · Khách hàng · Số điện thoại · Địa chỉ
 /* Tuỳ chọn tờ bìa trong bgCfg: logo 'cty' (logo công ty, mặc định) | 'tao' (đang tạo logo); logoAn = true: ẩn logo (bia.logo = 'an');
    taoKieu: 'anh' (Logo ảnh: ảnh tải lên logoAnh) | 'chu' (Logo chữ: logoChu + kiểu chữ lc*) — chọn 1 trong 2;
    bản cũ lưu logo 'anh' (ảnh riêng) / 'chu' (chỉ tên) -> 'tao' với taoKieu tương ứng;
@@ -279,7 +401,9 @@ export function bgBia_(bgCfg) {
        chưa đặt thì theo tdSo cũ (12,5 / 11 / 10 px nhân tdSo / 12) */
     ...tdCo_(c),
     /* hienTT = các mục đang hiện; bản cũ lưu anTT (mục ẩn) thì đổi sang danh sách hiện */
-    hienTT: Array.isArray(c.hienTT) ? c.hienTT : BG_TT_MAC.filter(k => !(Array.isArray(c.anTT) && c.anTT.indexOf(k) >= 0)),
+    hienTT: Array.isArray(c.hienTT) ? c.hienTT
+      : Array.isArray(c.anTT) ? ['kh', 'ht', 'ten', 'qm', 'dt', 'nc', 'pc', 'dtbg'].filter(k => c.anTT.indexOf(k) < 0)   // bản cũ: anTT tính trên bộ mặc định cũ
+        : BG_TT_MAC,
   }
 }
 export function bgBuildPages(ctx, ui, ver, me) {
@@ -336,53 +460,118 @@ export function bgBuildPages(ctx, ui, ver, me) {
   for (let i = 0; i < tt.length; i += 2) rowsTT += '<tr>' + ip(tt[i][1], ttVal[tt[i][0]]) + (tt[i + 1] ? ip(tt[i + 1][1], ttVal[tt[i + 1][0]]) : '<td class="k"></td><td class="v"></td>') + '</tr>'
   const infoBlock = tt.length ? '<table class="qx-info">' + rowsTT + '</table>' : ''
   // ===== TRANG 1 = TỜ BÌA (Mẫu 1 hoặc Mẫu 2) =====
-  themTrang(decoxHead + infoBlock + bgCoverPage_(comp, ctx, ui.coverMau), { ten: 'Tờ bìa' })
+  themTrang('', { ten: 'Tờ bìa' })          // chỗ của tờ bìa: dựng ở cuối (cần tổng tiền), có thể thành nhiều trang
   // ===== Từ trang 2: bảng chi tiết các hạng mục đã bóc được chọn, THEO ĐÚNG CHIP CỘT đang bật =====
   const lines = bgLines_(ctx)
-  const cols = bgDocCols_(ctx, ui)
-  const coAnh = cols.some(function (c) { return c[0] === 'hinhAnh' })
-  const colg = bgColg_(cols, 30, ui.bgColW); const thead = bgTh_(cols)
-  const tblCls = 'qx-tbl' + (cols.length >= 15 ? ' qx-dense' : '') + (cols.length >= 20 ? ' qx-dense2' : '')
-  function rowHtml(l, ri) {
-    return '<tr><td class="ct">' + (ri + 1) + '</td>'
-      + cols.map(function (c) { return '<td class="' + bgDocAlign_(c[0]) + '">' + bgDocCell_(l, c[0]) + '</td>' }).join('') + '</tr>'
+  /* bộ dựng bảng theo 1 danh sách cột (chung, hoặc cột riêng của 1 hạng mục - bgDocColsOf_) */
+  function bang(cols) {
+    const coAnh = cols.some(function (c) { return c[0] === 'hinhAnh' })
+    /* thước đo chiều cao (chia trang theo chiều cao): cỡ chữ / đệm theo độ dày bảng (qx-dense), hệ số cỡ chữ báo giá, đệm dòng của khung */
+    const chu = bgChu_(ctx.bgCfg)
+    const kz = (Number(chu.co) || 100) / 100
+    const dense = cols.length >= 20 ? 2 : cols.length >= 15 ? 1 : 0
+    const fz = [10.5, 9.5, 8.5][dense] * kz; const padH = [8, 5, 3][dense]
+    const padV = chu.ctkSet && chu.ctkCach != null ? chu.ctkCach : [8, 6, 5][dense]
+    const fam = (chu.font ? chu.font + ', ' : '') + 'Arial, Helvetica, sans-serif'
+    const tongW = bgDocTongW_(cols, 30, ui.bgColW)
+    const rong = function (c) { return bgDocW_(c[0], ui.bgColW) / tongW * 1047 - 2 * padH - 1 }
+    const hDong = fz * 1.45
+    function hRow(l) {
+      let h = hDong
+      cols.forEach(function (c) {
+        const k = c[0]; const w = rong(c); let x
+        if (k === 'hinhAnh') x = l.hinhAnh ? Math.min(240, Math.max(20, w)) : 0
+        else if (k === 'ten') x = Math.max(1, soDong_(l.ten, fz, true, fam, w)) * hDong + (l.maSP ? 8 * kz * 1.3 + 1 : 0)
+        else if (k === 'moTa' || k === 'kichThuoc') x = Math.min(5, soDong_(k === 'moTa' ? l.moTa : l.kichThuoc, 9.5 * kz, false, fam, w)) * 9.5 * kz * 1.35 + 2
+        else if (bgDocAlign_(k) === 'num') x = hDong
+        else x = soDong_(bgDocCell_(l, k), fz, false, fam, w) * hDong
+        if (x > h) h = x
+      })
+      return Math.ceil(h + 2 * padV + 1) + 1
+    }
+    const hSec = Math.ceil(hDong + 2 * padV + 2)
+    /* gắn mã băm (data-hk) lên dòng để khung ẩn đo đúng dòng đó; chiều cao = số đo thật nếu có, không thì ước tính */
+    const colg = bgColg_(cols, 30, ui.bgColW)
+    const gan = function (html) { const k = bam_(colg + html); return { k: k, html: html.replace(/^<tr/, '<tr data-hk="' + k + '"') } }
+    const TH = gan(bgTh_(cols))
+    /* chỗ cho các dòng: trang 794 - đệm trên 34 - chân trang (đáy 22 + chữ ~14 + cách 8) - tiêu đề hạng mục ~50 - hàng tiêu đề cột */
+    const hHead = hDo_.get(TH.k) || (18 + 3 * 9 * 1.25 * kz)
+    const cho = hCho_ != null ? hCho_ - hHead - 4 : (794 - 34 - 44 - 50 - hHead) * 0.98
+    const rowRaw = function (l, ri) {
+      return '<tr><td class="ct">' + (ri + 1) + '</td>'
+        + cols.map(function (c) { return '<td class="' + bgDocAlign_(c[0]) + '">' + bgDocCell_(l, c[0]) + '</td>' }).join('') + '</tr>'
+    }
+    return {
+      cho: cho, hHead: hHead,
+      /* 1 dòng sản phẩm / 1 dòng đề mục kèm chiều cao dùng để chia trang */
+      row: function (l, ri) { const g = gan(rowRaw(l, ri)); return { html: g.html, h: hDo_.get(g.k) || hRow(l) } },
+      sec: function (nhan, tien) { const g = gan(bgSecRow_(cols, nhan, tien, 'thanhTien')); return { html: g.html, h: hDo_.get(g.k) || hSec } },
+      colg: colg, thead: TH.html,
+      tblCls: 'qx-tbl' + (cols.length >= 15 ? ' qx-dense' : '') + (cols.length >= 20 ? ' qx-dense2' : ''),
+      rowHtml: function (l, ri) { return gan(rowRaw(l, ri)).html },
+      secRow: function (nhan, tien) { return gan(bgSecRow_(cols, nhan, tien, 'thanhTien')).html },
+      PER: bgPerRows_(ui.per, coAnh),          // số dòng mỗi trang (tự động: có ảnh 8, không ảnh 13)
+    }
   }
-  function secRow(nhan, tien) { return bgSecRow_(cols, nhan, tien, 'thanhTien') }
-  const PER = bgPerRows_(ui.per, coAnh)          // số dòng mỗi trang (tự động: có ảnh 8, không ảnh 13)
+  const B0 = bang(bgDocCols_(ctx, ui))
+  const colg = B0.colg; const thead = B0.thead; const tblCls = B0.tblCls; const rowHtml = B0.rowHtml; const secRow = B0.secRow; const PER = B0.PER
+  /* Chia 1 dãy dòng thành các trang -> [[đầu, cuối)…]. "Dòng / trang" đặt số cố định thì chia theo số đó; Tự động thì chia theo CHIỀU CAO
+     ước tính (hs) cho vừa chỗ trống của trang - không trang nào phải thu nhỏ chữ. Dòng đề mục (meta null) không đứng cuối trang. */
+  function chia(hs, metas, B) {
+    const n = hs.length; const out = []
+    if (Number(ui.per) > 0) { for (let i = 0; i < n; i += B.PER) out.push([i, Math.min(n, i + B.PER)]); return out }
+    let dau = 0; let cong = 0
+    for (let i = 0; i < n; i++) {
+      if (i > dau && cong + hs[i] > B.cho) {
+        let cat = i
+        if (metas[i - 1] === null && cat - 1 > dau) cat = i - 1      // đề mục nhóm sang trang sau cùng dòng của nó
+        out.push([dau, cat]); dau = cat; cong = 0
+        for (let j = dau; j < i; j++) cong += hs[j]
+      }
+      cong += hs[i]
+    }
+    if (dau < n) out.push([dau, n])
+    return out
+  }
   if (ui.perSec) {
     const byNode = {}; const ordN = []
     lines.forEach(function (l) { const c = (l.nhom || '').trim() || '__k'; if (!byNode[c]) { byNode[c] = []; ordN.push(c) } byNode[c].push(l) })
     ordN.forEach(function (code) {
+      const B = bang(bgDocColsOf_(ctx, ui, code))   // cột riêng của hạng mục (nếu đã đặt)
       const its = byNode[code]; const ten = (code === '__k' ? 'KHÁC' : (nodeName(code) || code))
       const secTt = its.reduce(function (a, l) { return a + ttBan_(l) }, 0)
-      const flatN = []; const metaN = []; const byF = {}; const ordF = []
+      const flatN = []; const metaN = []; const hN = []; const byF = {}; const ordF = []
       its.forEach(function (l) { const g = (l.tang || '').trim() || 'HẠNG MỤC'; if (!byF[g]) { byF[g] = []; ordF.push(g) } byF[g].push(l) })
       ordF.forEach(function (g, gi) {
         const sub = byF[g].reduce(function (a, l) { return a + ttBan_(l) }, 0)
-        flatN.push(secRow((ROMAN_[gi] || (gi + 1)) + '. ' + esc(g), sub)); metaN.push(null)
-        byF[g].forEach(function (l, ri) { flatN.push(rowHtml(l, ri)); metaN.push(ttBan_(l)) })
+        const s1 = B.sec((ROMAN_[gi] || (gi + 1)) + '. ' + esc(g), sub); flatN.push(s1.html); metaN.push(null); hN.push(s1.h)
+        byF[g].forEach(function (l, ri) { const r = B.row(l, ri); flatN.push(r.html); metaN.push(ttBan_(l)); hN.push(r.h) })
       })
-      flatN.push(secRow('<b>TỔNG ' + esc(String(ten).toUpperCase()) + '</b>', secTt)); metaN.push(null)
-      for (let q0 = 0; q0 < flatN.length; q0 += PER) {
-        themTrang('<div class="qx-secttl">' + esc(String(ten).toUpperCase()) + (q0 ? ' (tiếp)' : '') + '</div>'
-          + '<table class="' + tblCls + '">' + colg + thead + flatN.slice(q0, q0 + PER).join('') + '</table>',
-        bgMetaTrang_(ten, metaN.slice(q0, q0 + PER)))
-      }
+      const s2 = B.sec('<b>TỔNG ' + esc(String(ten).toUpperCase()) + '</b>', secTt); flatN.push(s2.html); metaN.push(null); hN.push(s2.h)
+      /* đầu trang đầu tiên của hạng mục: Chưa VAT · VAT x% · Thành tiền (VAT) của riêng hạng mục này */
+      const vatHm = vatOf_(ctx, code); const tienVat = Math.round(secTt * vatHm / 100)
+      const hmTong = '<span class="qx-hmtong"><span>Chưa VAT <b>' + money(secTt) + '</b></span><span>VAT ' + vatHm + '% <b>' + money(tienVat) + '</b></span>'
+        + '<span class="g">Thành tiền (VAT) <b>' + money(secTt + tienVat) + '</b></span></span>'
+      chia(hN, metaN, B).forEach(function (r) {
+        themTrang('<div class="qx-secttl"><span>' + esc(String(ten).toUpperCase()) + (r[0] ? ' (tiếp)' : '') + '</span>' + (r[0] ? '' : hmTong) + '</div>'
+          + '<table class="' + B.tblCls + '">' + B.colg + B.thead + flatN.slice(r[0], r[1]).join('') + '</table>',
+        bgMetaTrang_(ten, metaN.slice(r[0], r[1])))
+      })
     })
   } else {
     const groups = {}; const order = []
     lines.forEach(function (l) { const g = (l.tang || '').trim() || 'HẠNG MỤC'; if (!groups[g]) { groups[g] = []; order.push(g) } groups[g].push(l) })
-    const flat = []; const metaF = []
+    const flat = []; const metaF = []; const hF = []
     order.forEach(function (g, gi) {
       const items = groups[g] || []; const sec = items.reduce(function (a, l) { return a + ttBan_(l) }, 0)
-      flat.push(secRow((ROMAN_[gi] || (gi + 1)) + '. ' + esc(g), sec)); metaF.push(null)
-      items.forEach(function (l, ri) { flat.push(rowHtml(l, ri)); metaF.push(ttBan_(l)) })
+      const s1 = B0.sec((ROMAN_[gi] || (gi + 1)) + '. ' + esc(g), sec); flat.push(s1.html); metaF.push(null); hF.push(s1.h)
+      items.forEach(function (l, ri) { const r = B0.row(l, ri); flat.push(r.html); metaF.push(ttBan_(l)); hF.push(r.h) })
     })
     if (flat.length) {
-      for (let i = 0; i < flat.length; i += PER) {
-        themTrang((i === 0 ? '<div class="qx-secttl">BẢNG BÁO GIÁ CHI TIẾT</div>' : '') + '<table class="' + tblCls + '">' + colg + thead + flat.slice(i, i + PER).join('') + '</table>',
-          bgMetaTrang_('Bảng báo giá chi tiết', metaF.slice(i, i + PER)))
-      }
+      chia(hF, metaF, B0).forEach(function (r) {
+        themTrang((r[0] === 0 ? '<div class="qx-secttl">BẢNG BÁO GIÁ CHI TIẾT</div>' : '') + '<table class="' + tblCls + '">' + colg + thead + flat.slice(r[0], r[1]).join('') + '</table>',
+          bgMetaTrang_('Bảng báo giá chi tiết', metaF.slice(r[0], r[1])))
+      })
     }
   }
   // ===== PHẦN THÔ (3.1) - bảng ước tính riêng, không nằm trong lines =====
@@ -410,18 +599,52 @@ export function bgBuildPages(ctx, ui, ver, me) {
   }
   // ===== Hộp tổng + ghi chú + ô ký: tổng ĐÚNG phạm vi đang xuất =====
   const subBG = lines.reduce(function (a, l) { return a + ttBan_(l) }, 0) + ptTong
-  const tong = bgTong_(subBG, ctx.bgCfg, p.vat)
-  // trang chi tiết cuối đã quá nửa số dòng / trang -> khối tổng kết sang trang riêng "Tổng kết"
-  const cuoi = metas[metas.length - 1] || {}; const PERc = PER
-  if (inners.length > 1 && (cuoi.dong || 0) > PERc * 0.5) { inners.push(bgTongKetHTML_(tong, org, ctx, me)); metas.push({ ten: 'Tổng kết' }) } else inners[inners.length - 1] += bgTongKetHTML_(tong, org, ctx, me)
+  const tong = bgTong_(subBG, ctx.bgCfg, p.vat, bgVatParts_(ctx))
+  /* Tờ bìa = phần đầu (logo, tiêu đề, thông tin) + bảng hạng mục kết thúc bằng khối tổng (1 module: tổng -> VAT -> tổng gồm VAT -> bằng chữ).
+     Đã đo (khung ẩn) thì chia theo chiều cao: bảng không vừa trang 1 thì các khối còn lại sang trang "(tiếp)" (lặp hàng tiêu đề); khối tổng
+     luôn đi liền 1 khối, không vừa thì sang trang sau cùng hàng tiêu đề - cỡ chữ tờ bìa giữ như mọi trang. Chưa đo đủ -> dồn hết vào trang 1. */
+  const CP = bgCoverParts_(comp, ctx, ui.coverMau)
+  const dauBia = decoxHead + infoBlock
+  let bia
+  if (CP.rong != null) bia = [dauBia + CP.rong + bgTongTienHTML_(tong, ctx)]
+  else {
+    const TH = ganHk_(CP.th, CP.open)
+    const TONG = CP.tong.map(function (r) { return ganHk_(r, CP.open) })
+    const khoi = CP.khoi.map(function (k) { return k.map(function (r) { return ganHk_(r, CP.open) }) })
+    const h = function (g) { return hDo_.get(g.k) }
+    const cao = function (ds) { return ds.reduce(function (a, g) { return a + h(g) }, 0) }
+    const du = hCho1_ != null && h(TH) != null && TONG.every(function (g) { return h(g) != null }) && khoi.every(function (k) { return k.every(function (g) { return h(g) != null }) })
+    const choN = hCho_ != null ? hCho_ : 794 - 34 - 42 - 8 - 50
+    let trang = [{ khoi: khoi.map(function (k, i) { return i }), tong: true }]
+    if (du) {
+      trang = [{ khoi: [], tong: false }]
+      let cho = hCho1_ - 4; let dung = h(TH)
+      const moi = function () { trang.push({ khoi: [], tong: false }); cho = choN - 4; dung = h(TH) }
+      khoi.forEach(function (k, i) {
+        const kh = cao(k)
+        if (trang[trang.length - 1].khoi.length && dung + kh > cho) moi()
+        trang[trang.length - 1].khoi.push(i); dung += kh
+      })
+      // hạng mục đổ đầy trang hiện tại; khối tổng (đi liền 1 khối) không vừa phần còn lại thì sang trang sau
+      if (dung + cao(TONG) > cho) moi()
+      trang[trang.length - 1].tong = true
+    }
+    bia = trang.map(function (t, ti) {
+      const bang = CP.open + TH.html + t.khoi.map(function (i) { return khoi[i].map(function (g) { return g.html }).join('') }).join('')
+        + (t.tong ? TONG.map(function (g) { return g.html }).join('') : '') + '</table>'
+      return (ti === 0 ? dauBia + CP.ttl : '<div class="qx-secttl">CHI TIẾT CÁC HẠNG MỤC (tiếp)</div>') + bang
+    })
+  }
+  inners.splice.apply(inners, [0, 1].concat(bia))
+  metas.splice.apply(metas, [0, 1].concat(bia.map(function () { return { ten: 'Tờ bìa' } })))
+  // tiến độ thanh toán + ghi chú + ô ký là trang bìa sau (trang cuối, riêng)
+  inners.push(bgTongKetHTML_(tong, org, ctx, me)); metas.push({ ten: 'Trang bìa sau' })
   const N = inners.length
   return inners.map(function (inner, idx) {
     const m = metas[idx] || {}
-    // Chân trang: đơn vị - dự án · nội dung trang · SỐ DÒNG · tiền của trang · số trang
-    const giua = [m.ten || '', m.dong ? (m.dong + ' dòng') : '', m.dong ? (money(m.tien || 0) + ' đ') : ''].filter(Boolean).join(' · ')
+    // Chân trang: đơn vị - dự án (trái) · số trang (phải); bỏ dòng giữa "hạng mục · số dòng · tiền của trang" (vẫn có ở thanh trên bản xem trước qua meta)
     const foot = '<div class="qp-foot">'
       + '<span>' + esc(org.ten) + ' — ' + esc(p.ten || '') + '</span>'
-      + '<span class="qp-mid">' + esc(giua) + '</span>'
       + '<span>Trang ' + (idx + 1) + ' / ' + N + '</span></div>'
     return { html: docHtml_('<div class="qs-page qx-page">' + inner + foot + '</div>'), meta: Object.assign({ trang: idx + 1 }, m) }
   })

@@ -20,6 +20,7 @@ import { COLS, PHONG_LIST, colPlain, cellSortVal_, tkSheetCo_, tkSheetOf_, TK_SH
 import { tkFieldsFor_, ttBan_, lnVnd_ } from '../lib/calc.js'
 import { TREE, nodeName, customGroups } from '../lib/tree.js'
 import { money } from '../lib/format.js'
+import { vatOf_ } from '../lib/quote.js'
 import { lineDocs_ } from '../lib/productFields.js'
 import { lnDiff_, lnDiffTip_, spOfLine_, giaLechList_ } from '../lib/bocSync.js'
 import { CHUA_PHAN_TANG, floorsList } from '../lib/sheetModel.js'
@@ -37,7 +38,7 @@ import { measureColW } from './breakdown/SheetGrid'
 import ColFilterPop from './breakdown/sheet/ColFilterPop'
 import LinePicker from './breakdown/sheet/LinePicker'
 import BulkBar from './breakdown/sheet/BulkBar'
-import { LineUpdatePop, PriceSyncModal, LnPickPop, RecentPop } from './breakdown/sheet/SyncPops'
+import { LineUpdatePop, PriceSyncModal, LnPickPop, RecentPop, HistoryDock } from './breakdown/sheet/SyncPops'
 import './breakdown/sheet/sheet.css'
 import { setPcAlignX } from './project/pcSlot'
 
@@ -111,6 +112,8 @@ export default function BreakdownTab() {
   const [adderKey, setAdderKey] = useState(0)
   const [pop, setPop] = useState(null)   // {kind, anchor, ...}
   const [presetDock, setPresetDock] = useState(false)   // khung "Chọn nhanh cột" bên trái vùng bảng
+  const [histDock, setHistDock] = useState(null)   // khung "Lịch sử" cạnh cột sản phẩm: 'recent' | 'ops'
+  const toggleHist = t => setHistDock(v => (v === t ? null : t))
   /* Khung "Chọn nhanh cột" và dải chip cột đi cặp: nút bộ cột mở cả hai, đóng bên nào cũng đóng cả hai (huỷ phần đang sửa) */
   function closeColTools() { cancelEdit(); setPresetDock(false); setPanel(p => (p === 'cols' ? null : p)) }
   const [toolSlot, setToolSlot] = useState(null)   // khung module thanh công cụ (SheetBody vẽ thanh công cụ vào đây)
@@ -705,9 +708,12 @@ export default function BreakdownTab() {
       )}
       </span>
       <span className="qs-bd-headsep" />
+      {/* 2 nút lịch sử mở khung dọc "Lịch sử" bên phải cột sản phẩm (HistoryDock), không bật popup / dải trên bảng */}
       <span className="qs-bd-hchip">
-      {recentTool}
-      <button className={`qs-bd-tb-btn${panel === 'history' ? ' on' : ''}`} title="Lịch sử thao tác" onMouseDown={e => e.preventDefault()} onClick={() => setPanel(p => (p === 'history' ? null : 'history'))}>
+      <button className={`qs-bd-tb-btn${histDock === 'recent' ? ' on' : ''}`} title="Vừa thêm vào bảng — xem lại / thêm lại" onMouseDown={e => e.preventDefault()} onClick={() => toggleHist('recent')}>
+        <Icon name="clock" size={18} />
+      </button>
+      <button className={`qs-bd-tb-btn${histDock === 'ops' ? ' on' : ''}`} title="Lịch sử thao tác" onMouseDown={e => e.preventDefault()} onClick={() => toggleHist('ops')}>
         <Icon name="history" size={18} />
       </button>
       </span>
@@ -747,6 +753,12 @@ export default function BreakdownTab() {
           <ProductInfo product={detail} width={catalogW} addSl={detailSl} onClose={() => setDetail(null)} onAdd={(product, opts) => addProduct(product, opts || {})}
             onDragProduct={onDragProduct} onDragEnd={endDragProduct} />
         )}
+        {catalogOpen && histDock && (
+          <HistoryDock width={catalogW} tab={histDock} onTab={setHistDock} onClose={() => setHistDock(null)}
+            lines={lines} labels={facade.labels} onJump={facade.jumpTo}
+            onGo={l => { if (l.nhom && l.nhom !== node) pickNode(l.nhom); flashTo(l.lineId, false) }}
+            onPlus={l => { mutate.updateLine(l.lineId, { soLuong: (Number(l.soLuong) || 0) + 1 }); toast('+1 số lượng: ' + l.ten) }} />
+        )}
         {/* #pdPanel của Phần thô vẫn hiện khi ẩn cột trái như bản gốc (#bocGrid.nocat.detail, PUB/index.html:5786) */}
         {isPT && <PtDetail />}
         {!isPT && !full && presetDock && <PresetDock width={catalogW} cols={colState.cols} onEdit={opts => { setPanel('cols'); startEdit(opts) }} onEndEdit={keep => (keep ? endEdit() : cancelEdit())} onClose={closeColTools} />}
@@ -755,7 +767,9 @@ export default function BreakdownTab() {
             count={isPT ? ptTot.count : sheetLines.length} treeCount={isPT ? sheetLines.length : undefined} hideCols={isPT} nodeLabel={treeSel}
             onOpenTree={e => { const at = e.currentTarget; setPop(p => (p && p.kind === 'tree' ? null : { kind: 'tree', anchor: at })) }}
             treeOpen={!!pop && pop.kind === 'tree'} sheetChips={isPT ? ptChips : sheetChips}
-            subtotal={isPT ? ptTot.grand : subtotal} vat={isPT ? ptTot.vatPct : (cur ? Number(cur.vat) || 0 : 0)} onVat={act.setVat}
+            subtotal={isPT ? ptTot.grand : subtotal} vat={isPT ? ptTot.vatPct : vatOf_({ vatHm: qs.projData && qs.projData.vatHm, cur }, node)} onVat={act.setVat}
+            vatRieng={!isPT && cur && qs.projData && qs.projData.vatHm && qs.projData.vatHm[node] != null}
+            onVatHm={isPT || !cur ? null : v => act.setVatHm(node, v)}
             view={view} onView={setView}
             catalogOpen={catalogOpen} onToggleCatalog={() => setCatalogOpen(o => !o)}
             colsShown={visibleCols.length} colsTotal={columns.length}

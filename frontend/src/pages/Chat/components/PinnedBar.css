@@ -1,0 +1,14 @@
+/* Thanh tin ghim (đầu thread) + nút ghim trên từng tin */
+.ch-pinned-bar { display: flex; flex-direction: column; gap: 2px; padding: 6px 14px; border-bottom: 1px solid var(--border, #e5e7eb); background: var(--surface-2, #f8fafc); }
+.ch-pinned-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ch-pinned-icon { flex: none; font-size: 12px; }
+.ch-pinned-text { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 2px 0; cursor: pointer; font-size: 13px; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-pinned-text:hover { text-decoration: underline; }
+.ch-pinned-x { flex: none; background: none; border: 0; cursor: pointer; font-size: 16px; line-height: 1; color: var(--muted, #64748b); padding: 0 4px; }
+.ch-pinned-more { align-self: flex-start; background: none; border: 0; padding: 0; cursor: pointer; font-size: 12px; color: var(--primary, #2563eb); }
+.ch-pin-btn { background: none; border: 0; padding: 0 4px; cursor: pointer; font-size: 11px; color: var(--muted, #64748b); opacity: 0; transition: opacity .15s; }
+.ch-msg-group:hover .ch-pin-btn, .ch-pin-btn:focus-visible { opacity: 1; }
+.ch-pin-btn.on { opacity: 1; color: var(--primary, #2563eb); }
+.ch-msg-flash { animation: ch-msg-flash 1.6s ease-out; }
+@keyframes ch-msg-flash { 0%, 40% { background: rgba(37, 99, 235, .14); } 100% { background: transparent; } }
+.ch-pin-err { font-size: 12px; color: var(--danger, #dc2626); padding: 4px 14px; }

@@ -107,7 +107,7 @@ export function spAllCols_(node, specs, hm) {
     { k: 'sku', label: 'Số SKU', cls: 'ct', kind: 'sku' },
   ]
   const tail = [
-    { k: 'giaDaiLy', label: 'Giá đại lý', cls: 'num sp-price', kind: 'giaDaiLy' },
+    { k: 'giaDaiLy', label: 'Giá đại lý', cls: 'num sp-price sp-hl', kind: 'giaDaiLy' },
     { k: 'nguoiTao', label: 'Người tạo', cls: '', kind: 'nguoiTao' },
     { k: 'ngayTao', label: 'Ngày tạo', cls: 'ct', kind: 'ngayTao' },
     { k: 'nguoiSua', label: 'Người sửa cuối', cls: '', kind: 'nguoiSua' },
@@ -118,7 +118,7 @@ export function spAllCols_(node, specs, hm) {
     const lark = f[0]; if (SP_SKIP[lark]) return
     const col = L2C[lark]; if (!col) return
     const e = { lark, col, sfx: SP_SFX[col] || '', num: !!SP_NUMCOL[col], money: !!SP_MONEY[col] }
-    const cls = SP_NUMCOL[col] ? 'num' : (SP_CTCOL[col] ? 'ct' : '')
+    const cls = (SP_NUMCOL[col] ? 'num' : (SP_CTCOL[col] ? 'ct' : '')) + (col === 'gia_ban_le' || col === 'ck_dai_ly_pct' ? ' sp-hl' : '') + (col === 'thuong_hieu' ? ' sp-hl2' : '')
     gen.push({ k: col, label: SP_COLLBL[col] || f[1], cls, kind: 'gen', e })
   })
   return head.concat(gen).concat(tail)
@@ -183,7 +183,7 @@ export const SP_DEFW = { stt: 52, thumb: 56, ten: 215, ma_sp: 140, duyet: 124, s
   trang_thai: 126, link_datasheet: 112, ghi_chu: 170 }
 export const spColW_ = (w, k) => (w && w[k]) || SP_DEFW[k] || 124
 export function spColsDefault_(ng) {
-  const b = { thumb: 1, ten: 1, ma_sp: 1, duyet: 1, sku: 1, thuong_hieu: 1, hang_muc: 1, giaDaiLy: 1 }
+  const b = { thumb: 1, ten: 1, ma_sp: 1, duyet: 1, sku: 1, thuong_hieu: 1, hang_muc: 1, gia_ban_le: 1, ck_dai_ly_pct: 1, giaDaiLy: 1 }
   if (ng === 'vs') { b.kich_thuoc = 1; b.mau_sac = 1; b.kieu_lap_dat = 1; b.he_thong_xa = 1; return b }
   if (ng === 'ct') { b.thanh_phan = 1; b.mau_sac = 1; b.dong_dm_a = 1; b.kieu_lap_dat = 1; return b }
   if (ng === 'son') { b.mau_sac = 1; b.be_mat = 1; b.do_phu = 1; b.kich_thuoc = 1; return b }
@@ -241,12 +241,23 @@ export function spOrder_(saved, cols) {
     else if (k === 'ma_sp' && o.indexOf('ten') >= 0) o.splice(o.indexOf('ten') + 1, 0, k)   // cột Mã SP (thêm sau) đứng ngay sau Sản phẩm
     else o.push(k)
   })
-  return o.filter(k => all.indexOf(k) >= 0)
+  const r = o.filter(k => all.indexOf(k) >= 0)
+  // 3 cột giá luôn đứng liền nhau theo thứ tự Giá bán lẻ -> %Chiết khấu -> Giá đại lý (tại chỗ của cột giá đứng trước nhất)
+  const gia = SP_PRICE_COLS.filter(k => r.indexOf(k) >= 0)
+  if (gia.length < 2) return r
+  const at = Math.min(...gia.map(k => r.indexOf(k)))
+  const rest = r.filter(k => gia.indexOf(k) < 0)
+  const pos = r.slice(0, at).filter(k => gia.indexOf(k) < 0).length
+  rest.splice(pos, 0, ...gia)
+  return rest
 }
-export const spColOn_ = (on, k) => (k === 'ten' || k === 'stt') ? true : !!(on && on[k])
+/* 3 cột giá: có sẵn trong bộ cột mặc định + Cột cơ bản, luôn đứng liền nhau, tô màu nổi bật (lớp sp-hl); bật / tắt được như cột khác */
+export const SP_PRICE_COLS = ['gia_ban_le', 'ck_dai_ly_pct', 'giaDaiLy']
+export const spColLocked_ = k => k === 'ten' || k === 'stt'
+export const spColOn_ = (on, k) => spColLocked_(k) ? true : !!(on && on[k])
 export function spColList_(cols, order) { const by = {}; cols.forEach(c => { by[c.k] = c }); return order.map(k => by[k]).filter(Boolean) }
 export function spVisCols_(cols, order, on) { return spColList_(cols, order).filter(c => spColOn_(on, c.k)) }
-export const SP_COL_CB = ['thumb', 'duyet', 'thuong_hieu', 'giaDaiLy']
+export const SP_COL_CB = ['thumb', 'duyet', 'thuong_hieu', 'gia_ban_le', 'ck_dai_ly_pct', 'giaDaiLy']
 /* COLSET.sp (app.js:1660-1666): keys = cột trừ stt/ten, mặc định theo ngành */
 export function spColset_(list, ngCols) {
   return {

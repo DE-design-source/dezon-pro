@@ -1,4 +1,4 @@
-# QS Pro production: PostgreSQL 17 + backend Go (kho file ở volume uploads) + Caddy (HTTPS, giao diện React).
+# QS Pro production: PostgreSQL 17 + backend Go (kho file ở volume uploads) + MinIO (tệp chat) + Caddy (HTTPS, giao diện React).
 # Chạy từ thư mục infra/deploy/ (đọc biến trong infra/deploy/.env - chép từ .env.example):
 #   bash deploy.sh                 # build + backup + migration + khởi động (dùng hằng ngày)
 #   docker compose ps              # trạng thái
@@ -75,6 +75,33 @@ services:
       RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-}
       # IP người dùng lấy từ X-Forwarded-For do Caddy gửi (chỉ tin mạng nội bộ của compose, xem networks bên dưới)
       TRUSTED_PROXIES: 172.30.0.0/24
+      # ---- Dezon Chat ----
+      CHAT_JWT_SECRET: ${CHAT_JWT_SECRET:-}
+      # Web Push (thiếu 1 trong 3 = tắt push)
+      CHAT_VAPID_PUBLIC_KEY: ${CHAT_VAPID_PUBLIC_KEY:-}
+      CHAT_VAPID_PRIVATE_KEY: ${CHAT_VAPID_PRIVATE_KEY:-}
+      CHAT_VAPID_SUBJECT: ${CHAT_VAPID_SUBJECT:-}
+      # Email OTP (SMTP_HOST trống = không gửi email, mã OTP ghi vào log)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # Tệp chat trên MinIO: backend nói chuyện với minio:9000 trong mạng compose; URL ký sẵn cho trình duyệt
+      # dùng tên miền riêng https://S3_DOMAIN (qua Caddy). Dùng user ứng dụng do minio-init tạo, KHÔNG dùng user root.
+      # CHAT_S3_ENDPOINT có trong .env nhưng để trống = backend tắt tệp chat; dịch vụ minio vẫn chạy nên S3_DOMAIN,
+      # MINIO_ROOT_PASSWORD, CHAT_S3_*_KEY vẫn bắt buộc (setup-server.sh tự sinh 2 khoá)
+      CHAT_S3_ENDPOINT: ${CHAT_S3_ENDPOINT-http://minio:9000}
+      # chỉ đặt CHAT_S3_PUBLIC_URL khi chạy thử trên máy (vd http://s3.localhost:8080)
+      CHAT_S3_PUBLIC_URL: ${CHAT_S3_PUBLIC_URL:-https://${S3_DOMAIN:?Thiếu S3_DOMAIN trong .env}}
+      CHAT_S3_ACCESS_KEY: ${CHAT_S3_ACCESS_KEY:?Thiếu CHAT_S3_ACCESS_KEY trong .env}
+      CHAT_S3_SECRET_KEY: ${CHAT_S3_SECRET_KEY:?Thiếu CHAT_S3_SECRET_KEY trong .env}
+      CHAT_S3_BUCKET: ${CHAT_S3_BUCKET:-chat-media}
+      CHAT_S3_REGION: ${CHAT_S3_REGION:-us-east-1}
+      CHAT_MEDIA_MAX_IMAGE_MB: ${CHAT_MEDIA_MAX_IMAGE_MB:-}
+      CHAT_MEDIA_MAX_FILE_MB: ${CHAT_MEDIA_MAX_FILE_MB:-}
+      CHAT_MEDIA_DAILY_MB: ${CHAT_MEDIA_DAILY_MB:-}
+      CHAT_MEDIA_URL_TTL_MIN: ${CHAT_MEDIA_URL_TTL_MIN:-}
     volumes:
       # ảnh / tài liệu người dùng tải lên - không xoá volume này (docker compose down -v là MẤT file).
       - uploads:/app/uploads
@@ -85,6 +112,8 @@ services:
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
+      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
     # backend tự tắt êm trong tối đa 15 giây (chờ request đang chạy, job báo cáo đang gửi)
     stop_grace_period: 30s
     healthcheck:
@@ -108,6 +137,8 @@ services:
       DOMAIN: ${DOMAIN:?Thiếu DOMAIN trong .env}
       WWW_DOMAIN: ${WWW_DOMAIN:-}
       ACME_EMAIL: ${ACME_EMAIL:?Thiếu ACME_EMAIL trong .env}
+      # tên miền riêng của kho tệp chat (site {$S3_DOMAIN} trong Caddyfile, chuyển tiếp tới minio:9000)
+      S3_DOMAIN: ${S3_DOMAIN:?Thiếu S3_DOMAIN trong .env}
     # CADDYFILE_SHA: deploy.sh ghi mã băm Caddyfile vào đây -> Caddyfile đổi thì web được tạo lại và đọc file mới
     env_file:
       - path: ./.env.caddy
@@ -124,6 +155,55 @@ services:
       api: { condition: service_started }
     logging: *logging
 
+  # Kho tệp chat (S3). Image dựng từ mã nguồn (infra/docker/minio.Dockerfile, có cả minio lẫn mc):
+  # image chính thức minio/minio, minio/mc không còn phát hành. Bucket riêng tư, không mở cổng 9000 ra ngoài:
+  # trình duyệt vào qua Caddy (https://S3_DOMAIN). Console quản trị chỉ trên 127.0.0.1 (SSH tunnel).
+  minio:
+    build:
+      context: ../..
+      dockerfile: infra/docker/minio.Dockerfile
+    image: qspro-minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Thiếu MINIO_ROOT_USER trong .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Thiếu MINIO_ROOT_PASSWORD trong .env}
+      # CORS cho URL ký sẵn (PUT từ trình duyệt): chỉ origin của app
+      MINIO_API_CORS_ALLOW_ORIGIN: ${PUBLIC_URL:-https://${DOMAIN:?Thiếu DOMAIN trong .env}}
+    volumes:
+      # tệp chat người dùng gửi - không xoá volume này (docker compose down -v là MẤT tệp).
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    logging: *logging
+
+  # Chạy 1 lần rồi thoát (mỗi lần up): bucket, user ứng dụng + policy, ILM xoá chat/in/ sau 1 ngày. Chạy lại được.
+  minio-init:
+    image: qspro-minio:latest
+    pull_policy: never
+    entrypoint: ["sh", "/init.sh"]
+    # HEALTHCHECK của image là của server minio, không áp cho bước khởi tạo
+    healthcheck: { disable: true }
+    environment:
+      MINIO_URL: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Thiếu MINIO_ROOT_USER trong .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Thiếu MINIO_ROOT_PASSWORD trong .env}
+      CHAT_S3_ACCESS_KEY: ${CHAT_S3_ACCESS_KEY:?Thiếu CHAT_S3_ACCESS_KEY trong .env}
+      CHAT_S3_SECRET_KEY: ${CHAT_S3_SECRET_KEY:?Thiếu CHAT_S3_SECRET_KEY trong .env}
+      CHAT_S3_BUCKET: ${CHAT_S3_BUCKET:-chat-media}
+    volumes:
+      - ./minio-init.sh:/init.sh:ro
+    depends_on:
+      minio: { condition: service_healthy }
+    restart: "no"
+    logging: *logging
+
 networks:
   default:
     ipam:
@@ -133,5 +213,6 @@ networks:
 volumes:
   pgdata:
   uploads:
+  minio_data:
   caddy_data:
   caddy_config:

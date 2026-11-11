@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useQs } from '../state/QsData'
 import { useQsStore } from '../state/store'
@@ -15,6 +15,8 @@ import CoverEditor from './quote/CoverEditor'
 import DetailEditor, { AreaTable } from './quote/DetailEditor'
 import { HistoryModal, VersionView } from './quote/HistoryModal'
 import { bgChu_ } from './quote/docCss'
+import { useTuyMau } from './quote/tuyMau'
+import { hDoSub_, hDoVer_ } from './quote/docModel'
 import './quote/quote.css'
 
 /* Tab "Xuất báo giá" (PUB/baogia.js): chế độ "Xem trước & Xuất" = 2 cột (5 thẻ thiết lập + trang giấy A4 ngang, renderExport /
@@ -35,7 +37,9 @@ export default function QuoteTab() {
   /* renderExport: tờ bìa chưa nạp cho dự án đang mở -> getCoverOrInit (chỉ khi tab đang hiện) */
   useEffect(() => { if (visible && maDA) coverEnsure(maDA) }, [visible, maDA, seq])
 
-  const m = useMemo(() => quoteModel({ cur, lines, projData, congTy, me, node }, q, tk, null), [cur, lines, projData, congTy, me, node, q, tk])
+  const tuy = useTuyMau()   // mặc định Tuỳ biến của công ty (gộp vào bgCfg ở projCtx_): tải xong / đổi thì vẽ lại
+  const hv = useSyncExternalStore(hDoSub_, hDoVer_)   // số đo chiều cao dòng (bản xem trước) đổi -> chia trang lại
+  const m = useMemo(() => quoteModel({ cur, lines, projData, congTy, me, node }, q, tk, null), [cur, lines, projData, congTy, me, node, q, tk, tuy, hv])   // eslint-disable-line react-hooks/exhaustive-deps
   const pages = useMemo(() => (cur && !m.ptErr ? m.pages() : []), [m, cur])
 
   /* Khung 2 cột cao vừa tới đáy vùng cuộn (bgVpApply_ 582-589): cột trái tự cuộn, nút xuất dính đáy */

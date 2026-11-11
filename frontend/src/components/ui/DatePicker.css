@@ -1,0 +1,76 @@
+/* Ô chọn ngày kiểu iOS (DatePicker.jsx). Màu nhấn: --dp-accent, mặc định theo --primary của trang. */
+.dp{position:relative; display:inline-flex; --dp-accent:var(--primary, #007AFF); --dp-tint:color-mix(in srgb, var(--dp-accent) 12%, transparent);}
+.dp-trigger{display:inline-flex; align-items:center; justify-content:space-between; gap:8px; width:100%; height:36px; padding:0 10px; border:1px solid var(--border, #D1D5DB); border-radius:9px;
+  background:var(--surface, #fff); color:var(--text, #1C1F26); font:inherit; font-size:13px; font-variant-numeric:tabular-nums; cursor:pointer; text-align:left;}
+.dp-trigger svg{flex:none; color:var(--text-muted, #8A8F98);}
+.dp-trigger:hover{border-color:color-mix(in srgb, var(--dp-accent) 45%, var(--border, #D1D5DB));}
+.dp-trigger:focus-visible, .dp-trigger.open{outline:none; border-color:var(--dp-accent); box-shadow:0 0 0 3px var(--dp-tint);}
+.dp-trigger.open svg{color:var(--dp-accent);}
+.dp-ph{color:var(--text-muted, #8A8F98);}
+
+.dp-pop{position:fixed; z-index:3000; width:312px; padding:14px 14px 10px; border-radius:16px; box-sizing:border-box;
+  background:color-mix(in srgb, var(--surface, #fff) 92%, transparent); -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
+  border:1px solid color-mix(in srgb, var(--border, #D1D5DB) 70%, transparent);
+  box-shadow:0 12px 40px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.06); color:var(--text, #1C1F26); font-size:15px;
+  animation:dp-in .16s ease-out;}
+.dp-pop *{box-sizing:border-box;}
+@keyframes dp-in{from{opacity:0; transform:translateY(-4px) scale(.98);} to{opacity:1; transform:none;}}
+.dp-pop button{font:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+
+.dp-head{display:flex; align-items:center; justify-content:space-between; padding:0 4px 10px;}
+.dp-title{display:inline-flex; align-items:center; gap:4px; padding:4px 2px !important; font-size:16px !important; font-weight:700; letter-spacing:-.01em;}
+.dp-title svg{color:var(--dp-accent); transition:transform .18s ease;}
+.dp-title.on{color:var(--dp-accent) !important;}
+.dp-title.on svg{transform:rotate(90deg);}
+.dp-nav{display:inline-flex; gap:6px;}
+.dp-nav button{display:grid; place-items:center; width:32px; height:32px; border-radius:50%; color:var(--dp-accent) !important;}
+.dp-nav button:first-child svg{transform:rotate(180deg);}
+.dp-nav button:hover{background:var(--dp-tint);}
+
+.dp-week, .dp-grid{display:grid; grid-template-columns:repeat(7, 1fr); justify-items:center;}
+.dp-week span{font-size:11.5px; font-weight:600; color:var(--text-muted, #8A8F98); text-transform:uppercase; letter-spacing:.02em; padding-bottom:4px;}
+.dp-grid{row-gap:2px;}
+.dp-day{width:38px; height:38px; border-radius:50%; font-size:16px !important; font-weight:500; font-variant-numeric:tabular-nums; transition:background .12s ease;}
+.dp-day:hover:not(:disabled):not(.on){background:var(--dp-tint);}
+.dp-day.today{color:var(--dp-accent) !important; font-weight:700;}
+.dp-day.on{background:var(--dp-accent) !important; color:#fff !important; font-weight:700;}
+.dp-day.off{opacity:.3; cursor:default !important;}
+
+.dp-months{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding:6px 0 4px;}
+.dp-months button{height:52px; border-radius:12px; font-size:15px !important; font-weight:600;}
+.dp-months button:hover{background:var(--dp-tint);}
+.dp-months button.on{background:var(--dp-accent) !important; color:#fff !important;}
+
+.dp-foot{display:flex; justify-content:space-between; margin-top:8px; padding:8px 4px 0; border-top:1px solid color-mix(in srgb, var(--border, #D1D5DB) 70%, transparent);}
+.dp-foot button{padding:6px 8px !important; border-radius:8px; color:var(--dp-accent) !important; font-size:14px !important; font-weight:600;}
+.dp-foot button:hover:not(:disabled){background:var(--dp-tint);}
+.dp-foot button:disabled{opacity:.35; cursor:default;}
+
+/* variant="card": lịch dạng thẻ */
+.dp-pop.dp-card{--dp-accent:#F05A4F; --dp-tint:color-mix(in srgb, #F05A4F 12%, transparent); width:300px; padding:22px 20px 12px; border-radius:26px; background:var(--surface, #fff);
+  border:1px solid color-mix(in srgb, var(--border, #D1D5DB) 60%, transparent); box-shadow:0 18px 48px rgba(15,23,42,.16), 0 2px 8px rgba(15,23,42,.06);}
+.dp-card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+.dp-card-date{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.dp-card-date > b{font-size:34px; font-weight:700; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums;}
+.dp-card-date > span{display:flex; align-items:center; gap:2px;}
+.dp-card-month{padding:2px 0 !important; font-size:16px !important; font-weight:500; color:var(--text-muted, #8A8F98) !important;}
+.dp-card-month:hover{color:var(--dp-accent) !important;}
+.dp-card-nav{display:grid; place-items:center; width:24px; height:24px; border-radius:50%; color:var(--text-muted, #8A8F98) !important;}
+.dp-card-nav:not(.nx) svg{transform:rotate(180deg);}
+.dp-card-nav:hover{background:var(--dp-tint); color:var(--dp-accent) !important;}
+.dp-card-ic{flex:none; position:relative; width:46px; height:46px; padding:0 !important; border-radius:11px; overflow:hidden; background:var(--surface, #fff) !important;
+  border:1px solid color-mix(in srgb, var(--border, #D1D5DB) 80%, transparent) !important; box-shadow:0 2px 6px rgba(15,23,42,.10);}
+.dp-card-ic i{position:absolute; left:0; right:0; top:0; height:13px; background:var(--dp-accent);}
+.dp-card-ic em{position:absolute; left:8px; right:8px; top:19px; display:grid; grid-template-columns:repeat(4, 1fr); gap:3px 4px;}
+.dp-card-ic em s{width:4px; height:4px; border-radius:50%; background:color-mix(in srgb, var(--text-muted, #8A8F98) 55%, transparent); text-decoration:none;}
+.dp-card-ic em s:nth-child(7){background:var(--dp-accent);}
+.dp-card-ic.on, .dp-card-ic:hover{box-shadow:0 0 0 3px var(--dp-tint), 0 2px 6px rgba(15,23,42,.10);}
+.dp-card-bar{position:relative; height:4px; margin:14px 0 16px; border-radius:99px; background:color-mix(in srgb, var(--text-muted, #8A8F98) 16%, transparent); overflow:hidden;}
+.dp-card-bar i{position:absolute; left:0; top:0; bottom:0; border-radius:99px; background:var(--dp-accent); transition:width .2s ease;}
+.dp-card .dp-week span{font-size:13px; font-weight:500; text-transform:none; color:var(--text-muted, #8A8F98); padding-bottom:6px;}
+.dp-card .dp-grid{row-gap:4px;}
+.dp-card .dp-day{width:34px; height:30px; border-radius:8px; font-size:15px !important;}
+.dp-card .dp-day.on{box-shadow:0 2px 6px color-mix(in srgb, var(--dp-accent) 40%, transparent);}
+.dp-card .dp-months button{height:44px; border-radius:10px; font-size:14px !important;}
+.dp-card .dp-foot{margin-top:10px; padding-top:8px;}
+.dp-card .dp-foot button{font-size:13px !important;}

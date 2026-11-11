@@ -46,8 +46,11 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("database chưa sẵn sàng: %v", err)
 	}
 	users, err := d.DB.Select(ctx, "users", database.SelectOpt{Select: "id,username,role,cong_ty_id", Filter: "cong_ty_id=not.is.null", Order: "username.asc", Limit: 1, NoScope: true})
-	if err != nil || len(users) == 0 {
+	if err != nil {
 		t.Fatalf("không đọc được users: %v", err)
+	}
+	if len(users) == 0 {
+		t.Skip("chưa có user thuộc công ty: cần database đã nạp seed (qspro_gotest)")
 	}
 	u := users[0]
 	me := &actor.Actor{UID: u.Val("id"), U: jsval.AsString(u.Val("username")), R: "staff", CT: u.Val("cong_ty_id")}

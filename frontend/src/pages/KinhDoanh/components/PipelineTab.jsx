@@ -1,6 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import { STAGES, STAGE_LABEL, DEPT_COLOR, DEPT_SHORT, DEPT_TINT } from '../../../data/kinhDoanhData'
 import { fmtTy, stageAccent } from '../utils'
+import { useKdMap } from './ShortlistSelect'
+
+/* Bộ lọc theo đánh giá tiềm năng (sao, kdOptions.rating): nút xổ danh sách, tích chọn nhiều mức 0..5 sao (0 = chưa đánh giá);
+   không tích mức nào = tất cả */
+const STAR_FLT = [5, 4, 3, 2, 1, 0]
+const StarIc = ({ on }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: on ? '#F5A524' : 'var(--border)' }}><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
+function StarFilter({ value, onChange, count }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const out = e => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', out)
+    return () => document.removeEventListener('mousedown', out)
+  }, [open])
+  const toggle = n => onChange(value.indexOf(n) >= 0 ? value.filter(x => x !== n) : [...value, n])
+  const label = !value.length ? 'Tất cả sao' : value.slice().sort((a, b) => b - a).map(n => (n ? n + '★' : 'Chưa đánh giá')).join(', ')
+  return (
+    <div className="kd-pl-sdd" ref={box}>
+      <button type="button" className={'kd-pl-sbtn' + (value.length ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <StarIc on /><span>{label}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && (
+        <div className="kd-pl-spop">
+          {STAR_FLT.map(n => (
+            <label key={n} className={value.indexOf(n) >= 0 ? 'on' : ''}>
+              <input type="checkbox" checked={value.indexOf(n) >= 0} onChange={() => toggle(n)} />
+              <span className="st">{n ? [1, 2, 3, 4, 5].map(i => <StarIc key={i} on={i <= n} />) : <em>Chưa đánh giá</em>}</span>
+              <i>{count(n)}</i>
+            </label>
+          ))}
+          <div className="ft">
+            <button type="button" onClick={() => onChange([])} disabled={!value.length}>Bỏ lọc</button>
+            <button type="button" className="pri" onClick={() => setOpen(false)}>Xong</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 import { DeptFilter, TimeFilter } from './Filters'
 import LeadCard from './LeadCard'
 
@@ -12,8 +53,13 @@ const viewBtnStyle = active => ({
   background: active ? 'var(--sales-tint)' : 'none', color: active ? 'var(--sales)' : 'var(--text-muted)', fontFamily: 'inherit',
 })
 
-export default function PipelineTab({ leads, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onAddAssignee, onRemoveAssignee }) {
+export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onAddAssignee, onRemoveAssignee }) {
   const [view, setView] = useState('kanban')
+  const rating = useKdMap('rating')
+  const [star, setStar] = useState([])   // các mức sao đang lọc ([] = tất cả)
+  const rateOf = l => Number(rating[String(l.id)]) || 0
+  const leads = !star.length ? leadsAll : leadsAll.filter(l => star.indexOf(rateOf(l)) >= 0)
+  const starCnt = n => leadsAll.filter(l => rateOf(l) === n).length
   const [draggingId, setDraggingId] = useState(null)
   const [hoverStage, setHoverStage] = useState(null)
   const [memberOpenFor, setMemberOpenFor] = useState(null)
@@ -114,15 +160,15 @@ export default function PipelineTab({ leads, dept, onDeptChange, timeFilter, onT
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Kéo thả thẻ giữa các cột, hoặc dùng ô chọn giai đoạn trên mỗi thẻ để chuyển. Thẻ vào cột "Dự án (Thiết kế)" / "Dự án (Thi công)" sẽ tự xuất hiện ở tab Dự án.</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none', flexWrap: 'wrap' }}>
-          <DeptFilter dept={dept} onChange={onDeptChange} />
-          <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} />
-          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>
-            <button className={view === 'list' ? 'active' : undefined} style={viewBtnStyle(view === 'list')} onClick={() => setView('list')}>Danh sách</button>
-          </div>
+      {/* 1 module xanh đậm (như băng dự án QS): phòng ban · thời gian | Kanban / Danh sách */}
+      <div className="kd-pl-bar">
+        <DeptFilter dept={dept} onChange={onDeptChange} />
+        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} />
+        <StarFilter value={star} onChange={setStar} count={starCnt} />
+        <span style={{ flex: 1 }} />
+        <div className="kd-pl-view" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>
+          <button className={view === 'list' ? 'active' : undefined} style={viewBtnStyle(view === 'list')} onClick={() => setView('list')}>Danh sách</button>
         </div>
       </div>
 
@@ -132,13 +178,13 @@ export default function PipelineTab({ leads, dept, onDeptChange, timeFilter, onT
           const items = leads.filter(l => l.stage === stageId)
           const total = items.reduce((s, l) => s + l.value, 0)
           const accent = stageAccent(stageId)
-          const isLostStage = stageId === 'truot-thau'
+          const isLostStage = stageId === 'truot-thau' || stageId === 'spam' || stageId === 'khong-tham-gia'
           const headColor = accent ? accent.color : ''
           return (
             <div
               key={stageId}
               className={`kd-stage-col${hoverStage === stageId ? ' drop-hover' : ''}`}
-              style={{ minWidth: 220, ...(isLostStage ? { opacity: 0.85 } : null) }}
+              style={{ minWidth: 220, '--lane': headColor || 'var(--text-muted)', ...(isLostStage ? { opacity: 0.85 } : null) }}
               onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (hoverStage !== stageId) setHoverStage(stageId) }}
               onDragLeave={() => setHoverStage(cur => (cur === stageId ? null : cur))}
               onDrop={e => {
@@ -149,10 +195,11 @@ export default function PipelineTab({ leads, dept, onDeptChange, timeFilter, onT
               }}
             >
               <div className="kd-stage-head">
-                <span style={{ fontWeight: 700, fontSize: 13, ...(headColor ? { color: headColor } : null) }}>{STAGE_LABEL[stageId]}</span>
+                <span title={STAGE_LABEL[stageId]} style={{ fontWeight: 700, fontSize: 13, ...(headColor ? { color: headColor } : null) }}>{STAGE_LABEL[stageId]}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: headColor || 'var(--text-muted)' }}>({items.length} dự án - {fmtTy(total)})</span>
               </div>
-              <div style={{ minHeight: 40, borderRadius: 8 }}>
+              <div className="kd-stage-body">
+                {!items.length && <div className="kd-stage-empty">Kéo thẻ vào đây</div>}
                 {items.map(l => (
                   <LeadCard
                     key={l.id} lead={l}
@@ -177,7 +224,8 @@ export default function PipelineTab({ leads, dept, onDeptChange, timeFilter, onT
           <button type="button" onClick={() => stepScroll(-1)} disabled={hs.pos <= 0.002} title="Sang trái" aria-label="Cuộn sang trái">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           </button>
-          <div className="kd-hscroll-track" ref={trackRef} onPointerDown={jumpTrack}>
+          {/* thanh trượt mảnh: rãnh xám + con trượt màu kinh doanh (dày lên khi rê / kéo) */}
+          <div className="kd-hscroll-track kd-hs-slim" ref={trackRef} onPointerDown={jumpTrack}>
             <div className="kd-hscroll-thumb" style={{ width: hs.ratio * 100 + '%', left: hs.pos * (1 - hs.ratio) * 100 + '%' }} onPointerDown={dragThumb} title="Kéo để xem các giai đoạn" />
           </div>
           <button type="button" onClick={() => stepScroll(1)} disabled={hs.pos >= 0.998} title="Sang phải" aria-label="Cuộn sang phải">

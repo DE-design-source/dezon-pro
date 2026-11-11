@@ -34,6 +34,9 @@ const (
 	Public Perm = 1 << iota // không cần đăng nhập (PUBLIC_FNS) - bỏ qua mọi kiểm tra khác
 	Admin                   // chỉ admin / super (ADMIN_FNS)
 	Super                   // chỉ super (SUPER_FNS)
+	// SelfAuth: CHỈ cho route chỉ bản Go - module tự xác thực bằng token riêng của nó (vd chat: access token JWT của
+	// tài khoản chat, không phải phiên QS). Middleware phân quyền của QS không bao giờ chặn route này; module tự trả 401.
+	SelfAuth
 )
 
 // Args: mảng args của request (req.body.args).
@@ -106,6 +109,9 @@ func NewRegistry() *Registry { return &Registry{fns: map[string]entry{}} }
 func (r *Registry) Register(name string, perm Perm, h Handler) {
 	if name == "" || h == nil {
 		panic("rpc: đăng ký hàm thiếu tên hoặc thiếu handler: " + name)
+	}
+	if perm&SelfAuth != 0 { // cổng /api/:fn chỉ biết phiên QS
+		panic("rpc: SelfAuth chỉ dùng cho route chỉ bản Go: " + name)
 	}
 	if _, dup := r.fns[name]; dup {
 		panic("rpc: trùng tên hàm API: " + name)

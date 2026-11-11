@@ -1,5 +1,5 @@
 // Package hr: trang HR (SiteFlow /cham-cong) - cơ cấu tổ chức, hồ sơ nhân sự, kiêm nhiệm.
-// Tính năng mới, chỉ bản Go: REST /api/v1/hr/... (không có hàm /api/:fn). Bảng: hr_don_vi, hr_nhan_vien, hr_kiem_nhiem (migration 0020).
+// Tính năng mới, chỉ bản Go: REST /api/v1/hr/... (không có hàm /api/:fn). Bảng: hr_don_vi, hr_nhan_vien, hr_kiem_nhiem (migration 0024).
 // Mọi lệnh ghi trả lại toàn bộ dữ liệu HR của công ty (giao diện thay state một lần, không tự ráp lại).
 package hr
 

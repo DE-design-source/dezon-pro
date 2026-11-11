@@ -202,6 +202,33 @@ export async function spAddToProject(p) {
   if (!S().cur) { toast('Chưa chọn dự án'); return }
   await addProdObj(p)
 }
+/* Ghi danh 1 sản phẩm vào nhiều dự án một lần (hộp "Ghi danh vào nhiều dự án" của modal Thông tin sản phẩm).
+   Dự án đang mở: qua addProdObj (bảng cập nhật ngay). Dự án khác: đọc dòng của dự án đó, trùng SP cùng tầng / đề mục thì cộng
+   số lượng, không thì thêm dòng mới ở "Chưa phân tầng" (giống addProdObj khi chưa chọn tầng). Trả {ok, fail}. */
+export async function spAddToProjects(p, maDAs, sl) {
+  sl = addProdSl_(sl)
+  const st = S(), curMa = st.cur ? st.cur.maDA : ''
+  let ok = 0
+  const fail = []
+  for (const maDA of maDAs) {
+    try {
+      if (maDA === curMa) { await addProdObj(p, sl); ok++; continue }
+      const lines = (await api.getLines(maDA)) || []
+      const nd = String(prodNode_(p, st.node, false) || st.node || '')
+      const same = addProdSame_(lines, p, '', nd, '', st.node)
+      if (same) await api.updateLine(same.lineId, { soLuong: (Number(same.soLuong) || 0) + sl })
+      else await api.addLine(maDA, addProdBuild_(p, st.products, nd, '', sl, '', st.node, newTmpId()).prod, sl)
+      ok++
+    } catch (e) {
+      if (e && e.name === 'QsAuthError') throw e
+      const pj = (st.projects || []).find(x => x.maDA === maDA)
+      fail.push(((pj && pj.ten) || maDA) + ': ' + errMsg(e))
+    }
+  }
+  if (fail.length) qsAlert('Ghi danh "' + (p.ten || '') + '": xong ' + ok + ' dự án, lỗi ' + fail.length + ':\n' + fail.join('\n'))
+  else toast('Đã ghi danh "' + (p.ten || '') + '"' + (sl > 1 ? ' ×' + sl : '') + ' vào ' + ok + ' dự án')
+  return { ok, fail: fail.length }
+}
 export async function spRemoveFromProject(l) {
   const cur = S().cur
   if (!await qsConfirm('Bỏ "' + ((l && l.ten) || 'sản phẩm này') + '" khỏi dự án ' + ((cur && cur.ten) || '') + '? Dòng bóc tách của nó sẽ bị xoá.')) return

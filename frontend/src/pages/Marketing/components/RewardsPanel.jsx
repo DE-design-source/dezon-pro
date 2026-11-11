@@ -31,7 +31,7 @@ export default function RewardsPanel({ visible }) {
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#C23B7822', color: 'var(--marketing)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>TV</div>
+        <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#1F5FBF22', color: 'var(--marketing)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>TV</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 14.5 }}>Đỗ Thảo Vy — Head Marketing</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Điểm khả dụng để đổi quà</div>

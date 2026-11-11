@@ -2,10 +2,11 @@
 # Sao lưu QS Pro đang chạy trong Docker (infra/deploy):
 #   - database ra file .dump (pg_dump định dạng custom): qspro-<thời điểm>.dump
 #   - kho ảnh / tài liệu (volume uploads, /app/uploads trong api) ra file nén: qspro-files-<thời điểm>.tar.gz
+#   - tệp chat (bucket MinIO) chép thêm vào thư mục qspro-media/ (mc mirror, không có bản theo thời điểm)
 #   bash infra/scripts/backup-db.sh
 # Lưu ở BACKUP_DIR (mặc định /opt/qspro-backups), xoá bản cũ hơn BACKUP_KEEP_DAYS ngày (mặc định 14).
 # setup-server.sh đặt lịch chạy 02:30 hằng ngày; deploy.sh gọi trước mỗi lần migration.
-# Khôi phục: bash infra/scripts/restore-db.sh <file.dump> [qspro-files-....tar.gz]
+# Khôi phục: bash infra/scripts/restore-db.sh <file.dump> [qspro-files-....tar.gz] [<BACKUP_DIR>/qspro-media]
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../deploy" && pwd)"
@@ -35,6 +36,25 @@ docker compose run --rm --no-deps -T --entrypoint tar api -C /app/uploads -czf -
 mv "$FILES_OUT.tmp" "$FILES_OUT"
 chmod 600 "$FILES_OUT"
 echo "$(date '+%F %T') Đã sao lưu file: $FILES_OUT ($(du -h "$FILES_OUT" | cut -f1))"
+
+# Tệp chat (MinIO): chép thêm (mc mirror) vào 1 thư mục cố định $BACKUP_DIR/qspro-media/, không xoá gì ở đích.
+# Tệp chat không bao giờ bị ghi đè (mỗi tệp 1 khoá ngẫu nhiên) nên thư mục này chứa đủ tệp cho MỌI bản .dump còn giữ;
+# tệp đã bị dọn trên MinIO vẫn còn ở đây (thừa vô hại). Bỏ chat/in/ (tệp tạm đang tải lên).
+# MinIO chưa chạy (vd lần deploy đầu có MinIO) thì bỏ qua bước này.
+MEDIA_DIR="$BACKUP_DIR/qspro-media"
+if [ -n "$(docker compose ps --status running -q minio 2>/dev/null)" ]; then
+  mkdir -p "$MEDIA_DIR"
+  chmod 700 "$MEDIA_DIR"
+  # container tạm từ image minio-init (có mc + biến MINIO_ROOT_* / CHAT_S3_BUCKET), chạy root để ghi vào $BACKUP_DIR
+  docker compose run --rm --no-deps -T --user 0 -v "$MEDIA_DIR:/backup" --entrypoint sh minio-init -c '
+    set -e
+    export MC_CONFIG_DIR=/tmp/.mc
+    mc alias set q http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
+    mc mirror -q --exclude "chat/in/*" "q/$CHAT_S3_BUCKET" /backup >/dev/null'
+  echo "$(date '+%F %T') Đã sao lưu tệp chat: $MEDIA_DIR ($(du -sh "$MEDIA_DIR" | cut -f1))"
+else
+  echo "$(date '+%F %T') Bỏ qua sao lưu tệp chat: MinIO chưa chạy"
+fi
 
 find "$BACKUP_DIR" -maxdepth 1 \( -name 'qspro-*.dump' -o -name 'qspro-*.dump.tmp' \
   -o -name 'qspro-files-*.tar.gz' -o -name 'qspro-files-*.tar.gz.tmp' \) -mtime +"$KEEP_DAYS" -print -delete

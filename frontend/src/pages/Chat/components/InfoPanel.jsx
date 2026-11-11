@@ -1,110 +1,230 @@
-import { FileIcon, IconSvg, initials } from './shared'
+import { useState } from 'react'
+import * as L from '../state/chatLogic'
+import {
+  acceptFriend, blockUser, cancelFriendRequest, removeMember, sendFriendRequest, setMemberRole, setMute, unblockUser,
+} from '../state/chatStore'
+import { IconSvg, avatarConv, colorFor, errText, initials } from './shared'
 import AddMemberPopover from './AddMemberPopover'
+import GroupInfoEditor, { GroupAvatarImg } from './GroupInfoEditor'
+import GroupSettingsPanel from './GroupSettingsPanel'
+import InviteLinkPanel from './InviteLinkPanel'
+import JoinRequestsPanel from './JoinRequestsPanel'
 
-const ico16 = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }
-const LINK_PATHS = <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>
-const IMAGE_PATHS = <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></>
+const MUTE_OPTIONS = [
+  { label: 'Trong 1 giờ', ms: 3600e3 },
+  { label: 'Trong 8 giờ', ms: 8 * 3600e3 },
+  { label: 'Trong 24 giờ', ms: 24 * 3600e3 },
+  { label: 'Đến khi bật lại', forever: true },
+]
 
-/* Cột thông tin hội thoại bên phải — renderInfo() trong chat.html */
-export default function InfoPanel({ conv, conversations, memberPopOpen, onToggleMemberPop, onCloseMemberPop, onAddMember, onOpenConv }) {
+const ico = { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }
+
+/* Cột thông tin hội thoại bên phải — renderInfo() trong chat.html.
+   Hội thoại cục bộ SiteFlow Bot: chỉ phần đầu (như bản cũ). Hội thoại thật: thành viên + vai trò, thêm / xoá / rời nhóm,
+   đổi tên, đặt / bỏ quản trị viên (trưởng nhóm), tắt thông báo, kết bạn / chặn (chat 1-1).
+   Quản trị nhóm (0022): ảnh + mô tả, sửa thông tin, yêu cầu vào nhóm, link mời, cài đặt quyền, chuyển trưởng nhóm, giải tán;
+   hiện / ẩn theo L.canDo. Nhóm đã giải tán: chỉ đọc, chỉ còn nút "Xoá khỏi danh sách". */
+export default function InfoPanel({ chat, conv, memberPopOpen, onToggleMemberPop, onCloseMemberPop, onLeft }) {
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const [muteOpen, setMuteOpen] = useState(false)
+
+  if (conv.local) {
+    return (
+      <div className="ch-info-panel">
+        <div className="ch-info-hero">
+          <div className="ch-avatar-lg" style={{ background: conv.color }}><IconSvg kind="bot" /></div>
+          <div className="ch-name">{conv.name}</div>
+          <div className="ch-sub">{conv.sub}</div>
+        </div>
+      </div>
+    )
+  }
+
+  const me = chat.me
   const c = conv
-  /* Chat cá nhân (dm): các nhóm chung đang tham gia cùng người này */
-  const sharedGroups = c.type === 'dm'
-    ? conversations.filter(x => x.type === 'group' && x.members && x.members.some(m => m.name === c.name))
-    : []
+  const members = chat.members[c.id] || []
+  const myRole = c.role || ((members.find(m => m.user_id === me.id) || {}).role) || 'member'
+  const peer = c.type === 'direct' ? c.peer : null
+  const pres = peer ? chat.presence[peer.id] : null
+  const online = peer && chat.net === 'online' ? (pres ? pres.online : !!peer.online) : false
+  const now = Date.now()
+  const muted = L.isMuted(c.muted_until, now)
+  const av = avatarConv(c, online)
+  const disbanded = c.type === 'group' && L.isDisbanded(c)
+  /* Còn quyền ghi trên nhóm: chưa rời, chưa giải tán (nhóm giải tán chỉ đọc, mọi thao tác ghi -> 410) */
+  const live = !c.left && !disbanded
+  const can = action => live && L.canDo(myRole, c.settings, action)
 
-  const files = c.files || []
-  const images = c.images || []
-  const links = c.links || []
+  async function act(key, fn, after) {
+    if (busy) return
+    setBusy(key); setErr('')
+    try { await fn(); if (after) after() } catch (e) { setErr(errText(e)) }
+    setBusy('')
+  }
+
+  const sub = c.type === 'group'
+    ? (disbanded ? 'Nhóm đã bị giải tán' : c.left ? '' : `${c.member_count || members.length} thành viên`)
+    : online ? 'Đang hoạt động' : (pres && pres.last_seen ? L.lastSeenLabel(pres.last_seen, now) : '')
+
+  const muteBlock = !c.left && !disbanded && (
+    <div className="ch-info-section">
+      <div className="ch-sec-title">Thông báo</div>
+      {muted ? (
+        <>
+          <div className="ch-info-note">{L.muteLabel(c.muted_until, now)}</div>
+          <button type="button" className="ch-info-btn" disabled={!!busy} onClick={() => act('mute', () => setMute(c.id, null))}>Bật lại thông báo</button>
+        </>
+      ) : muteOpen ? (
+        <div className="ch-info-actions">
+          {MUTE_OPTIONS.map(o => (
+            <button key={o.label} type="button" className="ch-info-btn" disabled={!!busy}
+              onClick={() => act('mute', () => setMute(c.id, o.forever ? 'forever' : new Date(Date.now() + o.ms).toISOString()), () => setMuteOpen(false))}>
+              {o.label}
+            </button>
+          ))}
+          <button type="button" className="ch-info-btn ghost" onClick={() => setMuteOpen(false)}>Huỷ</button>
+        </div>
+      ) : (
+        <button type="button" className="ch-info-btn" onClick={() => setMuteOpen(true)}>Tắt thông báo</button>
+      )}
+    </div>
+  )
+
+  let body = null
+  if (c.type === 'direct' && peer) {
+    const rel = peer.relation
+    body = (
+      <>
+        {peer.phone && (
+          <div className="ch-info-section">
+            <div className="ch-sec-title">Số điện thoại</div>
+            <div className="ch-info-note">{L.formatPhone(peer.phone)}</div>
+          </div>
+        )}
+        {peer.email && (
+          <div className="ch-info-section">
+            <div className="ch-sec-title">Email</div>
+            <div className="ch-info-note">{peer.email}</div>
+          </div>
+        )}
+        {muteBlock}
+        <div className="ch-info-section">
+          <div className="ch-sec-title">Bạn bè</div>
+          <div className="ch-info-actions">
+            {rel === 'friend' && <div className="ch-info-note">Hai bạn đã là bạn bè</div>}
+            {rel === 'none' && <button type="button" className="ch-info-btn" disabled={!!busy} onClick={() => act('fr', () => sendFriendRequest(peer.id))}>Gửi lời mời kết bạn</button>}
+            {rel === 'outgoing' && <button type="button" className="ch-info-btn" disabled={!!busy} onClick={() => act('fr', () => cancelFriendRequest(peer.id))}>Huỷ lời mời kết bạn</button>}
+            {rel === 'incoming' && <button type="button" className="ch-info-btn" disabled={!!busy} onClick={() => act('fr', () => acceptFriend(peer.id))}>Chấp nhận lời mời kết bạn</button>}
+            {rel === 'blocked'
+              ? <button type="button" className="ch-info-btn" disabled={!!busy} onClick={() => act('block', () => unblockUser(peer.id))}>Bỏ chặn</button>
+              : <button type="button" className="ch-info-btn danger" disabled={!!busy}
+                  onClick={() => { if (window.confirm(`Chặn ${peer.display_name}? Hai bên sẽ không nhắn tin được cho nhau.`)) act('block', () => blockUser(peer.id)) }}>
+                  Chặn người này
+                </button>}
+          </div>
+        </div>
+      </>
+    )
+  } else if (c.type === 'group') {
+    const sorted = members.slice().sort((a, b) => {
+      const r = { owner: 0, admin: 1, member: 2 }
+      return (r[a.role] - r[b.role]) || String(a.display_name).localeCompare(String(b.display_name), 'vi')
+    })
+    body = (
+      <>
+        {/* Đã rời / bị xoá: không còn xem được danh sách thành viên (danh sách cũ không còn đúng) */}
+        {c.left && <div className="ch-info-section"><div className="ch-info-note">Bạn không còn là thành viên của nhóm này.</div></div>}
+        {/* Đã giải tán: chỉ đọc lịch sử, không còn danh sách thành viên (members: []) */}
+        {disbanded && (
+          <div className="ch-info-section">
+            <div className="ch-info-note">Nhóm đã bị giải tán. Bạn vẫn xem được tin nhắn cũ nhưng không gửi tin được nữa.</div>
+          </div>
+        )}
+        {live && <GroupInfoEditor conv={c} canEdit={can('edit_info')} />}
+        {can('manage_requests') && <JoinRequestsPanel chat={chat} conv={c} />}
+        {live && <div className="ch-info-section">
+          <div className="ch-sec-title-row">
+            <div className="ch-sec-title">Thành viên ({members.length || c.member_count || 0})</div>
+            {can('add_members') && (
+              <button type="button" className="ch-pjm-add-btn" title="Thêm người vào nhóm" onClick={e => { e.stopPropagation(); onToggleMemberPop() }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            )}
+            {memberPopOpen && <AddMemberPopover conv={c} chat={chat} onClose={onCloseMemberPop} />}
+          </div>
+          {!members.length && <div className="ch-info-note">Đang tải thành viên…</div>}
+          {sorted.map(m => {
+            const self = m.user_id === me.id
+            const canRole = live && L.canSetRole(myRole, m.role) && !self
+            const canRemove = live && !self && L.canRemoveMember(myRole, m.role, false)
+            return (
+              <div key={m.user_id} className="ch-member-row">
+                <span className="ch-m-avatar" style={{ background: colorFor(m.user_id) }}>{initials(m.display_name)}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span className="ch-m-name">{m.display_name}{self ? ' (bạn)' : ''}</span><br />
+                  <span className="ch-m-role">{L.ROLE_LABEL[m.role] || m.role}</span>
+                </span>
+                <span className="ch-member-actions">
+                  {canRole && (
+                    <button type="button" className="ch-msg-action-btn" disabled={!!busy}
+                      title={m.role === 'admin' ? 'Bỏ quyền quản trị' : 'Đặt làm quản trị viên'}
+                      onClick={() => act('role' + m.user_id, () => setMemberRole(c.id, m.user_id, m.role === 'admin' ? 'member' : 'admin'))}>
+                      <svg {...ico} fill={m.role === 'admin' ? 'currentColor' : 'none'}><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" /></svg>
+                    </button>
+                  )}
+                  {canRemove && (
+                    <button type="button" className="ch-msg-action-btn" disabled={!!busy} title="Xoá khỏi nhóm"
+                      onClick={() => { if (window.confirm(`Xoá ${m.display_name} khỏi nhóm?`)) act('rm' + m.user_id, () => removeMember(c.id, m.user_id)) }}>
+                      <svg {...ico}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+        </div>}
+        {live && <InviteLinkPanel chat={chat} conv={c} me={me} myRole={myRole} />}
+        {muteBlock}
+        {live && (
+          <GroupSettingsPanel conv={c} members={members} me={me} canSettings={can('settings')} isOwner={can('disband')} />
+        )}
+        {disbanded && (
+          <div className="ch-info-section">
+            <button type="button" className="ch-info-btn danger" disabled={!!busy}
+              onClick={() => { if (window.confirm('Xoá nhóm "' + L.convTitle(c) + '" khỏi danh sách? Bạn sẽ không xem lại được tin nhắn của nhóm.')) act('leave', () => removeMember(c.id, me.id), onLeft) }}>
+              Xoá khỏi danh sách
+            </button>
+          </div>
+        )}
+        {live && (
+          <div className="ch-info-section">
+            <button type="button" className="ch-info-btn danger" disabled={!!busy}
+              onClick={() => {
+                const owner = myRole === 'owner' ? ' Bạn là trưởng nhóm, quyền trưởng nhóm sẽ chuyển cho quản trị viên / thành viên vào sớm nhất.' : ''
+                if (window.confirm('Rời nhóm "' + L.convTitle(c) + '"?' + owner)) act('leave', () => removeMember(c.id, me.id), onLeft)
+              }}>
+              Rời nhóm
+            </button>
+          </div>
+        )}
+      </>
+    )
+  }
 
   return (
     <div className="ch-info-panel">
       <div className="ch-info-hero">
-        {c.type === 'dm'
-          ? <div className="ch-avatar-lg round" style={{ background: c.color }}>{initials(c.name)}</div>
-          : <div className="ch-avatar-lg" style={{ background: c.color }}><IconSvg kind={c.type === 'bot' ? 'bot' : c.icon} /></div>}
-        <div className="ch-name">{c.name}</div>
-        <div className="ch-sub">{c.sub}</div>
+        {av.type === 'dm' ? (
+          <div className="ch-avatar-lg round" style={{ background: av.color }}>{initials(av.name)}</div>
+        ) : <GroupAvatarImg key={c.avatar ? c.avatar.id : 0} conv={c} className="ch-avatar-lg" />}
+        <div className="ch-name">{L.convTitle(c)}</div>
+        {sub && <div className="ch-sub">{sub}</div>}
+        {c.type === 'group' && c.description && <div className="ch-ga-desc">{c.description}</div>}
       </div>
-
-      {c.type === 'group' && (
-        <div className="ch-info-section">
-          <div className="ch-sec-title-row">
-            <div className="ch-sec-title">Thành viên ({c.members.length}{c.sub ? ' / ' + c.sub.split(' ')[0] : ''})</div>
-            <button type="button" className="ch-pjm-add-btn" title="Thêm người vào nhóm" onClick={e => { e.stopPropagation(); onToggleMemberPop() }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
-            {memberPopOpen && <AddMemberPopover onAdd={onAddMember} onClose={onCloseMemberPop} />}
-          </div>
-          {c.members.map((m, i) => (
-            <div key={i} className="ch-member-row">
-              <span className="ch-m-avatar" style={{ background: m.color }}>{initials(m.name)}</span>
-              <span><span className="ch-m-name">{m.name}</span><br /><span className="ch-m-role">{m.role}</span></span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {sharedGroups.length > 0 && (
-        <div className="ch-info-section">
-          <div className="ch-sec-title">Nhóm chung ({sharedGroups.length})</div>
-          {sharedGroups.map(g => (
-            <a key={g.id} className="ch-group-row" href="#" onClick={e => { e.preventDefault(); onOpenConv(g.id) }}>
-              <span className="ch-g-ico" style={{ background: g.color }}><IconSvg kind={g.icon} /></span>
-              <span><span className="ch-g-n">{g.name}</span><br /><span className="ch-g-m">{g.sub}</span></span>
-            </a>
-          ))}
-        </div>
-      )}
-
-      {(files.length > 0 || images.length > 0 || links.length > 0) && (
-        <div className="ch-info-section">
-          <div className="ch-cat-icons">
-            <div className="ch-cat-icon-btn" title="Ảnh & video"><svg {...ico16}>{IMAGE_PATHS}</svg><span className="ch-cnt">{images.length}</span><span className="ch-lbl">Ảnh/Video</span></div>
-            <div className="ch-cat-icon-btn" title="Tệp"><svg {...ico16}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg><span className="ch-cnt">{files.length}</span><span className="ch-lbl">File</span></div>
-            <div className="ch-cat-icon-btn" title="Liên kết"><svg {...ico16}>{LINK_PATHS}</svg><span className="ch-cnt">{links.length}</span><span className="ch-lbl">Link</span></div>
-          </div>
-        </div>
-      )}
-
-      {images.length > 0 && (
-        <div className="ch-info-section">
-          <div className="ch-sec-title">Ảnh &amp; video đã gửi</div>
-          <div className="ch-media-grid">
-            {images.map((im, i) => (
-              <div key={i} className="ch-media-thumb" style={{ background: im.color }}>
-                {im.kind === 'video'
-                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5,3 19,12 5,21" /></svg>
-                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{IMAGE_PATHS}</svg>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {files.length > 0 && (
-        <div className="ch-info-section">
-          <div className="ch-sec-title">Tệp đã chia sẻ</div>
-          {files.map((f, i) => (
-            <div key={i} className="ch-file-row">
-              <span className="ch-f-ico" style={{ background: 'var(--danger-tint)', color: 'var(--danger)' }}><FileIcon size={14} /></span>
-              <span><span className="ch-f-n">{f.name}</span><br /><span className="ch-f-m">{f.size}</span></span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {links.length > 0 && (
-        <div className="ch-info-section">
-          <div className="ch-sec-title">Liên kết đã chia sẻ</div>
-          {links.map((l, i) => (
-            <div key={i} className="ch-link-row">
-              <span className="ch-l-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{LINK_PATHS}</svg></span>
-              <span><span className="ch-l-t">{l.title}</span><br /><span className="ch-l-d">{l.domain}</span></span>
-            </div>
-          ))}
-        </div>
-      )}
+      {err && <div className="ch-info-err" role="alert">{err}</div>}
+      {c.left && <div className="ch-info-note">Bạn không còn là thành viên của cuộc trò chuyện này.</div>}
+      {body}
     </div>
   )
 }

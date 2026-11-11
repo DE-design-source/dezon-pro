@@ -9,7 +9,7 @@ import { updateLine, deleteLines, useQsStore } from '../../state/store'
 import { COLS, visCols, colW } from '../../lib/columns.js'
 import { money } from '../../lib/format.js'
 import { ttBan_ } from '../../lib/calc.js'
-import { areaCompute_, fmtM2_, bgLines_, bgTong_, computeQuoteLocal, coverCosts, donGiaPhanTho_ } from '../../lib/quote.js'
+import { areaCompute_, fmtM2_, bgLines_, bgTong_, bgVatParts_, computeQuoteLocal, coverCosts, donGiaPhanTho_ } from '../../lib/quote.js'
 import { lineText, lineApply, tkSheetSua_, TK_SO, TK_GIUA } from '../breakdown/sheet/tkModel'
 import { toggleCol } from '../breakdown/sheet/tkCols'
 import { areaLoad_, areaSet, areaApply } from './quoteActions'
@@ -120,7 +120,7 @@ export default function DetailEditor({ ctx, tk, nganh, onExport, exporting }) {
   const lines = bgLines_(ctx)
   const groups = {}; const order = []
   lines.forEach(l => { const g = (l.tang || '').trim() || 'CHƯA PHÂN TẦNG'; if (!groups[g]) { groups[g] = []; order.push(g) } groups[g].push(l) })
-  const q = bgTong_(computeQuoteLocal(false, ctx).subtotal, ctx.bgCfg, ctx.cur && ctx.cur.vat)
+  const q = bgTong_(computeQuoteLocal(false, ctx).subtotal, ctx.bgCfg, ctx.cur && ctx.cur.vat, bgVatParts_(ctx))
   const n = cols.length + 1
   return (
     <div className="qs-card qs-qt-card">
@@ -160,7 +160,7 @@ export default function DetailEditor({ ctx, tk, nganh, onExport, exporting }) {
         <div className="qs-qt-ed-sum">
           <div><span>Tạm tính</span><b>{money(q.sub)} đ</b></div>
           {q.ck ? <div><span>Chiết khấu</span><b>−{money(q.ck)} đ</b></div> : null}
-          <div><span>VAT {q.vatPct}%</span><b>{money(q.vat)} đ</b></div>
+          <div><span>VAT {q.vatNhan}</span><b>{money(q.vat)} đ</b></div>
           <div className="grand"><span>Tổng cộng</span><b>{money(q.total)} đ</b></div>
         </div>
       </div>

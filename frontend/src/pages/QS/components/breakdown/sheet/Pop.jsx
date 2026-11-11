@@ -7,7 +7,8 @@ import './sheet.css'
    anchor: phần tử / DOMRect để đặt dưới (thiếu chỗ thì lật lên trên), hoặc {x, y} = điểm chuột (menu chuột phải).
    place = 'below' | 'above' (ưu tiên phía trên như thanh thao tác hàng loạt) · width (px bố cục) · onClose() khi bấm ra ngoài / Esc.
    Popup nằm trong vùng bị zoom nên đo tỉ lệ px style -> px màn hình bằng hai lần đặt thử (như DocsPopover). */
-export default function Pop({ anchor, place = 'below', width, className = '', onClose, children, keepOpenOn }) {
+/* matchAnchor: hộp rộng đúng bằng phần tử neo (vd. ô chọn % VAT của Mua hàng: danh sách xổ cùng bề rộng với ô) */
+export default function Pop({ anchor, place = 'below', width, className = '', onClose, children, keepOpenOn, matchAnchor }) {
   const ref = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -22,7 +23,8 @@ export default function Pop({ anchor, place = 'below', width, className = '', on
     pop.style.left = '100px'; pop.style.top = '100px'
     const b = pop.getBoundingClientRect()
     const z = (b.left - a.left) / 100 || 1
-    const w = a.width; const h = a.height
+    if (matchAnchor && r.width) pop.style.width = r.width / z + 'px'
+    const w = matchAnchor && r.width ? r.width : a.width; const h = pop.getBoundingClientRect().height
     const vw = window.innerWidth; const vh = window.innerHeight
     let top
     if (anchor.x !== undefined && !anchor.getBoundingClientRect) top = Math.min(r.top, vh - h - 12 * z)

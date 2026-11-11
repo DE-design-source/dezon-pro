@@ -424,6 +424,12 @@ html[data-theme="dark"] .qs-bd-seg button.on{background:var(--dash-accent);}
 .qs-bd-node{display:contents;}
 .qs-bd-totals b{font-size:15px; font-weight:600;}
 .qs-bd-vsep{width:1px; height:22px; margin:0 12px; background:var(--border);}
+/* ô VAT riêng của hạng mục đang xem (đầu bảng Bóc tách): viền đứt = theo VAT dự án, viền liền màu nhấn = đã đặt riêng */
+.qs-bd-vathm b{display:inline-flex; align-items:center; gap:3px;}
+.qs-bd-vatin{width:44px; height:24px; padding:0 4px; border:1px dashed var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-weight:700; text-align:right; -moz-appearance:textfield;}
+.qs-bd-vatin::-webkit-inner-spin-button, .qs-bd-vatin::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
+.qs-bd-vathm.rieng .qs-bd-vatin{border-style:solid; border-color:var(--dash-accent); color:var(--dash-accent);}
+.qs-bd-vatin:focus{outline:none; border-color:var(--dash-accent);}
 .qs-bd-vat{width:42px; height:26px; padding:0 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; outline:none; -moz-appearance:textfield;}
 .qs-bd-vat::-webkit-outer-spin-button, .qs-bd-vat::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
 .qs-bd-vat:focus{border-color:var(--dash-accent);}

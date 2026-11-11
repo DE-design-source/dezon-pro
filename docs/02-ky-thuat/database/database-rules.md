@@ -15,7 +15,7 @@
 ## B. Quan hệ
 
 7. **Quan hệ sở hữu phải có khoá ngoại thật**, kèm `ON DELETE` được chọn có lý do: `CASCADE` cho dòng con không có nghĩa khi thiếu cha; `SET NULL` cho tham chiếu tới người thực hiện; `RESTRICT` cho phần còn lại. Không `CASCADE` theo thói quen.
-8. **Bảng con không lặp lại `company_id`.** Nó chỉ có khoá ngoại tới bảng cha; công ty của dòng con là công ty của dòng cha. Khai báo `"tenant": {via, parent, key}` cho bảng con trong `server/db-map.json` để lớp dữ liệu xét quyền qua bảng cha. `company_id` chỉ đặt ở bảng gốc của công ty (khoá ngoại trực tiếp tới `companies`) và ở bảng nhật ký / lịch sử phải sống lâu hơn bản ghi gốc.
+8. **Bảng con không lặp lại `company_id`.** Nó chỉ có khoá ngoại tới bảng cha; công ty của dòng con là công ty của dòng cha. Khai báo `"tenant": {via, parent, key}` cho bảng con trong `backend/internal/platform/database/db-map.json` để lớp dữ liệu xét quyền qua bảng cha. `company_id` chỉ đặt ở bảng gốc của công ty (khoá ngoại trực tiếp tới `companies`) và ở bảng nhật ký / lịch sử phải sống lâu hơn bản ghi gốc.
 9. **Tham chiếu mềm phải được khai báo.** Cột trỏ tới bản ghi có thể đã bị xoá (bản chụp, lịch sử) không có khoá ngoại, nhưng chú thích cột phải ghi "soft reference" và lý do.
 10. **Không suy ra khoá ngoại từ hậu tố `_id` hay `_code`.** Kiểm tra code và đếm dòng mồ côi trước.
 11. **Quan hệ nhiều-nhiều qua bảng trung gian** có unique trên cặp khoá; bảng trung gian chỉ chứa thuộc tính của chính quan hệ đó.
@@ -30,7 +30,7 @@
 ## D. Kiểu dữ liệu và tên
 
 16. **Tên:** `snake_case`, tiếng Anh, bảng số nhiều. Khoá công ty luôn là `company_id`. Thời điểm kết thúc bằng `_at`, ngày bằng `_date`, phần trăm bằng `_pct`, boolean bắt đầu bằng `is_` / `has_`. Không đặt `data`, `value`, `type` trần.
-17. **Cột mới phải thêm vào `server/db-map.json`** cùng lúc với migration (tên trong code -> tên trong database).
+17. **Cột mới phải thêm vào `backend/internal/platform/database/db-map.json`** cùng lúc với migration (tên trong code -> tên trong database).
 18. **Tiền và số lượng:** `numeric`, không dùng float. **Thời điểm:** `timestamptz`. **Ngày nghiệp vụ:** `date`. **Cờ:** `boolean`, không dùng 0/1.
 19. **`jsonb` chỉ cho tài liệu được đọc/ghi nguyên khối**, và cấu trúc của nó phải được mô tả trong data dictionary. Dữ liệu cần truy vấn hoặc tham chiếu từng phần tử thì là bảng.
 20. **Không đổi kiểu cột hàng loạt.** Mỗi lần đổi kiểu phải kèm truy vấn chứng minh mọi giá trị hiện có chuyển được.
@@ -44,9 +44,9 @@
 
 ## F. Multi-tenant
 
-25. **Mỗi bảng mới phải được xếp loại**: tenant-owned, user-owned, dùng chung, hệ thống, hay lịch sử. Bảng thuộc công ty phải được thêm vào `TENANT_TABLES` trong `server/supa.js`: bảng gốc có `company_id`, bảng con khai báo `tenant` (quy tắc 8).
+25. **Mỗi bảng mới phải được xếp loại**: tenant-owned, user-owned, dùng chung, hệ thống, hay lịch sử. Bảng thuộc công ty phải được thêm vào `TenantTables` trong `backend/internal/platform/database/postgres.go`: bảng gốc có `company_id`, bảng con khai báo `tenant` (quy tắc 8).
 26. **Không tin `company_id` từ client.** Lớp dữ liệu gắn công ty từ phiên đăng nhập.
-27. **Mỗi lần dùng `noScope: true` phải có chú thích lý do** ngay tại dòng gọi, và điều kiện công ty tường minh trong bộ lọc nếu truy vấn chạm dữ liệu tenant.
+27. **Mỗi lần dùng `NoScope: true` phải có chú thích lý do** ngay tại dòng gọi, và điều kiện công ty tường minh trong bộ lọc nếu truy vấn chạm dữ liệu tenant.
 28. **Mọi thay đổi liên quan tenant phải kèm test cách ly** (A không đọc, không sửa, không xoá được của B; database từ chối liên kết chéo).
 
 ## G. Index và hiệu năng

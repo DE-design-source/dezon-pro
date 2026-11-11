@@ -14,7 +14,7 @@ import (
 	"qspro-backend/internal/shared/omap"
 )
 
-// Chấm công & phép (migration 0021): ca (hr_ca), lịch tuần lặp lại (hr_lich_tuan), chấm công theo ngày (hr_cham_cong),
+// Chấm công & phép (migration 0025): ca (hr_ca), lịch tuần lặp lại (hr_lich_tuan), chấm công theo ngày (hr_cham_cong),
 // đơn từ + luồng duyệt (hr_don_tu). Lệnh ghi trả {ok}; giao diện đọc lại GET /hr/attendance.
 
 var (

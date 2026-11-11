@@ -6,6 +6,8 @@ import { pad2, spNorm_ } from '../../../lib/format.js'
 import { ctColor } from '../../../lib/catalogFilters.js'
 import { csPresetList_, csPresetKeys_, csPresetOn_ } from '../../../lib/columns.js'
 import { spOptList_, spSingleVals_, spSpecOpts_, lsJson, lsSet } from './spModel'
+import SearchSelect from '../../common/SearchSelect'
+import { FChips } from '../../breakdown/FilterSections'
 
 /* Các bảng nổi của tab Danh sách SP (port PUB/sanpham.js): chọn hạng mục spCatToggle (989-998), Bộ lọc spBoLocPop_ (1061-1115, nay là bảng neo trong khung, không qua FloatPop),
    chọn nhanh bộ cột csPresetPop_ (app.js:1747-1782), Sửa hàng loạt spBulkEditPop_ (1724-1741), "⋯" spBulkMorePop_ (1750-1769),
@@ -68,12 +70,17 @@ function DockPanel({ title, anchor, top, onClose, foot, children, className = ''
    module "Khối hiển thị" bật / tắt từng khối lọc; tiêu đề khối "Công suất · 30", bấm để thu / mở; lựa chọn là lưới ô đều.
    Nhớ theo máy: thứ tự module (qs_spflt_order), khối đang hiện (qs_spflt_show), module thu gọn (qs_spflt_modfold) */
 const FLT_SHOW = [['brands', 'Thương hiệu'], ['nccs', 'Nhà cung cấp'], ['price', 'Khoảng giá'], ['watt', 'Công suất'], ['kelvin', 'Nhiệt độ màu'], ['angle', 'Góc chiếu sáng'], ['cri', 'CRI']]
-const FLT_MODS = ['show', 'scope', 'brand', 'spec']
+const FLT_MODS = ['show', 'tags', 'scope', 'brand', 'spec']
 const CHEV = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6" /></svg>
 const GRIP = <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.3" /><circle cx="7.5" cy="2.5" r="1.3" /><circle cx="2.5" cy="7" r="1.3" /><circle cx="7.5" cy="7" r="1.3" /><circle cx="2.5" cy="11.5" r="1.3" /><circle cx="7.5" cy="11.5" r="1.3" /></svg>
 
-export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuXoa, onTim, onPrice, onReset, onClose }) {
-  const [order, setOrderSt] = useState(() => { const o = lsJson('qs_spflt_order', null); return Array.isArray(o) && FLT_MODS.every(k => o.includes(k)) ? o : FLT_MODS })
+export function FilterPop({ anchor, top, scope, f, onSel, onSpec, onNhieuXoa, onMap, onPrice, onReset, onClose }) {
+  // thứ tự đã lưu từ trước khi có module "Đang lọc": chèn 'tags' ngay sau 'show'
+  const [order, setOrderSt] = useState(() => {
+    let o = lsJson('qs_spflt_order', null)
+    if (Array.isArray(o) && !o.includes('tags') && o.includes('show')) { o = o.slice(); o.splice(o.indexOf('show') + 1, 0, 'tags') }
+    return Array.isArray(o) && FLT_MODS.every(k => o.includes(k)) ? o : FLT_MODS
+  })
   const [show, setShowSt] = useState(() => ({ brands: 1, nccs: 1, price: 1, watt: 1, kelvin: 1, angle: 1, cri: 1, ...lsJson('qs_spflt_show', {}) }))
   const [modFold, setModFoldSt] = useState(() => lsJson('qs_spflt_modfold', { scope: true }))
   const [secFold, setSecFold] = useState({})
@@ -102,10 +109,20 @@ export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuX
     const v = opts.filter(o => spNorm_(o) === spNorm_(cur))[0] || ''
     return (
       <label className="qspl-fcol2" key={key}><span>{lb}</span>
-        <select className="qspl-fsel" value={v} onChange={e => onSel(key, e.target.value)}>
-          <option value="">{ph}</option>
-          {opts.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <SearchSelect className="sm" inline value={v} options={opts} allLabel={ph} onChange={x => onSel(key, x)} />
+      </label>
+    )
+  }
+  /* Thương hiệu chọn nhiều (gõ để tìm, đánh dấu nhiều thương hiệu), ghi vào f.brands (cùng bộ với chip Thương hiệu);
+     ô chọn 1 cũ (f.brand) được bỏ khi chọn ở đây để 2 kiểu lọc không chồng nhau */
+  function brandMulti() {
+    const m = spSingleVals_(scope, 'thuongHieu')
+    const opts = Object.keys(m).sort((a, b) => a.localeCompare(b, 'vi')).map(k => [k, k + ' (' + m[k] + ')'])
+    const sel = Object.keys(f.brands || {}).filter(k => f.brands[k])
+    return (
+      <label className="qspl-fcol2" key="brands"><span>Thương hiệu (chọn nhiều)</span>
+        <SearchSelect className="sm" inline multi value={sel} options={opts} allLabel="Tất cả thương hiệu"
+          onChange={arr => { const o = {}; arr.forEach(k => { o[k] = 1 }); onMap('brands', o); if (f.brand) onSel('brand', '') }} />
       </label>
     )
   }
@@ -116,14 +133,13 @@ export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuX
     if (!keys.length) return null
     keys.sort((x, y) => { const na = parseFloat(x), nb = parseFloat(y); if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb; return x.localeCompare(y) })
     const o = f[fkey] || {}
+    /* dải chip chung với Bóc tách (FChips): từ 12 giá trị có ô gõ để tìm, chip đang chọn luôn hiện */
     return sec(fkey, title, keys.length, keys.filter(k => o[k]).length, (
-      <div className="qs-bd-fchips">
-        {keys.map(k => (
-          <button type="button" key={k} title={k} className={`qs-bd-fchip${o[k] ? ' on' : ''}`} onClick={() => onSpec(fkey, k)}>
-            {opt.dot && <span className="qs-bdc-dot" style={{ background: opt.dot(k) }} />}{k}
-          </button>
-        ))}
-      </div>
+      <FChips items={keys.map(k => ({ k, on: !!o[k] }))} render={({ k }) => (
+        <button type="button" key={k} title={k} className={`qs-bd-fchip${o[k] ? ' on' : ''}`} onClick={() => onSpec(fkey, k)}>
+          {opt.dot && <span className="qs-bdc-dot" style={{ background: opt.dot(k) }} />}{k}
+        </button>
+      )} />
     ))
   }
   function nhieu(title, field, fkey, ph) {
@@ -132,23 +148,22 @@ export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuX
     if (!keys.length) return null
     keys.sort((x, y) => x.localeCompare(y, 'vi'))
     const o = f[fkey] || {}, daChon = keys.filter(k => o[k]).length
-    const q = spNorm_(fltQ[fkey] || '')
-    const extra = (
-      <>
-        {daChon > 0 && <button type="button" className="qspl-fgt-x qspl-fclear" onClick={() => onNhieuXoa(fkey)}>Bỏ chọn {daChon}</button>}
-        {keys.length > 8 && <input className="qspl-fsearch" placeholder={ph || 'Gõ để tìm…'} value={fltQ[fkey] || ''} onChange={e => onTim(fkey, e.target.value)} />}
-      </>
-    )
+    const extra = daChon > 0 && <button type="button" className="qspl-fgt-x qspl-fclear" onClick={() => onNhieuXoa(fkey)}>Bỏ chọn {daChon}</button>
     return sec(fkey, title, keys.length, daChon, (
-      <div className="qs-bd-fchips qspl-fwide">
-        {keys.filter(k => !q || spNorm_(k).indexOf(q) >= 0).slice(0, 60).map(k => (
-          <button type="button" key={k} title={k} className={`qs-bd-fchip${o[k] ? ' on' : ''}`} onClick={() => onSpec(fkey, k)}>
-            <span className="qspl-fcl">{k}</span><small>{m[k]}</small>
-          </button>
-        ))}
-      </div>
+      <FChips cls="qspl-fwide" items={keys.map(k => ({ k, on: !!o[k] }))} render={({ k }) => (
+        <button type="button" key={k} title={k} className={`qs-bd-fchip${o[k] ? ' on' : ''}`} onClick={() => onSpec(fkey, k)}>
+          <span className="qspl-fcl">{k}</span><small>{m[k]}</small>
+        </button>
+      )} />
     ), extra)
   }
+  /* Module "Đang lọc" như Bóc tách: mỗi lựa chọn đang bật 1 thẻ (nhãn khối + giá trị + ✕ bỏ riêng), "Xoá hết" = Xoá lọc */
+  const tags = []
+  ;[['brand', 'Thương hiệu'], ['hangMuc', 'Hạng mục SP'], ['dong', 'Dòng SP']].forEach(([k, lb]) => { if (f[k]) tags.push({ id: k, lb, val: f[k], clear: () => onSel(k, '') }) })
+  ;[['brands', 'Thương hiệu'], ['nccs', 'Nhà cung cấp'], ['watt', 'Công suất'], ['kelvin', 'Nhiệt độ màu'], ['angle', 'Góc chiếu'], ['cri', 'CRI']].forEach(([k, lb]) => {
+    Object.keys(f[k] || {}).filter(v => f[k][v]).forEach(v => tags.push({ id: k + ':' + v, lb, val: v, clear: () => onSpec(k, v) }))
+  })
+  if (f.min || f.max) tags.push({ id: 'price', lb: 'Giá', val: (f.min || 0) + ' – ' + (f.max || '…'), clear: () => { onPrice('min', ''); onPrice('max', '') } })
   const onN = FLT_SHOW.filter(x => show[x[0]]).length
   const MODS = {
     show: {
@@ -167,15 +182,24 @@ export function FilterPop({ anchor, top, scope, f, fltQ, onSel, onSpec, onNhieuX
         </div>
       )],
     },
+    tags: {
+      title: <>Đang lọc <b className="qs-bd-mod-n">{tags.length}</b></>, cls: 'qs-bd-mod-tags',
+      body: [tags.length ? (
+        <div key="t" className="qs-bdc-tags">
+          {tags.map(t => <span key={t.id} className="qs-bdc-tag" title={t.lb}><i>{t.lb}</i>{t.val}<b onClick={t.clear} title="Bỏ lọc này">✕</b></span>)}
+          <button type="button" className="qs-bdc-tags-x" onClick={onReset}>Xoá hết</button>
+        </div>
+      ) : null],
+    },
     scope: {
-      title: 'Phạm vi sản phẩm',
-      body: [sec('sel', 'Thương hiệu · hạng mục · dòng sản phẩm', 0, ['brand', 'hangMuc', 'dong'].filter(k => f[k]).length, (
-        <div className="qspl-fsel3">
-          {fsel('brand', 'Thương hiệu', 'thuongHieu', 'Tất cả thương hiệu')}
+      title: 'Phạm vi sản phẩm', cls: 'qs-bd-mod-scope',
+      body: [(
+        <div key="s" className="qspl-fsel3">
+          {brandMulti()}
           {fsel('hangMuc', 'Hạng mục sản phẩm', 'hangMuc', 'Tất cả hạng mục SP')}
           {fsel('dong', 'Dòng sản phẩm', 'nhom', 'Tất cả dòng SP')}
         </div>
-      ))],
+      )],
     },
     brand: {
       title: 'Thương hiệu & giá',

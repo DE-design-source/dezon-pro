@@ -1,28 +1,34 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../../../../components/ui/Icon'
-import QsIcon from '../common/QsIcon'
 import ChangeInput from './ChangeInput'
+import SearchSelect from '../common/SearchSelect'
 import NodePicker from './NodePicker'
 import { useBgFontLink } from './QuotePreview'
 import { BIA_MAX, biaMauDs, biaDangChon, biaKhop, biaApDung, biaLuuMoi, biaLuuDe, biaXoa } from './biaMau'
 import { PresetDock, ColsStrip } from '../breakdown/sheet/ColsTools'
 import { myCols, useTkCols, setColsMap, startEdit, cancelEdit, endEdit } from '../breakdown/sheet/tkCols'
-import { setVat } from '../breakdown/sheet/bocActions'
+import { ttBan_ } from '../../lib/calc.js'
+import { setVatHm } from '../breakdown/sheet/bocActions'
+import { projDataSet_ } from '../../state/projData'
+import { getState } from '../../state/store'
 import { COLS, COLSET, csQuickLabel_ } from '../../lib/columns.js'
 import { money, tkNum_ } from '../../lib/format.js'
 import { currentGroup, draftName_ } from '../../lib/dashModel.js'
 import {
-  BG_MAU_DS, BG_NOI_BO, bgNoiBoXuat_, bgNoiBoBat_, bgBiaCanh_, bgLines_, bgPTRows_, bgOpt_, bgTong_, computeQuoteLocal, bgGhiChu_, docSoVN_, bgOrg_,
+  BG_MAU_DS, BG_NOI_BO, bgNoiBoXuat_, bgNoiBoBat_, bgBiaCanh_, bgLines_, bgPTRows_, bgPTSecs_, vatOf_, bgOpt_, bgTong_, bgVatParts_, computeQuoteLocal, bgGhiChu_, docSoVN_, bgOrg_,
+  bgAn_, bgHidden, coverCosts, coverDepth, coverSortFn, bgSoLaiOn_, coverSoLai_,
 } from '../../lib/quote.js'
-import { bgDocCols_, bgBia_, BG_TT_DS, BG_LOGO_MIN, BG_LOGO_MAX, TD_CO_MIN, TD_CO_MAX, docImg_ } from './docModel'
-import { bgChu_, bgSoOf_, BG_SO_MIN, BG_SO_MAX, appFontName_, appFontValue_, TT_CO_MIN, TT_CO_MAX, TK_LUI_MAX, khungKeys_, khungW_, KH_W_MIN, KH_W_MAX, BG_HD_NEN, BG_HD_NEN_DS, BG_KIEU_DS, BG_CANH_DS } from './docCss'
+import { bgKy_, bgKyMac_, KY_COT_MAX, bgDocCols_, bgBia_, BG_TT_DS, BG_LOGO_MIN, BG_LOGO_MAX, TD_CO_MIN, TD_CO_MAX, docImg_, bgColHm_ } from './docModel'
+import { nodeName } from '../../lib/tree.js'
+import { bgChu_, bgSoOf_, BG_SO_MIN, BG_SO_MAX, appFontName_, appFontValue_, TT_CO_MIN, TT_CO_MAX, TK_LUI_MAX, khungKeys_, khungW_, KH_W_MIN, KH_W_MAX, BG_HD_NEN, BG_HD_NEN_DS, BG_COT_NEN_DS, BG_TG_NEN_DS, BG_TS_NEN_DS, BG_TS_CHU_DS, BG_TS_VIEN_DS, BG_KIEU_DS, BG_CANH_DS, BG_KHO_DS } from './docCss'
 import { FONT_CATALOG, FONT_CATEGORIES, isFontAvailable } from '../../../../data/fontCatalog'
 import {
   useQuoteUi, setQ, bgSetPer_, bgTogglePerSec_, bgColReset_, bgColTuyBien_,
 } from './quoteState'
-import { qsToast as toast } from '../common/dialogs'
-import { bgChot, bgMauDat, bgNoiBoDat, bgOptSet, bgOptSetMany, bgOrgEdit, bgDotSet, bgDotAdd, bgDotDel } from './quoteActions'
+import { qsToast as toast, qsConfirm, qsAsk } from '../common/dialogs'
+import { useTuyMau, tuyChup_, tuyPatch_, tuyLuuNhanh, tuyLuuMacDinh, TUY_KEYS, NHANH_MAX } from './tuyMau'
+import { bgCfgRaw, bgChot, bgMauDat, bgNoiBoDat, bgOptSet, bgOptSetMany, bgOrgEdit, bgDotSet, bgDotAdd, bgDotDel } from './quoteActions'
 
 const PER_OPTS = [['0', 'Tự động'], ['8', '8'], ['10', '10'], ['12', '12'], ['15', '15'], ['18', '18'], ['20', '20'], ['25', '25'], ['30', '30']]
 
@@ -149,26 +155,26 @@ function KhungTuy({ pre, chu, coDoc = true, ngangNhan = 'Kẻ dòng (ngang)' }) 
     <>
       {/* Viền (bao quanh + bo góc) · Ngang (kẻ dòng, lùi 2 đầu) · Dọc (kẻ cột, lùi 2 đầu) · Khoảng cách dòng; mỗi đường nét riêng */}
       <div className="qsq-khnhom">
-        <b>Viền</b>
+        <b><i className="ic vien" />Viền</b>
         <label className="qsq-chk"><input type="checkbox" checked={chu[k('Bao')]} onChange={e => bgOptSet(k('Bao'), e.target.checked)} /> Viền bao quanh</label>
         <label className="qsq-lb">Bo góc</label>
         <SoChu v={chu[k('Bo')]} min={0} max={20} step={1} don="px (0–20)" onSet={n => bgOptSet(k('Bo'), n)} />
         {chu[k('Bao')] && net('B')}
       </div>
       <div className="qsq-khnhom">
-        <b>Ngang</b>
+        <b><i className="ic ngang" />Ngang</b>
         <label className="qsq-chk"><input type="checkbox" checked={chu[k('Ngang')]} onChange={e => bgOptSet(k('Ngang'), e.target.checked)} /> {ngangNhan}</label>
         {chu[k('Ngang')] && <>{lui(k('Lui'), 'Lùi 2 đầu (không chạm khung trái / phải)')}{net('N')}</>}
       </div>
       {coDoc && (
         <div className="qsq-khnhom">
-          <b>Dọc</b>
+          <b><i className="ic doc" />Dọc</b>
           <label className="qsq-chk"><input type="checkbox" checked={chu[k('Doc')]} onChange={e => bgOptSet(k('Doc'), e.target.checked)} /> Kẻ cột (dọc)</label>
-          {chu[k('Doc')] && <>{lui(k('LuiD'), pre === 'ctk' ? 'Lùi 2 đầu (chỉ dòng đề mục nhỏ: vạch dọc không chạm cạnh ô)' : 'Lùi 2 đầu (không chạm khung trên / dưới)')}{net('D')}</>}
+          {chu[k('Doc')] && <>{lui(k('LuiD'), pre === 'ctk' ? 'Lùi 2 đầu (dòng đề mục nhỏ + tiêu đề cột: vạch dọc không chạm cạnh ô)' : 'Lùi 2 đầu (không chạm khung trên / dưới)')}{net('D')}</>}
         </div>
       )}
       <div className="qsq-khnhom">
-        <b>Khoảng cách dòng</b>
+        <b><i className="ic cach" />Khoảng cách dòng</b>
         <SoChu v={chu[k('Cach')]} min={2} max={24} step={1} don="px (2–24)" onSet={n => bgOptSet(k('Cach'), n)} />
       </div>
       {chu[k('Set')] && (
@@ -254,7 +260,91 @@ const TB_VUNG = [
   ['td', 'Tiêu đề', 'Hộp tiêu đề nền màu trên đầu tờ bìa.'],
   ['tt', 'Thông tin dự án', 'Bảng Tên dự án / Khách hàng… trên tờ bìa.'],
   ['ct', 'Bảng hạng mục', 'Bảng chi tiết hạng mục — tờ bìa và các trang tính.'],
+  ['tong', 'Khối tổng', 'Tổng chi phí dự kiến · VAT · Tổng gồm VAT cuối bảng hạng mục tờ bìa.'],
+  ['sau', 'Trang bìa sau', 'Tiến độ thanh toán · Tổng giá trị báo giá · Ghi chú & điều khoản · Ô ký ở trang cuối.'],
 ]
+/* Màu của Trang bìa sau: [khoá, nhãn, màu mặc định, bảng màu nhanh] */
+const TS_MAU = [['tsNen', 'Nền tiêu đề khối', '#f7f9fb', BG_TS_NEN_DS], ['tsChu', 'Chữ tiêu đề khối', 'Màu chủ đạo', BG_TS_CHU_DS],
+  ['tsVien', 'Viền khối', '#e6eaef', BG_TS_VIEN_DS], ['tsTong', 'Nền dòng Thành tiền sau thuế', '#f7f9fb', BG_TS_NEN_DS]]
+/* 3 kiểu dòng của khối tổng: [khoá nền, nhãn, mô tả màu mặc định] */
+const TG_DONG = [['tgNen1', 'Dòng tổng chi phí dự kiến', 'Theo màu đề mục lớn'], ['tgNen2', 'Dòng chiết khấu / VAT', 'Nền nhạt'], ['tgNen3', 'Dòng tổng gồm VAT', 'Màu chủ đạo']]
+/* Thanh mẫu Tuỳ biến (đầu khung Tuỳ biến): 3 ô lưu nhanh (1)(2)(3) - ô trống bấm = lưu bộ đang dùng, ô đã lưu bấm = áp cho bản nháp này,
+   nút ↻ nhỏ trên ô = lưu đè; "Lưu làm mặc định" = bộ đang dùng thành mặc định của công ty (bản nháp chưa tự chỉnh dùng bộ này);
+   "Về mặc định" = bỏ chỉnh riêng của bản nháp (về mặc định công ty, chưa có thì mặc định gốc). Lưu ở dữ liệu công ty 'bgTuy' (tuyMau.js) */
+function TuyMauBar() {
+  const T = useTuyMau()
+  const bo = () => tuyChup_(bgCfgRaw())     // chỉ khoá bản nháp tự đặt (không lẫn mặc định công ty đã gộp)
+  const hienTai = { ...((T.macDinh) || {}), ...bo() }   // bộ đang thấy trên bản xem trước
+  const giong = x => x && TUY_KEYS.every(k => (x[k] == null ? null : x[k]) === (hienTai[k] == null ? null : hienTai[k]))
+  const tenO = i => (T.nhanh[i] && T.nhanh[i]._ten) || ''
+  /* lưu bộ đang dùng vào ô i, kèm tên tự đặt (bỏ trống = chỉ số ô) */
+  async function luuVao(i) {
+    const ten = await qsAsk({ title: 'Lưu bộ tuỳ biến vào ô ' + (i + 1), label: 'Tên bộ (tự đặt, có thể bỏ trống)', value: tenO(i) || ('Bộ ' + (i + 1)), confirmText: 'Lưu' })
+    if (ten == null) return
+    const bo = { ...hienTai }; if (String(ten).trim()) bo._ten = String(ten).trim().slice(0, 40)
+    if (await tuyLuuNhanh(i, bo)) toast('Đã lưu "' + (bo._ten || 'ô ' + (i + 1)) + '" vào ô ' + (i + 1))
+  }
+  async function oNhanh(i) {
+    const x = T.nhanh[i]
+    if (!x) { await luuVao(i); return }
+    bgOptSetMany(tuyPatch_(x)); toast('Đã áp bộ ' + (i + 1) + (x._ten ? ' - ' + x._ten : ''))
+  }
+  /* nút "Lưu nhanh": menu chọn Tạo mới (ô trống đầu tiên, hết thì mở thêm ô, tối đa NHANH_MAX) hoặc Lưu đè lên 1 ô đã có */
+  const [menu, setMenu] = useState(false)
+  const menuRef = useRef(null)
+  useEffect(() => {
+    if (!menu) return undefined
+    const dong = e => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false) }
+    document.addEventListener('mousedown', dong)
+    return () => document.removeEventListener('mousedown', dong)
+  }, [menu])
+  let oMoi = T.nhanh.findIndex(x => !x)
+  if (oMoi < 0 && T.nhanh.length < NHANH_MAX) oMoi = T.nhanh.length
+  const chon = i => { setMenu(false); luuVao(i) }
+  async function luuDe(i, e) {
+    e.stopPropagation()
+    if (!await qsConfirm('Lưu đè ô ' + (i + 1) + ' bằng bộ tuỳ biến đang dùng?')) return
+    if (await tuyLuuNhanh(i, { ...hienTai, ...(tenO(i) ? { _ten: tenO(i) } : {}) })) toast('Đã lưu đè ô ' + (i + 1))
+  }
+  async function macDinh() {
+    if (!await qsConfirm('Lưu bộ tuỳ biến đang dùng (màu, font, cỡ chữ, khung, viền bảng) làm MẶC ĐỊNH của công ty? Bản nháp chưa tự chỉnh sẽ dùng bộ này.')) return
+    if (await tuyLuuMacDinh(hienTai)) { bgOptSetMany(tuyPatch_(null)); toast('Đã lưu làm mặc định công ty') }
+  }
+  const coRieng = Object.keys(bo()).length > 0
+  return (
+    <div className="qsq-tuymau">
+      <span className="lb">Bộ tuỳ biến</span>
+      <div className="o">
+        {T.nhanh.map((x, i) => (
+          <button type="button" key={i} className={'qsq-tuyo' + (x ? ' co' : '') + (giong(x) ? ' on' : '')}
+            title={x ? 'Áp bộ ' + (i + 1) + (x._ten ? ' - ' + x._ten : '') + ' cho bản nháp này' : 'Ô trống - bấm để lưu bộ tuỳ biến đang dùng vào ô ' + (i + 1)} onClick={() => oNhanh(i)}>
+            {i + 1}
+            {T.nhanh[i] && <i title={'Lưu đè ô ' + (i + 1)} onClick={e => luuDe(i, e)}><Icon name="refresh" size={9} /></i>}
+          </button>
+        ))}
+      </div>
+      <div className="qsq-luunhanh" ref={menuRef}>
+        <button type="button" className={'qsc-btn' + (menu ? ' on' : '')} aria-expanded={menu} title="Lưu bộ tuỳ biến đang dùng: tạo ô mới hoặc lưu đè lên ô đã có"
+          onClick={() => setMenu(v => !v)}><Icon name="plus" size={12} />Lưu nhanh<Icon name="chevronDown" size={11} /></button>
+        {menu && (
+          <div className="qsq-luunhanh-m" role="menu">
+            <button type="button" role="menuitem" disabled={oMoi < 0} onClick={() => chon(oMoi)}>
+              <span className="so moi">+</span>{oMoi < 0 ? 'Đã đủ ' + NHANH_MAX + ' ô' : 'Tạo mới (ô ' + (oMoi + 1) + ')'}</button>
+            {T.nhanh.some(Boolean) && <div className="h">Lưu đè lên</div>}
+            {T.nhanh.map((x, i) => x && (
+              <button type="button" role="menuitem" key={i} onClick={() => chon(i)}>
+                <span className="so">{i + 1}</span>{x._ten || 'Bộ ' + (i + 1)}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      <button type="button" className="qsc-btn" title="Bộ đang dùng thành mặc định của công ty" onClick={macDinh}><Icon name="check" size={12} />Lưu làm mặc định</button>
+      <button type="button" className="qsc-btn" disabled={!coRieng} title={T.macDinh ? 'Bỏ chỉnh riêng, về mặc định công ty' : 'Bỏ chỉnh riêng, về mặc định gốc'}
+        onClick={() => { bgOptSetMany(tuyPatch_(null)); toast(T.macDinh ? 'Đã về mặc định công ty' : 'Đã về mặc định gốc') }}><Icon name="undo" size={12} />Về mặc định</button>
+      {T.macDinh && <span className="md" title="Công ty đã có bộ mặc định riêng">● Có mặc định công ty</span>}
+    </div>
+  )
+}
 function TuyBien({ mau, chu, bia, fontNhom }) {
   const [vung, setVungS] = useState(() => { try { return localStorage.getItem('qs_bg_tuyvung') || 'chung' } catch (e) { return 'chung' } })
   const setVung = v => { setVungS(v); try { localStorage.setItem('qs_bg_tuyvung', v) } catch (e) { /* bỏ qua */ } }
@@ -264,6 +354,7 @@ function TuyBien({ mau, chu, bia, fontNhom }) {
   )
   return (
     <>
+      <TuyMauBar />
       {/* sơ đồ trang: bấm vào vùng cần chỉnh */}
       <div className="qsq-tbmap">
         {nut('chung', 'qsq-tbmap-all', <><Icon name="layers" size={14} />Toàn báo giá</>)}
@@ -271,6 +362,11 @@ function TuyBien({ mau, chu, bia, fontNhom }) {
           {nut('td', 'qsq-tbmap-td', <><i /><i /><i /></>)}
           {nut('tt', 'qsq-tbmap-tt', <><i /><i /><i /><i /></>)}
           {nut('ct', 'qsq-tbmap-ct', <><i className="h" /><i /><i className="sec" /><i /><i /></>)}
+          {nut('tong', 'qsq-tbmap-tong', <><i className="t1" /><i className="t2" /><i className="t3" /></>)}
+        </div>
+        {/* trang cuối: Trang bìa sau */}
+        <div className="qsq-tbmap-pg" aria-label="Sơ đồ trang bìa sau">
+          {nut('sau', 'qsq-tbmap-sau', <><i className="k" /><i /><i className="k" /><i /><i className="ky" /></>)}
         </div>
       </div>
       <div className="qsq-tbvung">
@@ -344,6 +440,70 @@ function TuyBien({ mau, chu, bia, fontNhom }) {
         </>
       )}
 
+      {vung === 'sau' && (
+        <>
+          <TtPhan id="tbts-mau" ten="Màu">
+            {TS_MAU.map(([k, nhan, mac, ds]) => (
+              <div key={k}>
+                <div className="qsq-mau-h"><label className="qsq-lb">{nhan}</label><code>{chu[k] ? chu[k].toUpperCase() : mac}</code>
+                  <ChangeInput type="color" value={chu[k] || ds[0]} title="Chọn màu khác" onCommit={v => bgOptSet(k, v)} /></div>
+                <div className="qsq-mau">
+                  <button type="button" className={!chu[k] ? 'on' : ''} style={{ background: 'linear-gradient(135deg, #12314f 50%, #fff 50%)' }} title={'Mặc định: ' + mac}
+                    onClick={() => bgOptSet(k, null)} />
+                  {ds.map(c => <button type="button" key={c} className={c === chu[k] ? 'on' : ''} style={{ background: c }} title={c.toUpperCase()}
+                    onClick={() => bgOptSet(k, c)} />)}
+                </div>
+              </div>
+            ))}
+          </TtPhan>
+          <TtPhan id="tbts-chu" ten="Chữ">
+            <label className="qsq-lb">Cỡ chữ trang bìa sau</label>
+            <CoSo pct={chu.tsCo} onSet={n => bgOptSet('tsSo', n)} />
+            <label className="qsq-lb">Font trang bìa sau</label>
+            <select className="qsq-in" value={chu.tsFont} style={chu.tsFont ? { fontFamily: chu.tsFont } : undefined} onChange={e => bgOptSet('tsFont', e.target.value || null)}>
+              <option value="">Như font báo giá</option>
+              {fontNhom.map(([cat, nhan, ds]) => (
+                <optgroup key={cat} label={nhan}>
+                  {ds.map(x => <option key={x.name} value={x.value || "'Montserrat', sans-serif"}>{x.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </TtPhan>
+        </>
+      )}
+
+      {vung === 'tong' && (
+        <>
+          <TtPhan id="tbtg-mau" ten="Màu nền">
+            {TG_DONG.map(([k, nhan, mac]) => (
+              <div key={k}>
+                <div className="qsq-mau-h"><label className="qsq-lb">{nhan}</label><code>{chu[k] ? chu[k].toUpperCase() : mac}</code>
+                  <ChangeInput type="color" value={chu[k] || BG_TG_NEN_DS[0]} title="Chọn màu nền khác" onCommit={v => bgOptSet(k, v)} /></div>
+                <div className="qsq-mau">
+                  <button type="button" className={!chu[k] ? 'on' : ''} style={{ background: 'linear-gradient(135deg, #12314f 50%, #fff 50%)' }} title={'Mặc định: ' + mac}
+                    onClick={() => bgOptSet(k, null)} />
+                  {BG_TG_NEN_DS.map(c => <button type="button" key={c} className={c === chu[k] ? 'on' : ''} style={{ background: c }} title={c.toUpperCase()}
+                    onClick={() => bgOptSet(k, c)} />)}
+                </div>
+              </div>
+            ))}
+          </TtPhan>
+          <TtPhan id="tbtg-chu" ten="Chữ">
+            <label className="qsq-lb">Cỡ chữ khối tổng</label>
+            <CoSo pct={chu.tgCo} onSet={n => bgOptSet('tgSo', n)} />
+            <label className="qsq-lb">Font khối tổng</label>
+            <select className="qsq-in" value={chu.tgFont} style={chu.tgFont ? { fontFamily: chu.tgFont } : undefined} onChange={e => bgOptSet('tgFont', e.target.value || null)}>
+              <option value="">Như font báo giá</option>
+              {fontNhom.map(([cat, nhan, ds]) => (
+                <optgroup key={cat} label={nhan}>
+                  {ds.map(x => <option key={x.name} value={x.value || "'Montserrat', sans-serif"}>{x.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </TtPhan>
+        </>
+      )}
+
       {vung === 'ct' && (
         <>
           <TtPhan id="tbct-chu" ten="Chữ">
@@ -362,8 +522,38 @@ function ChiTietTuy({ chu, fontNhom, phan }) {
   return (
     <>
       {phan !== 'vien' && (<>
+      {/* Tiêu đề cột: nền / màu chữ / cỡ chữ / font riêng (hàng đầu bảng hạng mục tờ bìa + bảng chi tiết) */}
+      <div className="qsq-khnhom"><b><i className="ic cot" />Tiêu đề cột</b>
+      <div className="qsq-mau-h"><label className="qsq-lb">Màu nền</label><code>{chu.cotNen ? chu.cotNen.toUpperCase() : 'Màu chủ đạo'}</code>
+        <ChangeInput type="color" value={chu.cotNen || BG_COT_NEN_DS[0]} title="Chọn màu nền khác" onCommit={v => bgOptSet('cotNen', v)} /></div>
+      <div className="qsq-mau">
+        <button type="button" className={!chu.cotNen ? 'on' : ''} style={{ background: 'linear-gradient(135deg, #12314f 50%, #fff 50%)' }} title="Theo màu chủ đạo"
+          onClick={() => bgOptSet('cotNen', null)} />
+        {BG_COT_NEN_DS.map(c => <button type="button" key={c} className={c === chu.cotNen ? 'on' : ''} style={{ background: c }} title={c.toUpperCase()}
+          onClick={() => bgOptSet('cotNen', c)} />)}
+      </div>
+      <label className="qsq-lb">Màu chữ</label>
+      <div className="qs-qt-mode qsq-seg2" role="radiogroup" aria-label="Màu chữ tiêu đề cột">
+        {[['trang', 'Trắng'], ['den', 'Đen']].map(([v, nhan]) => (
+          <button type="button" key={v} role="radio" aria-checked={chu.cotChu === v} className={chu.cotChu === v ? 'on' : ''}
+            onClick={() => bgOptSet('cotChu', v === 'trang' ? null : v)}>{nhan}</button>
+        ))}
+      </div>
+      <label className="qsq-lb">Cỡ chữ tiêu đề cột</label>
+      <CoSo pct={chu.cotCo} onSet={n => bgOptSet('cotSo', n)} />
+      <label className="qsq-lb">Font tiêu đề cột</label>
+      <select className="qsq-in" value={chu.cotFont} style={chu.cotFont ? { fontFamily: chu.cotFont } : undefined} onChange={e => bgOptSet('cotFont', e.target.value || null)}>
+        <option value="">Như font báo giá</option>
+        {fontNhom.map(([cat, nhan, ds]) => (
+          <optgroup key={cat} label={nhan}>
+            {ds.map(x => <option key={x.name} value={x.value || "'Montserrat', sans-serif"}>{x.name}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      </div>
+
       {/* Đề mục lớn: nền / màu chữ / cỡ chữ / font riêng */}
-      <div className="qsq-subh">Đề mục lớn</div>
+      <div className="qsq-khnhom"><b><i className="ic demuc" />Đề mục lớn</b>
       <div className="qsq-mau-h"><label className="qsq-lb">Màu nền</label><code>{chu.hdNen.toUpperCase()}</code>
         <ChangeInput type="color" value={chu.hdNen} title="Chọn màu nền khác" onCommit={v => bgOptSet('hdNen', v === BG_HD_NEN ? null : v)} /></div>
       <div className="qsq-mau">
@@ -388,7 +578,7 @@ function ChiTietTuy({ chu, fontNhom, phan }) {
           </optgroup>
         ))}
       </select>
-
+      </div>
       </>)}
       {phan !== 'chu' && (<>
       {/* Viền bảng: bộ khung chung (Viền · Ngang · Dọc · Khoảng cách dòng) + tô xen kẽ hàng */}
@@ -397,13 +587,14 @@ function ChiTietTuy({ chu, fontNhom, phan }) {
       <label className="qsq-chk"><input type="checkbox" checked={chu.soLe} onChange={e => bgOptSet('soLe', e.target.checked ? null : false)} /> Tô xen kẽ hàng (sọc nhạt)</label>
       </>)}
       {phan !== 'vien' && (<>
-      <div className="qsq-subh">Nội dung ô</div>
+      <div className="qsq-khnhom"><b><i className="ic noidung" />Nội dung ô</b>
       <label className="qsq-lb">Canh dọc</label>
       <div className="qs-qt-mode qsq-seg3" role="radiogroup" aria-label="Canh dọc">
         {BG_CANH_DS.map(([v, nhan]) => (
           <button type="button" key={v} role="radio" aria-checked={chu.canhDoc === v} className={chu.canhDoc === v ? 'on' : ''}
             onClick={() => bgOptSet('canhDoc', v === 'giua' ? null : v)}>{nhan}</button>
         ))}
+      </div>
       </div>
       </>)}
     </>
@@ -588,6 +779,140 @@ function Sub({ id, t, extra, children }) {
     </div>
   )
 }
+/* 2 công tắc nhanh của Đầu mục trên bìa (dùng ở khung chi tiết + ngay trên thẻ Trang bìa cột trái):
+   Ẩn mục không phát sinh số (chi phí = 0, bấm lại = hiện lại đúng các mục đó) · Đánh số lại liên tục */
+function DauMucNhanh({ ctx }) {
+  const cover = ctx.cover || []
+  if (!cover.length) return null
+  const an = bgAn_(ctx.bgCfg)
+  const cost = coverCosts({ ...ctx, bgCfg: { ...(ctx.bgCfg || {}), an: {} } }).cost
+  const zero = cover.filter(c => !(Number(cost[c.stt]) > 0)).map(c => c.stt)
+  const zeroAn = zero.length > 0 && zero.every(s => bgHidden(s, ctx.bgCfg))
+  const soLai = bgSoLaiOn_(ctx.bgCfg)
+  const togZero = () => {
+    const m = { ...an }
+    if (zeroAn) zero.forEach(s => { delete m[s] }); else zero.forEach(s => { m[s] = 1 })
+    bgOptSet('an', Object.keys(m).length ? m : null)
+    toast(zeroAn ? 'Đã hiện lại ' + zero.length + ' mục không phát sinh' : 'Đã ẩn ' + zero.length + ' mục không phát sinh chi phí')
+  }
+  return (
+    <>
+      <CongTac on={zeroAn} nhan={'Ẩn mục không phát sinh số (' + zero.length + ')'} tip="Bật = ẩn mọi mục có chi phí = 0; tắt = hiện lại các mục đó" onToggle={togZero} />
+      <CongTac on={soLai} nhan="Đánh số lại liên tục (1 → 1.1)" tip="Mục hiện đầu tiên là 1, mục con 1.1, 1.2… (tắt = giữ mã hạng mục gốc, vd 3.2.6)"
+        onToggle={() => bgOptSet('soLai', soLai ? false : null)} />
+    </>
+  )
+}
+/* Đầu mục trên bìa: bật / tắt từng mục của bảng hạng mục tờ bìa (mục lớn + mục con), ghi bgCfg.an = {stt: 1}.
+   Tắt 1 mục thì các mục con của nó ẩn theo (công tắc mờ đi); số tiền mục cha / tổng bìa không tính mục đã ẩn (coverCosts).
+   Nút nhanh: Ẩn mục không phát sinh (chi phí = 0) · Hiện tất cả. Bản xem trước, PDF và Excel cùng ẩn. */
+function DauMuc({ ctx }) {
+  const cover = (ctx.cover || []).slice().sort(coverSortFn)
+  if (!cover.length) return <p className="qs-qt-note">Chưa có mục. Bấm ↻ Nạp lại mẫu ở chế độ Chỉnh sửa.</p>
+  const an = bgAn_(ctx.bgCfg)
+  // số tiền khi KHÔNG ẩn gì: để biết mục nào thật sự không phát sinh, kể cả mục đang ẩn
+  const cost = coverCosts({ ...ctx, bgCfg: { ...(ctx.bgCfg || {}), an: {} } }).cost
+  const vis = cover.filter(c => !bgHidden(c.stt, ctx.bgCfg))
+  const soLai = bgSoLaiOn_(ctx.bgCfg)
+  const so = soLai ? coverSoLai_(vis) : {}
+  const datAn = m => bgOptSet('an', Object.keys(m).length ? m : null)
+  /* Bật / tắt 1 mục kéo theo cả nhánh: tắt = ẩn mục + mọi mục con; bật = hiện mục + mọi mục con, và hiện các mục cha đang ẩn
+     (anh em của nhánh dưới mục cha đó vẫn giữ ẩn, ghi rõ từng khoá để không lộ ra khi mục cha hiện lại) */
+  const conOf = stt => cover.filter(c => c.stt !== stt && String(c.stt).indexOf(stt + '.') === 0).map(c => c.stt)
+  const togRow = stt => {
+    const m = { ...an }
+    if (!bgHidden(stt, ctx.bgCfg)) {
+      m[stt] = 1
+      conOf(stt).forEach(k => { m[k] = 1 })
+    } else {
+      const p = String(stt).split('.')
+      for (let i = 1; i < p.length; i++) {
+        const cha = p.slice(0, i).join('.')
+        if (!bgHidden(cha, ctx.bgCfg)) continue
+        conOf(cha).forEach(k => { if (k !== stt && stt.indexOf(k + '.') !== 0 && k.indexOf(stt + '.') !== 0) m[k] = 1 })
+        delete m[cha]
+      }
+      delete m[stt]
+      conOf(stt).forEach(k => { delete m[k] })
+    }
+    datAn(m)
+  }
+  return (
+    <div className="qsq-dm">
+      <DauMucNhanh ctx={ctx} />
+      <div className="qsq-dm-list">
+        {cover.map(c => {
+          const d = coverDepth(c.stt)
+          const on = !bgHidden(c.stt, ctx.bgCfg)
+          const nCon = conOf(c.stt).length
+          const v = Number(cost[c.stt]) || 0
+          // số in: mục đang hiện = số trên bìa; mục ẩn không có số in -> "–" (tránh 2 dòng cùng số khi đánh số lại)
+          const soIn = on ? (so[c.stt] || c.stt) : (soLai ? '–' : c.stt)
+          return (
+            <label key={c.stt} className={'qsq-dm-it d' + Math.min(d, 3) + (on ? '' : ' off')}
+              title={(on ? 'Bỏ chọn để ẩn' : 'Chọn để hiện') + (nCon ? ' cả ' + (nCon + 1) + ' mục (gồm mục con)' : '') + ' · mã gốc ' + c.stt}>
+              <input type="checkbox" checked={on} onChange={() => togRow(c.stt)} />
+              <span className="no">{soIn}</span>
+              <span className="nm">{c.hangMuc || '(chưa đặt tên)'}</span>
+              <span className={'v' + (v ? '' : ' z')}>{v ? money(v) : '–'}</span>
+            </label>
+          )
+        })}
+      </div>
+      <div className="qsq-dm-act">
+        <span>Đang hiện <b>{vis.length}/{cover.length}</b> mục</span>
+        <button type="button" className="qsc-btn" disabled={!Object.keys(an).length} onClick={() => datAn({})}>Hiện tất cả</button>
+      </div>
+      <p className="qs-qt-note">Mục ẩn không in ra bản xem trước, PDF và Excel; tổng của mục cha không tính mục con đã ẩn. Cột số là số sẽ in trên bìa.</p>
+    </div>
+  )
+}
+/* Bật / tắt cột theo từng hạng mục: hàng chọn "Chung (mọi hạng mục)" + các hạng mục đang có dòng báo giá (Điện lạnh, Thiết bị vệ sinh…).
+   Chung = chip cột của Bóc tách (tk.cols, như cũ). Chọn 1 hạng mục: chip là cột RIÊNG của hạng mục đó (bgCfg.colHm[mã]); bấm chip đầu tiên
+   thì chép bộ cột chung làm điểm bắt đầu. Hạng mục có cột riêng gắn chấm xanh; "Dùng cột chung" bỏ cột riêng. */
+function ColHm({ ctx, tk, tkEdit, perSec }) {
+  const [sel, setSel] = useState('')
+  const hm = bgColHm_(ctx.bgCfg)
+  const codes = []
+  // đủ mọi hạng mục có dòng trong khái toán (mọi dòng bóc tách của bản nháp, không chỉ hạng mục đang chọn in), xếp theo mã cây
+  ;(ctx.lines || []).forEach(l => { const c = String(l.nhom || '').trim(); if (c && codes.indexOf(c) < 0) codes.push(c) })
+  codes.sort((a, b) => { const k = s => String(s).split('.').map(x => parseInt(x, 10) || 0); const x = k(a), y = k(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d } return 0 })
+  Object.keys(hm).forEach(c => { if (codes.indexOf(c) < 0) codes.push(c) })   // hạng mục đã đặt riêng nhưng tạm hết dòng: vẫn hiện để bỏ được
+  const cur = sel && codes.indexOf(sel) >= 0 ? sel : ''
+  const rieng = cur ? hm[cur] : null
+  const map = cur ? (rieng || tk.cols) : tk.cols
+  const datHm = (code, m) => { const n = { ...hm }; if (m) n[code] = m; else delete n[code]; bgOptSet('colHm', Object.keys(n).length ? n : null) }
+  const onToggle = k => {
+    if (k === 'ten') return
+    if (!cur) { setColsMap({ ...tk.cols, [k]: !tk.cols[k] }); return }
+    datHm(cur, { ...map, [k]: !map[k] })
+  }
+  const nOn = m => COLS.filter(c => m[c[0]]).length
+  /* 2 module: Hạng mục (shortlist gõ để tìm: Chung + các hạng mục có dòng) -> Cột (chip tự đổi theo hạng mục đang chọn) */
+  return (
+    <>
+      {codes.length > 0 && (
+        <div className="qsq-khnhom">
+          <b><i className="ic demuc" />Hạng mục<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{Object.keys(hm).length} cột riêng</em></b>
+          <SearchSelect className="qsq-colhm-ss" value={cur} allLabel="Chung (mọi hạng mục)" onChange={v => setSel(v || '')}
+            options={codes.map(c => [c, (nodeName(c) || c) + (hm[c] ? ' · cột riêng (' + nOn(hm[c]) + ')' : '')])} />        </div>
+      )}
+      <div className="qsq-khnhom">
+      <b><i className="ic cot" />Cột · {cur ? (nodeName(cur) || cur) : 'Chung'}<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{nOn(map)}/{COLS.length}</em></b>
+      {cur && (
+        <div className={'qsq-colhm-info' + (rieng ? ' on' : '')}>
+          <span>{rieng ? <><b>{nodeName(cur) || cur}</b> dùng cột riêng · {nOn(rieng)} cột</> : <><b>{nodeName(cur) || cur}</b> đang dùng cột chung — bấm chip để đặt cột riêng</>}</span>
+          {rieng && <button type="button" className="qsc-btn" onClick={() => datHm(cur, null)}>Dùng cột chung</button>}
+        </div>
+      )}
+      {cur && !perSec && <p className="qsq-note warn"><Icon name="alert" size={12} /> Bản xem trước / PDF chỉ áp cột riêng khi bật "Mỗi hạng mục một trang mới" (Trang chi tiết). File Excel luôn áp (mỗi hạng mục 1 sheet).</p>}
+      <div className="qsq-colstrip">
+        <ColsStrip columns={COLS.map(c => ({ key: c[0], label: c[1] }))} cols={map} editing={cur ? false : tkEdit} onToggle={onToggle} />
+      </div>
+      </div>
+    </>
+  )
+}
 /* Font cho báo giá: chữ không chân / có chân (Google) + font có sẵn trên máy (Microsoft / Apple) có đủ dấu tiếng Việt */
 const FONT_NHOM = ['sans', 'serif', 'microsoft', 'apple']
 /* Công tắc bật / tắt (bgCongTac_ 528-530) */
@@ -599,55 +924,148 @@ function CongTac({ on, nhan, tip, onToggle }) {
   )
 }
 
-/* Khối "Tổng kết & điều khoản" (bgTkPanel_ 1131-1159) đặt trong thẻ 5 */
-function TkPanel({ ctx, open, onToggle }) {
+/* "Tổng kết & điều khoản" (thẻ 5): 4 module riêng có viền - Tổng tiền (VAT, chiết khấu, tổng + bằng chữ) · Thời hạn (ngày báo giá,
+   hiệu lực -> ngày hết hạn) · Tiến độ thanh toán (từng đợt: nội dung, %, số tiền; thanh tỉ lệ các đợt) · Ghi chú & điều khoản */
+const hetHan_ = (ngay, so) => {
+  const d = new Date(ngay); if (isNaN(d)) return ''
+  d.setDate(d.getDate() + (Number(so) || 0))
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear()
+}
+const DOT_MAU = ['#12314f', '#2f6fb0', '#6ea8d8', '#9cc3e4', '#c7dcef', '#7c7c7c']
+function TkPanel({ ctx }) {
   const o = bgOpt_(ctx.bgCfg)
-  const q = bgTong_(computeQuoteLocal(false, ctx).subtotal, ctx.bgCfg, ctx.cur && ctx.cur.vat)
+  const q = bgTong_(computeQuoteLocal(false, ctx).subtotal, ctx.bgCfg, ctx.cur && ctx.cur.vat, bgVatParts_(ctx))
   const tongDot = o.dot.reduce((a, d) => a + (Number(d[1]) || 0), 0)
+  const du = Math.round(tongDot * 100) / 100 === 100
   const ghi = o.ghiChu != null ? o.ghiChu : bgGhiChu_(q, ctx.bgCfg).join('\n')
+  const het = hetHan_(o.ngay, o.hieuLuc)
+  const org = bgOrg_(ctx.congTy, ctx.bgOrg)
+  const ky = bgKy_(ctx.bgCfg)
+  const datKy = m => bgOptSet('ky', { ...((ctx.bgCfg && ctx.bgCfg.ky) || {}), ...m })
+  /* VAT lấy từ % của từng hạng mục ở Bóc tách; sửa % ở đây thì hỏi rồi ghi ngược về Bóc tách (cùng dữ liệu vatHm / ptVat).
+     Tiền VAT mỗi mục đã trừ chiết khấu theo tỉ lệ */
+  const byHm = {}; const ordHm = []
+  bgLines_(ctx).forEach(l => { const k = String(l.nhom || '').trim(); if (!(k in byHm)) { byHm[k] = 0; ordHm.push(k) } byHm[k] += ttBan_(l) })
+  const hs = q.sub ? q.sau / q.sub : 0
+  const vatDs = ordHm.map(k => ({ code: k, ten: k ? (nodeName(k) || k) : 'Khác', vp: vatOf_(ctx, k), tt: byHm[k] }))
+  const ptTt = bgPTSecs_(ctx).reduce((a, x) => a + (Number(x.tt) || 0), 0)
+  if (ptTt) vatDs.push({ code: '3.1', ten: 'Phần thô', vp: vatOf_(ctx, '3.1'), tt: ptTt })
+  const doiVat = async (x, v) => {
+    const n = Number(String(v).trim().replace(',', '.'))
+    if (!isFinite(n) || n < 0 || n > 100 || n === x.vp) return false
+    if (!x.code) { toast('Dòng chưa có hạng mục - không đặt VAT riêng được'); return false }
+    if (!await qsConfirm({ title: 'Cập nhật VAT ' + n + '% vào hạng mục "' + x.ten + '" trong bảng Bóc tách?', ok: 'Cập nhật' })) return false
+    if (x.code === '3.1') projDataSet_('ptVat', n); else setVatHm(x.code, n)
+    toast('Đã cập nhật VAT ' + n + '% cho ' + x.ten + ' (Bóc tách)')
+  }
   return (
-    <div>
-      <div className="qsq-tk-h" onClick={onToggle}>
-        <QsIcon name="money" size={15} /><span style={{ flex: 1 }} />
-        <button type="button" className="qs-qt-btn" title="Tên, logo, địa chỉ in trên báo giá" onClick={e => { e.stopPropagation(); bgOrgEdit() }}>
-          <Icon name="building" size={14} />Thông tin công ty</button>
-        <span className="qsq-tk-car">{open ? '▴' : '▾'}</span>
-        <span className="qsq-tk-sum">Tạm tính <b>{money(q.sub)}</b>{q.ck ? <> · CK <b>−{money(q.ck)}</b></> : null} · VAT <b>{money(q.vat)}</b> · Tổng <b className="g">{money(q.total)} đ</b></span>
+    <div className="qsq-tk2">
+      {/* Thông tin công ty in trên báo giá: module riêng */}
+      <div className="qsq-khnhom">
+        <b><i className="ic cty" />Thông tin công ty<span style={{ flex: 1 }} />
+          <button type="button" className="qsq-tk2-cty" title="Tên, logo, địa chỉ in trên báo giá" onClick={bgOrgEdit}><Icon name="building" size={13} />Sửa</button></b>
+        <div className="qsq-tk2-org"><b>{org.ten || 'Chưa có tên công ty'}</b>{(org.lines || []).filter(Boolean).map((x, i) => <span key={i}>{x}</span>)}</div>
       </div>
-      {open && (
-        <div className="qsq-tk-b">
-          <div className="qsq-tk-c">
-            <label>Chiết khấu tổng đơn</label>
-            <div className="qsq-tk-ck">
-              <ChangeInput type="text" inputMode="decimal" value={o.ckKieu === 'vnd' ? money(o.ck) : o.ck} onCommit={v => bgOptSet('ck', tkNum_(v))} />
-              <select value={o.ckKieu} onChange={e => bgOptSet('ckKieu', e.target.value)}><option value="pct">%</option><option value="vnd">đ</option></select>
-            </div>
-            <label>Ngày báo giá</label>
-            <ChangeInput type="date" value={o.ngay} onCommit={v => bgOptSet('ngay', v)} />
-            <label>Hiệu lực (ngày)</label>
-            <ChangeInput type="number" min="0" value={o.hieuLuc} onCommit={v => bgOptSet('hieuLuc', Number(v) || 0)} />
-            <div className="qsq-tk-chu">{docSoVN_(q.total)}</div>
-          </div>
-          <div className="qsq-tk-c">
-            <label>Tiến độ thanh toán <span className={Math.round(tongDot) === 100 ? 'ok' : 'bad'}>tổng {tongDot}%</span></label>
-            {o.dot.map((d, i) => (
-              <div key={i} className="qsq-tk-dot">
-                <span className="n">{i + 1}</span>
-                <ChangeInput value={d[0]} onCommit={v => bgDotSet(i, 0, v)} />
-                <ChangeInput className="pc" type="number" min="0" max="100" step="any" value={Number(d[1]) || 0} onCommit={v => bgDotSet(i, 1, v)} /><i>%</i>
-                <span className="tien">{money(Math.round(q.total * (Number(d[1]) || 0) / 100))} đ</span>
-                <button type="button" className="x" title="Xoá đợt" onClick={() => bgDotDel(i)}>✕</button>
-              </div>
-            ))}
-            <button type="button" className="qs-qt-btn" onClick={bgDotAdd}>＋ Thêm đợt</button>
-          </div>
-          <div className="qsq-tk-c">
-            <label>Ghi chú &amp; điều khoản <small>(mỗi dòng 1 ý — hiệu lực báo giá tự thêm)</small></label>
-            <ChangeInput as="textarea" rows={6} value={ghi} onCommit={v => bgOptSet('ghiChu', v)} />
-            {o.ghiChu != null && <button type="button" className="qs-qt-btn" onClick={() => bgOptSet('ghiChu', null)}>Dùng ghi chú mặc định</button>}
-          </div>
+
+      <div className="qsq-khnhom">
+        <b><i className="ic tien" />Tổng tiền</b>
+        {/* 3 khối riêng cùng cỡ chữ / tỉ lệ: Thành tiền (Chưa VAT) (+ chiết khấu) · VAT (theo từng hạng mục) · Thành tiền (Bao gồm VAT) (+ bằng chữ) */}
+        <div className="qsq-tk2-sum">
+          <div><span>Thành tiền (Chưa VAT)</span><b>{money(q.sub)}</b></div>
+          {q.ck ? <><div><span>Chiết khấu</span><b className="am">−{money(q.ck)}</b></div><div><span>Sau chiết khấu</span><b>{money(q.sau)}</b></div></> : null}
         </div>
-      )}
+        <div className="qsq-tk2-sum">
+          <div><span>VAT {q.vatNhan}</span><b>{money(q.vat)}</b></div>
+          {vatDs.length > 0 && (
+            <ul className="qsq-tk2-vat">
+              {vatDs.map((x, i) => (
+                <li key={(x.code || '') + i}><span>{x.ten}</span>
+                  <em><ChangeInput className="qsq-tk2-vp" type="number" step="any" min="0" max="100" value={x.vp} title="% VAT lấy từ Bóc tách - sửa ở đây sẽ hỏi rồi cập nhật về Bóc tách"
+                    onCommit={v => doiVat(x, v)} />%</em>
+                  <b>{money(Math.round(x.tt * hs * x.vp / 100))}</b></li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="qsq-tk2-sum dam">
+          <div className="tong"><span>Thành tiền (Bao gồm VAT)</span><b>{money(q.total)}</b></div>
+          <p>{docSoVN_(q.total)}</p>
+        </div>
+      </div>
+
+      {/* Chiết khấu tổng đơn: module riêng - trừ vào tạm tính trước khi tính VAT */}
+      <div className="qsq-khnhom">
+        {/* chú thích hiện khi rê chuột vào đầu module (không chiếm dòng bên dưới) */}
+        <b title={q.ck ? 'Sau chiết khấu ' + money(q.sau) + ' đ (' + Math.round(q.ckPct * 100) / 100 + '% tạm tính) · VAT tính trên số sau chiết khấu' : 'Nhập % hoặc số tiền (đ) chiết khấu cho cả báo giá'}>
+          <i className="ic ck" />Chiết khấu tổng đơn<span style={{ flex: 1 }} />{q.ck ? <em className="qsq-colhm-n">−{money(q.ck)} đ</em> : null}</b>
+        <div className="qsq-tk2-in"><ChangeInput type="text" inputMode="decimal" value={o.ckKieu === 'vnd' ? money(o.ck) : o.ck} onCommit={v => bgOptSet('ck', tkNum_(v))} />
+          <select value={o.ckKieu} onChange={e => bgOptSet('ckKieu', e.target.value)}><option value="pct">%</option><option value="vnd">đ</option></select></div>
+      </div>
+
+      <div className="qsq-khnhom">
+        <b><i className="ic lich" />Thời hạn</b>
+        <div className="qsq-tk2-o2">
+          <div><label className="qsq-lb">Ngày báo giá</label><ChangeInput className="qsq-tk2-f" type="date" value={o.ngay} onCommit={v => bgOptSet('ngay', v)} /></div>
+          <div><label className="qsq-lb">Hiệu lực</label>
+            <div className="qsq-tk2-in"><ChangeInput type="number" min="0" value={o.hieuLuc} onCommit={v => bgOptSet('hieuLuc', Number(v) || 0)} /><em>ngày</em></div></div>
+        </div>
+        {het && <p className="qsq-tk2-note">Báo giá có hiệu lực đến hết ngày <b>{het}</b></p>}
+      </div>
+
+      <div className="qsq-khnhom">
+        <b><i className="ic dot" />Tiến độ thanh toán<span style={{ flex: 1 }} /><em className={'qsq-tk2-badge' + (du ? ' ok' : ' bad')}>{du ? '✓ ' : ''}Tổng {Math.round(tongDot * 100) / 100}%</em></b>
+        {o.dot.length > 0 && (
+          <div className="qsq-tk2-bar" aria-hidden="true">
+            {o.dot.map((d, i) => <i key={i} style={{ flex: Math.max(0, Number(d[1]) || 0), background: DOT_MAU[i % DOT_MAU.length] }} />)}
+            {tongDot < 100 && <i className="thieu" style={{ flex: 100 - tongDot }} />}
+          </div>
+        )}
+        {o.dot.map((d, i) => (
+          <div key={i} className="qsq-tk2-dot">
+            <span className="n" style={{ background: DOT_MAU[i % DOT_MAU.length] }}>{i + 1}</span>
+            <ChangeInput className="ten" value={d[0]} placeholder="Nội dung đợt" onCommit={v => bgDotSet(i, 0, v)} />
+            <button type="button" className="x" title="Xoá đợt" onClick={() => bgDotDel(i)}><Icon name="x" size={13} /></button>
+            <div className="qsq-tk2-in pc"><ChangeInput type="number" min="0" max="100" step="any" value={Number(d[1]) || 0} onCommit={v => bgDotSet(i, 1, v)} /><em>%</em></div>
+            <span className="tien">{money(Math.round(q.total * (Number(d[1]) || 0) / 100))} đ</span>
+          </div>
+        ))}
+        <button type="button" className="qsq-tk2-them" onClick={bgDotAdd}><Icon name="plus" size={13} />Thêm đợt</button>
+      </div>
+
+      <div className="qsq-khnhom">
+        <b><i className="ic ghi" />Ghi chú &amp; điều khoản</b>
+        <ChangeInput as="textarea" className="qsq-tk2-f" rows={6} value={ghi} onCommit={v => bgOptSet('ghiChu', v)} />
+        <p className="qsq-tk2-note">Mỗi dòng 1 ý · dòng hiệu lực báo giá tự thêm.</p>
+        {o.ghiChu != null && <button type="button" className="qsq-tk2-them" onClick={() => bgOptSet('ghiChu', null)}><Icon name="undo" size={13} />Dùng ghi chú mặc định</button>}
+      </div>
+
+      {/* Chữ ký (trang bìa sau): hiện / ẩn, dòng "(Ký, ghi rõ họ tên)", chiều cao chỗ ký, 2-3 cột với tiêu đề + tên tự đặt */}
+      <div className="qsq-khnhom">
+        <b><i className="ic ky" />Chữ ký<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{ky.an ? 'Đang ẩn' : ky.cot.length + ' cột'}</em></b>
+        <CongTac on={!ky.an} nhan="Hiện ô ký" tip="Tắt = bỏ cả khối chữ ký ở trang bìa sau" onToggle={v => datKy({ an: !v })} />
+        {!ky.an && (
+          <>
+            <CongTac on={ky.ghi} nhan="Dòng (Ký, ghi rõ họ tên)" tip="Dòng nhắc nhỏ dưới tiêu đề mỗi cột ký" onToggle={v => datKy({ ghi: v })} />
+            <label className="qsq-lb">Chiều cao chỗ ký</label>
+            <SoChu v={ky.cao} min={30} max={240} step={10} don="px (30–240)" onSet={n => datKy({ cao: n })} />
+            {ky.cot.map((c, i) => {
+              const mac = bgKyMac_(i, ctx, org, getState().me ? (getState().me.hoTen || getState().me.username) : '')
+              return (
+                <div key={i} className="qsq-tk2-ky">
+                  <div className="h"><span>Cột {i + 1}</span>
+                    {i >= 2 && <button type="button" className="x" title="Bỏ cột này" onClick={() => datKy({ cot: ky.cot.filter((y, j) => j !== i) })}><Icon name="x" size={13} /></button>}</div>
+                  <ChangeInput className="qsq-tk2-f" value={c.hd} placeholder={mac.hd || 'Tiêu đề cột'} title="Tiêu đề cột ký (để trống = mặc định)"
+                    onCommit={v => datKy({ cot: ky.cot.map((y, j) => (j === i ? { ...y, hd: String(v || '').slice(0, 80) } : y)) })} />
+                  <ChangeInput className="qsq-tk2-f" value={c.nm} placeholder={mac.nm || 'Tên / chức danh dưới chỗ ký'} title="Dòng dưới chỗ ký (để trống = mặc định)"
+                    onCommit={v => datKy({ cot: ky.cot.map((y, j) => (j === i ? { ...y, nm: String(v || '').slice(0, 120) } : y)) })} />
+                </div>
+              )
+            })}
+            {ky.cot.length < KY_COT_MAX && <button type="button" className="qsq-tk2-them" onClick={() => datKy({ cot: ky.cot.concat([{ hd: '', nm: '' }]) })}><Icon name="plus" size={13} />Thêm cột ký</button>}
+            {ctx.bgCfg && ctx.bgCfg.ky && <button type="button" className="qsq-tk2-them" onClick={() => bgOptSet('ky', null)}><Icon name="undo" size={13} />Chữ ký mặc định</button>}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -851,8 +1269,12 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
       <TheXo id="bia" ten="Trang bìa" tip="Chọn mẫu tờ bìa"
         phu={'Trang 1 · ' + (biaDang ? biaDang.ten : 'Mẫu') + (biaDoi ? ' (đã sửa)' : '') + ' · ' + bia.hienTT.length + ' mục thông tin'}
         inline={({ moKhung }) => (
-          <BiaMauHang ctx={ctx} coverMau={q.coverMau} onChon={t => { biaApDung(t); moKhung() }}
-            onMoi={async () => { if (await biaLuuMoi(ctx.bgCfg, q.coverMau)) moKhung() }} />
+          <>
+            <BiaMauHang ctx={ctx} coverMau={q.coverMau} onChon={t => { biaApDung(t); moKhung() }}
+              onMoi={async () => { if (await biaLuuMoi(ctx.bgCfg, q.coverMau)) moKhung() }} />
+            {/* chọn nhanh ngay trên thẻ (không mở khung chi tiết); danh sách từng đầu mục ở khung bên phải */}
+            <div className="qsq-dm qsq-dm-nhanh"><DauMucNhanh ctx={ctx} /></div>
+          </>
         )}>
         <Sub id="biamau" t="Mẫu tờ bìa">
           <BiaMauHang ctx={ctx} coverMau={q.coverMau} onChon={biaApDung} onMoi={() => biaLuuMoi(ctx.bgCfg, q.coverMau)} />
@@ -880,6 +1302,9 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
         <Sub id="thongtin" t="Thông tin dự án" extra={<span className="qsq-subn">{bia.hienTT.length}/{BG_TT_DS.length}</span>}>
           <TtDuAn bia={bia} />
         </Sub>
+        <Sub id="daumuc" t="Đầu mục trên bìa" extra={<span className="qsq-subn">{(ctx.cover || []).filter(c => !bgHidden(c.stt, ctx.bgCfg)).length}/{(ctx.cover || []).length}</span>}>
+          <DauMuc ctx={ctx} />
+        </Sub>
       </TheXo>
 
       <The id="chitiet" ten="Trang chi tiết" phu={'Trang 2+ · ' + pages + ' trang' + (q.bgPerSec !== false ? ' · mỗi hạng mục 1 trang' : '')}>
@@ -902,6 +1327,11 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
         </Sub>
       </The>
 
+      {/* Tổng kết & điều khoản (trang bìa sau) ngay dưới Trang chi tiết: đi theo thứ tự trang của báo giá */}
+      <The id="tk" ten="Tổng kết & điều khoản" phu="VAT · chiết khấu · thanh toán · ghi chú" className="tk">
+        <TkPanel ctx={ctx} />
+      </The>
+
       {/* Cột xuất: 3 module riêng — Bộ cột (danh sách bộ, sửa / sắp xếp / xoá / mặc định như Bóc tách) · Bật / tắt từng cột
           (chip + Tạo mới / Lưu đè bộ cột) · Cột nội bộ. Dùng chung bộ cột với bảng Bóc tách */}
       <The id="cot" ten="Cột xuất" phu={'Đang in ' + nCot + ' cột · bộ ' + ql.nhan}>
@@ -910,10 +1340,7 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
             onEndEdit={keep => (keep ? endEdit() : cancelEdit())} onClose={() => {}} />
         </Sub>
         <Sub id="chip" t="Bật / tắt từng cột" extra={<span className="qsq-subn">{ql.on}/{ql.total}</span>}>
-          <div className="qsq-colstrip">
-            <ColsStrip columns={COLS.map(c => ({ key: c[0], label: c[1] }))} cols={tk.cols} editing={tkEdit}
-              onToggle={k => { if (k === 'ten') return; setColsMap({ ...tk.cols, [k]: !tk.cols[k] }) }} />
-          </div>
+          <ColHm ctx={ctx} tk={tk} tkEdit={tkEdit} perSec={q.bgPerSec !== false} />
         </Sub>
         <Sub id="noibo" t="Cột nội bộ">
           <CongTac on={noiBo} nhan="Xuất kèm cột nội bộ (bản nội bộ)" tip="Giá bán lẻ NCC, CK đại lý, giá đại lý, lợi nhuận… — không gửi khách" onToggle={bgNoiBoDat} />
@@ -931,13 +1358,18 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
         <TuyBien mau={mau} chu={chu} bia={bia} fontNhom={fontNhom} />
       </The>
 
-      <The id="tk" ten="Tổng kết & điều khoản" phu="VAT · chiết khấu · thanh toán · ghi chú" className="tk">
-        <div className="qsq-vat"><label className="qsq-lb">VAT của dự án</label>
-          <span><ChangeInput className="qsq-in" type="number" step="any" min="0" value={Number(ctx.cur && ctx.cur.vat) || 0}
-            title="Dùng chung với Bóc tách / Chi phí" onCommit={v => setVat(v)} /> %</span></div>
-        <TkPanel ctx={ctx} open={!!q.tkOpen} onToggle={() => setQ(s => ({ tkOpen: !s.tkOpen }))} />
-      </The>
-
+      {/* Khổ in: trang xem trước, chia trang và bản in / PDF theo khổ này (bgCfg.kho) */}
+      <div className="qsq-kho" role="radiogroup" aria-label="Khổ in">
+        <span className="lb">Khổ in</span>
+        <div className="ds">
+          {BG_KHO_DS.map(x => (
+            <button key={x[0]} type="button" role="radio" aria-checked={chu.kho.k === x[0]} className={chu.kho.k === x[0] ? 'on' : ''}
+              title={x[1] + ' (' + x[5] + ' × ' + x[6] + ' mm)'} onClick={() => bgOptSet('kho', x[0] === 'A4L' ? null : x[0])}>
+              <i className={x[2] > x[3] ? 'ngang' : 'doc'} aria-hidden="true" />{x[1]}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="qsq-xuat">
         <button type="button" className="qs-qt-btn green" disabled={q.exporting} onClick={() => onExport('xlsx')}>
           <Icon name="download" size={15} />{q.exporting ? 'Đang xuất…' : 'Xuất Excel'}</button>

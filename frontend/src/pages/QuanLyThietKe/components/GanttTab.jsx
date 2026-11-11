@@ -4,6 +4,7 @@ import * as QLTK_DATA from '../../../data/quanLyThietKeData'
 import TaskDrawer from './TaskDrawer'
 import GanttItemModal from './GanttItemModal'
 import PurchaseBoard from './PurchaseBoard'
+import PurchaseInfoPanel from './PurchaseInfoPanel'
 import { useDelivery, projectSub, createSamplePhases, CORE_PHASES } from '../delivery'
 
 const STATS_EXPANDED_H = 200
@@ -127,6 +128,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [drawer, setDrawer] = useState({ taskId: null, open: false })
   const [board, setBoard] = useState({ taskId: null, open: false })
+  const [pinfo, setPinfo] = useState({ taskId: null, open: false })   // Phiếu thông tin mua hàng (khung phải)
   const [openPhasePop, setOpenPhasePop] = useState(null)
   const [cashflowOpen, setCashflowOpen] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
@@ -273,13 +275,22 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   }
   function openTask(t) {
     setSelectedTaskId(t.id)
-    // Công việc mua hàng → mở trang chi tiết đơn mua hàng dạng kanban thay cho drawer
-    if (purchaseTaskIds.has(t.id)) setBoard({ taskId: t.id, open: true })
-    else setDrawer({ taskId: t.id, open: true })
+    // Công việc mua hàng → mở "Phiếu thông tin mua hàng" ở khung phải (timeline vẫn hiện); nút trong phiếu mở bảng kanban đầy đủ
+    if (purchaseTaskIds.has(t.id)) { setDrawer(d => ({ ...d, open: false })); setPinfo({ taskId: t.id, open: true }) }
+    else { setPinfo(p => ({ ...p, open: false })); setDrawer({ taskId: t.id, open: true }) }
   }
   function closeDrawer() {
     setDrawer(d => ({ ...d, open: false }))
     setSelectedTaskId(null)
+  }
+  function closePinfo() {
+    setPinfo(p => ({ ...p, open: false }))
+    setSelectedTaskId(null)
+  }
+  function openBoardFromPinfo() {
+    const id = pinfo.taskId
+    setPinfo(p => ({ ...p, open: false }))
+    if (id) setBoard({ taskId: id, open: true })
   }
   function closeBoard() {
     setBoard(b => ({ ...b, open: false }))
@@ -750,10 +761,22 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
         onAddComment={addComment}
         onConfirm={confirmFinance}
       />
+      <PurchaseInfoPanel
+        task={pinfo.taskId ? phases.flatMap(p => p.tasks).find(t => t.id === pinfo.taskId) : null}
+        items={pinfo.taskId ? purchaseItems[pinfo.taskId] : null}
+        open={pinfo.open}
+        projectName={dv.current ? currentProject.name + (currentProject.maDA ? ' - [' + currentProject.maDA + ']' : '') : ''}
+        meName={dv.meName}
+        onUpdateItems={setPurchaseItems}
+        onClose={closePinfo}
+        onOpenBoard={openBoardFromPinfo}
+      />
       <PurchaseBoard
         task={boardTask}
         items={boardTask ? purchaseItems[boardTask.id] : null}
         open={board.open}
+        projectName={dv.current ? currentProject.name + (currentProject.maDA ? ' - [' + currentProject.maDA + ']' : '') : ''}
+        meName={dv.meName}
         onClose={closeBoard}
         onMove={movePurchaseItem}
         onUpdateItems={setPurchaseItems}

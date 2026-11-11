@@ -11,7 +11,7 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-// Phân quyền HR (migration 0024): tài khoản đăng nhập gắn với 1 hồ sơ nhân sự (hr_nhan_vien.tai_khoan_id) có vai trò HR.
+// Phân quyền HR (migration 0028): tài khoản đăng nhập gắn với 1 hồ sơ nhân sự (hr_nhan_vien.tai_khoan_id) có vai trò HR.
 // Admin / super của công ty luôn là sysadmin. Vai trò -> phạm vi dữ liệu (all / dept / self) + ma trận quyền theo phân hệ
 // (hr_bao_mat, thiếu thì DefaultPerms). Mọi lệnh HR qua gate(): kiểm tab hr, quyền phân hệ; dữ liệu đọc lọc theo phạm vi.
 

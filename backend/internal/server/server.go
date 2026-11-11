@@ -51,6 +51,7 @@ type Server struct {
 	engine *gin.Engine
 	http   *http.Server
 	stop   []func(context.Context) // việc cần làm khi tắt (dừng job nền...)
+	drain  []func(context.Context) // việc chạy TRƯỚC http.Server.Shutdown (kết nối đã hijack: WebSocket chat)
 
 	reports   contracts.ReportRunner   // module reports, cho job nền
 	expiry    contracts.ExpiryReminder // module companies: nhắc gia hạn trong ứng dụng (M17.3), cho job nền
@@ -289,12 +290,17 @@ func (s *Server) SwaggerOn() bool { return s.swaggerOn }
 // OnShutdown đăng ký việc chạy khi server tắt (vd dừng job nền).
 func (s *Server) OnShutdown(fn func(context.Context)) { s.stop = append(s.stop, fn) }
 
+// OnShutdownFirst đăng ký việc chạy NGAY khi bắt đầu tắt, trước http.Server.Shutdown: http.Server không theo dõi
+// kết nối đã hijack (WebSocket), nên gateway chat phải tự báo client "reconnect" rồi đóng - làm trước thì client
+// biết sớm thay vì chờ request REST đang dở chạy xong.
+func (s *Server) OnShutdownFirst(fn func(context.Context)) { s.drain = append(s.drain, fn) }
+
 // Run mở cổng và chạy tới khi ctx bị huỷ (SIGINT / SIGTERM), rồi tắt êm: ngừng nhận request mới,
 // chờ request đang chạy tối đa 15 giây, đóng pool database.
 func (s *Server) Run(ctx context.Context) error {
 	errc := make(chan error, 1)
 	go func() {
-		fmt.Println("QS Pro chạy tại http://localhost:" + strconv.Itoa(s.deps.Cfg.Port))
+		//fmt.Println("QS Pro chạy tại http://localhost:" + strconv.Itoa(s.deps.Cfg.Port))
 		if s.swaggerOn {
 			fmt.Println("Swagger UI: http://localhost:" + strconv.Itoa(s.deps.Cfg.Port) + "/api-docs")
 		}
@@ -310,6 +316,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	// tối đa 5 giây cho phần này (client chết không trả khung đóng thì bị cắt), còn lại cho request đang chạy
+	dctx, dcancel := context.WithTimeout(sctx, 5*time.Second)
+	for _, fn := range s.drain {
+		fn(dctx)
+	}
+	dcancel()
 	err := s.http.Shutdown(sctx)
 	for _, fn := range s.stop {
 		fn(sctx)

@@ -1029,9 +1029,88 @@ func purchaseItems(v any) ([]any, error) {
 		if it.Has("dept") {
 			o.Set("dept", str(it, "dept"))
 		}
+		if err := poExtra(it, o); err != nil {
+			return nil, err
+		}
 		out = append(out, o)
 	}
 	return out, nil
+}
+
+// Trường phiếu chi tiết đơn mua hàng (chỉ ghi khi client gửi): chữ, nhân sự (1 tên hoặc danh sách tên), ngày yyyy-mm-dd,
+// số ngày, tệp đính kèm [{name, url}].
+var (
+	poText   = []string{"sample", "drawings", "workflow", "productGroup", "payment", "priority", "note", "createdBy"}
+	poPeople = []string{"pm", "buyer", "accountant", "siteManager", "pc", "siteReceiver"}
+	poDates  = []string{"orderActualPurchasing", "orderActualAccounting", "orderActualPc", "actualAtSite", "planPc", "planBuy", "planDueKT", "createdAt"}
+	poDays   = []string{"leadTime", "timeOffset"}
+	poFiles  = []string{"filesPm", "filesContract", "filesSample", "filesDrawings"}
+	safeURL  = regexp.MustCompile(`^(https?://|/)`)
+)
+
+func poExtra(it, o *omap.Map) error {
+	for _, k := range poText {
+		if it.Has(k) {
+			s := str(it, k)
+			if len([]rune(s)) > 2000 {
+				return apperr.BadRequest("Nội dung quá dài: " + k)
+			}
+			o.Set(k, s)
+		}
+	}
+	for _, k := range poPeople {
+		if !it.Has(k) {
+			continue
+		}
+		if _, ok := it.Val(k).([]any); ok {
+			o.Set(k, strList(it.Val(k)))
+		} else {
+			o.Set(k, str(it, k))
+		}
+	}
+	for _, k := range poDates {
+		if it.Has(k) {
+			d, err := optDate(it, k)
+			if err != nil {
+				return err
+			}
+			o.Set(k, d)
+		}
+	}
+	for _, k := range poDays {
+		if !it.Has(k) {
+			continue
+		}
+		if jsval.IsNullish(it.Val(k)) || str(it, k) == "" {
+			o.Set(k, nil)
+			continue
+		}
+		n := jsval.ToNumber(it.Val(k))
+		if n != n || n < -3650 || n > 3650 {
+			return apperr.BadRequest("Số ngày không hợp lệ: " + k)
+		}
+		o.Set(k, jsval.Round(n))
+	}
+	for _, k := range poFiles {
+		if !it.Has(k) {
+			continue
+		}
+		arr, _ := it.Val(k).([]any)
+		files := []any{}
+		for _, x := range arr {
+			f, ok := x.(*omap.Map)
+			if !ok || len(files) >= 20 {
+				return apperr.BadRequest("Tệp đính kèm không hợp lệ")
+			}
+			u := str(f, "url")
+			if !safeURL.MatchString(u) || strings.HasPrefix(u, "//") {
+				return apperr.BadRequest("Đường dẫn tệp không hợp lệ")
+			}
+			files = append(files, omap.Of("name", str(f, "name"), "url", u))
+		}
+		o.Set(k, files)
+	}
+	return nil
 }
 
 // purchaseFlow: các bước (cột) bảng kanban mua hàng của 1 công việc; null = quy trình mặc định của giao diện.

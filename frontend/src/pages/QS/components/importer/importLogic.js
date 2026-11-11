@@ -167,7 +167,7 @@ export async function tdSave_(specs, setBtn) {
       const gia = Number(data['GIÁ BÁN LẺ']) || 0, qty = Math.max(1, Number(g.qty) || 1)
       // Đề mục theo NGÀNH đang nhập: sơn 3.2.2, công tắc 3.2.6.2, điện lạnh 3.2.7, gạch 3.2.4, vệ sinh 3.2.5, đèn 3.2.6.1
       const ndGhi = ndOfNganh_(ngIn)
-      items[0].ghi = { maDAs, qty, prod: { ten, ma: data['MÃ SẢN PHẨM'] || '', thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '',
+      items[0].ghi = { maDA: maDAs[0], maDAs, qty, prod: { ten, ma: data['MÃ SẢN PHẨM'] || '', thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '',
         moTa: data['MÔ TẢ'] || '', kichThuoc: data['KÍCH THƯỚC'] || '', dvt: data['ĐƠN VỊ TÍNH'] || 'Cái', hinhAnh: data['ẢNH SẢN PHẨM'] || '',
         donGiaVon: gia, donGiaBan: gia, nhom: ndGhi, hangMuc: nodeName(ndGhi), loai: nodeName(ndGhi), tang: '', extra: { nganh: data['DÒNG SẢN PHẨM'] || '' } } }
     }
@@ -186,6 +186,13 @@ export async function tdSave_(specs, setBtn) {
     }
     return 'ok'
   } finally { setBtn(false, '') }
+}
+
+/* Dự án đã chọn để ghi danh của form: ghi.maDAs (chọn nhiều); bản cũ ghi.maDA (null = dự án đang mở) */
+export function ghiMaDAs_(g, cur) {
+  if (Array.isArray(g.maDAs)) return g.maDAs
+  const m = g.maDA == null ? ((cur && cur.maDA) || '') : g.maDA
+  return m ? [m] : []
 }
 
 /* ===== DANH SÁCH CHỜ (nhap.js:532-559, 587-663) ===== */
@@ -279,12 +286,13 @@ async function pendingCommitRun_(ds) {
       : (g.ma ? (getState().products || []).filter(x => x.ma === g.ma && x.ten === g.ten)[0] : null)
     if (!g.rid && !real) { toast('Lưu "' + g.ten + '" OK nhưng chưa tìm thấy SP để ghi danh dự án — thêm tay ở Danh sách sản phẩm'); continue }
     if (real) pr = Object.assign({}, real, { nhom: nd, hangMuc: nodeName(nd), loai: nodeName(nd), tang: '', extra: { nganh: real.nhom || '' } })
-    // 1 sản phẩm ghi vào MỌI dự án đã chọn (bản cũ trong danh sách chờ chỉ có maDA)
-    for (const maDA of (g.ghi.maDAs || [g.ghi.maDA]).filter(Boolean)) {
+    // ghi danh vào từng dự án đã chọn (chọn nhiều ở bảng Ghi danh vào nhiều dự án); bản cũ chỉ có maDA
+    const dsDA = g.ghi.maDAs && g.ghi.maDAs.length ? g.ghi.maDAs : [g.ghi.maDA]
+    for (const ma of dsDA) {
       try {
-        await api.addLine(maDA, pr, g.ghi.qty); ghiN++
+        await api.addLine(ma, pr, g.ghi.qty); ghiN++
         const cur = getState().cur
-        if (cur && cur.maDA === maDA) await reloadLines()
+        if (cur && cur.maDA === ma) await reloadLines()
       } catch (e3) { toast('Lưu "' + g.ten + '" OK nhưng ghi danh dự án lỗi: ' + e3.message) }
     }
   }

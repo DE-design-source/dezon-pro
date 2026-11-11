@@ -4,7 +4,7 @@ import QsIcon from '../common/QsIcon'
 import { MrootPortal } from '../common/Mroot'
 import { getDialogs } from '../common/dialogs'
 import { money } from '../../lib/format.js'
-import { bgHist_, bgMa_, bgTong_, computeQuoteLocal, BG_LYDO } from '../../lib/quote.js'
+import { bgHist_, bgMa_, bgTong_, bgVatParts_, computeQuoteLocal, BG_LYDO } from '../../lib/quote.js'
 import { useQsStore } from '../../state/store'
 import { fmtDateTime_, cpSigned_, freshModel } from './quoteModel'
 import { bgDocCss_, docScreenCss } from './docCss'
@@ -33,7 +33,7 @@ export function HistoryModal({ onClose, onView }) {
   const h = bgHist_(projData).slice().reverse()
   const tongNay = useMemo(() => {
     const m = freshModel()
-    return bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, m.ctx.cur && m.ctx.cur.vat).total
+    return bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, m.ctx.cur && m.ctx.cur.vat, bgVatParts_(m.ctx)).total
   }, [projData, cur])
   return (
     <MrootPortal>

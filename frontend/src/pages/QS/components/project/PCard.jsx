@@ -1,13 +1,14 @@
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
-import { cpTong_ } from '../../lib/totals.js'
+import { cpTong_, daScope_ } from '../../lib/totals.js'
 import { money, safeUrl_ } from '../../lib/format.js'
 import { dezonUrl_, ttChuan_ } from '../../lib/dashModel.js'
 import { useFold, foldToggle_, projCtx_, usePdState, pdRetry_ } from './projectShell'
 import { projInfoModal, dezonSet_ } from './projectActions'
 import { useQsStore } from '../../state/store'
 import { setPcTotalsEl, setPcNodeEl, usePcAlignX } from './pcSlot'
+import { setQbSlotEl } from './qbSlot'
 import { useFitLevel } from '../common/useFitLevel'
 import './project.css'
 
@@ -17,19 +18,29 @@ import './project.css'
    Dạng gập dùng lại thanh .qs-bd-bar của bản clone. Số tiền chỉ hiện khi đã có projData của bản nháp (usePdState).
    Ở tab Bóc tách, băng mở rộng có chỗ trống .qs-pc-totals: SheetHeader đưa dải Chưa VAT / VAT / Tổng lên đây (pcSlot.js). */
 export default function PCard() {
-  const { cur, lines, projects, projData, selectProject, status } = useQs()
+  const { cur, lines, projects, projData, selectProject, status, node, hmNode } = useQs()
   const tab = useQsStore(s => s.tab)
   const alignX = usePcAlignX()
   const pd = usePdState(cur, status)
   const folded = useFold('pcard')
   const p = cur || {}
   const pct = Math.max(0, Math.min(100, Number(p.tienDo) || 0))
-  // đúng số tab Chi phí: gồm Phần thô, đã trừ CK báo giá (cpTong_ với hm = '')
-  const TT = useMemo(() => (cur ? cpTong_(lines || [], '', projCtx_(cur, projData)) : null), [cur, lines, projData])
+  /* Lợi nhuận / % Lợi nhuận theo hạng mục đang xem, khớp số của tab: Bóc tách theo node, Chi phí / Dự án theo hmNode
+     (cpTong_ của đúng phạm vi đó; chưa chọn hạng mục = toàn dự án, gồm Phần thô, đã trừ CK báo giá). Tab khác: toàn dự án */
+  const hm = tab === 'boc' ? (node || '') : (tab === 'chiphi' || tab === 'duan' ? (hmNode || '') : '')
+  const TT = useMemo(() => (cur ? cpTong_(daScope_(lines || [], hm), hm, projCtx_(cur, projData)) : null), [cur, lines, projData, hm])
   /* Băng thiếu chỗ thì gọn dần theo mức data-fit 0..4 (project.css): đo tràn chữ ở các cụm, nút, tên hạng mục */
   const bandRef = useRef(null)
   useFitLevel(bandRef, 4, '.qs-pc-mod, .qs-pc-main, .qs-pc-node, .qs-bd-node-lbl, .qs-bd-category b, .qs-bd-seg button, .qs-bd-cols-label', [folded, tab])
 
+  /* Chi phí / Dự án: chỗ trống trên băng cho "Hạng mục đã bóc" + kiểu bảng + cột hiển thị (PageHead portal vào, qbSlot 'pc:<tab>') */
+  const nodeKey = tab === 'chiphi' || tab === 'duan' ? 'pc:' + tab : ''
+  const nodeRef = useCallback(n => { if (nodeKey) setQbSlotEl(nodeKey, n) }, [nodeKey])
+  /* Chi phí: chỗ trong khung tiền cho dải Vốn · Giá bán · Lợi nhuận · Biên (PageHead portal vào, qbSlot 'pcm:chiphi');
+     có dải thì ẩn Lợi nhuận / % Lợi nhuận của băng (trùng) */
+  // Mua hàng: dải NCC đang chọn · Sản phẩm · Trước / Sau giảm · VAT · Tổng cũng lên khung tiền (PurchaseTab portal vào 'pcm:muahang')
+  const moneyKey = tab === 'chiphi' ? 'pcm:chiphi' : (tab === 'muahang' ? 'pcm:muahang' : '')
+  const moneyRef = useCallback(n => { if (moneyKey) setQbSlotEl(moneyKey, n) }, [moneyKey])
   const openInfo = () => { if (cur) projInfoModal(cur.maDA) }
   const stop = e => e.stopPropagation()
   /* Ô chọn dự án đứng ở đầu băng, thay cho tên dự án (tên đang chọn hiện ngay trong ô) */
@@ -72,7 +83,7 @@ export default function PCard() {
     <div className="qs-pc" ref={bandRef}>
       {/* Bóc tách: khối tên dự án rộng tới mép trái của bảng bên dưới (trừ đệm trái 14 + khe 23 của .qs-pc, project.css) để các module
           Hạng mục đã bóc · kiểu bảng · cột · tiền nằm gọn trong bề ngang của bảng, thẳng mép bảng */}
-      <div className={`qs-pc-main${tab === 'boc' ? ' has-node' : ''}`}
+      <div className={`qs-pc-main${tab === 'boc' || nodeKey ? ' has-node' : ''}`}
         style={tab === 'boc' && alignX ? { '--pc-align': Math.max(170, alignX - 37) + 'px' } : undefined}>
         <div className="qs-pc-top">
           <span className="qs-pc-proj" onClick={stop}>{sel}</span>
@@ -81,9 +92,11 @@ export default function PCard() {
         </div>
       </div>
       {tab === 'boc' && <div className="qs-pc-node" ref={setPcNodeEl} onClick={stop} />}
+      {nodeKey && <div className="qs-pc-node" ref={nodeRef} onClick={stop} />}
       {/* Module 4 (tiền): Chưa VAT · Tổng (VAT) (Bóc tách đưa vào .qs-pc-totals) · Lợi nhuận · % Lợi nhuận, chung 1 khung */}
       <div className="qs-pc-mod qs-pc-money">
         {tab === 'boc' && <div className="qs-pc-totals" ref={setPcTotalsEl} onClick={stop} />}
+        {moneyKey && <div className="qs-pc-totals qs-pc-cpstats" ref={moneyRef} onClick={stop} />}
         <div className="qs-pc-kpi">
           {TT && (
             <>
@@ -91,7 +104,7 @@ export default function PCard() {
                 ? (
                   <>
                     <div className="qs-pc-k"><span className="kv">{money(TT.net - TT.von)}đ</span><span className="kl">Lợi nhuận</span></div>
-                    <div className="qs-pc-k" title="Lợi nhuận / doanh thu chưa VAT (đã trừ chiết khấu báo giá)">
+                    <div className="qs-pc-k" title={hm ? 'Lợi nhuận / doanh thu chưa VAT của hạng mục đang xem' : 'Lợi nhuận / doanh thu chưa VAT toàn dự án (đã trừ chiết khấu báo giá)'}>
                       <span className="kv">{(Math.round(TT.bien * 10) / 10).toLocaleString('vi-VN')}%</span><span className="kl">% Lợi nhuận</span>
                     </div>
                     {TT.ptErr && <div className="qs-pc-k qs-pc-err" title={TT.ptErr}><span className="kv">!</span><span className="kl">Phần thô lỗi, chưa tính</span></div>}

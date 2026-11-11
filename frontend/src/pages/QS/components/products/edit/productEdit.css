@@ -10,7 +10,9 @@
 /* thấp hơn hộp xác nhận / toast / xem ảnh dùng chung (90 / 95 / 99) để "Thoát mà chưa lưu?" hiện trên modal */
 .qsc-ov.qspe-ov{z-index:88;}
 .qspe-dlg{background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:16px; box-shadow:0 24px 60px rgba(0,0,0,.28); font-size:13px; line-height:1.5; padding:20px 22px; max-width:100%;}
-.qspe-dlg.qspe-edit{width:min(1240px, calc(96vw / var(--qs-zoom, .75)));}
+/* hộp Cập nhật sản phẩm rộng ~70% bề ngang màn hình (trước: tối đa 1240px); màn ≤1400px thì 92% */
+.qspe-dlg.qspe-edit{width:calc(70vw / var(--qs-zoom, .75)); max-width:calc(96vw / var(--qs-zoom, .75));}
+@media (max-width:1400px){ .qspe-dlg.qspe-edit{width:calc(92vw / var(--qs-zoom, .75));} }
 .qspe-dlg.qspe-nbt{width:min(820px, calc(96vw / var(--qs-zoom, .75)));}
 .qspe-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;}
 .qspe-head h3{margin:0; display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:650; color:var(--text);}

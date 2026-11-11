@@ -1,12 +1,18 @@
 package server
 
 import (
+	"context"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"time"
 
+	"qspro-backend/internal/config"
 	"qspro-backend/internal/middleware"
 	"qspro-backend/internal/modules/auth"
 	"qspro-backend/internal/modules/categories"
+	"qspro-backend/internal/modules/chat"
+	"qspro-backend/internal/modules/chat/realtime"
 	"qspro-backend/internal/modules/companies"
 	"qspro-backend/internal/modules/delivery"
 	"qspro-backend/internal/modules/estimates"
@@ -22,6 +28,10 @@ import (
 	"qspro-backend/internal/modules/system"
 	"qspro-backend/internal/modules/takeoff"
 	"qspro-backend/internal/modules/users"
+	"qspro-backend/internal/platform/logger"
+	"qspro-backend/internal/platform/mailer"
+	"qspro-backend/internal/platform/objstore"
+	"qspro-backend/internal/platform/webpush"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/response"
 )
@@ -119,7 +129,8 @@ func (s *Server) modules() []Module {
 	matSvc := materials.New(materials.Deps{DuyetDelay: time.Minute, DB: d.DB, Cfg: d.Cfg, Auditor: usersSvc, Users: usersSvc, UserFmt: usersSvc,
 		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage})
 	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc})
-	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc})
+	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc, Users: usersSvc, UserFmt: usersSvc,
+		Notifier: notifSvc, Admins: notifSvc})
 	quoteSvc := quotations.New(quotations.Deps{DB: d.DB, Cfg: d.Cfg, Lines: takeoffSvc, Projects: projSvc, Media: filesSvc,
 		Files: d.Storage})
 	estSvc := estimates.New(estimates.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Auditor: usersSvc})
@@ -130,6 +141,16 @@ func (s *Server) modules() []Module {
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
 		Delivery: delivSvc})
+	// Chat (tài khoản theo số điện thoại hoặc email, không phụ thuộc module nào). Gateway WebSocket một tiến trình (realtime.Hub)
+	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
+	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);
+	// bộ chạy phân phối + worker push dừng SAU, khi request REST đang dở đã xong (tin hệ thống của chúng vẫn phân phối + push).
+	chatSvc := chat.New(chat.Deps{DB: d.DB, Cfg: d.Cfg, Mail: chatMail(d.Cfg), Push: chatPush(d.Cfg),
+		Media: chatMedia(d.Cfg, s)})
+	chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(d.Cfg.CORSOrigins)})
+	chatSvc.SetGateway(chatHub)
+	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
+	s.OnShutdown(chatSvc.Shutdown)
 	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
@@ -137,8 +158,99 @@ func (s *Server) modules() []Module {
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, hrSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc,
 	}
 }
 
 // ═══════════════════ MODULE WIRING - KẾT THÚC ═══════════════════
+
+// chatMail: client SMTP gửi mã OTP khi đăng nhập chat bằng email; chưa đặt SMTP_HOST hoặc cấu hình sai -> nil (mã OTP
+// email ghi vào log server, ghi 1 dòng log). Trả interface nil thật như chatPush.
+func chatMail(cfg *config.Config) chat.MailSender {
+	if cfg.SMTPHost == "" {
+		logger.Info("chat", "email chat tắt: chưa đặt SMTP_HOST, mã OTP email ghi vào log")
+		return nil
+	}
+	c, err := mailer.New(mailer.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword,
+		From: cfg.SMTPFrom})
+	if err != nil {
+		logger.Error("chat", "email chat tắt (mã OTP email ghi vào log):", err.Error())
+		return nil
+	}
+	return c
+}
+
+// chatPush: client Web Push của chat khi đủ 3 biến CHAT_VAPID_*; thiếu hoặc khoá sai -> nil (tắt push, ghi 1 dòng log).
+// Trả interface nil thật (không phải *webpush.Client nil) để chat.Service nhận đúng là "tắt".
+func chatPush(cfg *config.Config) chat.PushSender {
+	pub, priv, sub := cfg.ChatVAPIDPublic, cfg.ChatVAPIDPrivate, cfg.ChatVAPIDSubject
+	if pub == "" && priv == "" && sub == "" {
+		logger.Info("chat", "push chat tắt: chưa đặt CHAT_VAPID_PUBLIC_KEY / CHAT_VAPID_PRIVATE_KEY / CHAT_VAPID_SUBJECT (sinh khoá: go run ./cmd/vapid)")
+		return nil
+	}
+	if pub == "" || priv == "" || sub == "" {
+		logger.Error("chat", "push chat tắt: phải đặt đủ cả 3 biến CHAT_VAPID_PUBLIC_KEY, CHAT_VAPID_PRIVATE_KEY, CHAT_VAPID_SUBJECT")
+		return nil
+	}
+	c, err := webpush.New(webpush.Options{PublicKey: pub, PrivateKey: priv, Subject: sub})
+	if err != nil {
+		logger.Error("chat", "push chat tắt:", err.Error())
+		return nil
+	}
+	return c
+}
+
+// chatMedia: kho tệp chat (MinIO / S3) khi đặt CHAT_S3_ENDPOINT; thiếu khoá hoặc cấu hình sai -> nil (route tệp trả
+// MEDIA_DISABLED, ghi 1 dòng log). Bucket kiểm / tạo ở nền (Ready), dừng thử lại khi server tắt. Trả interface nil thật.
+func chatMedia(cfg *config.Config, s *Server) chat.MediaStore {
+	if cfg.ChatS3Endpoint == "" {
+		logger.Info("chat", "tệp chat tắt: chưa đặt CHAT_S3_ENDPOINT")
+		return nil
+	}
+	if cfg.ChatS3AccessKey == "" || cfg.ChatS3SecretKey == "" {
+		logger.Error("chat", "tệp chat tắt: phải đặt CHAT_S3_ACCESS_KEY và CHAT_S3_SECRET_KEY khi có CHAT_S3_ENDPOINT")
+		return nil
+	}
+	c, err := objstore.New(objstore.Config{Endpoint: cfg.ChatS3Endpoint, PublicURL: cfg.ChatS3PublicURL, AccessKey: cfg.ChatS3AccessKey,
+		SecretKey: cfg.ChatS3SecretKey, Bucket: cfg.ChatS3Bucket, Region: cfg.ChatS3Region})
+	if err != nil {
+		logger.Error("chat", "tệp chat tắt:", err.Error())
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Start(ctx)
+	s.OnShutdown(func(context.Context) { cancel() })
+	return c
+}
+
+var _ chat.MediaStore = (*objstore.Client)(nil)
+
+// wsOrigins: OriginPatterns của gateway chat = host (bỏ scheme) của CORS_ORIGINS - trang ở origin khác API (giao diện
+// React) được mở WebSocket; cùng host với API luôn được phép. CORS so khớp nguyên chuỗi nên ký tự đặc biệt của
+// path.Match ([ ] * ? \, vd "[::1]:5199") được thoát; riêng "*" giữ nguyên = mọi origin, như CORS.
+func wsOrigins(origins []string) []string {
+	out := make([]string, 0, len(origins))
+	for _, o := range origins {
+		o = strings.TrimSpace(o)
+		if o == "*" {
+			out = append(out, o)
+			continue
+		}
+		if i := strings.Index(o, "://"); i >= 0 {
+			o = o[i+3:]
+		}
+		o = strings.TrimRight(o, "/")
+		if o == "" {
+			continue
+		}
+		var b strings.Builder
+		for _, r := range o {
+			if strings.ContainsRune(`[]*?\`, r) {
+				b.WriteByte('\\')
+			}
+			b.WriteRune(r)
+		}
+		out = append(out, b.String())
+	}
+	return out
+}

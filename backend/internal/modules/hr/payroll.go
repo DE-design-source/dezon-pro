@@ -12,7 +12,7 @@ import (
 	"qspro-backend/internal/shared/omap"
 )
 
-// Lương & bảo hiểm (migration 0022): cấu hình (hr_cau_hinh_luong), thưởng / phạt / doanh số (hr_dieu_chinh_luong),
+// Lương & bảo hiểm (migration 0026): cấu hình (hr_cau_hinh_luong), thưởng / phạt / doanh số (hr_dieu_chinh_luong),
 // kỳ lương (hr_ky_luong), định phí theo đơn vị (hr_dinh_phi). Bảng lương tính ở giao diện (calcPay); khi duyệt, giao diện
 // gửi bản chụp phiếu lương để số đã duyệt không đổi theo dữ liệu sửa sau. Lệnh ghi trả {ok}; giao diện đọc lại GET /hr/payroll.
 

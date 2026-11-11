@@ -4,7 +4,7 @@
 
 > Sinh từ catalog `qspro_en` ngày 2026-10-12 (kiểu, NULL, mặc định, ràng buộc, chú thích cột trong DB) + chú giải từ truy vết code.
 > Cột "Ý nghĩa" lấy nguyên văn `COMMENT ON COLUMN` trong database (tiếng Anh, viết khi đổi tên 2026-10-07; 39 cột Công tắc - Ổ cắm chỉ ghi tên cũ).
-> Cột "Tên trong code" là khoá mà `server/*.js` dùng; API trả về client bằng khoá camelCase riêng (xem [database-dependencies.md](database-dependencies.md)).
+> Cột "Tên trong code" là khoá mà backend Go dùng khi gọi lớp dữ liệu (`backend/internal/platform/database`, dịch sang tên database theo `db-map.json`); API trả về client bằng khoá camelCase riêng (xem [database-dependencies.md](database-dependencies.md)).
 > Đây là từ điển của schema HIỆN TẠI. Thay đổi đề xuất ghi ở cột "Phân loại / ghi chú" và ở [proposed-schema.md](proposed-schema.md).
 
 **Phân loại dư thừa:** A = dữ liệu gốc, B = snapshot tại thời điểm, C = dẫn xuất / tổng lưu sẵn, D = dư thừa không có lý do. Cột không ghi gì = A.
@@ -58,7 +58,7 @@ Phiên đăng nhập lưu phía máy chủ - thêm bằng migration 0014 (2026-1
 Mỗi lần đăng nhập 1 dòng; token ký HMAC mang `id` (khoá `sid`). Đăng xuất xoá dòng -> token hết hiệu lực ngay; tự đổi mật khẩu
 xoá các phiên khác của tài khoản; admin đặt lại mật khẩu xoá mọi phiên của tài khoản đó; xoá tài khoản xoá phiên (CASCADE). Dòng quá hạn bị bỏ qua và được dọn ở lần đăng nhập kế tiếp
 của tài khoản. **Xếp loại (quy tắc 25): bảng hệ thống, xuyên công ty** - kiểm phiên chạy trước khi biết công ty nên mọi truy vấn
-`noScope` (`backend/internal/modules/auth/postgres.go`), luôn lọc tường minh theo `id` / `user_id`; không có `company_id`
+`NoScope: true` (`backend/internal/modules/auth/postgres.go`), luôn lọc tường minh theo `id` / `user_id`; không có `company_id`
 (công ty của phiên = công ty của `users`), không khai `tenant` trong `db-map.json` và không vào `TenantTables` (super không có
 công ty; thêm vào `TenantTables` sẽ đổi thứ tự xoá dữ liệu khi xoá công ty). Thay cho lọc dự phòng: chỉ module auth được chạm bảng
 (test `TestPhienChiTruyCapQuaAuth` trong `backend/internal/modules/auth`); module khác thu hồi phiên qua
@@ -237,7 +237,7 @@ Bình luận công việc - migration 0016. **Bảng con** (tenant qua `project_
 
 ## `hr_org_units` (`hr_don_vi`)
 
-Nút sơ đồ tổ chức của trang HR (`/cham-cong`) - migration 0020 (2026-10-30), module `backend/internal/modules/hr`. **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`). Khoá ngoại ghép `(company_id, ...)` giữ cấp trên, trưởng đơn vị trong cùng công ty. Self-reference dùng `NO ACTION` (kiểm cuối câu lệnh) để xoá công ty xoá được cả cây trong một câu.
+Nút sơ đồ tổ chức của trang HR (`/cham-cong`) - migration 0024 (2026-10-30), module `backend/internal/modules/hr`. **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`). Khoá ngoại ghép `(company_id, ...)` giữ cấp trên, trưởng đơn vị trong cùng công ty. Self-reference dùng `NO ACTION` (kiểm cuối câu lệnh) để xoá công ty xoá được cả cây trong một câu.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -258,7 +258,7 @@ Nút sơ đồ tổ chức của trang HR (`/cham-cong`) - migration 0020 (2026-
 
 ## `hr_employees` (`hr_nhan_vien`)
 
-Hồ sơ nhân sự của trang HR - migration 0020. **Tenant-owned, bảng gốc.** Không gắn với tài khoản đăng nhập (`users`). Phòng ban / quản lý / trưởng đơn vị đều qua khoá ngoại ghép `(…, company_id)` nên database từ chối liên kết sang công ty khác.
+Hồ sơ nhân sự của trang HR - migration 0024. **Tenant-owned, bảng gốc.** Không gắn với tài khoản đăng nhập (`users`). Phòng ban / quản lý / trưởng đơn vị đều qua khoá ngoại ghép `(…, company_id)` nên database từ chối liên kết sang công ty khác.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -284,12 +284,12 @@ Hồ sơ nhân sự của trang HR - migration 0020. **Tenant-owned, bảng gố
 | `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
 | `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
 | `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
-| `user_id` | `tai_khoan_id` | uuid | có |  | FK SET NULL, UNIQUE khi có | Login account of this employee (same company, checked by the service); null = not linked. | Migration 0024. |
-| `hr_role` | `vai_tro_hr` | text | không | 'employee' | CHECK | HR role of the linked account. | Migration 0024; admin công ty luôn là sysadmin. |
+| `user_id` | `tai_khoan_id` | uuid | có |  | FK SET NULL, UNIQUE khi có | Login account of this employee (same company, checked by the service); null = not linked. | Migration 0028. |
+| `hr_role` | `vai_tro_hr` | text | không | 'employee' | CHECK | HR role of the linked account. | Migration 0028; admin công ty luôn là sysadmin. |
 
 ## `hr_unit_members` (`hr_kiem_nhiem`)
 
-Kiêm nhiệm (HĐQT, ban, đơn vị khác ngoài phòng ban chính) - migration 0020. **Bảng con** của `hr_org_units` (không có `company_id`; db-map `tenant` qua `unit_id`).
+Kiêm nhiệm (HĐQT, ban, đơn vị khác ngoài phòng ban chính) - migration 0024. **Bảng con** của `hr_org_units` (không có `company_id`; db-map `tenant` qua `unit_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -303,7 +303,7 @@ Kiêm nhiệm (HĐQT, ban, đơn vị khác ngoài phòng ban chính) - migratio
 
 ## `hr_shifts` (`hr_ca`)
 
-Ca làm việc của trang HR - migration 0021 (2026-10-31), module `backend/internal/modules/hr` (`attendance.go`). **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`).
+Ca làm việc của trang HR - migration 0025 (2026-10-31), module `backend/internal/modules/hr` (`attendance.go`). **Xếp loại (quy tắc 25): tenant-owned, bảng gốc** (`company_id`, có trong `TenantTables`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -321,7 +321,7 @@ Ca làm việc của trang HR - migration 0021 (2026-10-31), module `backend/int
 
 ## `hr_work_patterns` (`hr_lich_tuan`)
 
-Lịch làm việc tuần lặp lại - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Lịch làm việc tuần lặp lại - migration 0025. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -333,7 +333,7 @@ Lịch làm việc tuần lặp lại - migration 0021. **Bảng con** của `hr
 
 ## `hr_attendance_logs` (`hr_cham_cong`)
 
-Chấm công 1 người / 1 ngày - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Chấm công 1 người / 1 ngày - migration 0025. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -352,7 +352,7 @@ Chấm công 1 người / 1 ngày - migration 0021. **Bảng con** của `hr_emp
 
 ## `hr_requests` (`hr_don_tu`)
 
-Đơn nghỉ / đi muộn - về sớm / OT kèm luồng duyệt - migration 0021. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Đơn nghỉ / đi muộn - về sớm / OT kèm luồng duyệt - migration 0025. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -373,7 +373,7 @@ Chấm công 1 người / 1 ngày - migration 0021. **Bảng con** của `hr_emp
 
 ## `hr_payroll_settings` (`hr_cau_hinh_luong`)
 
-Cấu hình công thức lương - migration 0022 (2026-11-03), module `backend/internal/modules/hr` (`payroll.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty.
+Cấu hình công thức lương - migration 0026 (2026-11-03), module `backend/internal/modules/hr` (`payroll.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -385,7 +385,7 @@ Cấu hình công thức lương - migration 0022 (2026-11-03), module `backend/
 
 ## `hr_pay_adjustments` (`hr_dieu_chinh_luong`)
 
-Thưởng / phạt / doanh số theo tháng - migration 0022. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Thưởng / phạt / doanh số theo tháng - migration 0026. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -400,7 +400,7 @@ Thưởng / phạt / doanh số theo tháng - migration 0022. **Bảng con** c�
 
 ## `hr_payroll_runs` (`hr_ky_luong`)
 
-Kỳ lương theo tháng (chốt công, duyệt, chi trả) - migration 0022. **Tenant-owned, bảng gốc**; chưa có dòng = nháp, chưa chốt công.
+Kỳ lương theo tháng (chốt công, duyệt, chi trả) - migration 0026. **Tenant-owned, bảng gốc**; chưa có dòng = nháp, chưa chốt công.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -417,7 +417,7 @@ Kỳ lương theo tháng (chốt công, duyệt, chi trả) - migration 0022. **
 
 ## `hr_unit_budgets` (`hr_dinh_phi`)
 
-Định phí theo đơn vị (quỹ lương kế hoạch + khoản cố định khác) - migration 0022. **Bảng con** của `hr_org_units` (db-map `tenant` qua `unit_id`).
+Định phí theo đơn vị (quỹ lương kế hoạch + khoản cố định khác) - migration 0026. **Bảng con** của `hr_org_units` (db-map `tenant` qua `unit_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -429,7 +429,7 @@ Kỳ lương theo tháng (chốt công, duyệt, chi trả) - migration 0022. **
 
 ## `hr_job_descriptions` (`hr_jd`)
 
-Thư viện JD - migration 0023 (2026-11-03), module `backend/internal/modules/hr` (`talent.go`). **Tenant-owned, bảng gốc.**
+Thư viện JD - migration 0027 (2026-11-03), module `backend/internal/modules/hr` (`talent.go`). **Tenant-owned, bảng gốc.**
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -449,7 +449,7 @@ Thư viện JD - migration 0023 (2026-11-03), module `backend/internal/modules/h
 
 ## `hr_job_openings` (`hr_tin_tuyen`)
 
-Tin tuyển dụng đăng từ JD - migration 0023. **Tenant-owned, bảng gốc.** JD đang được tin dùng không xoá được (RESTRICT).
+Tin tuyển dụng đăng từ JD - migration 0027. **Tenant-owned, bảng gốc.** JD đang được tin dùng không xoá được (RESTRICT).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -470,7 +470,7 @@ Tin tuyển dụng đăng từ JD - migration 0023. **Tenant-owned, bảng gốc
 
 ## `hr_candidates` (`hr_ung_vien`)
 
-Ứng viên của 1 tin, kèm đánh giá phỏng vấn và lịch phỏng vấn - migration 0023. **Bảng con** của `hr_job_openings` (db-map `tenant` qua `job_id`).
+Ứng viên của 1 tin, kèm đánh giá phỏng vấn và lịch phỏng vấn - migration 0027. **Bảng con** của `hr_job_openings` (db-map `tenant` qua `job_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -494,7 +494,7 @@ Tin tuyển dụng đăng từ JD - migration 0023. **Tenant-owned, bảng gốc
 
 ## `hr_objectives` (`hr_muc_tieu`)
 
-Mục tiêu OKR theo kỳ kèm kết quả then chốt - migration 0023. **Tenant-owned, bảng gốc.**
+Mục tiêu OKR theo kỳ kèm kết quả then chốt - migration 0027. **Tenant-owned, bảng gốc.**
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -510,7 +510,7 @@ Mục tiêu OKR theo kỳ kèm kết quả then chốt - migration 0023. **Tenan
 
 ## `hr_performance_reviews` (`hr_danh_gia`)
 
-Đánh giá nhân sự theo kỳ (tự đánh giá -> quản lý) - migration 0023. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`). Giao diện dùng kỳ = quý hiện tại.
+Đánh giá nhân sự theo kỳ (tự đánh giá -> quản lý) - migration 0027. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`). Giao diện dùng kỳ = quý hiện tại.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -526,7 +526,7 @@ Mục tiêu OKR theo kỳ kèm kết quả then chốt - migration 0023. **Tenan
 
 ## `hr_course_enrollments` (`hr_ghi_danh`)
 
-Ghi danh và tiến độ khoá học - migration 0023. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Ghi danh và tiến độ khoá học - migration 0027. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -538,7 +538,7 @@ Ghi danh và tiến độ khoá học - migration 0023. **Bảng con** của `hr
 
 ## `hr_security_settings` (`hr_bao_mat`)
 
-Ma trận quyền HR + ẩn lương theo công ty - migration 0024 (2026-11-03), module `backend/internal/modules/hr` (`access.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty. Cùng migration: `hr_employees.user_id` (tài khoản đăng nhập, unique khi có, SET NULL) và `hr_employees.hr_role` (sysadmin / hradmin / manager / employee). Nhật ký HR ghi vào `audit_logs` (action `hr.<phân hệ>.<thao tác>`).
+Ma trận quyền HR + ẩn lương theo công ty - migration 0028 (2026-11-03), module `backend/internal/modules/hr` (`access.go`). **Tenant-owned, bảng gốc**, 1 dòng / công ty. Cùng migration: `hr_employees.user_id` (tài khoản đăng nhập, unique khi có, SET NULL) và `hr_employees.hr_role` (sysadmin / hradmin / manager / employee). Nhật ký HR ghi vào `audit_logs` (action `hr.<phân hệ>.<thao tác>`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -551,7 +551,7 @@ Ma trận quyền HR + ẩn lương theo công ty - migration 0024 (2026-11-03),
 
 ## `hr_courses` (`hr_khoa_hoc`)
 
-Danh mục khoá học theo công ty - migration 0025. **Tenant-owned, bảng gốc.** `hr_course_enrollments.course_id` tham chiếu mềm tới bảng này (ghi danh của khoá đã xoá bị bỏ qua khi đọc). Cùng migration: `hr_candidates.cv_url` (link CV trong kho file).
+Danh mục khoá học theo công ty - migration 0029. **Tenant-owned, bảng gốc.** `hr_course_enrollments.course_id` tham chiếu mềm tới bảng này (ghi danh của khoá đã xoá bị bỏ qua khi đọc). Cùng migration: `hr_candidates.cv_url` (link CV trong kho file).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -568,7 +568,7 @@ Danh mục khoá học theo công ty - migration 0025. **Tenant-owned, bảng g�
 
 ## `hr_learning_paths` (`hr_lo_trinh`)
 
-Lộ trình học theo công ty - migration 0025. **Tenant-owned, bảng gốc.**
+Lộ trình học theo công ty - migration 0029. **Tenant-owned, bảng gốc.**
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -582,7 +582,7 @@ Lộ trình học theo công ty - migration 0025. **Tenant-owned, bảng gốc.*
 
 ## `hr_schedule_overrides` (`hr_lich_ngay`)
 
-Lịch làm việc riêng từng ngày, thắng lịch tuần - migration 0025. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
+Lịch làm việc riêng từng ngày, thắng lịch tuần - migration 0029. **Bảng con** của `hr_employees` (db-map `tenant` qua `employee_id`).
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -594,7 +594,7 @@ Lịch làm việc riêng từng ngày, thắng lịch tuần - migration 0025. 
 
 ## `hr_work_sites` (`hr_dia_diem`)
 
-Địa điểm làm việc theo công ty - migration 0026 (2026-11-03), module `backend/internal/modules/hr` (`attendance.go`). **Tenant-owned, bảng gốc.** Thay danh sách địa điểm / toạ độ mẫu cố định trong giao diện.
+Địa điểm làm việc theo công ty - migration 0030 (2026-11-03), module `backend/internal/modules/hr` (`attendance.go`). **Tenant-owned, bảng gốc.** Thay danh sách địa điểm / toạ độ mẫu cố định trong giao diện.
 
 | Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
 |---|---|---|---|---|---|---|---|
@@ -655,6 +655,185 @@ Bảng 1-1 với `products`, chỉ có dòng khi SP có ít nhất 1 thông số
 | `min_clearance` | `kc_lap_min` | text | có |  | HVAC spec (code: kc_lap_min) |
 | `installation_note` | `gc_lap_dat` | text | có |  | HVAC spec (code: gc_lap_dat) |
 | `material_spec` | `quy_cach_vt` | text | có |  | HVAC spec (code: quy_cach_vt) |
+
+## `chat_users` (`chat_nguoi_dung`)
+
+Tài khoản chat (danh tính = số điện thoại HOẶC email) - migration 0018 (2026-10-30), cột `email` từ 0019 (2026-11-02), module
+`backend/internal/modules/chat` (Chat MVP, roadmap N8). Tài khoản tạo bằng email không có số (`phone` null) và ngược lại; CHECK
+`ck_chat_users_phone_email`: phải có ít nhất một trong hai. Chưa liên kết email vào tài khoản số (hai tài khoản riêng, [decisions.md](decisions.md) D-16).
+**Xếp loại (quy tắc 25) của 10 bảng `chat_*` (9 bảng của 0018 + `chat_media` của 0020): user-owned, không theo công ty** (riêng `chat_otp_codes`: hệ thống). Tài khoản chat KHÔNG phải
+`users` của QS và dùng chung mọi công ty (như Zalo): không có `company_id`, không vào `TenantTables`, không khai `tenant` trong `db-map.json`;
+module chat tự kiểm quyền theo `user_id` / `device_id` của access token chat (không dùng phiên QS). Module đọc / ghi bằng SQL thô qua
+`database.DB.Pool()` với tên tiếng Anh (lý do: [decisions.md](decisions.md) D-15); khoá tiếng Việt `chat_*` trong `db-map.json` có đủ cho quy
+tắc 17 nhưng code chat không dùng. Không bảng nào có cột `jsonb`. MVP không xoá tài khoản chat (khoá ngoại tới người tạo / người gửi là RESTRICT).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (user_id in the chat API). |  |
+| `phone` | `sdt` | text | có |  | UNIQUE, CHECK | Phone number in E.164 form (+84901234567), normalized by the service; unique. Null = account created by email. | **NHẠY CẢM (PII)**. CHECK `^\+[1-9][0-9]{7,14}$`. Service chuẩn hoá trước (`chat/phone.go`): `0` + 9 số / `84` + 9 số -> `+84...`, di động VN phải đầu 3/5/7/8/9; sai -> `PHONE_INVALID`. Chỉ trả cho chính mình, bạn bè và kết quả tra đúng số (tra theo email không lộ số). NULL từ 0019 (tài khoản email). |
+| `email` | `email` | text | có |  | UNIQUE, CHECK | Lowercase email address, normalized by the service; unique. Null = account created by phone. At least one of phone / email is set. | **NHẠY CẢM (PII)**. Migration 0019. CHECK `ck_chat_users_email`: chữ thường, <= 254 ký tự, khớp `^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$`. Service chuẩn hoá trước (`chat/email.go` `NormalizeEmail`, client `chatLogic.normalizeEmail` cho cùng kết quả): bỏ khoảng trắng hai đầu, chữ thường toàn bộ; phần trước `@` <= 64; không bỏ dấu chấm / `+tag`; sai -> `EMAIL_INVALID`. Unique `uq_chat_users_email` (tìm / tạo tài khoản khi xác thực OTP email, `GET /chat/users/search?email=`). Chỉ trả cho chính mình, bạn bè và kết quả tra đúng email (tra theo số không lộ email). |
+| `phone_hash` | `sdt_hash` | text | có |  | GENERATED | Derived: lowercase hex SHA-256 of phone (null when phone is null); contact matching without sending raw numbers. | **C (dẫn xuất)**: `GENERATED ALWAYS AS (encode(sha256(phone::bytea), 'hex')) STORED` (quy tắc 14). Dùng `phone::bytea` vì `convert_to` là STABLE, không dùng được trong cột GENERATED; CHECK của `phone` chỉ cho `+` và chữ số nên kết quả = SHA-256 của chuỗi UTF-8. Index `idx_chat_users_phone_hash` (`POST /chat/contacts/match`). |
+| `display_name` | `ten_hien_thi` | text | không |  | CHECK | Name shown to other users, 1..100 characters. | Tài khoản mới không gửi tên -> `Người dùng <4 số cuối>`; tài khoản email -> phần trước `@` (cắt 100 ký tự; rỗng thì `Người dùng`). |
+| `show_read_receipts` | `hien_da_xem` | boolean | không | true |  | False: other members never see this user's read pointer (last_read_seq); the user's own devices still do. | Lệch quy tắc 16 (boolean nên bắt đầu `is_` / `has_`): giữ đúng khoá API `show_read_receipts` của CHAT.md. |
+| `last_seen_at` | `truy_cap_cuoi` | timestamp with time zone | có |  |  | Time the user went offline (last connection closed + grace period); null = never. | Ghi khi người dùng offline (kết nối cuối đóng + 30 giây chống nhấp nháy) và lúc tắt server. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Account creation time (first successful OTP verification, by SMS or email). |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last profile change time (set by the service). |  |
+
+## `chat_devices` (`chat_thiet_bi`)
+
+Thiết bị đã đăng nhập chat: 1 dòng / lần xác thực OTP thành công - migration 0018. User-owned (qua `user_id`). Đăng xuất = xoá dòng
+(refresh token đi theo CASCADE, push token nằm trên chính dòng).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (device_id, also the "did" claim of the access token). |  |
+| `user_id` | `nguoi_dung_id` | bigint | không |  | FK CASCADE | Owning chat account. | CASCADE: thiết bị không có nghĩa khi thiếu tài khoản (quy tắc 7). Index `idx_chat_devices_user_id` (thiết bị nhận push của một người). |
+| `platform` | `nen_tang` | text | không |  | CHECK | ios / android / web / desktop. |  |
+| `device_name` | `ten_thiet_bi` | text | không | '' | CHECK | Free-text label (browser / OS), at most 200 characters. |  |
+| `push_kind` | `loai_push` | text | có |  | CHECK | Push channel of push_token: webpush / fcm / apns; null = no push for this device. | MVP chỉ nhận `webpush`; `fcm` / `apns` để sẵn cho app mobile (roadmap N8.2). CHECK `ck_chat_devices_push_token`: null cùng lúc với `push_token`. |
+| `push_token` | `push_token` | text | có |  | CHECK | webpush: the PushSubscription JSON string; fcm / apns: the device token. Null together with push_kind. | **NHẠY CẢM**: endpoint là bí mật của subscription (log chỉ ghi tên máy). Chuỗi JSON `{"endpoint","keys":{"p256dh","auth"}}` lưu dạng `text`, đọc / ghi nguyên khối, không truy vấn phần tử (không cần `jsonb`, quy tắc 19). Endpoint phải là https của dịch vụ push đã biết (`fcm.googleapis.com`, `android.googleapis.com`, `*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com` - chống SSRF). Đăng ký lại cùng subscription thì gỡ khỏi thiết bị khác (index một phần `idx_chat_devices_push_token`); dịch vụ push trả 404 / 410 -> service đặt về null. |
+| `last_seen_at` | `truy_cap_cuoi` | timestamp with time zone | có |  |  | Last token refresh or WebSocket authentication from this device. | Ghi lúc xác thực OTP, refresh token và gói `auth` của WebSocket. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Login time. |  |
+
+## `chat_refresh_tokens` (`chat_refresh_token`)
+
+Refresh token của thiết bị chat, lưu băm, xoay vòng mỗi lần refresh - migration 0018. User-owned (qua `chat_devices`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `device_id` | `thiet_bi_id` | bigint | không |  | FK CASCADE | Device the token belongs to. | CASCADE: đăng xuất / thu hồi thiết bị xoá mọi token của nó. Index `idx_chat_refresh_tokens_device_id`. |
+| `token_hash` | `token_hash` | text | không |  | UNIQUE, CHECK | Lowercase hex SHA-256 of the opaque token (the token itself is never stored). | **NHẠY CẢM**. Token = 32 byte ngẫu nhiên base64url, chỉ client giữ; CHECK `^[0-9a-f]{64}$`. |
+| `expires_at` | `het_han` | timestamp with time zone | không |  |  | Expiry (issue time + CHAT_REFRESH_TTL_DAYS). | **C (dẫn xuất)**: = lúc cấp + `CHAT_REFRESH_TTL_DAYS` (mặc định 30 ngày); nguồn chuẩn là lúc service cấp token. |
+| `used_at` | `da_dung` | timestamp with time zone | có |  |  | Set when the token was rotated; null = still usable. | Trình lại token đã dùng: dưới 30 giây -> `REFRESH_RACE` (409, không thu hồi); cũ hơn -> xoá thiết bị -> `REFRESH_REUSED` (401). |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Issue time. |  |
+
+## `chat_otp_codes` (`chat_otp`)
+
+Mã OTP đăng nhập chat, đồng thời là nguồn đếm giới hạn gửi mã - migration 0018, cột `email` từ 0019. **Xếp loại: hệ thống, không theo công ty**
+(mã tạm theo số điện thoại hoặc email, tài khoản có thể chưa tồn tại). Mỗi dòng gửi tới đúng MỘT đích: `phone` (SMS) hoặc `email` (CHECK
+`ck_chat_otp_codes_phone_email`). Mã 6 số sống 5 phút, gửi lại sau 60 giây, tối đa 5 lần / giờ / số hoặc email và 20 lần / giờ / IP (đếm chung
+cả số lẫn email); mỗi lần xin mã xoá dòng quá 24 giờ của số / email đó. MVP chưa gửi SMS thật: mã ghi vào log server (roadmap N8.1). Email gửi qua
+SMTP (`SMTP_*`); chưa đặt `SMTP_HOST` thì mã email cũng ghi vào log.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `phone` | `sdt` | text | có |  | CHECK | E.164 phone the code was sent to; null when sent by email. Soft reference: the account may not exist yet, no FK. | **Tham chiếu mềm** tới `chat_users.phone` (quy tắc 9). **NHẠY CẢM (PII)**. Index `(phone, created_at desc)`: mã mới nhất, đếm theo số, khoá. NULL từ 0019 (mã gửi qua email). |
+| `email` | `email` | text | có |  | CHECK | Lowercase email the code was sent to; null when sent by SMS. Exactly one of phone / email is set. | Migration 0019. **Tham chiếu mềm** tới `chat_users.email` (quy tắc 9). **NHẠY CẢM (PII)**. CHECK `ck_chat_otp_codes_email`: chữ thường, <= 254 ký tự. Index một phần `idx_chat_otp_codes_email_created_at (email, created_at desc) where email is not null`: mã mới nhất, đếm theo email, khoá. |
+| `code_hash` | `ma_hash` | text | không |  |  | Lowercase hex HMAC-SHA256(server OTP secret, phone-or-email \|\| ':' \|\| code); the code itself is never stored. | **NHẠY CẢM**. Khoá OTP suy từ khoá JWT chat (`CHAT_JWT_SECRET`, trống thì từ `AUTH_SECRET`); so không lộ thời gian. |
+| `request_ip` | `ip` | text | không | '' |  | Client IP of the request (rate limit per IP); empty when unknown. | **NHẠY CẢM (PII)**. Đứng sau reverse proxy phải đặt `TRUSTED_PROXIES`, không thì mọi client chung một IP. Index `(request_ip, created_at desc)`. |
+| `attempts` | `so_lan_sai` | integer | không | 0 | CHECK | Wrong verification attempts against this code. | Sai lần 1-4 -> `OTP_INVALID`; lần 5 -> `OTP_LOCKED`. |
+| `expires_at` | `het_han` | timestamp with time zone | không |  |  | created_at + 5 minutes. | **C (dẫn xuất)**: = lúc ghi + 5 phút (service ghi `now() + interval`). |
+| `consumed_at` | `da_dung` | timestamp with time zone | có |  |  | Set when verified successfully; a consumed code is never accepted again. |  |
+| `locked_until` | `khoa_den` | timestamp with time zone | có |  |  | Set when attempts reach 5: the phone / email cannot request or verify codes until then (15 minutes). |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Request time. |  |
+
+## `chat_friendships` (`chat_ban_be`)
+
+Quan hệ bạn bè / lời mời / chặn giữa hai tài khoản chat, CÓ HƯỚNG (user -> friend) - migration 0018. User-owned. Bạn bè = hai chiều đều
+`accepted`; lời mời = một dòng `pending` của người gửi; chặn = dòng `blocked` của người chặn (dòng ngược lại bị xoá trừ khi người kia cũng chặn).
+Bị người khác chặn thì API trả `relation = none` (không lộ).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `user_id` | `nguoi_dung_id` | bigint | không |  | PK, FK CASCADE | Account that owns this side of the relation. | CASCADE: quan hệ không có nghĩa khi thiếu một bên. |
+| `friend_id` | `ban_id` | bigint | không |  | PK, FK CASCADE, CHECK | The other account. | CHECK `user_id <> friend_id`. Index `idx_chat_friendships_friend_id_status` (lời mời gửi tới tôi). |
+| `status` | `trang_thai` | text | không |  | CHECK | pending / accepted / blocked. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Time the relation row was created (friend request time for pending). |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last status change (set by the service). |  |
+
+## `chat_conversations` (`chat_hoi_thoai`)
+
+Hội thoại 1-1 (`direct`) hoặc nhóm (`group`) - migration 0018. User-owned (thuộc các thành viên). Mọi tin của hội thoại được cấp `seq` tăng
+dần từ `last_seq` trong transaction gửi (khoá dòng hội thoại = thứ tự tin).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (conversation_id). |  |
+| `conversation_type` | `loai` | text | không |  | CHECK | direct / group. |  |
+| `name` | `ten` | text | có |  | CHECK | Group name (1..100 characters); null for direct conversations. | CHECK `(conversation_type = 'group') = (name is not null)`. |
+| `last_seq` | `seq_cuoi` | bigint | không | 0 | CHECK | Derived: seq of the newest message (= max(chat_messages.seq) of the conversation, 0 = none). Written only by the send path. | **C (tổng lưu sẵn)**: chỉ đường gửi tin ghi, bằng `UPDATE ... SET last_seq = last_seq + 1 RETURNING`. CHECK không tham chiếu được bảng khác; cách kiểm: `select c.id from chat_conversations c left join chat_messages m on m.conversation_id = c.id group by c.id having c.last_seq <> coalesce(max(m.seq), 0)` phải ra 0 dòng. |
+| `last_message_at` | `tin_cuoi_luc` | timestamp with time zone | có |  |  | Derived: created_at of the newest message; null = no message yet. Orders the conversation list. | **C (dẫn xuất)**: = `created_at` của tin `seq = last_seq` (cùng một `clock_timestamp()` lấy dưới khoá dòng, nên `created_at` tăng theo `seq`). |
+| `created_by` | `nguoi_tao` | bigint | không |  | FK RESTRICT | Account that created the conversation (chat accounts are not deleted in the MVP: restrict). | RESTRICT thay cho SET NULL của quy tắc 7 vì cột NOT NULL và MVP không xoá tài khoản chat. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Bumped on every message, rename and membership change; drives GET /chat/sync. |  |
+
+## `chat_conversation_members` (`chat_thanh_vien`)
+
+Thành viên hội thoại kèm con trỏ đã nhận / đã xem (theo `seq`) - migration 0018. User-owned. Bảng trung gian N-N `chat_users` -
+`chat_conversations` (quy tắc 11: khoá chính trên cặp). Dòng được GIỮ khi rời nhóm / bị xoá (`left_at`) để `/chat/sync` báo được việc rời.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | PK, FK CASCADE | Conversation. |  |
+| `user_id` | `nguoi_dung_id` | bigint | không |  | PK, FK CASCADE | Member account. | Index `idx_chat_conversation_members_user_id` (danh sách hội thoại, `/chat/sync`, tổng chưa đọc). |
+| `member_role` | `vai_tro` | text | không | 'member' | CHECK | owner / admin / member (direct conversations: member). | Trưởng nhóm rời -> quyền chuyển cho phó nhóm vào sớm nhất, không có thì thành viên vào sớm nhất. |
+| `last_read_seq` | `da_xem_seq` | bigint | không | 0 | CHECK | Every message with seq <= this was seen by the member. Never decreases while active. | Chưa đọc = `max(0, last_seq - last_read_seq)`; gửi tin đặt con trỏ của người gửi = `seq`. Người khác thấy null khi chủ con trỏ tắt `show_read_receipts`. |
+| `last_delivered_seq` | `da_nhan_seq` | bigint | không | 0 | CHECK | Every message with seq <= this reached a device of the member. Never decreases; the service keeps it >= last_read_seq. | Không có CHECK `>= last_read_seq`: service giữ bất biến này (đánh dấu đã xem cũng nâng đã nhận). |
+| `muted_until` | `tat_bao_den` | timestamp with time zone | có |  |  | No push for this conversation until then; 'infinity' = muted forever; null or past = not muted. | API trả `"forever"` cho `infinity`. |
+| `left_at` | `roi_nhom_luc` | timestamp with time zone | có |  |  | Null = active member; set when the member left or was removed (re-adding clears it). | Thêm lại: xoá `left_at`, `joined_at = now()`, hai con trỏ = `last_seq` hiện tại (không thấy tin cũ là chưa đọc). |
+| `joined_at` | `ngay_vao` | timestamp with time zone | không | now() |  | Time the member (re)joined; earliest-joined admin / member inherits ownership when the owner leaves. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Bumped when this member's pointers, mute or membership change; drives GET /chat/sync. |  |
+
+## `chat_direct_pairs` (`chat_cap_1_1`)
+
+Mỗi cặp tài khoản có tối đa 1 hội thoại 1-1 - migration 0018. User-owned. Dòng được chèn cùng transaction với hội thoại; khoá chính trên
+(id nhỏ, id lớn) chặn hai lần tạo đồng thời ra hai hội thoại. **C (dẫn xuất)** từ 2 dòng thành viên của hội thoại `direct`, giữ để có ràng buộc duy nhất.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `user_low` | `nguoi_thap` | bigint | không |  | PK, FK CASCADE, CHECK | Smaller account id of the pair. | CHECK `user_low < user_high`. |
+| `user_high` | `nguoi_cao` | bigint | không |  | PK, FK CASCADE | Larger account id of the pair. |  |
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | FK CASCADE, UNIQUE | The direct conversation of the pair. | CASCADE theo hội thoại. |
+
+## `chat_messages` (`chat_tin_nhan`)
+
+Tin nhắn của mọi hội thoại chat - migration 0018. User-owned (thuộc hội thoại). MVP giữ ở PostgreSQL (CHAT.md mục 4 cho phép chuyển sang
+Cassandra sau với cùng khoá); văn bản và tin hệ thống, từ 0020 (2026-11-02) thêm tin ảnh / video / tệp / thoại (mỗi tin tối đa 1 tệp
+`chat_media` qua `media_id`); chưa sửa / xoá / thu hồi (roadmap N8.3).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (message_id). |  |
+| `conversation_id` | `hoi_thoai_id` | bigint | không |  | FK CASCADE, UNIQUE | Conversation. | CASCADE: tin không có nghĩa khi thiếu hội thoại. |
+| `seq` | `seq` | bigint | không |  | UNIQUE, CHECK | Position in the conversation: 1, 2, 3... without gaps (allocated from chat_conversations.last_seq). | `uq_chat_messages_conversation_id_seq` cũng là index đọc lịch sử (`before_seq` / `after_seq`) và tin cuối. CHECK `seq > 0`. |
+| `client_msg_id` | `client_msg_id` | uuid | có |  | UNIQUE, CHECK | UUID generated by the sending client; resending the same id returns the stored message (idempotent). Null for system messages. | Chống trùng bằng `uq_chat_messages_conversation_id_sender_id_client_msg_id` (thay bảng `message_dedup` của CHAT.md, không có TTL). CHECK: null khi và chỉ khi `message_type = 'system'`. Service đổi về chữ thường. |
+| `sender_id` | `nguoi_gui` | bigint | không |  | FK RESTRICT, UNIQUE | Sender (for system messages: the member who performed the action). | RESTRICT: tin là lịch sử, MVP không xoá tài khoản chat. |
+| `message_type` | `loai` | text | không |  | CHECK | text / system / image / video / file / voice (system: group created, members added / removed / left, renamed, role changed). | `image` / `video` / `file` / `voice` từ 0020; phải bằng `chat_media.media_type` của tệp đính kèm (service kiểm, CHECK không tham chiếu được bảng khác). |
+| `content` | `noi_dung` | text | không |  | CHECK | text/system: 1..4000 characters, not blank. image/video/file: optional caption 0..4000. voice: empty. | Tin hệ thống tiếng Việt do service sinh, vd `Lan đã thêm Bình, Châu vào nhóm` (quá 5 tên thì `... và N người khác`). CHECK `ck_chat_messages_content` (0020): <= 4000 ký tự; text/system không trống; voice = `''`. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Time the message was stored (the "sent" time). | Service ghi `clock_timestamp()` lấy dưới khoá dòng hội thoại (trùng `last_message_at`). |
+| `media_id` | `tep_id` | bigint | có |  | FK RESTRICT, CHECK | Attachment (chat_media) of an image / video / file / voice message; null for text / system. | Migration 0020. CHECK `ck_chat_messages_media_id`: có khi và chỉ khi `message_type` thuộc image / video / file / voice. RESTRICT: không xoá tệp còn tin dùng (janitor chỉ xoá tệp không còn tin nào trỏ tới). Index một phần `idx_chat_messages_media_id ... where media_id is not null` (quyền tải tệp `MediaGet`, janitor). Nhiều tin có thể dùng chung 1 tệp (chống trùng theo người tải). |
+| `file_name` | `ten_tep` | text | có |  | CHECK | Type file only: display / download name for this message (a dedup hit reuses the object but keeps the new name). | Migration 0020. CHECK `ck_chat_messages_file_name`: null, hoặc `message_type = 'file'` và 1..255 ký tự, không có `/`, `\`, ký tự điều khiển. Service đặt bắt buộc cho tin `file` (mặc định = `chat_media.file_name`). |
+
+## `chat_media` (`chat_tep`)
+
+Tệp đính kèm chat (ảnh / video / tệp / tin thoại) - migration 0020 (2026-11-02), backend/CHAT.md mục 12, [decisions.md](decisions.md) D-17.
+**Xếp loại: user-owned (thuộc người tải), không theo công ty.** Byte của tệp nằm trên MinIO (S3), KHÔNG qua API: client xin presigned PUT
+(`POST /chat/media/upload-url`) lên khoá tạm `chat/in/...`, báo xong (`POST /chat/media/:id/complete`), server chép sang khoá cuối `chat/m/...`
+rồi kiểm kích thước / loại / sha256 / quét virus; đọc bằng presigned GET 60 phút. Một dòng mỗi `(uploader_id, sha256, media_type)` (chống trùng
+theo từng người tải, sha256 do server tính lại khi complete). Dọn dẹp (janitor `chat/service_media.go`): object của dòng `pending` / `failed`
+xoá sau 2 giờ, `processing` treo quá 10 phút trả về `pending`, dòng `failed` / `pending` xoá sau 24 giờ, dòng `ready` không tin nào dùng xoá sau 24 giờ.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key (media_id in the chat API, sent as attachments[] of a message). | identity |
+| `uploader_id` | `nguoi_tai` | bigint | không |  | FK RESTRICT, UNIQUE | Account that requested the upload; only this account can attach it to a message. | RESTRICT: MVP không xoá tài khoản chat. Index `idx_chat_media_uploader_id_created_at (uploader_id, created_at)`: hạn mức dung lượng 24 giờ. |
+| `media_type` | `loai` | text | không |  | CHECK, UNIQUE | image / video / file / voice; must equal chat_messages.message_type of every message using it (checked by the service). | **E**: `image`, `video`, `file`, `voice`. |
+| `mime_type` | `mime` | text | không |  | CHECK | Lowercase MIME without parameters. Image: overwritten with the sniffed type at complete. File: informational only, always served as application/octet-stream. | CHECK `ck_chat_media_mime_type`: <= 100 ký tự, `^[a-z0-9.+-]+/[a-z0-9.+-]+$`; image -> `image/%`, video -> `video/%`, voice -> `audio/%`, file tuỳ ý. |
+| `size_bytes` | `kich_thuoc` | bigint | không |  | CHECK | Declared size, signed into the presigned PUT (Content-Length) and re-checked by Stat at complete. | CHECK 1..209715200 (trần cứng 200 MB; mặc định cấu hình `CHAT_MEDIA_MAX_FILE_MB` = 100). |
+| `sha256` | `sha256` | text | không |  | CHECK, UNIQUE | Lowercase hex SHA-256 declared by the client and re-computed by the server at complete (mismatch -> failed); per-uploader dedup key. | CHECK `^[0-9a-f]{64}$`. Unique `uq_chat_media_uploader_id_sha256_media_type` (`insert ... on conflict` ở `MediaUploadURL`). |
+| `file_name` | `ten_tep` | text | có |  | CHECK | Sanitized file name of the first upload (no path, no control characters). Each message carries its own chat_messages.file_name. | CHECK: 1..255 ký tự, không `/`, `\`, ký tự điều khiển. |
+| `object_key` | `khoa_tep` | text | không |  | UNIQUE, CHECK | Final object key chat/m/u<uploader_id>/<yyyymm>/<32 hex random>; never presigned for PUT. Staging key = same path under chat/in/. | CHECK `like 'chat/m/%'`. Khoá tạm `chat/in/...` có ILM hết hạn 1 ngày trên bucket. |
+| `thumb_key` | `khoa_anh_nho` | text | có |  | CHECK | Image: server-made 320 px JPEG (<object_key>.t.jpg), null when the original is a JPEG of at most 320 px. Video: client poster copied to <object_key>.p.jpg. | CHECK: chỉ image / video. |
+| `status` | `trang_thai` | text | không | 'pending' | CHECK | pending (URL issued) / processing (complete running) / ready / failed (size, type or hash mismatch, or expired) / blocked (virus scan). | **E**: `pending`, `processing`, `ready`, `failed`, `blocked`. Index `idx_chat_media_status_updated_at (status, updated_at)`: janitor. Chỉ `ready` mới gắn được vào tin. |
+| `width` | `rong` | integer | có |  | CHECK | Pixel width as displayed (EXIF orientation applied). Image: measured by the server; video: client hint. | CHECK `ck_chat_media_width_height`: width / height cùng null hoặc cùng có, 1..100000. |
+| `height` | `cao` | integer | có |  | CHECK | Pixel height as displayed, see width. |  |
+| `duration_ms` | `thoi_luong_ms` | integer | có |  | CHECK | Video / voice length in milliseconds (client-provided). | CHECK 1..86400000; bắt buộc với voice (`ck_chat_media_voice`). |
+| `waveform` | `dang_song` | smallint[] | có |  | CHECK | Voice only: 1..128 amplitude buckets 0..255, no nulls, for the waveform drawing. | CHECK `ck_chat_media_waveform`; bắt buộc với voice. |
+| `blurhash` | `blurhash` | text | có |  | CHECK | Blurhash (4x3 components) of the image / poster, computed by the server. | CHECK: chỉ image / video, 6..100 ký tự. **C (dẫn xuất)** từ ảnh. |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Time the upload URL was first issued (service clock); never reset on re-issue; basis of the 24 h quota. | Service ghi `s.now()` (đồng hồ thử được trong test), không dựa vào default. |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last state change or dedup reuse (service clock). Janitor: objects of pending/failed removed after 2 h, processing reset after 10 min, failed/pending rows deleted after 24 h, unreferenced ready rows after 24 h. | Service ghi `s.now()`. |
 
 ## `audit_logs` (`audit_log`)
 
@@ -1157,7 +1336,7 @@ Dòng của phiếu đề xuất — ĐA HÌNH: dòng sản phẩm (ck) hoặc �
 
 ## Cấu trúc JSON trong `project_data_entries.data_value`
 
-Khoá hợp lệ do server kiểm (`PROJ_DATA_KEYS`, store_supa.js:1117). Mỗi lần ghi thay toàn bộ giá trị. Số dòng thực tế ngày 2026-10-12 trong ngoặc.
+Khoá hợp lệ do server kiểm (`projDataKeys` trong `backend/internal/modules/projects/model.go`). Mỗi lần ghi thay toàn bộ giá trị. Số dòng thực tế ngày 2026-10-12 trong ngoặc.
 
 | Khoá | Phạm vi | Kiểu | Cấu trúc | Quan hệ ngầm |
 |---|---|---|---|---|
@@ -1172,5 +1351,5 @@ Khoá hợp lệ do server kiểm (`PROJ_DATA_KEYS`, store_supa.js:1117). Mỗi 
 | `ptInfo` (0) | CÔNG TY (`__cty:<id>`) | object | Khoá = tên công tác viết thường; `{model, anh, ts, gc, pv, tl}` | Chồng lấn với cột của `work_items` |
 | `bgOrg` (0) | CÔNG TY | object | `{ten, logo, diaChi, sdt, email, web, xuong}` | Hồ sơ công ty in trên báo giá |
 
-`users.ui_preferences`: khoá cho phép `tkCols, cpCols, daCols, spCols` (auth.js:270-279); dữ liệu thực có thêm khoá cũ `tkColSets`.
+`users.ui_preferences`: khoá cho phép `tkCols, cpCols, daCols, spCols, tkPresets, tkQuick, tkOrder, tkLastCols, bgBiaMau` (`prefKeys` trong `backend/internal/modules/auth/model.go`); dữ liệu thực ngày 2026-10-12 có thêm khoá cũ `tkColSets`.
 

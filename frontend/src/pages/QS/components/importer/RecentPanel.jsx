@@ -73,7 +73,7 @@ function HistoryList({ products, me, onEdit }) {
   )
 }
 
-export default function RecentPanel({ specs, onEditOpen }) {
+export default function RecentPanel({ specs, onEditOpen, open, onOpen }) {
   const { navigate, products } = useQs()
   const me = useQsStore(s => s.me)
   const [tab, setTab] = useState('phien')
@@ -105,7 +105,7 @@ export default function RecentPanel({ specs, onEditOpen }) {
           {p.loi ? <div className="qsi-pc-loi">{p.loi}</div> : null}
           <span className="qsi-pc-tag">{dangSua ? 'Đang sửa' : (p.loi ? 'Lỗi — sửa lại' : 'Chờ lưu')}</span>
           {p.combo && p.combo.length ? <span className="qsi-pc-tag">+ combo {p.combo.length}</span> : null}
-          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ {(p.ghi.maDAs || [p.ghi.maDA]).length > 1 ? (p.ghi.maDAs.length + ' dự án') : 'dự án'} ×{p.ghi.qty || 1}</span> : null}
+          {p.ghi ? <span className="qsi-pc-tag" title="Ghi danh vào dự án sau khi lưu">→ {(p.ghi.maDAs || []).length > 1 ? p.ghi.maDAs.length + ' dự án' : 'dự án'} ×{p.ghi.qty || 1}</span> : null}
         </div>
         <div className="qsi-pc-act">
           <button className="qsi-pc-btn" title="Sửa — mở lại trong form" onClick={async () => { if (await pendingEdit_(p, specs) && onEditOpen) onEditOpen() }}><QsIcon name="edit" size={14} /></button>
@@ -114,9 +114,20 @@ export default function RecentPanel({ specs, onEditOpen }) {
       </div>
     )
   })
+  /* Thu gọn: chỉ còn nút biểu tượng (kèm số) + nút Thêm sản phẩm; bấm nút -> danh sách mở rộng sang bên phải (nổi trên form) */
+  const n = pd.length + ps.length
   return (
-    <div className="qsi-recent">
-      <div className="qsi-recent-h">Sản phẩm vừa nhập <span className="qsi-rcount">{pad2(pd.length + ps.length)}</span></div>
+    <div className={'qsi-recent' + (open ? ' open' : '')}>
+      <button type="button" className="qsi-recent-tg" aria-expanded={open} title={open ? 'Thu gọn danh sách' : 'Mở danh sách Sản phẩm vừa nhập / Lịch sử nhập'} onClick={() => onOpen(!open)}>
+        <span className="ic"><QsIcon name="list" size={17} /></span>
+        <span className="tx">Sản phẩm vừa nhập</span>
+        <span className="qsi-rcount">{pad2(n)}</span>
+        <span className="chev" aria-hidden="true">›</span>
+      </button>
+      {open && (
+      <div className="qsi-recent-fly">
+      <div className="qsi-recent-h">Sản phẩm vừa nhập <span className="qsi-rcount">{pad2(n)}</span>
+        <button type="button" className="qsi-recent-x" title="Đóng" onClick={() => onOpen(false)}>✕</button></div>
       <div className="qsi-recent-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'phien'} className={tab === 'phien' ? 'on' : ''} onClick={() => setTab('phien')}>Phiên này</button>
         <button type="button" role="tab" aria-selected={tab === 'ls'} className={tab === 'ls' ? 'on' : ''} onClick={() => setTab('ls')}>Lịch sử nhập</button>
@@ -147,6 +158,8 @@ export default function RecentPanel({ specs, onEditOpen }) {
         ) : null}
       </div>
       </>}
+      </div>
+      )}
       <div className="qsi-rfoot">
         {pd.length ? <div className="qsi-rfoot-note"><b>{pd.length}</b> sản phẩm đang chờ — <b>chưa</b> lưu vào Database</div> : null}
         <button className="qsi-btn qsi-blue qsi-block" disabled={!pd.length || committing} onClick={() => pendingCommit_()}>

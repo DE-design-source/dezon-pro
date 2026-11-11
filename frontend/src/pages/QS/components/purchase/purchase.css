@@ -270,3 +270,118 @@ html[data-theme="dark"] .qs-po-pm-i.tot b{color:#4ADE80;}
 .qs-po-ar-b{display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:14px 18px 16px;}
 .qs-po-ar-pk{flex:1; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .qs-po-ar .qs-po-dlg-h{padding:14px 18px 11px;}
+
+/* ---------- Sửa thẻ NCC (nút Edit, SupplierCard): hàng thêm tay · cột tự thêm · ghi chú cho NCC ---------- */
+.qs-po-editbtn{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px; margin-right:10px; border:1px solid var(--dash-accent-border); border-radius:7px; background:var(--surface); color:var(--dash-accent); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-po-editbtn:hover{background:var(--dash-accent-tint);}
+.qs-po-editbtn.on{background:var(--dash-accent); border-color:var(--dash-accent); color:#fff;}
+.qs-po-card.editing{box-shadow:0 0 0 2px var(--dash-accent-tint); border-color:var(--dash-accent-border);}
+.qs-po-xin{width:100%; min-width:0; height:28px; padding:0 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; outline:none;}
+.qs-po-xin:focus{border-color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint);}
+.qs-po-xin.name{font-weight:600;}
+.qs-po-xin.c{text-align:center; max-width:80px;}
+.qs-po-xin.r{text-align:right; max-width:130px;}
+.qs-po-xin.th{height:24px; background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.35); color:#fff; font-weight:700; text-align:center;}
+.qs-po-xthin{display:inline-flex; align-items:center; gap:4px;}
+.qs-po-xthin button{width:20px; height:20px; padding:0; border:none; border-radius:50%; background:rgba(255,255,255,.15); color:#fff; font-size:10px; cursor:pointer;}
+.qs-po-xthin button:hover{background:var(--danger);}
+.qs-po-xth{min-width:110px;}
+.qs-po-xc{min-width:110px; font-size:12.5px;}
+.qs-po-xdash{color:var(--text-muted);}
+.qs-po-xrow td{background:color-mix(in srgb, var(--dash-accent-tint) 45%, transparent);}
+.qs-po-xico{display:inline-grid; place-items:center; width:36px; height:36px; border-radius:8px; border:1px dashed var(--dash-accent-border); color:var(--dash-accent);}
+.qs-po-name.static{cursor:default;}
+.qs-po-xtag{margin-left:6px; padding:1px 7px; border-radius:6px; background:var(--dash-accent-tint); color:var(--dash-accent); font-size:10.5px; font-weight:700;}
+.qs-po-xedit{display:flex; flex-direction:column; gap:5px;}
+.qs-po-xdel{align-self:flex-start; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border:none; border-radius:6px; background:none; color:var(--danger); font:inherit; font-size:12px; cursor:pointer;}
+.qs-po-xdel:hover{background:var(--danger-tint);}
+.qs-po-xadd td{padding:8px 12px !important; background:var(--dash-soft);}
+.qs-po-xadd button{display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px; margin-right:8px; border:1px dashed var(--dash-accent-border); border-radius:8px; background:var(--surface); color:var(--dash-accent); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-po-xadd button:hover{background:var(--dash-accent-tint); border-style:solid;}
+.qs-po-xhint{font-size:11.5px; color:var(--text-muted);}
+.qs-po-xnote{display:flex; flex-direction:column; gap:5px; padding:10px 14px; border-top:1px solid var(--border); background:var(--dash-soft);}
+.qs-po-xnote > span{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:var(--text-muted);}
+.qs-po-xnote textarea{width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; resize:vertical;}
+.qs-po-xnote p{margin:0; font-size:13px; white-space:pre-wrap;}
+
+/* Cột tóm tắt (Tổng hợp đơn · Đơn đã gửi · Phiếu đề xuất đã gửi) chuyển sang TRÁI, rộng 440px như cột trái Bảng điều khiển /
+   cột danh mục Bóc tách; khung thẻ cùng kiểu (bo 12, viền + bóng nhẹ, khe 16px). Màn ≤1280px: xếp dọc, cột tóm tắt nằm dưới danh sách NCC */
+.qs-po-main{gap:16px;}
+.qs-po-side{order:-1; width:440px; gap:16px;}
+.qs-po-side > .qs-card{border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 3px rgba(15, 23, 42, .06); overflow:hidden;}
+@media (max-width:1280px){ .qs-po-side{order:2; width:100%;} }
+/* cột tóm tắt trái kéo tới đáy khung nhìn (trang QS bị zoom nên chia --qs-zoom); thẻ cuối giãn lấp phần còn lại */
+.qs-po-side{align-self:flex-start; min-height:calc((100vh - 150px) / var(--qs-zoom, .675));}
+.qs-po-side > .qs-card:last-child{flex:1 0 auto;}
+@media (max-width:1280px){ .qs-po-side{min-height:0;} .qs-po-side > .qs-card:last-child{flex:none;} }
+/* đầu các thẻ cột trái (Tổng hợp đơn · Đơn đã gửi · Phiếu đề xuất đã gửi) cao như đầu thẻ cột trái Bảng điều khiển */
+.qs-po-side .qs-po-box-head{min-height:52px; padding:6px 12px 6px 16px; font-size:15px;}
+.qs-po-side .qs-po-box-head b{font-weight:700;}
+
+/* "Hạng mục đã bóc" thành thẻ đầu cột trái (băng dự án mở rộng): nút chọn hạng mục trải hết bề ngang thẻ */
+.qs-po-side > .qs-card.qs-po-hmbox{flex:none;}
+.qs-po-hmrow{padding:10px 12px 12px;}
+.qs-po-hmrow .qs-bd-category{width:100%; max-width:none; margin:0;}
+/* Vùng danh sách NCC thành 1 module riêng (khung trắng bo 12, viền + bóng nhẹ như các module khác), cao tới đáy khung nhìn như cột trái;
+   cách hàng hạng mục / tìm kiếm phía trên 12px, cách cột trái 16px */
+.qs-po-main{margin-top:12px; align-items:stretch;}
+.qs-po-list{align-self:stretch; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 3px rgba(15, 23, 42, .06);
+  min-height:calc((100vh - 150px) / var(--qs-zoom, .675));}
+/* mỗi thẻ NCC viền đậm (navy pha) để tách rõ từng nhà cung cấp; thẻ đang chọn viền màu nhấn */
+.qs-po-list{gap:16px;}
+.qs-po-list > .qs-po-card{border:1.5px solid color-mix(in srgb, var(--dash-navy) 40%, var(--border)); border-radius:10px; box-shadow:0 2px 6px rgba(15, 23, 42, .08);}
+.qs-po-list > .qs-po-card.on{border-color:color-mix(in srgb, var(--dash-accent) 70%, var(--border));}
+.qs-po-list > .qs-po-card.editing{border-color:var(--dash-accent);}
+.qs-po-list > .qs-po-empty{box-shadow:none; border:1px dashed var(--border);}
+@media (max-width:1280px){ .qs-po-list{min-height:0;} }
+
+/* Chân bảng NCC: Tổng (chưa VAT) · VAT (%) có ô nhập + chọn nhanh 10 / 8 / 5% · Tổng (VAT) */
+.qs-po-vatpick{display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;}
+.qs-po-vatpick > span{margin-right:2px;}
+.qs-po-vatpick button{height:22px; padding:0 8px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:11px; font-weight:700; letter-spacing:0; cursor:pointer;}
+.qs-po-vatpick button:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qs-po-vatpick button.on{border-color:var(--dash-accent); background:var(--dash-accent); color:#fff;}
+.qs-po-vatpick button.ve{border-style:dashed; text-transform:none;}
+.qs-po-vatpick .qs-po-pct{text-transform:none; letter-spacing:0;}
+/* ô VAT của NCC: ô nhập % + nút ▾ xổ danh sách chọn nhanh */
+.qs-po-vatin{display:inline-flex; align-items:center; gap:3px; height:24px; padding:0 2px 0 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface); text-transform:none; letter-spacing:0;}
+.qs-po-vatin input{width:38px; height:20px; padding:0; border:0; background:none; color:var(--text); font:inherit; font-size:12px; font-weight:700; text-align:right; -moz-appearance:textfield;}
+.qs-po-vatin input::-webkit-inner-spin-button, .qs-po-vatin input::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
+.qs-po-vatin input:focus{outline:none;}
+.qs-po-vatin:focus-within{border-color:var(--dash-accent);}
+.qs-po-vatpick .qs-po-vatin button.dd{width:20px; height:20px; padding:0; border:0; border-radius:5px; background:none; color:var(--text-muted); display:grid; place-items:center;}
+.qs-po-vatpick .qs-po-vatin button.dd:hover, .qs-po-vatpick .qs-po-vatin button.dd.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qs-po-vatpop{padding:4px;}
+.qs-po-vatpop button{display:flex; align-items:center; justify-content:space-between; width:100%; height:30px; padding:0 10px; border:0; border-radius:7px; background:none; color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer;}
+.qs-po-vatpop button:hover{background:var(--surface-alt);}
+.qs-po-vatpop button.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+/* ô VAT của thẻ NCC = 1 nút (số % + ▾); danh sách xổ ngay dưới, thẳng mép trái ô, dòng đầu "Tự nhập" */
+.qs-po-vatpick button.qs-po-vatin.trig{height:26px; padding:0 6px 0 9px; gap:4px; border-radius:7px; color:var(--text); font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-po-vatpick button.qs-po-vatin.trig b{font-weight:700;}
+.qs-po-vatpick button.qs-po-vatin.trig svg{color:var(--text-muted); transition:transform .15s;}
+.qs-po-vatpick button.qs-po-vatin.trig.on{border-color:var(--dash-accent); background:var(--surface); color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint);}
+.qs-po-vatpick button.qs-po-vatin.trig.on svg{transform:rotate(180deg); color:var(--dash-accent);}
+.qs-po-vatself{display:flex; align-items:center; gap:6px; padding:6px 8px 8px; margin-bottom:4px; border-bottom:1px solid var(--border); font-size:12px; font-weight:600; color:var(--text-muted);}
+.qs-po-vatself span{flex:1;}
+.qs-po-vatself input{width:52px; height:26px; padding:0 6px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:700; text-align:right; outline:none;}
+.qs-po-vatself input:focus{border-color:var(--dash-accent);}
+/* hộp xổ VAT: trên cùng ô trống chỉ để gõ số (căn giữa), dưới là 10 / 8 / 5 / 0% căn giữa, dấu tích nằm sát phải */
+.qs-po-vatpop .qs-po-vatself{display:block; padding:2px 2px 6px; margin-bottom:4px; border-bottom:1px solid var(--border);}
+.qs-po-vatpop .qs-po-vatself input{display:block; width:100%; height:32px; box-sizing:border-box; padding:0 8px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:700; text-align:center; -moz-appearance:textfield;}
+.qs-po-vatpop .qs-po-vatself input::-webkit-inner-spin-button, .qs-po-vatpop .qs-po-vatself input::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
+.qs-po-vatpop .qs-po-vatself input::placeholder{font-weight:500; color:var(--text-muted);}
+.qs-po-vatpop .qs-po-vatself input:focus{outline:none; border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qs-po-vatpop button{position:relative; justify-content:center;}
+.qs-po-vatpop button .ck{position:absolute; right:10px;}
+/* danh sách xổ % VAT rộng đúng bằng ô chọn (Pop matchAnchor): ô rộng tối thiểu 92px để chứa ô "Nhập %" */
+.qs-po-vatpick button.qs-po-vatin.trig{min-width:92px; justify-content:space-between;}
+.qs-po-vatpop{box-sizing:border-box; min-width:0 !important;}
+.qs-po-vatpop .qs-po-vatself{padding:4px 2px 6px; gap:3px;}
+.qs-po-vatpop .qs-po-vatself span{display:none;}
+.qs-po-vatpop .qs-po-vatself input{flex:1; width:0; min-width:0;}
+.qs-po-vatpop button{padding:0 8px;}
+/* ô Nhập % (VatSelfInput): ô chữ chiếm phần còn lại + nút ✓ nhỏ */
+.qs-po-vatpop .qs-po-vatself{display:flex; align-items:center;}
+.qs-po-vatpop .qs-po-vatself input{display:block; flex:1 1 auto; width:auto; min-width:0; height:28px; padding:0 6px; color:var(--text); font-size:13px; text-align:left;}
+.qs-po-vatpop .qs-po-vatself button.ok{flex:none; display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid var(--dash-accent-border); border-radius:6px; background:var(--surface); color:var(--dash-accent); cursor:pointer;}
+.qs-po-vatpop .qs-po-vatself button.ok:disabled{opacity:.4; cursor:default;}
