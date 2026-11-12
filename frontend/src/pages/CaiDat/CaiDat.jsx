@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import './CaiDat.css'
 import { useTheme } from '../../hooks/useTheme'
@@ -62,6 +62,9 @@ function CaiDatRoot() {
   const [params, setParams] = useSearchParams()
   const [activeTab, setTab] = useState(() => params.get('tab') || 'account')
   const setActiveTab = key => { setTab(key); if (params.get('tab')) setParams({}, { replace: true }) }
+  // Cài đặt đang mở mà đi tới ?tab=... (vd. menu Tài khoản ở thanh trên) thì đổi tab
+  const tabParam = params.get('tab')
+  useEffect(() => { if (tabParam) setTab(tabParam) }, [tabParam])
   const qsTabs = useQsSettingsTabs()
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)

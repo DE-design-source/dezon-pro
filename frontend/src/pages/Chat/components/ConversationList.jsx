@@ -16,8 +16,8 @@ const NET_TEXT = { connecting: 'Đang kết nối…', authing: 'Đang kết n�
 
 /* Cột danh sách hội thoại — renderConvList() trong chat.html.
    Dòng đầu luôn là hội thoại cục bộ SiteFlow Bot (ghim cố định), sau đó là hội thoại thật của máy chủ chat.
-   Cạnh tiêu đề "Chat": bộ chọn tài khoản (mỗi tab một tài khoản). */
-export default function ConversationList({ chat, bot, activeId, filterTab, searchTerm, onTab, onSearch, onSelect, onOpenDirectory, onNewChat, onAddAccount, onSearchMessages }) {
+   Cạnh tiêu đề "Chat": chip tài khoản chat (đăng nhập bằng tài khoản Dezon Pro). */
+export default function ConversationList({ chat, bot, activeId, filterTab, searchTerm, onTab, onSearch, onSelect, onOpenDirectory, onNewChat, onSearchMessages }) {
   /* Chuỗi người dùng gõ (giữ hoa / dấu) cho dòng "Tìm tin nhắn chứa ..." - searchTerm đã lowercase */
   const [rawTerm, setRawTerm] = useState('')
   const ready = chat.auth === 'ready'
@@ -101,7 +101,7 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
   }
 
   let note = null
-  if (!ready) note = chat.auth === 'unconfigured' ? 'Chưa cấu hình máy chủ chat.' : 'Đăng nhập Dezon Chat để xem tin nhắn của bạn.'
+  if (!ready) note = chat.auth === 'unconfigured' ? 'Chưa cấu hình máy chủ chat.' : chat.auth === 'checking' ? 'Đang kết nối Dezon Chat…' : chat.auth === 'denied' ? 'Chưa được cấp quyền Chat.' : 'Chưa kết nối được Dezon Chat.'
   else if (!chat.listLoaded && chat.listLoading) note = 'Đang tải hội thoại…'
   else if (!chat.listLoaded && chat.listError) note = chat.listError
   else if (chat.listLoaded && rows.length <= 1 && filterTab === 'all' && !searchTerm) note = 'Chưa có cuộc trò chuyện nào. Bấm + để nhắn tin mới.'
@@ -119,7 +119,7 @@ export default function ConversationList({ chat, bot, activeId, filterTab, searc
         <div className="ch-row1">
           <div className="ch-row1-title">
             <h2>Chat</h2>
-            <AccountSwitcher chat={chat} onAdd={onAddAccount} />
+            <AccountSwitcher chat={chat} />
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="ch-icon-btn" title="Danh bạ" onClick={onOpenDirectory}>

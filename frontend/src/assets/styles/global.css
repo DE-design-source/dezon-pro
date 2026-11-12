@@ -212,11 +212,13 @@ html {
   --sb-bg: #12161F; --sb-text: #AEB4C2; --sb-strong: #FFFFFF; --sb-muted: #7C8399;
   --sb-border: #262B37; --sb-hover: rgba(255,255,255,.05); --sb-chip: #2A3040; --sb-btn-bg: rgba(255,255,255,.06);
   --sb-active-bg: rgba(47,93,168,.38); --sb-active-text: #FFFFFF;
+  --dz-logo-pro: #FFFFFF; /* chữ PRO của logo (components/ui/DezonLogo.jsx) trên nền tối */
 }
 html[data-theme="light"] {
   --sb-bg: #FFFFFF; --sb-text: #4B5563; --sb-strong: #161A22; --sb-muted: #6B7280;
   --sb-border: #E2E5EC; --sb-hover: rgba(15,23,42,.05); --sb-chip: #E6EAF2; --sb-btn-bg: rgba(15,23,42,.04);
   --sb-active-bg: var(--primary-tint); --sb-active-text: color-mix(in srgb, var(--primary) 62%, #161A22); /* pha tối để màu chủ đạo nhạt vẫn đọc được */
+  --dz-logo-pro: #1A44AB;
 }
 /* Đường kẻ ngăn sidebar với nội dung (vẽ bằng bóng trong để không hiện khi sidebar thu về 0px) */
 .app-sidebar { transition: width 0.18s ease, background 0.15s ease, color 0.15s ease; box-shadow: inset -1px 0 0 var(--sb-border); }

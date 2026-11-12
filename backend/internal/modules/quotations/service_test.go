@@ -433,7 +433,7 @@ func runSteps(t *testing.T, cs *caseSpec, svc *Service, st *stubs, ctx context.C
 				out = errOut(err)
 				break
 			}
-			buf, err := svc.BuildBangXlsx(arg(args, 0))
+			buf, err := svc.BuildBangXlsx(ctx, arg(args, 0))
 			if err != nil {
 				t.Fatalf("%s: mô hình dựng được nhưng ghi file lỗi: %v", name, err)
 			}

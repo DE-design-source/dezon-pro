@@ -32,6 +32,10 @@ export default function useHeaderTabsFit() {
     // trang / tab thay đổi (đổi route, đổi tab, nhãn tab đổi) → đo lại
     const mo = new MutationObserver(muts => { if (muts.some(m => m.type === 'childList' || (m.attributeName === 'class' && m.target.closest?.('.hdr-tabs') && !m.target.classList.contains('hdr-tabs')))) run() })
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', run); mo.disconnect() }
+    // thu gọn / mở sidebar: cửa sổ giữ nguyên cỡ nhưng vùng nội dung rộng / hẹp lại → đo lại theo bề rộng sidebar
+    const sb = document.getElementById('appSidebar')
+    const ro = sb && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(run) : null
+    if (ro) ro.observe(sb)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', run); mo.disconnect(); if (ro) ro.disconnect() }
   }, [])
 }

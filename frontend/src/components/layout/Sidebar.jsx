@@ -5,7 +5,9 @@ import { useSidebar } from '../../hooks/useSidebar'
 import { NAV_MAIN, NAV_BOTTOM } from '../../data/navigation'
 import SidebarDock from './SidebarDock'
 import { useNavHidden } from '../../hooks/useNavHidden'
+import { DezonWordmark } from '../ui/DezonLogo'
 import { useChatUnreadTotal } from '../../pages/Chat/state/chatStore'
+import { useWorkSession } from '../../services/workSession'
 
 function NavIcon({ pathData }) {
   return (
@@ -60,8 +62,12 @@ export default function Sidebar() {
   const isCollapsed = level === 'icons'
   const isUltra = level === 'logo'
   const chatUnread = useChatUnreadTotal() // 0 = không hiện số (chưa đăng nhập chat / không có tin chưa đọc)
-  const navHidden = useNavHidden() // tab người dùng ẩn ở Cài đặt > Hiển thị
+  // chỉ hiện trang tài khoản được cấp quyền (Cài đặt > Admin) và chưa bị người dùng ẩn ở Cài đặt > Hiển thị; Cài đặt luôn hiện
+  const navHidden = useNavHidden()
   const shown = item => navHidden.indexOf(item.path) < 0
+  const { canPage } = useWorkSession()
+  const navMain = NAV_MAIN.filter(it => canPage(it.perm) && shown(it))
+  const navBottom = NAV_BOTTOM.filter(it => canPage(it.perm) && shown(it))
 
   /* Thu gọn tối đa: sidebar không chiếm chỗ, chỉ còn nút tròn nổi (SidebarDock) để mở menu */
   /* Báo mức thu gọn cho CSS (global.css chừa chỗ cho cụm nổi ở các trang có lề hẹp) */
@@ -125,29 +131,10 @@ export default function Sidebar() {
           padding: isCollapsed || isUltra ? '0 0 16px' : '0 4px 22px',
           justifyContent: isCollapsed || isUltra ? 'center' : 'space-between',
         }}>
-          {/* Logo Icon */}
-          <div
-            onClick={() => {
-              if (isCollapsed) expand()
-            }}
-            title={isCollapsed || isUltra ? "Click để mở rộng" : "Dezon"}
-            style={{
-              width: 30, height: 30, borderRadius: '50%',
-              background: 'var(--primary, #2F5DA8)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flex: 'none', cursor: isCollapsed || isUltra ? 'pointer' : 'default',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/>
-              <circle cx="12" cy="9" r="2.3"/>
-            </svg>
-          </div>
-
           {/* Khi đang mở rộng: Hiện tên và 2 nút thu gọn */}
           {!isCollapsed && !isUltra && (
             <>
-              <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--sb-strong)', flex: 1, whiteSpace: 'nowrap' }}>Dezon</span>
+              <span style={{ flex: 1, minWidth: 0, color: 'var(--sb-strong)' }}><DezonWordmark height={18} /></span>
               
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
@@ -206,14 +193,14 @@ export default function Sidebar() {
         {!isUltra && (
           // Màn hình thấp (laptop, cỡ chữ lớn): menu tự cuộn thay vì bị cắt mất các mục cuối
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-            {NAV_MAIN.filter(shown).map(item => (
+            {navMain.map(item => (
               <NavItem key={item.path} item={item} collapsed={isCollapsed}
                 badge={item.path === '/chat' ? (chatUnread > 99 ? '99+' : chatUnread || null) : item.badge} />
             ))}
 
-            <div className="sidebar-divider" style={{ margin: '10px 0 6px' }} />
+            {navMain.length > 0 && <div className="sidebar-divider" style={{ margin: '10px 0 6px' }} />}
 
-            {NAV_BOTTOM.filter(shown).map(item => (
+            {navBottom.map(item => (
               <NavItem key={item.path} item={item} collapsed={isCollapsed} />
             ))}
           </nav>

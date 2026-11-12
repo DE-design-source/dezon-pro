@@ -48,7 +48,11 @@ export default function PurchaseInfoPanel({ task, items, open, projectName, meNa
     }
     place()
     window.addEventListener('resize', place)
-    return () => window.removeEventListener('resize', place)
+    // Thu gọn / mở sidebar không đổi cỡ cửa sổ nhưng đổi bề rộng thanh tiêu đề -> đo lại theo từng khung hình chuyển động
+    const hd = document.querySelector('.da-header, .tk-header')
+    const ro = hd && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null
+    if (ro) ro.observe(hd)
+    return () => { window.removeEventListener('resize', place); if (ro) ro.disconnect() }
   }, [open, wide])
   const panelStyle = {
     ...(geo.left != null ? { width: 'auto', left: geo.left } : null),

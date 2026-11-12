@@ -23,7 +23,7 @@ var leadBody = func() []rpc.GoField {
 		{Name: "partner", In: "body", Type: "boolean", Desc: "Chuyển giao cho đối tác"},
 		{Name: "categories", In: "body", Type: "array", Desc: "Hạng mục công việc (chuỗi)"},
 		{Name: "assignees", In: "body", Type: "array", Desc: "Người phụ trách [{name, role}]"},
-		{Name: "handoff", In: "body", Type: "object", Desc: "Phiếu bàn giao gần nhất {status, dept, requestedAt, assignee}; null = không có"},
+		{Name: "handoff", In: "body", Type: "object", Desc: "Phiếu bàn giao gần nhất {status, dept, requestedAt, assignee, stage}; stage = giai đoạn gửi phiếu, dept Thiết kế / Thi công quyết định trang triển khai; null = không có"},
 	}
 	for _, k := range []string{"phone", "email", "address", "source", "projectType", "scale", "concept", "notes", "creator", "manager", "boqFile"} {
 		f = append(f, rpc.GoField{Name: k, In: "body", Desc: "Chuỗi tự do"})

@@ -1,0 +1,62 @@
+/* Màn đăng nhập chung + thẻ trạng thái của AppGate (giống thẻ đăng nhập QS cũ, vừa màn hình điện thoại) */
+.dz-gate {
+  position: fixed; inset: 0; z-index: 1000; overflow: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px; box-sizing: border-box;
+  background: radial-gradient(circle at 20% 10%, #1c4a76 0%, #0e2540 55%, #081726 100%);
+  color: #1f2b38;
+}
+.dz-gate.plain { background: var(--bg, #f4f6fa); color: var(--text, #1f2b38); }
+.dz-login-card {
+  width: 380px; max-width: 100%; background: #fff; border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(8, 20, 40, .45); overflow: hidden; margin: auto;
+}
+.dz-login-brand { background: linear-gradient(135deg, #12314f, #1c4a76); color: #fff; padding: 28px 30px 22px; text-align: center; }
+.dz-login-brand img { display: block; height: 34px; max-width: 80%; margin: 0 auto; }
+.dz-login-tag { font-size: 12px; color: #b9cbe0; margin-top: 10px; letter-spacing: .2px; }
+.dz-login-body { padding: 24px 30px 26px; display: flex; flex-direction: column; }
+.dz-login-h { font-size: 20px; font-weight: 800; color: #1f2b38; }
+.dz-login-sub { font-size: 12.5px; color: #8a96a5; margin: 2px 0 16px; }
+.dz-login-msg { background: #fdecec; color: #c0392b; border: 1px solid #f3c9c6; border-radius: 9px; padding: 9px 11px; font-size: 12.5px; margin-bottom: 12px; }
+.dz-login-field { position: relative; margin-bottom: 12px; }
+.dz-login-field .dz-login-ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #9aa7b4; pointer-events: none; }
+.dz-login-field input {
+  width: 100%; border: 1px solid #dde3ea; border-radius: 11px; padding: 12px 40px;
+  font: inherit; font-size: 15px; box-sizing: border-box; background: #f8fafc; color: #1f2b38; transition: .12s;
+}
+.dz-login-field input:focus { border-color: #2f6bff; background: #fff; box-shadow: 0 0 0 3px #2f6bff22; outline: none; }
+.dz-login-eye {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center; color: #9aa7b4; cursor: pointer;
+  border-radius: 7px; border: none; background: transparent; padding: 0;
+}
+.dz-login-eye svg { width: 17px; height: 17px; }
+.dz-login-eye:hover, .dz-login-eye.on { color: #2f6bff; }
+.dz-login-btn {
+  width: 100%; margin-top: 8px; background: linear-gradient(135deg, #2f6bff, #1c4fd6); color: #fff; border: none;
+  border-radius: 11px; padding: 13px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 8px 20px rgba(47, 107, 255, .32); transition: .12s;
+}
+.dz-login-btn:hover { filter: brightness(1.06); }
+.dz-login-btn:disabled { opacity: .65; cursor: default; }
+.dz-login-foot { text-align: center; font-size: 11px; color: #aab3c0; margin-top: 16px; }
+
+.dz-card {
+  width: 380px; max-width: 100%; background: var(--surface, #fff); border: 1px solid var(--border, #e3e8ef);
+  border-radius: 16px; padding: 26px 26px 22px; box-shadow: 0 12px 40px rgba(15, 30, 60, .12);
+  display: flex; flex-direction: column; gap: 12px; color: var(--text, #1f2b38); box-sizing: border-box; margin: auto;
+}
+.dz-card-t { font-size: 16px; font-weight: 700; }
+.dz-card-x { font-size: 13px; color: var(--text-muted, #6b7785); line-height: 1.5; }
+.dz-card-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.dz-card-btn {
+  border: none; border-radius: 9px; padding: 10px 14px; font: inherit; font-size: 13.5px; font-weight: 700;
+  cursor: pointer; background: var(--primary, #2F5DA8); color: #fff;
+}
+.dz-card-btn.ghost { background: var(--surface-alt, #f1f4f8); color: var(--text, #1f2b38); border: 1px solid var(--border, #e3e8ef); }
+.dz-inline { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg, #f4f6fa); overflow: auto; }
+
+@media (max-width: 480px) {
+  .dz-login-brand { padding: 22px 20px 18px; }
+  .dz-login-body { padding: 20px 18px 22px; }
+}

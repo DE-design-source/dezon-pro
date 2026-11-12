@@ -122,7 +122,7 @@ export function cpFlatten(rows, by, firstKey, closed, minBien, plain) {
 }
 /* Thân yêu cầu POST /export/bang của Chi phí (cpXuatExcel_): đúng cột đang bật, lọc / tìm, cách gom; dòng tổng như dải tổng trang */
 export function cpXlsxBody(cur, keys, rows, by, loc, hm, ctx) {
-  const cols = [{ label: 'STT' }].concat(keys.map(k => ({ label: cpLabel_(k), num: cpAlign_(k) === 'num' || (cpAlign_(k) === 'ct' && k !== 'dvt') })))
+  const cols = [{ label: 'STT' }].concat(keys.map(k => ({ label: cpLabel_(k), num: cpAlign_(k) === 'num' || (cpAlign_(k) === 'ct' && k !== 'dvt'), w: xw_(k) })))
   const val = (l, k) => { if (k === 'ten' || k === 'dvt') return String(l[k] || ''); const v = cellSortVal_(l, k); return typeof v === 'number' ? v : (Number(v) || 0) }
   const out = []
   const them = (list, pre) => list.forEach((l, i) => out.push({ cells: [pre + (i + 1)].concat(keys.map(k => val(l, k))) }))
@@ -139,7 +139,7 @@ export function cpXlsxBody(cur, keys, rows, by, loc, hm, ctx) {
   const tong = [['Tổng giá vốn', T.von]].concat(!loc && T.ptBan ? [['  trong đó Phần thô (giá bán)', T.ptBan]] : []).concat(!loc && T.ck ? [['Chiết khấu báo giá', -T.ck]] : [])
     .concat([['Tổng giá bán', banT], ['Lợi nhuận', T.ln], ['VAT ' + vp + '%', vat], ['Tổng thanh toán', banT + vat]])
   return {
-    ten: 'BẢNG CHI PHÍ — ' + (cur.ten || cur.maDA) + (hm ? (' · ' + nodeName(hm)) : ''), sheet: 'Chi phi', cols, rows: out, tong,
+    ten: 'BẢNG CHI PHÍ — ' + (cur.ten || cur.maDA) + (hm ? (' · ' + nodeName(hm)) : ''), sheet: 'Chi phi', cols, rows: out, tong, dep: true,
   }
 }
 /* ROMAN_ của bản gốc (baogia.js:131) có 15 số */
@@ -192,18 +192,22 @@ export function daFlatten(dg, lines, firstKey, closed, plain) {
   } })
   return out
 }
-/* Thân yêu cầu POST /export/bang của Dự án (daXuatExcel_): bỏ cột ảnh / tài liệu, dòng tầng = {group}, ô số giữ kiểu số */
+/* Độ rộng cột Excel (đơn vị ký tự) theo độ rộng mặc định trên màn hình (DEFW, px) - dùng với dep: true của /export/bang */
+const xw_ = k => Math.max(8, Math.min(60, Math.round((DEFW[k] || 120) / 7)))
+/* Thân yêu cầu POST /export/bang của Dự án (daXuatExcel_): bỏ cột tài liệu, dòng tầng = {group}, ô số giữ kiểu số.
+   dep: true (chỉ bản Go) -> file có viền, canh giữa, cột Hình ảnh nhúng ảnh thật (ô gửi link ảnh) */
 const DA_NUM = { soLuong: 1, giaNCC: 1, giaDaiLy: 1, donGia: 1, donGiaCK: 1, thanhTien: 1, lnVnd: 1, chietKhau: 1, lnPct: 1, ckKhach: 1, markup: 1, margin: 1 }
 export function daXlsxBody(cur, keys, dg, lines) {
-  const ks = keys.filter(k => k !== 'hinhAnh' && k !== 'taiLieu')
+  const ks = keys.filter(k => k !== 'taiLieu')
   const rows = []
+  const o = (l, k) => (k === 'hinhAnh' ? String(l.hinhAnh || '').split('\n')[0].trim() : (DA_NUM[k] ? cellSortVal_(l, k) : String(lineText(l, k, ''))))
   dg.order.forEach((g, gi) => {
     rows.push({ group: romanPT(gi) + '. ' + g })
-    dg.groups[g].forEach((l, ri) => rows.push({ cells: [(gi + 1) + '.' + (ri + 1)].concat(ks.map(k => (DA_NUM[k] ? cellSortVal_(l, k) : String(lineText(l, k, ''))))) }))
+    dg.groups[g].forEach((l, ri) => rows.push({ cells: [(gi + 1) + '.' + (ri + 1)].concat(ks.map(k => o(l, k))) }))
   })
   return {
-    ten: 'SẢN PHẨM TRONG DỰ ÁN — ' + (cur.ten || cur.maDA), sheet: 'Du an',
-    cols: [{ label: 'STT' }].concat(ks.map(k => ({ label: cpLabel_(k), num: !!DA_NUM[k] }))), rows,
+    ten: 'SẢN PHẨM TRONG DỰ ÁN — ' + (cur.ten || cur.maDA), sheet: 'Du an', dep: true,
+    cols: [{ label: 'STT' }].concat(ks.map(k => ({ label: cpLabel_(k), num: !!DA_NUM[k], img: k === 'hinhAnh', w: k === 'hinhAnh' ? 12 : xw_(k) }))), rows,
     tong: daExcelTong_(lines, cur.vat),
   }
 }

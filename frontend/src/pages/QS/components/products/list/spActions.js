@@ -257,8 +257,9 @@ export async function spBulkApply(all, lark, val, label, col, onProgress) {
     + (bo ? '\n(Bỏ qua ' + bo + ' sản phẩm kho chung Dezon)' : ''))) return false
   let ok = 0
   const errs = [], undo = []
+  if (onProgress) onProgress(0, prods.length)
   for (let i = 0; i < prods.length; i++) {
-    if (onProgress) onProgress(i + 1, prods.length)
+    if (i && onProgress) onProgress(i, prods.length)
     const d = { 'MÃ SẢN PHẨM': prods[i].ma }; d[lark] = val
     const truoc = (col && prods[i].raw && prods[i].raw[col] != null) ? String(prods[i].raw[col]) : ''
     try {
@@ -267,13 +268,14 @@ export async function spBulkApply(all, lark, val, label, col, onProgress) {
     } catch (e) { if (errs.length < 3) errs.push((prods[i].ma || '?') + ': ' + errMsg(e).slice(0, 60)) }
   }
   spUndoPush_(undo, 'sửa hàng loạt ' + label + ' cho ' + ok + ' SP')
+  if (onProgress) onProgress(prods.length, prods.length)
   await reloadProducts()
   if (errs.length) toast('Cập nhật ' + ok + '/' + prods.length + ' — lỗi: ' + errs.join(' | '))
   else toast('Đã đặt ' + label + ' = "' + val + '" cho ' + ok + ' sản phẩm')
   return true
 }
 /* Admin: xoá thật. selCount = số dòng đang tick (để báo số SP kho chung bị bỏ qua) */
-export async function spBulkDelete(sel, selCount) {
+export async function spBulkDelete(sel, selCount, onProgress) {
   const prods = sel.filter(p => !p.spChung)
   const keys = prods.map(p => String(p.recordId || p.ma || '')).filter(Boolean)
   if (!keys.length) { toast('Không có sản phẩm nào xoá được (kho chung Dezon chỉ xem)'); return false }
@@ -281,7 +283,11 @@ export async function spBulkDelete(sel, selCount) {
   if (!await qsConfirm('Xóa ' + keys.length + ' sản phẩm khỏi danh mục? Không thể hoàn tác.'
     + (bo ? '\n(Bỏ qua ' + bo + ' sản phẩm kho chung Dezon)' : ''))) return false
   let ok = 0, err = ''
-  for (let i = 0; i < keys.length; i++) { try { await api.deleteDbProduct(keys[i]); ok++ } catch (e) { if (!err) err = errMsg(e) } }
+  for (let i = 0; i < keys.length; i++) {
+    if (onProgress) onProgress(i, keys.length)
+    try { await api.deleteDbProduct(keys[i]); ok++ } catch (e) { if (!err) err = errMsg(e) }
+  }
+  if (onProgress) onProgress(keys.length, keys.length)
   await reloadProducts()
   // bản gốc chỉ báo số đã xoá; lỗi từng SP thì nói thêm thay vì nuốt
   toast('Đã xóa ' + ok + ' sản phẩm' + (err ? (' · ' + (keys.length - ok) + ' lỗi: ' + err.slice(0, 70)) : ''))

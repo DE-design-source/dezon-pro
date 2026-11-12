@@ -63,8 +63,9 @@ const (
 
 // chat_devices.login_method.
 const (
-	LoginOTP = "otp"
-	LoginQR  = "qr"
+	LoginOTP   = "otp"
+	LoginQR    = "qr"
+	LoginDezon = "dezon" // POST /chat/auth/dezon: phiên Dezon Pro (0045)
 )
 
 // Trạng thái phiên QR (chat_qr_login_sessions.status) + QRExpired (chỉ là kết quả poll / thông tin, không lưu).
@@ -237,7 +238,7 @@ type DeviceDTO struct {
 	Name        string  `json:"name"`
 	UserAgent   string  `json:"user_agent"`
 	LastIP      string  `json:"last_ip"`
-	LoginMethod string  `json:"login_method"` // otp / qr
+	LoginMethod string  `json:"login_method"` // otp / qr / dezon
 	Push        bool    `json:"push"`         // có push token
 	Online      bool    `json:"online"`       // đang có kết nối WebSocket (gateway hỗ trợ deviceOnliner)
 	Current     bool    `json:"current"`      // thiết bị của chính request này

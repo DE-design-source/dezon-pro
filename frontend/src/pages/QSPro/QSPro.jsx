@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { NAV_MAIN, NAV_BOTTOM } from '../../data/navigation'
+import { useWorkSession } from '../../services/workSession'
 import './QSPro.css'
+import { DezonMark, DezonWordmark } from '../../components/ui/DezonLogo'
 
 /* Trang QS Pro: nhúng ứng dụng QS Pro (trang ngoài) phủ kín màn hình.
    Giao diện Dezon thu lại thành một nút tròn nổi:
@@ -27,7 +29,10 @@ function NavIcon({ pathData }) {
   return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }} dangerouslySetInnerHTML={{ __html: pathData }} />
 }
 
-const ALL_PAGES = [...NAV_MAIN, ...NAV_BOTTOM]
+const ALL_NAV = [...NAV_MAIN, ...NAV_BOTTOM]
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+// chữ đầu của từ đầu + từ cuối: "Trần Anh" -> "TA"
+const initials = s => { const w = String(s || '').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase() }
 /* Bỏ dấu tiếng Việt để gõ "kinh doanh" hay "kinh doanh" không dấu đều tìm ra */
 const fold = text => text.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
 
@@ -52,6 +57,10 @@ function MenuItem({ item, onPick, index, highlighted, onHover, stagger }) {
 export default function QSPro() {
   const navigate = useNavigate()
   const location = useLocation()
+  // menu chỉ có các trang tài khoản được cấp quyền (data/navigation.js perm)
+  const { me, canPage } = useWorkSession()
+  const ALL_PAGES = ALL_NAV.filter(p => canPage(p.perm))
+  const name = (me && (me.hoTen || me.username)) || ''
   const [frameKey, setFrameKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -160,7 +169,7 @@ export default function QSPro() {
         <div className={`qsp-dock${onRight ? ' right' : ''}${dragging ? ' dragging' : ''}`} style={dockStyle}>
           <button type="button" className={`qsp-logo${loading ? ' loading' : ''}`} onPointerDown={onLogoPointerDown} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openMenu() }} aria-label="Mở menu Dezon" data-tip="Bấm: mở menu · Giữ kéo: di chuyển">
             <span className="qsp-ring" />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z" /><circle cx="12" cy="9" r="2.3" /></svg>
+            <DezonMark size={19} />
             <span className={`qsp-status${loading ? ' busy' : ''}`} />
           </button>
           <div className="qsp-dock-more">
@@ -191,10 +200,7 @@ export default function QSPro() {
           <div className="qsp-backdrop" onClick={() => setMenuOpen(false)} />
           <aside className="qsp-menu">
             <div className="qsp-menu-head">
-              <span className="qsp-logo small">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z" /><circle cx="12" cy="9" r="2.3" /></svg>
-              </span>
-              <span className="qsp-menu-brand">Dezon</span>
+              <span className="qsp-menu-brand"><DezonWordmark height={18} white /></span>
               <button type="button" className="qsp-icon-btn" onClick={() => setMenuOpen(false)} title="Đóng menu, tiếp tục dùng QS Pro">
                 <svg {...icon}><path d="M15 18l-6-6 6-6" /></svg>
               </button>
@@ -233,10 +239,10 @@ export default function QSPro() {
             </nav>
             <div className="qsp-menu-hint"><kbd className="qsp-kbd">↵</kbd> mở trang <span /> <kbd className="qsp-kbd">Esc</kbd> quay lại QS Pro</div>
             <div className="qsp-menu-user">
-              <span className="qsp-menu-avatar">TA</span>
+              <span className="qsp-menu-avatar">{initials(name)}</span>
               <div>
-                <div className="qsp-menu-name">Trần Anh</div>
-                <div className="qsp-menu-role">Quản lý dự án</div>
+                <div className="qsp-menu-name">{name}</div>
+                <div className="qsp-menu-role">{ROLE_LBL[me && me.role] || 'Nhân viên'}</div>
               </div>
             </div>
           </aside>

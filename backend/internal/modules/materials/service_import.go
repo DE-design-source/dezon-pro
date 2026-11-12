@@ -160,5 +160,9 @@ func (s *Service) ImportGated(ctx context.Context, a *actor.Actor, products any)
 	if !edit {
 		return nil, apperr.New("Tài khoản không có quyền nhập sản phẩm")
 	}
-	return s.ImportCommit(ctx, a, products)
+	r, err := s.ImportCommit(ctx, a, products)
+	if err == nil && r != nil {
+		s.baoDuyet(ctx, a, int(jsval.Num0(r.Val("inserted"))), int(jsval.Num0(r.Val("updated"))), "")
+	}
+	return r, err
 }

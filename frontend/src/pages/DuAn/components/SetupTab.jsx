@@ -84,7 +84,7 @@ function SetupGeneral({ onGoto }) {
       <div className="da-card da-setup-card">
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Thiết lập chung cho dự án</h3>
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 18px' }}>
-          Việc tạo hồ sơ khách hàng mới nay thuộc mục <Link to="/kinh-doanh" style={{ color: 'var(--sales)', fontWeight: 600 }}>Kinh doanh</Link>. Khi một cơ hội được chuyển vào cột "Dự án (Thiết kế)" hoặc "Dự án (Thi công)" ở đó, dự án sẽ tự xuất hiện bên dưới.
+          Việc tạo hồ sơ khách hàng mới nay thuộc mục <Link to="/kinh-doanh" style={{ color: 'var(--sales)', fontWeight: 600 }}>Kinh doanh</Link>. Khi một cơ hội được chuyển vào cột "Dự án (Thi công)" hoặc gửi phiếu cho Phòng Thi công ở đó, dự án sẽ tự xuất hiện bên dưới.
         </p>
 
         <div className="da-field" style={{ marginBottom: 16 }}>

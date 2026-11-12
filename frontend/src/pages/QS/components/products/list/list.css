@@ -695,6 +695,24 @@
 .qspl-band .qspl-lay button.qspl-qbtn{width:30px; height:30px; padding:0; border-radius:50%; border:1.5px solid rgba(255,255,255,.45); background:rgba(255,255,255,.08); color:#fff; font-size:13px; font-weight:700; justify-content:center;}
 .qspl-band .qspl-lay button.qspl-qbtn:hover{background:rgba(255,255,255,.18); border-color:#fff; color:#fff;}
 .qspl-band .qspl-lay button.qspl-qbtn.on{background:#fff; color:#0B2545; border-color:#fff;}
+
+/* Sửa hàng loạt: ô tìm trường + danh sách trường mở sẵn */
+.qspl-bbpop-b select[size]{height:auto; padding:4px; min-width:230px;}
+.qspl-bbpop-b label i{font-style:normal; font-weight:500;}
+.qspl-bb-none{font-size:11.5px; color:var(--text-muted); padding:2px 2px 4px;}
+
+/* Panel Sản phẩm trong dự án: bấm thẻ để xem nhanh */
+.qspl-pp-list .qspl-pp-prod, .qspl-pp-row, .qspl-pp-tile{cursor:pointer;}
+.qspl-pp-list .qspl-pp-prod:hover, .qspl-pp-row:hover, .qspl-pp-tile:hover{background:var(--dash-soft);}
+.qspl-vt.trung{color:#dc2626;}
+.qspl-vt.trung .n{background:#fee2e2; color:#b91c1c;}
+.qspl-vt.trung.on{background:#dc2626; color:#fff;}
+.qspl-prog{position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:1200; width:min(380px, calc(100vw - 32px)); padding:12px 14px; border-radius:12px; background:var(--surface); color:var(--text); border:1px solid var(--border); box-shadow:0 12px 36px rgba(0,0,0,.22); font-size:13px;}
+.qspl-prog .h{display:flex; justify-content:space-between; gap:10px; margin-bottom:8px;}
+.qspl-prog .h span{font-weight:700; color:var(--dash-accent); white-space:nowrap;}
+.qspl-prog .bar{height:8px; border-radius:99px; background:var(--surface-alt); overflow:hidden;}
+.qspl-prog .bar i{display:block; height:100%; background:var(--dash-accent); transition:width .2s;}
+.qspl-prog small{display:block; margin-top:6px; font-size:11px; opacity:.65;}
 /* Modal Thông tin sản phẩm rộng hơn: gần trọn màn hình (92% bề ngang, tối đa 1500px; .qs-mroot bị zoom nên chia cho --qs-zoom),
    cao tối đa 90% màn hình, thân cuộn bên trong; cột ảnh rộng 400px, phần thông số chia 3 cột (màn vừa: 2, hẹp: 1) */
 .qspl-ov{align-items:center;}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import QsIcon from '../../common/QsIcon'
 import FloatPop from './FloatPop'
 import { TREE } from '../../../lib/tree.js'
@@ -363,12 +363,19 @@ export function OverPop({ anchor, customs, onPick, onClose }) {
   )
 }
 
-/* Sửa hàng loạt: chọn trường + giá trị mới, Enter = Áp dụng */
+/* Sửa hàng loạt: tìm trường (gõ chữ, không dấu cũng được) + chọn trường (xếp theo chữ cái) + giá trị mới, Enter = Áp dụng */
+const boDau_ = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim()
 export function BulkEditPop({ anchor, fields, n, onApply, onClose, toast }) {
-  const [fld, setFld] = useState(fields.length ? fields[0][0] : '')
+  const xep = useMemo(() => fields.slice().sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'vi')), [fields])
+  const [q, setQ] = useState('')
+  const loc = useMemo(() => { const k = boDau_(q); return k ? xep.filter(f => boDau_(f[1]).indexOf(k) >= 0) : xep }, [xep, q])
+  const [fld, setFld] = useState(xep.length ? xep[0][0] : '')
   const [val, setVal] = useState('')
   const inp = useRef(null)
-  useEffect(() => { const t = setTimeout(() => { if (inp.current) inp.current.focus() }, 0); return () => clearTimeout(t) }, [])
+  // đang gõ tìm mà trường đang chọn không còn trong kết quả -> chọn kết quả đầu
+  useEffect(() => { if (loc.length && !loc.some(f => f[0] === fld)) setFld(loc[0][0]) }, [loc, fld])
+  const qRef = useRef(null)
+  useEffect(() => { const t = setTimeout(() => { if (qRef.current) qRef.current.focus() }, 0); return () => clearTimeout(t) }, [])
   function apply() {
     if (String(val).trim() === '') { toast('Chưa nhập giá trị mới'); if (inp.current) inp.current.focus(); return }
     const f = fields.filter(x => x[0] === fld)[0]
@@ -379,10 +386,13 @@ export function BulkEditPop({ anchor, fields, n, onApply, onClose, toast }) {
     <FloatPop anchor={anchor} place="above-center" onClose={onClose} className="qspl-bbpop">
       <div className="qspl-bbpop-h">Sửa hàng loạt <span>{n} dòng</span></div>
       <div className="qspl-bbpop-b">
-        <label>Trường cần đổi</label>
-        <select value={fld} onChange={e => setFld(e.target.value)}>
-          {fields.map(f => <option key={f[0]} value={f[0]}>{f[1]}</option>)}
+        <label>Trường cần đổi <i>({loc.length}/{xep.length})</i></label>
+        <input ref={qRef} className="qspl-bb-q" placeholder="Tìm trường… (vd: chiết khấu, màu)" value={q} onChange={e => setQ(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && loc.length) { e.preventDefault(); if (inp.current) inp.current.focus() } }} />
+        <select value={fld} onChange={e => setFld(e.target.value)} size={Math.min(8, Math.max(3, loc.length))}>
+          {loc.map(f => <option key={f[0]} value={f[0]}>{f[1]}</option>)}
         </select>
+        {!loc.length && <div className="qspl-bb-none">Không có trường nào khớp "{q}"</div>}
         <label>Giá trị mới</label>
         <input ref={inp} placeholder="Nhập giá trị…" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') apply() }} />
       </div>

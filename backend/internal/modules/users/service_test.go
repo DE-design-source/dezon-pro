@@ -208,7 +208,7 @@ func TestRoutes(t *testing.T) {
 	(&Service{}).RegisterRoutes(e.Group("/api/v1"))
 	want := map[string]bool{"GET /api/v1/users": true, "POST /api/v1/users": true, "PATCH /api/v1/users/:id": true,
 		"PUT /api/v1/users/:id/password": true, "PUT /api/v1/users/:id/active": true, "DELETE /api/v1/users/:id": true,
-		"GET /api/v1/audit-log": true}
+		"GET /api/v1/audit-log": true, "PATCH /api/v1/auth/me": true}
 	for _, r := range e.Routes() {
 		k := r.Method + " " + r.Path
 		if !want[k] {

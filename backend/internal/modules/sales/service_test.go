@@ -103,7 +103,7 @@ func (p fakeProjects) GetProject(ctx context.Context, ma any) (*omap.Map, error)
 }
 
 // fakeDelivery: ghi lại lời gọi sang module delivery ("ensure:<kind>:<giá trị>" / "rename:<tên cũ>><tên mới>" /
-// "detach:<id>" / "delete:<id>")
+// "detach:<kind>:<id>" / "delete:<kind>:<id>")
 type fakeDelivery struct{ calls []string }
 
 func (d *fakeDelivery) EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, v float64, kind string) (bool, error) {
@@ -114,11 +114,11 @@ func (d *fakeDelivery) RenameFromLead(ctx context.Context, old, lead *omap.Map) 
 	d.calls = append(d.calls, "rename:"+jsval.Str(old.Val("ten_khach"))+">"+jsval.Str(lead.Val("ten_khach")))
 	return nil
 }
-func (d *fakeDelivery) DetachFromLead(ctx context.Context, leadID any, deleted bool) error {
+func (d *fakeDelivery) DetachFromLead(ctx context.Context, leadID any, kind string, deleted bool) error {
 	if deleted {
-		d.calls = append(d.calls, "delete:"+jsval.Str(leadID))
+		d.calls = append(d.calls, "delete:"+kind+":"+jsval.Str(leadID))
 	} else {
-		d.calls = append(d.calls, "detach:"+jsval.Str(leadID))
+		d.calls = append(d.calls, "detach:"+kind+":"+jsval.Str(leadID))
 	}
 	return nil
 }
@@ -243,9 +243,11 @@ func TestTaoSuaKhachHang(t *testing.T) {
 	}
 }
 
-// Bàn giao: tu-van / dam-phan / thiet-ke -> dự án ở cả 2 trang (giá trị = giá trị ước tính lúc tạo, kể cả khi gắn dự án QS).
-// Chỉ gọi delivery khi giai đoạn qua ranh giới đó hoặc tên / loại công trình đổi - sửa thứ khác không đụng dự án (không ghi
-// đè giá trị HĐ, không tạo lại dự án người dùng đã xoá). Rời -> detach (ẩn), quay lại -> ensure (hiện lại), xoá khách -> delete.
+// Bàn giao: gửi tới phòng nào thì chỉ có dự án ở trang phòng đó - phiếu gửi từ đúng giai đoạn đang đứng tới Thiết kế -> design,
+// Thi công -> construction; không có phiếu đó (hoặc gửi QS): cột thiet-ke -> design, thi-cong -> construction, tu-van / dam-phan
+// -> không trang nào. Giá trị = giá trị ước tính. Chỉ gọi delivery khi giai đoạn / phiếu đổi (đồng bộ lại cả 2 trang theo dòng vừa
+// ghi) hoặc tên / loại công trình đổi - sửa thứ khác không đụng dự án (không ghi đè giá trị HĐ, không tạo lại dự án đã xoá).
+// Trang không cần -> detach (ẩn), cần -> ensure (tạo / hiện lại), xoá khách -> delete.
 func TestBanGiaoDuAn(t *testing.T) {
 	f, d := newFake(), &fakeDelivery{}
 	s := newSvc(f, "")
@@ -258,32 +260,63 @@ func TestBanGiaoDuAn(t *testing.T) {
 		}
 		d.calls = nil
 	}
+	phieu := func(dept, stage string) *omap.Map {
+		return omap.Of("status", "pending-handoff", "dept", dept, "stage", stage)
+	}
+	const (
+		dsD, dsC   = "detach:design:1", "detach:construction:1"
+		en2D       = "ensure:design:2000000000"
+		en3D, en3C = "ensure:design:3000000000", "ensure:construction:3000000000"
+	)
 	l, err := s.CreateLead(ctx, a, omap.Of("name", "Chị Hoa", "stage", "tu-van", "valueVnd", 2e9, "maDA", "DA-1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := l.(*omap.Map).Val("id").(float64)
-	want("tạo ở tu-van", "ensure:design:2000000000", "ensure:construction:2000000000")
-	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "dam-phan", "valueVnd", 3e9))
-	want("sang dam-phan (vẫn trong vùng bàn giao, đổi giá trị)")
-	_, _ = s.UpdateLead(ctx, a, id, omap.Of("note", "gọi lại", "phone", "0909"))
+	want("tạo ở tu-van, chưa gửi phiếu")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("Thiết kế", "tu-van")))
+	want("gửi phiếu tu-van tới Phòng Thiết kế", en2D, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("note", "gọi lại", "phone", "0909", "assignees", []any{omap.Of("name", "Lan")}))
 	want("sửa thứ khác")
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("name", "Chị Hoa Lê"))
 	want("đổi tên", "rename:Chị Hoa>Chị Hoa Lê")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("Thi công", "tu-van")))
+	want("gửi lại phiếu tới Phòng Thi công", dsD, "ensure:construction:2000000000")
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "dam-phan", "valueVnd", 3e9))
+	want("sang dam-phan, chưa gửi phiếu mới (phiếu tu-van không còn tính)", dsD, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("QS", "dam-phan")))
+	want("phiếu dam-phan gửi QS", dsD, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("Thiết kế", "dam-phan")))
+	want("phiếu dam-phan gửi Phòng Thiết kế", en3D, dsC)
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "thiet-ke"))
-	want("sang thiet-ke")
+	want("sang cột Dự án (Thiết kế), chưa gửi phiếu cột", en3D, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("Thi công", "thiet-ke")))
+	want("phiếu cột Thiết kế gửi Phòng Thi công", dsD, en3C)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", phieu("QS", "thiet-ke")))
+	want("phiếu cột Thiết kế gửi QS -> trang của cột", en3D, dsC)
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "thi-cong"))
-	want("sang thi-cong", "detach:1")
+	want("sang cột Dự án (Thi công)", dsD, en3C)
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "bao-gia"))
-	want("sang bao-gia (đã ở ngoài)")
+	want("sang bao-gia (ra ngoài)", dsD, dsC)
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("name", "Chị Hoa L."))
-	want("đổi tên khi ở ngoài")
+	want("đổi tên khi ở ngoài (dự án đang ẩn đổi theo)", "rename:Chị Hoa Lê>Chị Hoa L.")
 	_, _ = s.UpdateLead(ctx, a, id, omap.Of("stage", "tu-van"))
-	want("quay lại tu-van", "ensure:design:3000000000", "ensure:construction:3000000000")
+	want("quay lại tu-van (phiếu gần nhất của thiet-ke)", dsD, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", omap.Of("status", "pending-handoff", "dept", "Thiết kế")))
+	want("phiếu cũ không ghi giai đoạn vẫn tính ở tu-van", en3D, dsC)
+	_, _ = s.UpdateLead(ctx, a, id, omap.Of("handoff", nil))
+	want("bỏ phiếu", dsD, dsC)
 	if _, err := s.DeleteLead(ctx, a, id); err != nil {
 		t.Fatal(err)
 	}
-	want("xoá", "delete:1")
+	want("xoá", "delete::1")
+
+	// tạo thẳng ở cột Dự án (Thi công) -> chỉ Quản lý dự án
+	_, _ = s.CreateLead(ctx, a, omap.Of("name", "Anh Bình", "stage", "thi-cong", "valueVnd", 1e9))
+	want("tạo ở thi-cong", "ensure:construction:1000000000")
+	// phiếu cũ không ghi giai đoạn không đổi trang của cột
+	_, _ = s.CreateLead(ctx, a, omap.Of("name", "Cô Lan", "stage", "thiet-ke", "valueVnd", 1e9, "handoff", omap.Of("dept", "Thi công")))
+	want("cột thiet-ke + phiếu cũ Thi công", "ensure:design:1000000000")
 
 	// bao-gia-thi-cong không còn tính là đã chốt
 	l, _ = s.CreateLead(ctx, a, omap.Of("name", "B", "stage", "bao-gia-thi-cong"))

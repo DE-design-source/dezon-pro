@@ -106,7 +106,8 @@ function KinhDoanhPage() {
     const lead = leads.find(l => sameId(l.id, id))
     if (!lead || lead.stage === newStage) return
     if (newStage === 'giao-ns') { setStaffReq(r => ({ open: true, leadId: lead.id, seq: r.seq + 1 })); return }
-    /* tu-van / dam-phan / thiet-ke: máy chủ tạo / cập nhật dự án ở Quản lý thiết kế + Quản lý dự án; giai đoạn khác: gỡ */
+    /* Máy chủ tạo / ẩn dự án theo phòng nhận (sales deliveryKinds): cột Dự án (Thiết kế) / (Thi công) -> trang của cột,
+       phiếu gửi Phòng Thiết kế / Thi công -> trang phòng đó; giai đoạn khác: gỡ */
     patchLead(lead.id, { stage: newStage })
     const cfg = HANDOFF_CONFIG[newStage]
     /* Cột nào có cấu hình phiếu thì kéo thẻ vào (từ bất kỳ cột nào) đều hiện phiếu */
@@ -171,7 +172,8 @@ function KinhDoanhPage() {
         requestedAt: dt || null, suggestedAssignee: assigneeName || null,
       })
       patchLead(lead.id, {
-        handoff: { status: cfg.pendingStatus, dept, requestedAt: dt || null, assignee: assigneeName || null },
+        /* stage: phiếu gửi từ giai đoạn nào - máy chủ chỉ theo phòng nhận khi khách còn ở đúng giai đoạn đó */
+        handoff: { status: cfg.pendingStatus, dept, requestedAt: dt || null, assignee: assigneeName || null, stage: handoff.stageKey },
         ...(assigneeName ? { assignees: [...(lead.assignees || []), { name: assigneeName, role }] } : null),
       })
     }
@@ -180,7 +182,7 @@ function KinhDoanhPage() {
   function selfQuote() {
     const cfg = HANDOFF_CONFIG[handoff.stageKey]
     if (!handoff.leadId || !cfg || !cfg.selfStatus) return
-    patchLead(handoff.leadId, { handoff: { status: cfg.selfStatus, dept: cfg.dept, requestedAt: null, assignee: null } })
+    patchLead(handoff.leadId, { handoff: { status: cfg.selfStatus, dept: cfg.dept, requestedAt: null, assignee: null, stage: handoff.stageKey } })
     closeHandoff()
   }
 

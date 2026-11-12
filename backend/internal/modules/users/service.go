@@ -337,6 +337,52 @@ func (s *Service) AdminUpdateUser(ctx context.Context, a *actor.Actor, id any, f
 	return omap.Of("ok", true), nil
 }
 
+// UpdateMyProfile (chỉ bản Go, Cài đặt > Tài khoản): người dùng tự sửa họ tên / email của CHÍNH MÌNH. Chỉ nhận khoá hoTen,
+// email (khoá khác bỏ qua - vai trò, quyền, phòng ban, công ty vẫn chỉ admin đổi). Họ tên trim, tối đa 100 ký tự (UTF-16, như
+// giao diện); email kiểm như admin sửa (checkEmail: dạng, trùng trong công ty). Không đổi gì -> không ghi. Trả UserOut.
+func (s *Service) UpdateMyProfile(ctx context.Context, a *actor.Actor, fields *omap.Map) (*omap.Map, error) {
+	u, err := s.repo.UserByID(ctx, a.UID)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil || jsval.StrictEquals(u.Val("active"), false) {
+		return nil, apperr.New(msgNotFound)
+	}
+	patch := omap.New()
+	if fields.Has("hoTen") {
+		ten := jsval.Trim(jsval.StrOr(fields.Val("hoTen"), ""))
+		if jsval.Len16(ten) > 100 {
+			return nil, apperr.BadRequest("Họ tên tối đa 100 ký tự")
+		}
+		if ten != jsval.StrOr(u.Val("ho_ten"), "") {
+			patch.Set("ho_ten", ten)
+		}
+	}
+	if fields.Has("email") {
+		email, doi, err := s.checkEmail(ctx, u, fields.Val("email"), patch)
+		if err != nil {
+			return nil, err
+		}
+		if doi {
+			patch.Set("email", email)
+		}
+	}
+	if patch.Len() == 0 {
+		return s.UserOut(u), nil
+	}
+	res, err := s.repo.UpdateUser(ctx, a.UID, patch)
+	if err != nil {
+		return nil, err
+	}
+	if len(res) == 0 {
+		return nil, apperr.New(msgNotFound)
+	}
+	s.forgetSession(a.UID)
+	js, _ := omap.MarshalString(patch)
+	s.Audit(ctx, a, "update_profile", "Tự sửa hồ sơ "+js, nil)
+	return s.UserOut(res[0]), nil
+}
+
 // checkEmail (M14.1): trim + chữ thường; rỗng = xoá; sai dạng -> msgEmailBad; trùng tài khoản khác trong CÙNG công ty
 // (công ty sau khi sửa) -> msgEmailDup. Trùng giữa các công ty khác nhau được phép (đăng nhập chọn theo loginScore).
 // Email gửi lên trùng email đang lưu (không phân biệt hoa thường) = KHÔNG đổi: không kiểm dạng, không ghi (doi = false),

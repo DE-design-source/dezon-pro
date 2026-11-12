@@ -1,5 +1,7 @@
 /* REST của Dezon Chat: /api/v1/chat/... trên cùng máy chủ Go với QS (API_BASE của ../../QS/api/http.js).
-   Danh tính chat RIÊNG (số điện thoại hoặc email + OTP), không dùng token QS: access token (JWT 15 phút) + refresh token (30 ngày).
+   Bản web đăng nhập chat bằng tài khoản Dezon Pro: dezonLogin() đổi token QS (qs_token) lấy phiên chat riêng
+   (POST /auth/dezon, cùng kết quả với otp/verify); OTP / QR giữ cho app di động / bản cũ.
+   Phiên chat: access token (JWT 15 phút) + refresh token (30 ngày).
    Nhiều tài khoản trong một trình duyệt, mỗi tab một tài khoản:
    - kho chung localStorage chat_accounts = {"version":1,"accounts":{"<user id>":{access_token, refresh_token, device_id,
      user, added_at}}}: mỗi tài khoản là một thiết bị riêng trên máy chủ (OTP một lần cho mỗi tài khoản);
@@ -10,7 +12,7 @@
    - 401 CHAT_NOAUTH -> làm mới token MỘT lần dưới khoá navigator.locks 'dezon-chat-refresh:<user id>' (không có thì dùng
      promise trong tab, theo tài khoản), đọc lại mục của tài khoản đó sau khi giữ khoá vì tab khác có thể vừa làm mới xong.
    - REFRESH_RACE -> đọc lại token rồi thử lại; REFRESH_INVALID / REFRESH_REUSED -> chỉ bỏ tài khoản đó khỏi kho. */
-import { API_BASE, apiConfigured } from '../../QS/api/http'
+import { API_BASE, apiConfigured, readToken } from '../../QS/api/http'
 import * as L from '../state/chatLogic'
 
 const LEGACY = { access: 'chat_access_token', refresh: 'chat_refresh_token', device: 'chat_device_id', user: 'chat_user' }
@@ -409,6 +411,12 @@ export function otpVerify(target, otp, displayName) {
   const body = { ...contactOf(target), otp, device: device() }
   if (displayName && displayName.trim()) body.display_name = displayName.trim()
   return raw('POST', '/auth/otp/verify', { body })
+}
+/* Đăng nhập chat bằng phiên Dezon Pro (Bearer qs_token) -> AuthResult như otp/verify. Lỗi: 401 (phiên Dezon Pro hết),
+   403 CHAT_NO_PERM (chưa được cấp quyền Chat). token: qs_token người gọi đã đọc (mặc định đọc lại). */
+export function dezonLogin(token = readToken()) {
+  if (!token) return Promise.reject(new ChatApiError('Chưa đăng nhập Dezon Pro', 401, 'NOAUTH'))
+  return raw('POST', '/auth/dezon', { body: { device: device() }, token, timeoutMs: 20000 })
 }
 export const logout = uid => call('POST', '/auth/logout', { uid })
 

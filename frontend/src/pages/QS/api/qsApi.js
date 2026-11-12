@@ -20,6 +20,8 @@ export const login = (username, password, signal) => post('/auth/login', { usern
 export const me = signal => get('/auth/me', null, signal)
 export const logout = signal => post('/auth/logout', {}, signal)
 export const changePassword = (oldPw, newPw, signal) => post('/auth/change-password', { oldPw, newPw }, signal)
+/* Tự sửa hồ sơ (chỉ bản Go): fields = {hoTen?, email?} -> tài khoản sau khi sửa */
+export const updateMe = (fields, signal) => patch('/auth/me', fields, signal)
 export const setMyPref = (key, value, signal) => put('/auth/me/prefs/' + enc(key), { value: value === undefined ? null : value }, signal)
 export const logClientError = (info, signal) => post('/client-errors', info || {}, signal)
 

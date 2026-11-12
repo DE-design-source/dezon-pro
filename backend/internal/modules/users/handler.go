@@ -35,6 +35,14 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("getAuditLog", rpc.Admin, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetAuditLog(ctx, args.ArgU(0))
 	})
+	reg.RegisterGoRoute(rpc.GoRoute{
+		Name: "updateMyProfile", Method: "PATCH", Path: "/auth/me", Perm: rpc.Login, Tag: "Tài khoản",
+		Summary: "Tự sửa họ tên / email của tài khoản đang đăng nhập (chỉ các khoá gửi lên) -> tài khoản sau khi sửa",
+		Fields: []rpc.GoField{
+			{Name: "hoTen", In: "body", Type: "string", Desc: "Họ tên, tối đa 100 ký tự"},
+			{Name: "email", In: "body", Type: "string", Desc: "Email; rỗng = xoá; không được trùng tài khoản khác trong công ty"},
+		},
+	})
 }
 
 // RegisterRoutes: REST /api/v1 - gọi đúng phương thức service mà hàm rpc gọi.
@@ -62,6 +70,10 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	})
 	g.DELETE("/:id", func(c *gin.Context) {
 		r, err := s.AdminDeleteUser(c.Request.Context(), actor.FromGin(c), c.Param("id"))
+		response.Result(c, r, err)
+	})
+	v1.PATCH("/auth/me", middleware.RequireLogin(), func(c *gin.Context) {
+		r, err := s.UpdateMyProfile(c.Request.Context(), actor.FromGin(c), bodyMap(c))
 		response.Result(c, r, err)
 	})
 	v1.GET("/audit-log", middleware.RequireAdmin(), func(c *gin.Context) {

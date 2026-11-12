@@ -101,6 +101,8 @@ export function spAllCols_(node, specs, hm) {
     { k: 'stt', label: 'STT', cls: 'ct', kind: 'stt' },
     { k: 'thumb', label: 'Ảnh', cls: 'thumbcol', kind: 'thumb' },
     { k: 'ten', label: 'Sản phẩm', cls: 'sp-name', kind: 'ten', e: { lark: 'TÊN SẢN PHẨM', col: 'ten_sp', sfx: '' } },
+    // Mã SP có cột riêng để sửa hàng loạt (chế độ Edit); ô mã nhỏ dưới tên vẫn giữ
+    { k: 'ma_sp', label: 'Mã sản phẩm', cls: '', kind: 'gen', e: { lark: 'MÃ SẢN PHẨM', col: 'ma_sp', sfx: '' } },
     { k: 'duyet', label: 'Trạng thái', cls: 'ct', kind: 'duyet' },
     { k: 'sku', label: 'Số SKU', cls: 'ct', kind: 'sku' },
   ]
@@ -170,7 +172,7 @@ export function fmtDateTime_(v) {
 }
 
 /* ---------- Bộ cột hiện / thứ tự / độ rộng (sanpham.js:711-767) ---------- */
-export const SP_DEFW = { stt: 52, thumb: 56, ten: 215, duyet: 124, sku: 78, giaDaiLy: 122, nguoiTao: 126, ngayTao: 104, nguoiSua: 130, gia_ban_bo_nguon: 130,
+export const SP_DEFW = { stt: 52, thumb: 56, ten: 215, ma_sp: 140, duyet: 124, sku: 78, giaDaiLy: 122, nguoiTao: 126, ngayTao: 104, nguoiSua: 130, gia_ban_bo_nguon: 130,
   thuong_hieu: 126, nha_cung_cap: 170, hang_muc: 130, dong_sp: 130, nhom_sp: 130,
   gia_ban_le: 118, ck_dai_ly_pct: 106, cong_suat_w: 96, nhiet_do_mau_k: 112, goc_chieu_deg: 96,
   goc_nghieng_deg: 106, mau_sac: 106, chat_lieu: 126, chieu_cao_mm: 98, duong_kinh_mm: 104,
@@ -181,7 +183,7 @@ export const SP_DEFW = { stt: 52, thumb: 56, ten: 215, duyet: 124, sku: 78, giaD
   trang_thai: 126, link_datasheet: 112, ghi_chu: 170 }
 export const spColW_ = (w, k) => (w && w[k]) || SP_DEFW[k] || 124
 export function spColsDefault_(ng) {
-  const b = { thumb: 1, ten: 1, duyet: 1, sku: 1, thuong_hieu: 1, hang_muc: 1, gia_ban_le: 1, ck_dai_ly_pct: 1, giaDaiLy: 1 }
+  const b = { thumb: 1, ten: 1, ma_sp: 1, duyet: 1, sku: 1, thuong_hieu: 1, hang_muc: 1, gia_ban_le: 1, ck_dai_ly_pct: 1, giaDaiLy: 1 }
   if (ng === 'vs') { b.kich_thuoc = 1; b.mau_sac = 1; b.kieu_lap_dat = 1; b.he_thong_xa = 1; return b }
   if (ng === 'ct') { b.thanh_phan = 1; b.mau_sac = 1; b.dong_dm_a = 1; b.kieu_lap_dat = 1; return b }
   if (ng === 'son') { b.mau_sac = 1; b.be_mat = 1; b.do_phu = 1; b.kich_thuoc = 1; return b }
@@ -198,11 +200,23 @@ export const spColScope_ = node => String(node || '') || '*'
 export function spColsLoad_(ngCols, sc) {
   const j = lsJson('qs_spcolcfg', {}) || {}
   const theoHm = sc && j.byNode && j.byNode[sc]
-  if (theoHm && Object.keys(theoHm).length) return theoHm
+  if (theoHm && Object.keys(theoHm).length) return theoHm._maSp ? theoHm : { ...theoHm, ma_sp: 1, _maSp: 1 }
   const luu = j[ON_KEY[ngCols] || 'on']
-  return (luu && Object.keys(luu).length) ? luu : spColsDefault_(ngCols)
+  // bộ cột đã lưu từ trước khi có cột Mã sản phẩm: bật cột này 1 lần (_maSp đánh dấu, người dùng tắt sau thì giữ tắt)
+  if (luu && Object.keys(luu).length && !luu._maSp) return { ...luu, ma_sp: 1, _maSp: 1 }
+  return (luu && Object.keys(luu).length) ? luu : { ...spColsDefault_(ngCols), _maSp: 1 }
 }
-export function spCfgLoad_() { const j = lsJson('qs_spcolcfg', {}) || {}; return { order: j.order || null, w: j.w || {} } }
+export function spCfgLoad_() {
+  const j = lsJson('qs_spcolcfg', {}) || {}
+  // 1 lần: thứ tự lưu từ trước khi có cột Mã SP -> đưa cột này lên ngay sau Sản phẩm (về sau người dùng kéo đi đâu thì giữ)
+  if (Array.isArray(j.order) && !j.maSpMoved) {
+    const o = j.order.filter(k => k !== 'ma_sp'), i = o.indexOf('ten')
+    o.splice(i >= 0 ? i + 1 : o.length, 0, 'ma_sp')
+    j.order = o; j.maSpMoved = 1
+    lsSet('qs_spcolcfg', JSON.stringify(j))
+  }
+  return { order: j.order || null, w: j.w || {} }
+}
 /* spSaveCols_: on = bộ cột THẬT của người dùng (đang Edit thì là bản lưu trước khi bật hết); có sc thì lưu riêng cho hạng mục đó */
 export function spCfgSave_(order, w, ngCols, on, sc) {
   const j = lsJson('qs_spcolcfg', {}) || {}
@@ -221,7 +235,12 @@ export function spOrder_(saved, cols) {
   const all = cols.map(c => c.k)
   const o = (saved || all).slice()
   const co = {}; o.forEach(k => { co[k] = 1 })
-  all.forEach(k => { if (!co[k]) { if (k === 'stt') o.unshift(k); else o.push(k) } })
+  all.forEach(k => {
+    if (co[k]) return
+    if (k === 'stt') o.unshift(k)
+    else if (k === 'ma_sp' && o.indexOf('ten') >= 0) o.splice(o.indexOf('ten') + 1, 0, k)   // cột Mã SP (thêm sau) đứng ngay sau Sản phẩm
+    else o.push(k)
+  })
   const r = o.filter(k => all.indexOf(k) >= 0)
   // 3 cột giá luôn đứng liền nhau theo thứ tự Giá bán lẻ -> %Chiết khấu -> Giá đại lý (tại chỗ của cột giá đứng trước nhất)
   const gia = SP_PRICE_COLS.filter(k => r.indexOf(k) >= 0)
@@ -310,13 +329,22 @@ export function spSapXep_(list, sort, cols) {
     return String(x).localeCompare(String(y), 'vi', { numeric: true }) * d
   })
 }
+/* Dữ liệu trùng (chỉ bản Go): cùng mã sản phẩm + cùng NCC (không phân biệt hoa / thường, khoảng trắng) */
+export const spTrungK_ = p => { const m = spNorm_(p.ma); return m ? m + '|' + spNorm_(p.ncc) : '' }
+export function spTrungSet_(products) {
+  const n = {}
+  ;(products || []).forEach(p => { const k = spTrungK_(p); if (k) n[k] = (n[k] || 0) + 1 })
+  return new Set(Object.keys(n).filter(k => n[k] > 1))
+}
 /* spDataList_ (nhánh sản phẩm) */
 export function spDataList_(products, q, f, view, sort, cols) {
   q = String(q || '').toLowerCase().trim(); f = f || {}
   const watts = actKeys_(f.watt), kels = actKeys_(f.kelvin), angs = actKeys_(f.angle), cris = actKeys_(f.cri)
   const mn = Number(f.min) || 0, mx = Number(f.max) || 0
   const bk = actKeys_(f.brands), nk = actKeys_(f.nccs)
+  const tr = view === 'trung' ? spTrungSet_(products) : null
   const list = (products || []).filter(p => {
+    if (tr && !tr.has(spTrungK_(p))) return false
     if (q && (p.ten + ' ' + p.ma + ' ' + p.thuongHieu + ' ' + p.ncc).toLowerCase().indexOf(q) < 0) return false
     if (f.node) { const c = spNodeCodeOf_(p); if (!(c === f.node || c.indexOf(f.node + '.') === 0)) return false }
     if (f.dong && spNorm_(p.nhom) !== spNorm_(f.dong)) return false
@@ -334,6 +362,8 @@ export function spDataList_(products, q, f, view, sort, cols) {
     if (cris.length) { const pc = splitVals(p.cri); if (!pc.some(x => cris.indexOf(x) >= 0)) return false }
     return true
   })
+  // xem trùng: các bản trùng đứng cạnh nhau
+  if (tr) return spGroupVariants_(spSapXep_(list, sort, cols).sort((a, b) => spTrungK_(a).localeCompare(spTrungK_(b))))
   return spGroupVariants_(spSapXep_(list, sort, cols))
 }
 /* spVarGroups2_: mỗi nhóm biến thể = 1 dòng đại diện + các dòng con */

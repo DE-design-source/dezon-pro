@@ -393,7 +393,7 @@ CREATE TABLE public.chat_devices (
     login_method text DEFAULT 'otp'::text NOT NULL,
     CONSTRAINT ck_chat_devices_device_name CHECK ((char_length(device_name) <= 200)),
     CONSTRAINT ck_chat_devices_last_ip CHECK ((char_length(last_ip) <= 64)),
-    CONSTRAINT ck_chat_devices_login_method CHECK ((login_method = ANY (ARRAY['otp'::text, 'qr'::text]))),
+    CONSTRAINT ck_chat_devices_login_method CHECK ((login_method = ANY (ARRAY['otp'::text, 'qr'::text, 'dezon'::text]))),
     CONSTRAINT ck_chat_devices_platform CHECK ((platform = ANY (ARRAY['ios'::text, 'android'::text, 'web'::text, 'desktop'::text]))),
     CONSTRAINT ck_chat_devices_push_kind CHECK ((push_kind = ANY (ARRAY['webpush'::text, 'fcm'::text, 'apns'::text]))),
     CONSTRAINT ck_chat_devices_push_token CHECK (((push_kind IS NULL) = (push_token IS NULL))),
@@ -482,7 +482,7 @@ COMMENT ON COLUMN public.chat_devices.last_ip IS 'Client IP at login (OTP / QR) 
 -- Name: COLUMN chat_devices.login_method; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.chat_devices.login_method IS 'otp = SMS / email code; qr = approved by another signed-in device (chat_qr_login_sessions).';
+COMMENT ON COLUMN public.chat_devices.login_method IS 'otp = SMS / email code; qr = approved by another signed-in device (chat_qr_login_sessions); dezon = exchanged a Dezon Pro session (POST /chat/auth/dezon).';
 
 
 --
@@ -1613,10 +1613,12 @@ CREATE TABLE public.chat_users (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     email text,
+    qs_user_id uuid,
+    qs_company_id uuid,
     CONSTRAINT ck_chat_users_display_name CHECK (((btrim(display_name) <> ''::text) AND (char_length(display_name) <= 100))),
     CONSTRAINT ck_chat_users_email CHECK (((email IS NULL) OR ((email = lower(email)) AND (char_length(email) <= 254) AND (email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'::text)))),
     CONSTRAINT ck_chat_users_phone CHECK ((phone ~ '^\+[1-9][0-9]{7,14}$'::text)),
-    CONSTRAINT ck_chat_users_phone_email CHECK (((phone IS NOT NULL) OR (email IS NOT NULL)))
+    CONSTRAINT ck_chat_users_phone_email CHECK (((phone IS NOT NULL) OR (email IS NOT NULL) OR (qs_user_id IS NOT NULL)))
 );
 
 
@@ -1624,7 +1626,7 @@ CREATE TABLE public.chat_users (
 -- Name: TABLE chat_users; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.chat_users IS 'Chat account (identity = phone number or email). Separate from QS users and not tenant-scoped: one account across all companies.';
+COMMENT ON TABLE public.chat_users IS 'Chat account (identity = phone number, email or linked Dezon Pro account). Separate from QS users and not tenant-scoped: one account across all companies.';
 
 
 --
@@ -1673,7 +1675,7 @@ COMMENT ON COLUMN public.chat_users.last_seen_at IS 'Time the user went offline 
 -- Name: COLUMN chat_users.created_at; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.chat_users.created_at IS 'Account creation time (first successful OTP verification, by SMS or email).';
+COMMENT ON COLUMN public.chat_users.created_at IS 'Account creation time (first successful OTP verification by SMS / email, or first Dezon Pro sign-in).';
 
 
 --
@@ -1688,6 +1690,20 @@ COMMENT ON COLUMN public.chat_users.updated_at IS 'Last profile change time (set
 --
 
 COMMENT ON COLUMN public.chat_users.email IS 'Lowercase email address, normalized by the service; unique. Null = account created by phone. At least one of phone / email is set.';
+
+
+--
+-- Name: COLUMN chat_users.qs_user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_users.qs_user_id IS 'users.id of the Dezon Pro account this chat account signs in with (POST /chat/auth/dezon); unique. Null = OTP / QR account. No FK: deleting the Dezon Pro user keeps the chat history.';
+
+
+--
+-- Name: COLUMN chat_users.qs_company_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.chat_users.qs_company_id IS 'companies.id of the linked Dezon Pro account at its last Dezon Pro sign-in; a different users.company_id on the next sign-in means the person moved company (colleague friendships are redone). Null = OTP / QR account or a Dezon Pro account without a company. No FK.';
 
 
 --
@@ -10612,6 +10628,14 @@ ALTER TABLE ONLY public.chat_users
 
 ALTER TABLE ONLY public.chat_users
     ADD CONSTRAINT uq_chat_users_phone UNIQUE (phone);
+
+
+--
+-- Name: chat_users uq_chat_users_qs_user_id; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.chat_users
+    ADD CONSTRAINT uq_chat_users_qs_user_id UNIQUE (qs_user_id);
 
 
 --

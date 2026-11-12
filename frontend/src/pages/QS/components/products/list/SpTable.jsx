@@ -304,6 +304,39 @@ function MauDots({ mau }) {
 
 /* 1 ô nhập trên bảng (spInp_ + spInlineSave): rời ô / Enter là lưu; tiền hiện 930.000, lưu số thuần.
    Lưu xong viền xanh 1,3 s; lỗi viền đỏ + thông báo; máy chủ báo "không đổi" thì trả lại giá trị cũ. */
+/* Đi chuyển bằng bàn phím giữa các ô sửa nhanh (chế độ Edit), như bảng tính:
+   ↑ / ↓ = ô cùng cột dòng trên / dưới · Enter = lưu + xuống dòng dưới (Shift+Enter: lên) · ← / → khi con trỏ đang ở đầu / cuối chữ =
+   ô bên trái / phải · Tab / Shift+Tab giữ như trình duyệt (ô kế tiếp). Rời ô cũ là tự lưu (onBlur). */
+function spNavKey_(ev) {
+  const el = ev.currentTarget, k = ev.key
+  let dr = 0, dc = 0
+  if (k === 'ArrowDown' || (k === 'Enter' && !ev.shiftKey)) dr = 1
+  else if (k === 'ArrowUp' || (k === 'Enter' && ev.shiftKey)) dr = -1
+  else if (k === 'ArrowLeft' && el.selectionStart === 0 && el.selectionEnd === 0) dc = -1
+  else if (k === 'ArrowRight' && el.selectionStart === el.value.length && el.selectionEnd === el.value.length) dc = 1
+  else return
+  const td = el.closest('td'), tr = td && td.parentElement
+  if (!tr) return
+  const inpOf = row => Array.prototype.slice.call(row.querySelectorAll('input.qspl-spin'))
+  let to = null
+  if (dc) {
+    const ds = inpOf(tr); to = ds[ds.indexOf(el) + dc] || null
+  } else {
+    // cùng cột (cùng ô td, cùng vị trí trong ô - ô Sản phẩm có 2 ô tên + mã); bỏ qua dòng nhóm / dòng không có ô nhập
+    const ci = td.cellIndex, pos = Array.prototype.indexOf.call(td.querySelectorAll('input.qspl-spin'), el)
+    for (let r = dr > 0 ? tr.nextElementSibling : tr.previousElementSibling; r; r = dr > 0 ? r.nextElementSibling : r.previousElementSibling) {
+      const c = r.cells && r.cells[ci]
+      const ds = c ? c.querySelectorAll('input.qspl-spin') : []
+      if (ds.length) { to = ds[Math.min(pos, ds.length - 1)]; break }
+    }
+  }
+  ev.preventDefault()
+  if (!to) { if (k === 'Enter') el.blur(); return }   // hết bảng: Enter vẫn lưu ô đang sửa
+  to.focus()
+  try { to.select() } catch (x) { /* bỏ qua */ }
+  to.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
 function SpInp({ p, e, val, bare, code, placeholder }) {
   const shownOf = v => { v = v == null ? '' : String(v); return e.money ? (v === '' ? '' : money(v)) : v }
   const init = shownOf(val)
@@ -355,7 +388,7 @@ function SpInp({ p, e, val, bare, code, placeholder }) {
       onChange={ev => setV(ev.target.value)}
       onFocus={ev => { focus.current = true; wide(ev.target, true) }}
       onBlur={ev => { focus.current = false; wide(ev.target, false); save(ev.target) }}
-      onKeyDown={ev => { if (ev.key === 'Enter') ev.currentTarget.blur() }}
+      onKeyDown={ev => spNavKey_(ev)}
       onClick={ev => ev.stopPropagation()} />
   )
   if (bare) return input

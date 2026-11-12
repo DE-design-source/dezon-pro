@@ -362,10 +362,10 @@ HR (`hr`, trang `/cham-cong`), migration 0024-0031 (chấm công tháng đã ch�
 - Service chặn: trùng mã NV, phòng ban / quản lý / trưởng đơn vị / thành viên không thuộc công ty, vòng quản lý, đơn vị nằm dưới chính nó,
   xoá đơn vị còn nhân sự hoặc đơn vị con, tổng kiêm nhiệm của 1 người > 90%.
 
-#### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023)
+#### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023, 0045)
 
 Chat MVP theo `backend/CHAT.md`: tài khoản riêng theo số điện thoại HOẶC email (bảng `chat_users`; tài khoản email không có số và ngược
-lại, chưa liên kết hai loại), KHÔNG phải phiên QS, không theo công ty (`x-view-company` không có tác dụng). Lý do thiết kế:
+lại, chưa liên kết hai loại) hoặc gắn tài khoản Dezon Pro (`chat_users.qs_user_id`, migration 0045, chỉ tạo qua `POST /auth/dezon`), KHÔNG phải phiên QS, không theo công ty (`x-view-company` không có tác dụng). Lý do thiết kế:
 `docs/02-ky-thuat/database/decisions.md` D-15, D-16; ảnh / video / tệp / tin thoại (migration 0020, bảng `chat_media`): D-17 và
 mục "Tệp đính kèm" bên dưới.
 - Khoá JSON `snake_case` như CHAT.md mục 5; phong bì như mọi route REST; mọi response có `Cache-Control: no-store`. Thời điểm là chuỗi
@@ -386,12 +386,28 @@ mục "Tệp đính kèm" bên dưới.
   `REFRESH_RACE` (hai tab refresh cùng lúc: đọc lại token đã lưu, không thu hồi); cũ hơn -> xoá thiết bị (mọi token, push token, đóng
   WebSocket bằng `force_logout`) -> 401 `REFRESH_REUSED`. Token lạ / hết hạn -> 401 `REFRESH_INVALID`.
 
+**Đăng nhập bằng tài khoản Dezon Pro** (migration 0045, `chat/service_dezon.go`, CHAT.md 6.7): giao diện web dùng một đăng nhập duy nhất -
+trang Chat đổi phiên Dezon Pro lấy phiên chat bằng `POST /auth/dezon` (quyền `rpc.Login`, gin `middleware.RequireLogin()`), không OTP.
+- Quyền: admin / super luôn được; nhân viên cần khoá `chat` trong `users.perms`, thiếu -> 403
+  `{"error":"Tài khoản chưa được cấp quyền Chat. Nhờ quản trị viên cấp quyền.","code":"CHAT_NO_PERM"}`. Tài khoản Dezon Pro đã khoá / không
+  còn -> 401 `NOAUTH`. `device.platform` sai -> 400 `BAD_REQUEST` (trống = `web`).
+- Mỗi `users.id` gắn đúng một tài khoản chat (`qs_user_id` unique, không khoá ngoại). Lần đầu: tạo tài khoản không số / email (`is_new = true`,
+  `phone` / `email` của Me là `null`), tên = họ tên Dezon Pro (trống = username, tối đa 100 ký tự) và kết bạn sẵn (accepted hai chiều) với
+  tài khoản chat gắn Dezon Pro của mọi người đang hoạt động cùng công ty; các lần sau: cùng tài khoản, đồng bộ lại tên, không kết bạn lại
+  (người đã huỷ kết bạn / chặn giữ nguyên) - trừ khi `users.company_id` khác `chat_users.qs_company_id` (migration 0046, đã chuyển công ty):
+  bỏ kết bạn accepted với tài khoản gắn Dezon Pro thuộc công ty cũ, kết bạn đồng nghiệp công ty mới (bỏ qua người đã có dòng quan hệ bất kỳ),
+  ghi công ty mới; bạn OTP / bạn công ty khác / dòng blocked giữ nguyên. Không tự gắn tài khoản OTP cũ trùng email.
+- Mỗi lần gọi tạo một thiết bị (`login_method = "dezon"`) + refresh token, gửi `devices.updated {reason: "login"}`; đăng xuất / WebSocket
+  như tài khoản OTP. `POST /auth/refresh` kiểm lại tài khoản Dezon Pro (còn, đang hoạt động, admin / super hoặc quyền `chat`): không đạt
+  -> xoá thiết bị, 401 `REFRESH_INVALID`. Route OTP / QR giữ nguyên (app di động, tài khoản cũ).
+
 **Route** (đường dẫn tính từ `/api/v1/chat`; `Name` là `operationId` `v1go_<Name>` trong `/api-docs.json`, nhóm `REST - Chat (chỉ bản Go)`):
 
 | Method | Đường dẫn | `Name` | Quyền | Thân / query -> kết quả |
 |---|---|---|---|---|
 | `POST` | `/auth/otp/request` | `chatOtpRequest` | Public | `{phone}` hoặc `{email}` -> `{phone?, email?, expires_in: 300, resend_after: 60, dev_code?}` (đúng một trong `phone` / `email`, đã chuẩn hoá); `dev_code` chỉ khi `CHAT_OTP_DEV=1`. Có `email` -> gửi mã qua SMTP (chưa đặt `SMTP_HOST` thì ghi log); gửi cả hai -> 400 `BAD_REQUEST` |
 | `POST` | `/auth/otp/verify` | `chatOtpVerify` | Public | `{phone \| email, otp, device: {platform, name}, display_name?}` -> `{access_token, refresh_token, expires_in, device_id, user: Me, is_new}`; số / email chưa có tài khoản thì tạo (tên mặc định của tài khoản email = phần trước `@`) |
+| `POST` | `/auth/dezon` | `chatDezonLogin` | Login | Header `Authorization: Bearer <token Dezon Pro>` (phiên QS, KHÔNG phải token chat), `{device?: {platform, name}}` -> như verify (`{access_token, refresh_token, expires_in, device_id, user: Me, is_new}`); tìm / tạo tài khoản chat gắn `users.id` (xem "Đăng nhập bằng tài khoản Dezon Pro" bên dưới). Chưa đăng nhập Dezon Pro -> 401 `{"error":"Chưa đăng nhập","code":"NOAUTH"}`; nhân viên thiếu quyền `chat` -> 403 `CHAT_NO_PERM`; 30 lần / 10 phút / tài khoản -> 429 `RATE_LIMIT` |
 | `POST` | `/auth/refresh` | `chatRefresh` | Public | `{refresh_token}` -> như verify, không có `is_new` |
 | `POST` | `/auth/logout` | `chatLogout` | SelfAuth | xoá thiết bị hiện tại (refresh + push token), đóng WebSocket của thiết bị -> `{}` |
 | `GET` / `PATCH` | `/me` | `chatMe` / `chatUpdateMe` | SelfAuth | Me; PATCH `{display_name?, show_read_receipts?}` -> Me |
@@ -830,7 +846,7 @@ Object mới / khoá mới (khoá vắng = false / null; JSON chỉ thêm khoá,
 - **SearchHit** `{conversation_id, conversation_type, conversation_name, message_id, seq, sender_id, sender_name, msg_type, content,
   file_name?, created_at}`: `conversation_name` = tên nhóm / tên người kia của chat 1-1; `content` đầy đủ (client tự cắt đoạn quanh từ khớp
   và tô đậm bằng cùng luật bỏ dấu); không có `attachments`.
-- **Device** `{id, platform, name, user_agent, last_ip, login_method: "otp" | "qr", push, online, current, last_seen_at, created_at}`:
+- **Device** `{id, platform, name, user_agent, last_ip, login_method: "otp" | "qr" | "dezon", push, online, current, last_seen_at, created_at}`:
   `online` = thiết bị đang có kết nối WebSocket (gateway cài `OnlineDevices`); `current` = thiết bị của chính request.
 - **QRSession** `{qr_id, status, platform, device_name, user_agent, request_ip, created_at, expires_at, expires_in}`.
 

@@ -9,18 +9,25 @@
      localStorage chat_outbox:<user id> (tải lại trang không mất), gửi tuần tự sau auth.ok + đồng bộ;
    - rcpt[cid][user]: con trỏ đã nhận / đã xem của thành viên khác; localRead: con trỏ đã xem báo lạc quan ở máy này;
    - presence, typing, friends, requests, blocks, push.
-   Nhiều tài khoản trong một trình duyệt, MỖI TAB MỘT TÀI KHOẢN (kho tài khoản + tài khoản của tab ở chatApi.js):
-   - accounts: các tài khoản đã đăng nhập trên trình duyệt (bộ chọn tài khoản); accountId: tài khoản của tab;
-   - đổi tài khoản chỉ đổi tab này: đóng socket, dọn toàn bộ trạng thái (hội thoại, tin, online, đang soạn, timer, báo
-     đã xem đang chờ) rồi khởi động tài khoản kia; outbox, ghim (chat_pins:<id>), lựa chọn push (chat_push:<id>) theo tài khoản;
-   - tài khoản của tab bị đăng xuất ở tab khác / bị thu hồi -> tab chuyển sang tài khoản kế tiếp hoặc về cổng đăng nhập.
-   Mỗi lần đăng xuất / đổi tài khoản tăng `epoch`: kết quả bất đồng bộ của phiên cũ bị bỏ. */
+   Đăng nhập: dùng phiên Dezon Pro DUY NHẤT (services/workSession.js), không có OTP / QR / thêm tài khoản trên web:
+   - chưa có phiên chat mà Dezon Pro 'ready' và có quyền 'chat' (canPage) -> exchangeDezon(): POST /chat/auth/dezon bằng
+     qs_token, lưu phiên vào kho (chatApi.js) rồi signIn; mỗi lúc chỉ một yêu cầu (promise dùng chung + khoá
+     navigator.locks giữa các tab), tự động thì cách nhau ít nhất 5 giây (không lặp khi phiên vừa đổi xong đã hỏng);
+   - phiên chat gắn với người dùng Dezon Pro (localStorage chat_dezon_uid): khác người đang đăng nhập / mất quyền Chat /
+     kho còn tài khoản OTP kiểu cũ -> đăng xuất mọi tài khoản chat (signOutAll) rồi đổi lại;
+   - sự kiện window 'dezon:auth': 'login' (đăng xuất Dezon Pro) -> signOutAll; 'ready' -> đổi phiên nếu chưa có;
+   - auth 'denied': chưa được cấp quyền Chat (canPage hoặc máy chủ trả 403 CHAT_NO_PERM) - cổng hiện lỗi + "Thử lại".
+   Kho tài khoản + tài khoản của tab (chatApi.js) giữ cơ chế cũ (thực tế chỉ còn một tài khoản): outbox, ghim
+   (chat_pins:<id>), lựa chọn push (chat_push:<id>) theo tài khoản; tài khoản bị thu hồi / đăng xuất ở tab khác -> về cổng
+   rồi tự đổi phiên lại. Mỗi lần đăng xuất / đổi tài khoản tăng `epoch`: kết quả bất đồng bộ của phiên cũ bị bỏ. */
 import { useSyncExternalStore } from 'react'
 import * as api from '../api/chatApi'
 import { ChatSocket } from '../api/chatSocket'
 import * as L from './chatLogic'
 import * as M from './chatMedia'
 import { putObject } from '../api/chatUpload'
+import { noAuth, readToken } from '../../QS/api/http'
+import { canPage, getSession } from '../../../services/workSession'
 
 const LEGACY_PINS_KEY = 'chat_pins' // ghim chung của bản một tài khoản -> chat_pins:<id>
 const PINS_PREFIX = 'chat_pins:'
@@ -51,7 +58,7 @@ function loadPins(uid) {
 
 function freshState(auth) {
   return {
-    auth, // unconfigured | checking | signedout | unreachable | ready
+    auth, // unconfigured | checking | signedout | unreachable | denied | ready
     error: '',
     accounts: api.configured() ? api.listAccounts() : [],
     accountId: api.activeAccountId(),
@@ -100,9 +107,9 @@ function mediaCfgOff() { return { enabled: false, insecure: false, voice: false 
    chat_last_account -> tài khoản duy nhất), bỏ ?u= khỏi địa chỉ */
 if (api.configured()) api.initTab()
 
+/* Có phiên thì kiểm tra lại; chưa có thì sắp đổi phiên Dezon Pro: cả hai đều 'checking' (không nháy cổng) */
 function initialAuth() {
-  if (!api.configured()) return 'unconfigured'
-  return api.readSession().refresh ? 'checking' : 'signedout'
+  return api.configured() ? 'checking' : 'unconfigured'
 }
 
 let S = freshState(initialAuth())
@@ -240,19 +247,181 @@ function subscribePassive(f) {
 
 function start() {
   if (!api.configured()) return
-  /* Lần đầu: khởi động tài khoản của tab. Sau đó, đang ở cổng mà kho đã có phiên (tài khoản mới rời trang ở bước đặt
-     tên, chưa signIn): đăng nhập luôn, không bắt làm lại OTP (mỗi lần OTP lại tạo thêm một thiết bị) */
-  if (!started || S.auth === 'signedout') {
+  /* Lần đầu: khởi động phiên chat (có sẵn và đúng người dùng Dezon Pro) hoặc đổi phiên Dezon Pro. Sau đó, đang ở cổng
+     (chưa có phiên / chưa được cấp quyền): thử lại khi mở lại trang Chat */
+  if (!started || S.auth === 'signedout' || S.auth === 'denied') {
     if (!started) api.flushPendingLogouts()
     started = true
-    const s = api.readSession()
-    if (s.refresh) { boot(s.user); return }
-    const next = api.resolveAccount(false)
-    if (next) { activate(next, false); return }
-    if (S.auth !== 'signedout') set({ auth: 'signedout' })
+    resume(false)
     return
   }
   if (S.auth === 'ready') socket.start()
+}
+
+/* ---------- phiên Dezon Pro -> phiên chat ---------- */
+
+const DEZON_UID_KEY = 'chat_dezon_uid'
+const NO_PERM_MSG = 'Tài khoản chưa được cấp quyền Chat. Nhờ quản trị viên cấp quyền.'
+const EXCHANGE_GAP_MS = 5000
+let exchanging = null // lần đổi phiên đang chạy {p, gen, uid} (mỗi lúc một yêu cầu cho cùng người dùng Dezon Pro)
+let exchangeGen = 0 // tăng khi đăng xuất Dezon Pro: kết quả đổi phiên đang chờ bị bỏ
+let lastExchange = 0
+let exchangeTimer = null
+let signingOut = null
+let waitingDezon = false // chưa biết phiên Dezon Pro (workSession đang kiểm tra): chờ 'dezon:auth'
+
+function boundUid() { try { return localStorage.getItem(DEZON_UID_KEY) || '' } catch (e) { return '' } }
+function setBoundUid(v) { try { if (v) localStorage.setItem(DEZON_UID_KEY, v); else localStorage.removeItem(DEZON_UID_KEY) } catch (e) { /* bỏ qua */ } }
+
+/* Phiên Dezon Pro hiện tại: ready = đã đăng nhập (có me + qs_token) */
+function dezon() {
+  let w = null
+  try { w = getSession() } catch (e) { w = null }
+  w = w || {}
+  const uid = w.me && w.me.id != null ? String(w.me.id) : ''
+  return { auth: w.auth || 'checking', uid, ready: w.auth === 'ready' && !!uid && !!readToken(), me: w.me || null, congTy: w.congTy || null }
+}
+function chatAllowed(w) {
+  try { return !!canPage('chat', w.me, w.congTy) } catch (e) { return false }
+}
+/* Phiên chat trong kho thuộc đúng người dùng Dezon Pro đang đăng nhập */
+const boundTo = w => !!w.uid && boundUid() === w.uid
+
+/* Về cổng (không có phiên chat): auth + thông báo */
+function gate(auth, error) {
+  if (S.auth === auth && !S.me && (S.error || '') === (error || '')) return
+  resetSession(auth)
+  S = { ...S, error: error || '' }
+  emit()
+}
+
+/* Chưa có phiên chat đang chạy: khởi động phiên có sẵn / đăng xuất phiên không thuộc người dùng này / đổi phiên Dezon Pro.
+   manual: người dùng bấm "Thử lại" (bỏ qua khoảng cách 5 giây giữa hai lần đổi tự động). */
+function resume(manual) {
+  if (!api.configured()) return
+  const w = dezon()
+  const has = api.listAccounts().length > 0
+  waitingDezon = !w.ready && w.auth === 'checking'
+  if (!w.ready) {
+    if (w.auth === 'login' && has) { signOutAll(); return }
+    gate(waitingDezon ? 'checking' : 'signedout')
+    return
+  }
+  const allowed = chatAllowed(w)
+  if (has && (!boundTo(w) || !allowed)) {
+    signOutAll().then(() => { const n = dezon(); if (n.ready && n.uid === w.uid && !S.me) resume(manual) })
+    return
+  }
+  if (!allowed) { gate('denied', NO_PERM_MSG); return }
+  const s = api.readSession()
+  if (s.refresh) { boot(s.user); return }
+  const next = api.resolveAccount(false)
+  if (next) { activate(next, false); return }
+  exchangeDezon(manual)
+}
+
+/* Đổi phiên Dezon Pro lấy phiên chat (một yêu cầu mỗi lúc) */
+function exchangeDezon(manual) {
+  const uid = dezon().uid
+  /* lần đang chạy của người dùng Dezon Pro trước / trước khi đăng xuất sẽ bị bỏ: không dùng chung, chạy lần mới */
+  if (exchanging && exchanging.gen === exchangeGen && exchanging.uid === uid) return exchanging.p
+  clearTimeout(exchangeTimer); exchangeTimer = null
+  if (S.auth !== 'checking' || S.me) gate('checking')
+  const wait = manual ? 0 : lastExchange + EXCHANGE_GAP_MS - Date.now()
+  if (wait > 0) {
+    exchangeTimer = setTimeout(() => { exchangeTimer = null; if (!S.me && !api.readSession().refresh) resume(false) }, wait)
+    return Promise.resolve()
+  }
+  const gen = exchangeGen
+  const p = runExchange(gen).finally(() => { if (exchanging && exchanging.p === p) exchanging = null })
+  exchanging = { p, gen, uid }
+  return p
+}
+
+async function runExchange(gen) {
+  if (signingOut) await signingOut
+  if (gen !== exchangeGen) return
+  const w = dezon()
+  if (!w.ready) { gate('signedout'); return }
+  const tok = readToken() // token đổi (tab khác đăng nhập / đăng xuất) trong lúc chờ -> bỏ kết quả
+  lastExchange = Date.now()
+  /* trong khoá: tab khác vừa đổi phiên cho cùng người dùng thì dùng luôn, không tạo thêm thiết bị */
+  const run = async () => {
+    if (boundTo(w)) {
+      const id = api.resolveAccount(false)
+      if (id) return { reuse: id }
+    }
+    return { r: await api.dezonLogin(tok) }
+  }
+  const locks = typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function'
+  let res
+  try {
+    res = await (locks ? navigator.locks.request('dezon-chat-exchange', run) : run())
+  } catch (e) {
+    if (gen !== exchangeGen) return
+    if (e && e.status === 401) {
+      /* phiên Dezon Pro đã hết: như mọi lời gọi QS (http.js) -> xoá token, workSession chuyển sang màn đăng nhập */
+      if (e.code === 'NOAUTH') noAuth()
+      gate('signedout')
+      return
+    }
+    if (e && e.status === 403) { gate('denied', (e && e.message) || NO_PERM_MSG); return }
+    gate('unreachable', (e && e.message) || 'Không kết nối được máy chủ chat')
+    return
+  }
+  const cur = dezon()
+  const r = res && res.r
+  const bound = boundUid()
+  if (gen !== exchangeGen || !cur.ready || cur.uid !== w.uid || readToken() !== tok || (r && bound && bound !== w.uid)) {
+    /* đăng xuất / đổi người dùng Dezon Pro / tab khác đã gắn kho cho người khác trong lúc chờ: bỏ thiết bị vừa tạo.
+       Sau khi lần này xong (finally đã bỏ exchanging), phiên Dezon Pro vẫn sẵn sàng mà chưa có phiên chat thì đổi lại
+       (cách lần trước ít nhất 5 giây) */
+    if (r && r.refresh_token) api.logoutTokens(r).then(ok => { if (!ok) api.queueLogout(r) })
+    setTimeout(() => { if (dezon().ready && !S.me && !api.readSession().refresh) resume(false) }, 0)
+    return
+  }
+  if (res.reuse) { activate(res.reuse, true); return }
+  setBoundUid(w.uid) // trước khi ghi kho: tab khác thấy kho đổi thì đã biết phiên thuộc ai
+  const saved = api.saveSession(r, true)
+  if (!saved.uid) { gate('unreachable', 'Không lưu được phiên chat, thử lại'); return }
+  if (saved.replaced) api.logoutTokens(saved.replaced)
+  signIn(r.user)
+}
+
+/* Đăng xuất MỌI tài khoản chat trên trình duyệt (đăng xuất Dezon Pro, đổi người dùng, mất quyền Chat, tài khoản OTP cũ):
+   bỏ khỏi kho ngay (không chờ mạng), bỏ tin chưa gửi / ghim / lựa chọn thông báo, huỷ subscription push của trình duyệt,
+   báo máy chủ xoá thiết bị (mất mạng thì báo lại sau). */
+function signOutAll() {
+  if (signingOut) return signingOut
+  exchangeGen++
+  clearTimeout(exchangeTimer); exchangeTimer = null
+  const entries = api.listAccounts().map(a => ({ id: a.id, s: api.readSession(a.id) }))
+  setBoundUid('')
+  if (S.me) { stopAllTyping(); flushReads() }
+  api.setActiveAccount(null)
+  if (S.auth !== 'signedout' || S.me) { resetSession('signedout'); emit() }
+  for (const { id, s } of entries) {
+    try { for (const k of [OUTBOX_PREFIX, PINS_PREFIX, PUSH_PREF_PREFIX]) localStorage.removeItem(k + id) } catch (e) { /* bỏ qua */ }
+    api.removeAccount(id, s.deviceId ? { deviceId: s.deviceId } : null)
+  }
+  syncAccounts()
+  const run = async () => {
+    if (pushSupported() && entries.length) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration()
+        const sub = reg && await reg.pushManager.getSubscription()
+        if (sub) await sub.unsubscribe()
+      } catch (e) { /* bỏ qua */ }
+    }
+    for (const { s } of entries) {
+      if (!s.refresh) continue
+      const entry = { access_token: s.access, refresh_token: s.refresh }
+      if (!(await api.logoutTokens(entry))) api.queueLogout(entry)
+    }
+  }
+  const p = run().catch(() => {}).finally(() => { if (signingOut === p) signingOut = null })
+  signingOut = p
+  return p
 }
 
 function boot(user) {
@@ -291,13 +460,17 @@ export function switchAccount(uid) {
 
 /* Tài khoản của tab không còn trong kho (đăng xuất ở đây / ở tab khác, bị thu hồi): chuyển sang tài khoản kế tiếp
    (sessionStorage -> chat_last_account -> tài khoản duy nhất) hoặc về cổng đăng nhập */
-function leaveAccount() {
-  const next = api.resolveAccount(false)
+function leaveAccount(external) {
+  const w = dezon()
+  const next = boundTo(w) ? api.resolveAccount(false) : null
   if (next) { activate(next, false); return }
   api.setActiveAccount(null)
   if (S.auth === 'signedout') { syncAccounts(); return }
   resetSession('signedout')
   emit()
+  /* phiên chat hỏng / bị thu hồi ở tab này: đổi lại bằng phiên Dezon Pro (cách lần trước ít nhất 5 giây). Bị bỏ ở tab
+     khác (external: đăng xuất / đổi người dùng Dezon Pro ở đó) thì chờ 'dezon:auth' hoặc lần mở trang Chat sau. */
+  if (!external && started && w.ready && !api.listAccounts().length) resume(false)
 }
 
 /* Máy chủ từ chối phiên (401): bỏ tài khoản nếu kho vẫn giữ đúng phiên đó; kho đã có phiên mới (đăng nhập lại ở tab
@@ -360,10 +533,12 @@ async function refreshMe() {
   }
 }
 
-export function retry() { boot(api.readSession().user) }
+export function retry() {
+  if (api.readSession().refresh && boundTo(dezon())) boot(api.readSession().user)
+  else resume(true)
+}
 
-/* Cổng đăng nhập gọi sau otp/verify (token đã lưu bằng api.saveSession): tab chuyển sang tài khoản vừa đăng nhập
-   (thêm tài khoản: tài khoản đang dùng vẫn đăng nhập, chọn lại được ở bộ chọn tài khoản) */
+/* Sau khi đổi phiên Dezon Pro (token đã lưu bằng api.saveSession): tab chuyển sang tài khoản vừa đăng nhập */
 export function signIn(user) {
   if (user) api.saveUser(user)
   const id = (user && user.id) || api.activeAccountId() || api.resolveAccount(false)
@@ -2643,19 +2818,19 @@ export function takeOpenTarget(uid) {
 
 /* Kho tài khoản đổi ở tab khác: vá token mới nhất của tab này (nếu bị ghi đè bằng bản cũ), cập nhật bộ chọn; tài khoản
    của tab bị bỏ -> sang tài khoản kế tiếp / cổng; token đổi thì không làm gì (lần gọi sau đọc kho); tab đang ở cổng mà
-   tab khác vừa đăng nhập thêm tài khoản -> dùng luôn (như bản một tài khoản) */
+   tab khác vừa đổi phiên chat cho cùng người dùng Dezon Pro -> dùng luôn */
 function onVaultChanged() {
   api.healVault()
   const before = new Set(S.accounts.map(a => a.id))
   syncAccounts()
   const cur = api.activeAccountId()
   if (cur) {
-    if (!api.hasAccount(cur)) { leaveAccount(); return }
+    if (!api.hasAccount(cur)) { leaveAccount(true); return }
     const u = api.readSession(cur).user
     if (u && S.me && u.id === S.me.id && JSON.stringify(u) !== JSON.stringify(S.me)) set({ me: { ...S.me, ...u } })
     return
   }
-  if (S.auth === 'signedout' && started && S.accounts.some(a => !before.has(a.id))) {
+  if (S.auth !== 'ready' && started && !exchanging && S.accounts.some(a => !before.has(a.id)) && boundTo(dezon())) {
     const next = api.resolveAccount(false)
     if (next) activate(next, false)
   }
@@ -2669,6 +2844,25 @@ if (hasWindow) {
   })
   window.addEventListener('pagehide', () => clearVisible(S.me && S.me.id))
   setInterval(markVisible, VISIBLE_BEAT_MS)
+
+  /* Phiên Dezon Pro (services/workSession.js): đăng xuất -> đăng xuất mọi tài khoản chat; sẵn sàng -> đổi phiên chat nếu
+     chưa có, phiên của người khác / đã mất quyền Chat thì đăng xuất rồi đổi lại */
+  window.addEventListener('dezon:auth', e => {
+    if (!api.configured()) return
+    const st = e && e.detail && e.detail.state
+    if (st === 'login') {
+      exchangeGen++
+      waitingDezon = false
+      if (api.listAccounts().length || S.me) signOutAll()
+      else gate('signedout')
+      return
+    }
+    if (st !== 'ready' || !started) return
+    const w = dezon()
+    if (!w.ready) return
+    if (api.listAccounts().length && (!boundTo(w) || !chatAllowed(w))) { resume(false); return }
+    if (waitingDezon || (S.auth !== 'ready' && S.auth !== 'checking' && !exchanging)) resume(false)
+  })
 
   /* Đăng xuất lúc mất mạng còn chờ báo máy chủ: thử lại khi có mạng (và lúc khởi động store) */
   window.addEventListener('online', () => { if (api.configured()) api.flushPendingLogouts() })

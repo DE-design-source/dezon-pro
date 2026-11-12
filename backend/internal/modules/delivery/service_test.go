@@ -432,8 +432,15 @@ func TestBanGiaoTuKinhDoanhDB(t *testing.T) {
 		t.Fatalf("đổi tên theo khách: %v", ps)
 	}
 
-	// rời giai đoạn: dự án đã sửa -> ẩn, giữ liên kết, không xoá
-	if err := s.DetachFromLead(ctx, leadID, false); err != nil {
+	// chỉ rời trang thi công: chỉ dự án thi công ẩn, thiết kế vẫn hiện
+	if err := s.DetachFromLead(ctx, leadID, "construction", false); err != nil {
+		t.Fatal(err)
+	}
+	if ps = byKind(leadID); len(ps) != 2 || !listed(designID) || listed(consID) || jsval.Truthy(ps["design"].Val("tach_khach_hang")) {
+		t.Fatalf("rời 1 trang chỉ ẩn dự án của trang đó: %v", ps)
+	}
+	// rời mọi trang: dự án đã sửa -> ẩn, giữ liên kết, không xoá
+	if err := s.DetachFromLead(ctx, leadID, "", false); err != nil {
 		t.Fatal(err)
 	}
 	if ps = byKind(leadID); len(ps) != 2 || !jsval.Truthy(ps["design"].Val("tach_khach_hang")) || listed(designID) || listed(consID) {
@@ -451,7 +458,7 @@ func TestBanGiaoTuKinhDoanhDB(t *testing.T) {
 	}
 
 	// xoá khách: dự án đã sửa -> bỏ liên kết, hiện như dự án tạo tay
-	if err := s.DetachFromLead(ctx, leadID, true); err != nil {
+	if err := s.DetachFromLead(ctx, leadID, "", true); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []float64{designID, consID} {
@@ -467,7 +474,7 @@ func TestBanGiaoTuKinhDoanhDB(t *testing.T) {
 	if _, err := s.AddPhase(ctx, a, c2, omap.Of("name", "Móng")); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DetachFromLead(ctx, lead2.Val("id"), false); err != nil {
+	if err := s.DetachFromLead(ctx, lead2.Val("id"), "", false); err != nil {
 		t.Fatal(err)
 	}
 	if p, _ := s.repo.GetProject(ctx, d2); p != nil {

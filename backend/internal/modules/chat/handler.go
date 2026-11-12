@@ -13,6 +13,7 @@ import (
 	"qspro-backend/internal/middleware"
 	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/server/rpc"
+	"qspro-backend/internal/shared/actor"
 	apperr "qspro-backend/internal/shared/errors"
 	"qspro-backend/internal/shared/response"
 )
@@ -42,7 +43,8 @@ var (
 )
 
 // RegisterRPC: chỉ khai route REST "chỉ bản Go" (không có hàm /api/:fn). otp/request, otp/verify, refresh công khai;
-// còn lại rpc.SelfAuth: module tự kiểm access token của chat (middleware QS không chặn).
+// auth/dezon rpc.Login (phiên Dezon Pro, middleware.RequireLogin); còn lại rpc.SelfAuth: module tự kiểm access token của chat
+// (middleware QS không chặn).
 func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	r := func(name, method, path string, perm rpc.Perm, sum string, f ...rpc.GoField) {
 		reg.RegisterGoRoute(rpc.GoRoute{Name: name, Method: method, Path: "/chat" + path, Perm: perm, Tag: tag, Summary: sum, Fields: f})
@@ -58,6 +60,9 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		rpc.GoField{Name: "otp", In: "body", Type: "string", Required: true, Desc: "Mã 6 số"},
 		rpc.GoField{Name: "device", In: "body", Type: "object", Desc: `{"platform":"web|ios|android|desktop","name":"Chrome Windows"}`},
 		rpc.GoField{Name: "display_name", In: "body", Type: "string", Desc: "Tên hiển thị khi tạo tài khoản mới (trống = \"Người dùng <4 số cuối>\" / phần trước @ của email)"})
+	r("chatDezonLogin", "POST", "/auth/dezon", rpc.Login,
+		"Đăng nhập chat bằng phiên Dezon Pro (Authorization: Bearer <token Dezon Pro>, không cần OTP): tìm / tạo tài khoản chat gắn với tài khoản Dezon Pro, ghi thiết bị, cấp token như otp/verify. Nhân viên cần quyền chat (CHAT_NO_PERM); 30 lần / 10 phút",
+		rpc.GoField{Name: "device", In: "body", Type: "object", Desc: `{"platform":"web|ios|android|desktop","name":"Chrome Windows"}`})
 	r("chatRefresh", "POST", "/auth/refresh", rpc.Public,
 		"Đổi refresh token lấy cặp token mới (token cũ hết dùng; dùng lại token cũ = thu hồi thiết bị)",
 		rpc.GoField{Name: "refresh_token", In: "body", Type: "string", Required: true})
@@ -335,6 +340,18 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		in.ClientIP = c.ClientIP()
 		in.UserAgent = c.Request.UserAgent()
 		r, err := s.VerifyOTP(c.Request.Context(), in)
+		reply(c, r, err)
+	})
+	// Phiên Dezon Pro -> phiên chat: v1 đã có middleware.Auth + Tenant, RequireLogin chặn khi chưa đăng nhập Dezon Pro.
+	g.POST("/auth/dezon", middleware.RequireLogin(), func(c *gin.Context) {
+		var in DezonInput
+		if err := bindJSON(c, &in); err != nil {
+			fail(c, err)
+			return
+		}
+		in.ClientIP = c.ClientIP()
+		in.UserAgent = c.Request.UserAgent()
+		r, err := s.DezonLogin(c.Request.Context(), actor.FromGin(c), in)
 		reply(c, r, err)
 	})
 	g.POST("/auth/refresh", func(c *gin.Context) {

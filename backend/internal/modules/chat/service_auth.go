@@ -420,6 +420,15 @@ func (s *Service) RefreshFrom(ctx context.Context, token, ip string) (*AuthResul
 			_, err := tx.Exec(ctx, `delete from chat_refresh_tokens where id = $1`, tid)
 			return err
 		}
+		// tài khoản gắn Dezon Pro: tài khoản Dezon Pro bị khoá / xoá / thu quyền chat -> xoá thiết bị, client đăng xuất
+		if ok, err := s.dezonRefreshOK(ctx, tx, uid); err != nil || !ok {
+			if err != nil {
+				return err
+			}
+			biz, revoked = errRefreshInvalid, did
+			_, err := tx.Exec(ctx, `delete from chat_devices where id = $1`, did)
+			return err
+		}
 		if _, err := tx.Exec(ctx, `update chat_refresh_tokens set used_at = now() where id = $1`, tid); err != nil {
 			return err
 		}

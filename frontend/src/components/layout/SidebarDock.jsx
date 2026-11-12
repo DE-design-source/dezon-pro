@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { NAV_MAIN, NAV_BOTTOM } from '../../data/navigation'
+import { DezonMark } from '../ui/DezonLogo'
 
 const SIZE = 44 // đường kính nút tròn
 const MARGIN = 6 // khoảng cách tối thiểu tới mép màn hình
@@ -95,10 +96,7 @@ export default function SidebarDock({ onExpand }) {
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       >
         {/* Logo của app, giống logo ở đầu sidebar */}
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z" />
-          <circle cx="12" cy="9" r="2.3" />
-        </svg>
+        <DezonMark size={20} />
       </button>
       <div className="sidebar-dock-pill">
         <span className="sidebar-dock-page">{current ? <ItemIcon pathData={current.icon} size={16} /> : null}</span>

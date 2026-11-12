@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"time"
 
 	"qspro-backend/internal/config"
 	"qspro-backend/internal/middleware"
@@ -125,7 +126,7 @@ func (s *Server) modules() []Module {
 
 	catSvc := categories.New(categories.Deps{})
 	filesSvc := files.New(files.Deps{Cfg: d.Cfg})
-	matSvc := materials.New(materials.Deps{DB: d.DB, Cfg: d.Cfg, Auditor: usersSvc, Users: usersSvc, UserFmt: usersSvc,
+	matSvc := materials.New(materials.Deps{DuyetDelay: time.Minute, DB: d.DB, Cfg: d.Cfg, Auditor: usersSvc, Users: usersSvc, UserFmt: usersSvc,
 		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage})
 	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc})
 	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc, Users: usersSvc, UserFmt: usersSvc,
@@ -136,16 +137,16 @@ func (s *Server) modules() []Module {
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
 		Users: usersSvc, Auditor: usersSvc})
 	reportsSvc := reports.New(reports.Deps{DB: d.DB, Cfg: d.Cfg})
-	// Kinh doanh -> Quản lý thiết kế + Quản lý dự án: khách ở tu-van / dam-phan / thiet-ke có dự án triển khai ở cả 2 trang (DeliveryFromLead)
+	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: khách gửi tới phòng nào thì có dự án triển khai ở trang phòng đó (DeliveryFromLead)
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
 		Delivery: delivSvc})
-	// Chat (tài khoản theo số điện thoại hoặc email, không phụ thuộc module nào). Gateway WebSocket một tiến trình (realtime.Hub)
+	// Chat (tài khoản theo số điện thoại / email, hoặc gắn tài khoản Dezon Pro: POST /chat/auth/dezon đọc users qua Users / UserFmt). Gateway WebSocket một tiến trình (realtime.Hub)
 	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
 	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);
 	// bộ chạy phân phối + worker push dừng SAU, khi request REST đang dở đã xong (tin hệ thống của chúng vẫn phân phối + push).
 	chatSvc := chat.New(chat.Deps{DB: d.DB, Cfg: d.Cfg, Mail: chatMail(d.Cfg), Push: chatPush(d.Cfg),
-		Media: chatMedia(d.Cfg, s)})
+		Media: chatMedia(d.Cfg, s), Users: usersSvc, UserFmt: usersSvc})
 	chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(d.Cfg.CORSOrigins)})
 	chatSvc.SetGateway(chatHub)
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)

@@ -20,7 +20,10 @@ export const PERM_TABS = [['dash', 'Bảng điều khiển'], ['boc', 'Bóc tác
   ['muahang', 'Mua hàng'], ['duan', 'Dự án'], ['sanpham', 'Danh sách sản phẩm'], ['import', 'Nhập dữ liệu']]
 /* Quyền các trang nghiệp vụ ngoài QS (services/workSession.js canTab). Không nằm trong PERM_TABS vì firstAllowedTab_ chọn tab QS từ đó */
 export const WORK_TABS = [['kinhdoanh', 'Kinh doanh'], ['thietke', 'Quản lý thiết kế'], ['thicong', 'Quản lý dự án (thi công)'], ['hr', 'Nhân sự (HR)']]
-export const GRANT_TABS = PERM_TABS.concat(WORK_TABS)
+/* Quyền xem các trang còn lại trên thanh bên (services/workSession.js canPage). Không phải tính năng công ty (CT_FEATURES) */
+export const PAGE_TABS = [['newsfeed', 'Newsfeed'], ['chat', 'Chat'], ['marketing', 'Marketing'], ['taichinh', 'Tài chính'], ['bim', 'BIM'],
+  ['sanxuat', 'Sản xuất'], ['it', 'IT'], ['rd', 'R&D'], ['banlamviec', 'Bàn làm việc'], ['lich', 'Lịch'], ['wiki', 'Wiki']]
+export const GRANT_TABS = PERM_TABS.concat(WORK_TABS, PAGE_TABS)
 const HIST_LIMIT = 100
 
 function readLs(k) { try { return localStorage.getItem(k) || '' } catch (e) { return '' } }
@@ -177,32 +180,38 @@ export function startSession() {
 }
 export function retrySession() { sessionPromise = null; return startSession() }
 
-/* Port doLogin_: trả Promise; lỗi ném ra để màn đăng nhập hiện chữ của máy chủ */
-export async function login(user, pw) {
-  user = String(user || '').trim(); pw = String(pw || '')
-  if (!user || !pw) throw new Error('Nhập tên đăng nhập và mật khẩu')
-  const r = await api.login(user, pw)
-  writeToken(r.token)
-  sessionPromise = Promise.resolve()
+/* Đăng nhập / đăng xuất do phiên chung (services/workSession.js) làm; store QS chỉ nhận kết quả.
+   adoptSession: phiên chung vừa sẵn sàng (mở trang có token, đăng nhập, tự đăng nhập dev) -> nhận me / congTy,
+   đổi token / công ty xem thì bỏ dữ liệu cũ; /qs đang mở thì nạp ngay, không thì lần attach() sau startSession() boot luôn */
+export function adoptSession(me, congTy) {
+  if (!me) return
+  if (S.key !== keyNow()) sessionPromise = null
   resetForKey(true)
-  setState({ me: r.user, congTy: r.congTy || null, auth: 'ready', loginMsg: '', viewAs: readViewAs() })
+  setState({ me, congTy: congTy || null, auth: 'ready', loginMsg: '', viewAs: readViewAs() })
   if (!canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
-  startNotifPoll()
-  boot()
-  return r
+  if (mounted) { startNotifPoll(); startSession() }
 }
 
-/* Port authLogout_: báo server (thu hồi phiên phía máy chủ, M1.2) rồi xoá token; không tải lại trang */
-export async function logout() {
-  await projDataFlush_()   // gửi hết hàng đợi khi token còn (sau đó mới xoá token)
-  try { await api.logout() } catch (e) { /* phiên đã hết thì thôi */ }
+/* Port authLogout_ (phần của QS): gửi hết hàng đợi khi token còn, phiên chung thu hồi token rồi gọi clearSession */
+export const flushBeforeLogout = () => projDataFlush_()
+export function clearSession() {
   stopNotifPoll()
-  writeToken(''); writeViewAs(''); writeSs('qs_cur', '')
+  writeViewAs(''); writeSs('qs_cur', '')
   try { localStorage.removeItem('qs_user') } catch (e) { /* bỏ qua */ }
   projDataReset_()
   bootPromise = null; sessionPromise = null; editSeq = {}
   qsCloseDialogs()
   setState({ key: '', ...dataInit(), me: null, congTy: null, viewAs: '', auth: 'login', loginMsg: '' })
+}
+let appLogout = null
+export function setAppLogout(fn) { appLogout = fn }
+/* Đăng xuất từ trong QS: luôn đi qua phiên chung (workSession đăng ký appLogout khi nạp) để mọi trang + Chat cùng biết */
+export async function logout() {
+  if (appLogout) return appLogout()
+  await projDataFlush_()
+  try { await api.logout() } catch (e) { /* phiên đã hết thì thôi */ }
+  writeToken('')
+  clearSession()
 }
 
 export async function changePassword(oldPw, newPw) {

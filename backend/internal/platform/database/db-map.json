@@ -829,6 +829,8 @@
    "sdt": "phone",
    "sdt_hash": "phone_hash",
    "email": "email",
+   "qs_user_id": "qs_user_id",
+   "qs_cong_ty_id": "qs_company_id",
    "ten_hien_thi": "display_name",
    "hien_da_xem": "show_read_receipts",
    "truy_cap_cuoi": "last_seen_at",

@@ -235,6 +235,42 @@ html[data-theme="dark"] .qs-po-pm-i.tot b{color:#4ADE80;}
 .qs-po-pcb-tot b{font-size:15px; font-weight:700; color:var(--dash-accent); font-variant-numeric:tabular-nums;}
 .qs-po-pcb-err{margin-top:14px; font-size:12px; color:var(--danger);}
 
+/* Mua hàng: ngày cần đặt, tiến độ hàng, thêm dòng */
+.qs-po-date, .qs-po-td{height:28px; border:1px solid var(--border); border-radius:7px; padding:0 6px; font:inherit; font-size:12px; background:var(--surface); color:var(--text); max-width:130px;}
+.qs-po-td.t1{border-color:#3b82f6; color:#1d4ed8;}
+.qs-po-td.t2{border-color:#a855f7; color:#7e22ce;}
+.qs-po-td.t3{border-color:#f59e0b; color:#b45309;}
+.qs-po-td.t4{border-color:#16a34a; color:#15803d; font-weight:600;}
+.qs-po-td.t5{border-color:#dc2626; color:#b91c1c; font-weight:600;}
+.qs-po-addrow{text-align:left !important; padding:6px 10px !important;}
+.qs-po-addrow button{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 12px; border:1px dashed var(--border); border-radius:8px; background:transparent; color:var(--dash-accent, #1d4ed8); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-po-addrow button:hover{background:var(--dash-soft);}
+.qs-po-ar{width:640px; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 100px);}
+.qs-po-ar-tabs{display:flex; gap:6px; padding:0 18px 10px;}
+.qs-po-ar-tabs button{height:30px; padding:0 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-muted, var(--text)); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-po-ar-tabs button.on{background:var(--dash-accent); border-color:var(--dash-accent); color:#fff;}
+.qs-po-ar-s{display:flex; align-items:center; gap:12px; padding:0 18px 8px;}
+.qs-po-ar-s > span{flex:1; display:flex; align-items:center; gap:6px; height:34px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface);}
+.qs-po-ar-s > span input{flex:1; border:0; outline:0; background:transparent; font:inherit; font-size:13px; color:var(--text);}
+.qs-po-ar-s label{display:flex; align-items:center; gap:5px; font-size:12px; white-space:nowrap;}
+.qs-po-ar-list{flex:1; min-height:160px; max-height:46vh; overflow:auto; margin:0 18px; border:1px solid var(--border); border-radius:10px;}
+.qs-po-ar-list > button{display:flex; align-items:center; gap:10px; width:100%; padding:6px 10px; border:0; border-bottom:1px solid var(--border); background:transparent; color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.qs-po-ar-list > button:hover{background:var(--surface-alt);}
+.qs-po-ar-list > button.on{background:var(--dash-soft); box-shadow:inset 3px 0 0 var(--dash-accent);}
+.qs-po-ar-list .t{flex:1; min-width:0; display:flex; flex-direction:column;}
+.qs-po-ar-list .t b{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-po-ar-list .t small{font-size:11.5px; opacity:.7;}
+.qs-po-ar-list .g{font-size:12.5px; font-weight:600; white-space:nowrap;}
+.qs-po-ar-more{padding:8px 10px; font-size:12px; opacity:.7; text-align:center;}
+.qs-po-ar-free{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 18px;}
+.qs-po-ar-free .w2{grid-column:1 / -1;}
+.qs-po-ar-free label, .qs-po-ar-f label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600;}
+.qs-po-ar-free input, .qs-po-ar-f input, .qs-po-ar-f select{height:34px; border:1px solid var(--border); border-radius:8px; padding:0 10px; font:inherit; font-size:13px; font-weight:400; background:var(--surface); color:var(--text);}
+.qs-po-ar-f{display:grid; grid-template-columns:100px 1fr 1fr; gap:10px; padding:12px 18px 0;}
+.qs-po-ar-b{display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:14px 18px 16px;}
+.qs-po-ar-pk{flex:1; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qs-po-ar .qs-po-dlg-h{padding:14px 18px 11px;}
+
 /* ---------- Sửa thẻ NCC (nút Edit, SupplierCard): hàng thêm tay · cột tự thêm · ghi chú cho NCC ---------- */
 .qs-po-editbtn{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px; margin-right:10px; border:1px solid var(--dash-accent-border); border-radius:7px; background:var(--surface); color:var(--dash-accent); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
 .qs-po-editbtn:hover{background:var(--dash-accent-tint);}
