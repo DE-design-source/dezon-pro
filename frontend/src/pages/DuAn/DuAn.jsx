@@ -12,14 +12,11 @@ import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import WorkGate from '../../components/ui/WorkGate'
 import { DeliveryProvider } from '../QuanLyThietKe/delivery'
+import { DA_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
-const MAIN_TABS = [
-  { key: 'list', label: 'Danh sách dự án' },
-  { key: 'create', label: 'Thiết lập thi công' },
-  { key: 'tiendo', label: 'Tiến độ' },
-  { key: 'nhiemvu', label: 'Nhiệm vụ' },
-  { key: 'nhansu', label: 'Cơ cấu phòng ban' },
-]
+/* Tab đầu trang: data/pageTabs.js (dùng chung với Cài đặt > Hiển thị) */
+const MAIN_TABS = DA_TABS
 const VALID_TABS = ['list', 'create', 'tiendo', 'nhiemvu', 'nhansu', 'detail']
 const VALID_GTABS = ['overview', 'mission', 'rewards', 'leaderboard']
 
@@ -59,6 +56,10 @@ function DuAnPage() {
     setTab(name)
   }
 
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/du-an')
+  useTabFallback(tabHidden, tab, MAIN_TABS.map(t => t.key), goToTab)
+
   const panelStyle = key => ({ display: tab === key ? 'flex' : 'none' })
 
   return (
@@ -73,7 +74,7 @@ function DuAnPage() {
           </div>
           <span className="da-header-title">Quản lý dự án</span>
           <div className="hdr-tabs" role="tablist">
-            {MAIN_TABS.map(t => (
+            {MAIN_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
               <button key={t.key} className={`da-proj-tab${tab === t.key ? ' active' : ''}`} onClick={() => goToTab(t.key)}>{t.label}</button>
             ))}
           </div>

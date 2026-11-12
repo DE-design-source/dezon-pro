@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 import { AI_KB, AI_TOPIC_LABELS, AI_SUGGESTIONS, matchTopic } from '../../../data/banLamViecData'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 
 export function loadAiPanelWidth() {
   try {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Các icon dùng trong chip chủ đề (14px) và nút công cụ (13px) */
@@ -27,7 +29,7 @@ const TOPICS = [
   { key: 'chamcong', label: 'Chấm công', Icon: IconUsers },
   { key: 'dongtien', label: 'Dòng tiền', Icon: IconCard },
   { key: 'khachhang', label: 'Khách hàng', Icon: IconClient },
-  { key: 'tinnhan', label: 'Tin nhắn', Icon: IconChat, wide: true },
+  { key: 'tinnhan', label: 'Tin nhắn', Icon: IconChat },
 ]
 
 export default function Dezbot({ open, onToggle, onClose, onResize, onResizingChange }) {
@@ -121,6 +123,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                     <button className="blv-ai-chip" onClick={() => sendMessage(AI_TOPIC_LABELS[key] || label)}><Icon s={14} />{label}</button>
                   </div>
                 ))}
+                <div className="blv-ai-topic-chip"><BugChip className="blv-ai-chip" onBefore={onClose} /></div>
               </div>
             </div>
           ) : (

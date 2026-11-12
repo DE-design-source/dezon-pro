@@ -54,8 +54,10 @@ html[data-theme="dark"][data-accent="teal"] .qs-page{--primary:#3FC2B6; --primar
   font-family:var(--qs-font); font-size:14px; line-height:1.5;
   transition:margin-right .25s ease, background .15s ease, color .15s ease;
 }
-.qs-page.qs-ai-open{margin-right:var(--ai-panel-width, 440px);}
-.qs-page.qs-ai-resizing{transition:none;}
+/* Mở Dezbot: thanh tiêu đề vẫn kéo hết bề ngang, chỉ vùng nội dung chừa chỗ cho cột Dezbot (rộng W + lề phải 12, đổi sang px của vùng thu nhỏ) */
+.qs-page .qs-scroll{transition:margin-right .25s ease;}
+.qs-page.qs-ai-open .qs-scroll{margin-right:calc((var(--ai-panel-width, 330px) + 12px) / var(--qs-zoom, .75));}
+.qs-page.qs-ai-resizing, .qs-page.qs-ai-resizing .qs-scroll{transition:none;}
 .qs-page *, .qs-page *::before, .qs-page *::after{box-sizing:border-box;}
 .qs-page h1, .qs-page h2, .qs-page h3, .qs-page h4{font-family:var(--qs-font); margin:0;}
 .qs-page button, .qs-page input, .qs-page select{font-family:inherit;}
@@ -101,9 +103,11 @@ html[data-theme="dark"][data-accent="teal"] .qs-page{--primary:#3FC2B6; --primar
    bằng đúng số px ghi trong CSS như các trang khác (14px = 14px), và vẫn đổi theo Cài đặt ▸ Giao diện ▸ Cỡ chữ (--fs-user).
    Đổi --qs-zoom thì đổi --qs-text = 1 / --qs-zoom. */
 .qs-page{--qs-text:1.3333;}
-/* Mặc định cả vùng QS (khung + chữ) nhỏ thêm 10%: trình duyệt 100% trông như 90% trước đây (.75 x 0,9).
-   Giữ --qs-text = 1,3333 (không bù) để chữ nhỏ theo cùng tỉ lệ; mọi chỗ dùng var(--qs-zoom) (hộp thoại .qs-mroot, vw/vh) tự theo */
-.qs-page{--qs-zoom:.675;}
+/* Kích thước chung của mọi trang do Cài đặt ▸ Giao diện ▸ Kích thước chuẩn quyết định (zoom --z-app trên <html>), nên QS
+   không tự thu nhỏ thêm (trước đây .675 = .75 x 0,9): chữ QS = đúng cỡ của các trang khác. Muốn gọn như trước: chọn 90%.
+   --qs-vz = tổng zoom thật của vùng QS (QS x chuẩn), dùng để đổi vw / vh sang px của vùng (calc(92vw / var(--qs-vz))) */
+.qs-page{--qs-zoom:.75;}
+.qs-page, .qs-mroot{--qs-vz:calc(var(--qs-zoom, .75) * var(--z-app, 1));}
 .qs-topbar, .qs-scroll{--fs:calc(var(--fs-user, 1) * var(--qs-text, 1.3333));}
 /* Cỡ chữ gốc đặt lại ngay trên vùng thu nhỏ: chữ không có cỡ riêng kế thừa 14px của .qs-page (ngoài vùng) sẽ bị thu còn 10,5px */
 .qs-topbar, .qs-scroll{font-size:14px;}
@@ -1138,6 +1142,8 @@ html[data-theme="dark"] .qs-po-status{background:#3A2E14; color:#F0B45A;}
 .qs-ai-topic-chip.wide{grid-column:1 / -1; justify-self:center; width:auto;}
 .qs-ai-chip{display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid var(--border); background:var(--surface); color:var(--text); padding:9px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;}
 .qs-ai-chip:hover{background:var(--surface-alt);}
+.qs-ai-chip.qs-ai-bug{border-color:color-mix(in srgb, var(--danger) 35%, var(--border)); color:var(--danger);}
+.qs-ai-chip.qs-ai-bug:hover{background:var(--danger-tint);}
 .qs-ai-log{flex:1; display:flex; flex-direction:column; gap:12px; padding-top:12px;}
 .qs-ai-msg{max-width:82%; padding:9px 13px; border-radius:14px; font-size:12.5px; line-height:1.55;}
 .qs-ai-msg.user{align-self:flex-end; background:var(--primary); color:#fff; border-bottom-right-radius:4px;}
@@ -1343,3 +1349,55 @@ html[data-theme="dark"] .qs-po-status{background:#3A2E14; color:#F0B45A;}
 .qs-bd-catbody{flex:1; min-height:0; display:flex; flex-direction:column; padding:0 13px; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
 /* Gióng hàng với cột bảng: hàng nút đầu cột Hạng mục cao bằng module thanh công cụ (--qs-toolmod-h, BreakdownTab đo) */
 .qs-bd-catalog > .qs-bd-catalog-head{height:var(--qs-toolmod-h, 62px); box-sizing:border-box;}
+
+/* ---------- Dezbot (MarkUp 2026-11-12 14:57): khung chat chia thành các module có viền, gọn trong khung, không mất chữ ----------
+   nền khung xám nhạt như vùng QS, mỗi phần (lời chào · chủ đề · gợi ý · ô nhập) là 1 thẻ trắng bo 12 có viền;
+   chip chủ đề 2 cột cao bằng nhau (kể cả Báo lỗi), chữ dài tự xuống dòng; gợi ý xếp nhiều hàng thay vì cuộn ngang bị cắt */
+.qs-ai-panel{background:var(--surface-alt);}
+.qs-ai-head{padding:14px 14px 10px; background:var(--surface); border-bottom:1px solid var(--border);}
+.qs-ai-body{padding:12px 12px 0; gap:12px;}
+.qs-ai-welcome{flex:none; align-items:stretch; padding:0; gap:12px; text-align:left;}
+.qs-ai-welcome > h2, .qs-ai-welcome > p{margin:0;}
+.qs-ai-welcome-card, .qs-ai-topic-card{padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,.06);}
+.qs-ai-welcome-card h2{font-size:19px; font-weight:800; line-height:1.3; overflow-wrap:anywhere;}
+.qs-ai-welcome-card p{margin:8px 0 0; max-width:none; font-size:12px; line-height:1.55; color:var(--text-muted); overflow-wrap:anywhere;}
+.qs-ai-topic-card > b{display:block; margin-bottom:10px; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+.qs-ai-topic-grid{max-width:none; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px;}
+.qs-ai-topic-chip, .qs-ai-topic-chip.wide{grid-column:span 1; justify-self:stretch; display:flex; min-width:0;}
+.qs-ai-chip{flex:1; min-width:0; min-height:40px; height:100%; justify-content:flex-start; padding:8px 12px; border-radius:10px; text-align:left; line-height:1.3; white-space:normal; overflow-wrap:anywhere;}
+.qs-ai-chip svg{flex:none;}
+.qs-ai-suggest-row{flex-wrap:wrap; gap:6px; margin:12px 12px 0; padding:12px; overflow:visible; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,.06);}
+.qs-ai-suggest-chip{flex:0 1 auto; max-width:100%; white-space:normal; text-align:left; line-height:1.35; border-radius:10px; overflow-wrap:anywhere;}
+.qs-ai-input-area{margin:12px; border-radius:12px; background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,.06);}
+.qs-ai-log{padding-top:0;}
+
+/* ---------- Dezbot = 1 khung bo tròn như các thẻ Bảng điều khiển (MarkUp 2026-11-12 15:06, 15:10) ----------
+   Nằm dưới thanh tiêu đề (cao 85.33 x zoom), cách mép phải / đáy 12 = lề vùng QS (16 x .75); cả trợ lý gọn trong 1 khung
+   bo 4 góc 9 (= 12 x .75) có viền, bên trong chia phần bằng vạch: đầu (cao 39 = 52 x .75) | lời chào + chủ đề | gợi ý | ô nhập.
+   Panel không bị thu nhỏ nên chữ = thang cỡ chữ Bảng điều khiển x zoom vùng QS
+   (--t-k 1.1: lg 16.5 tiêu đề · md 14.85 chữ chính · sm 13.75 chữ phụ / nút · xs 12.65 nhãn) để hiển thị bằng cỡ chữ cột trái */
+.qs-ai-panel{--t-lg:calc(16.5px * var(--qs-zoom, .75) * var(--fs, 1)); --t-md:calc(14.85px * var(--qs-zoom, .75) * var(--fs, 1));
+  --t-sm:calc(13.75px * var(--qs-zoom, .75) * var(--fs, 1)); --t-xs:calc(12.65px * var(--qs-zoom, .75) * var(--fs, 1));
+  top:calc(85.33px * var(--qs-zoom, .75) + 12px); right:12px; bottom:12px; height:auto; max-width:calc(92vw - 12px);
+  background:var(--surface); border:1px solid var(--border); border-radius:9px; box-shadow:0 1px 3px rgba(15,23,42,.06);
+  transform:translateX(calc(100% + 24px));}
+.qs-ai-panel.open{transform:translateX(0);}
+.qs-page.qs-ai-open .qs-ai-fab{display:none;}
+.qs-ai-head{min-height:39px; padding:6px 8px 6px 12px; gap:8px; background:var(--surface); border-bottom:1px solid var(--border);}
+.qs-ai-head h4{font-size:var(--t-lg); font-weight:700;}
+.qs-ai-newchat{padding:6px 12px; border-radius:999px; font-size:var(--t-xs);}
+.qs-ai-body{padding:12px; gap:12px; min-height:0;}
+.qs-ai-welcome{gap:12px;}
+.qs-ai-welcome-card, .qs-ai-topic-card{padding:0; border:0; border-radius:0; background:none; box-shadow:none;}
+.qs-ai-topic-card{padding-top:12px; border-top:1px solid var(--border);}
+.qs-ai-welcome-card h2{font-size:var(--t-lg); font-weight:700; line-height:1.35;}
+.qs-ai-welcome-card p{margin-top:6px; font-size:var(--t-sm); line-height:1.5;}
+.qs-ai-topic-card > b{margin-bottom:8px; font-size:var(--t-xs);}
+.qs-ai-chip{min-height:36px; padding:7px 10px; border-radius:8px; font-size:var(--t-md);}
+.qs-ai-log{flex:1; gap:10px;}
+.qs-ai-msg{font-size:var(--t-sm);}
+.qs-ai-suggest-row{margin:0; padding:10px 12px; border:0; border-top:1px solid var(--border); border-radius:0; box-shadow:none;}
+.qs-ai-suggest-chip{padding:6px 10px; border-radius:8px; font-size:var(--t-xs);}
+.qs-ai-input-area{margin:0 12px 12px; padding:10px 12px; border-radius:8px; background:var(--surface-alt); box-shadow:none;}
+.qs-ai-input-area textarea{font-size:var(--t-md);}
+.qs-ai-send{padding:6px 16px; border-radius:999px; font-size:var(--t-sm);}

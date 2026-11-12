@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { AI_KB, AI_TOPIC_LABELS, AI_SUGGESTIONS, matchTopic } from '../../../data/qsData'
+import { openBugReport } from '../../../components/ui/BugReport'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 
 export function loadAiPanelWidth() {
   try {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 const Svg = ({ html }) => (
@@ -29,7 +31,9 @@ const TOPICS = [
   { key: 'chamcong', label: 'Chấm công', icon: ICON_USERS },
   { key: 'dongtien', label: 'Dòng tiền', icon: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/>' },
   { key: 'khachhang', label: 'Khách hàng', icon: '<path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><path d="M2 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="8" cy="7" r="4"/>' },
-  { key: 'tinnhan', label: 'Tin nhắn', icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', wide: true },
+  { key: 'tinnhan', label: 'Tin nhắn', icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
+  /* Báo lỗi: mở hộp chụp màn hình + gửi phòng IT (không hỏi trợ lý) */
+  { key: 'baoloi', label: 'Báo lỗi', icon: '<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9M6.5 13H3M21 13h-3.5"/>', bug: true },
 ]
 
 export default function Dezbot({ open, onToggle, onClose, onResize, onResizingChange }) {
@@ -41,6 +45,9 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
   const panelRef = useRef(null)
   const timers = useRef([])
   const seq = useRef(0)
+
+  /* đóng Dezbot trước khi chụp để khung trợ lý không che màn hình cần báo lỗi */
+  function openBug() { onClose(); setTimeout(() => openBugReport('QS'), 280) }
 
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
@@ -111,14 +118,20 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
         <div className="qs-ai-body" ref={logRef}>
           {messages.length === 0 ? (
             <div className="qs-ai-welcome">
-              <h2>Tôi có thể giúp gì,<br /><span className="muted">hôm nay?</span></h2>
-              <p>Hỏi về tiến độ, nhân công, dòng tiền, khách hàng, bóc tách hay quy trình — trợ lý đọc trực tiếp dữ liệu trong workspace.</p>
+              {/* 2 module có viền: lời chào | chủ đề hỏi nhanh (chip 2 cột cao bằng nhau, kể cả Báo lỗi) */}
+              <div className="qs-ai-welcome-card">
+                <h2>Tôi có thể giúp gì,<br /><span className="muted">hôm nay?</span></h2>
+                <p>Hỏi về tiến độ, nhân công, dòng tiền, khách hàng, bóc tách hay quy trình — trợ lý đọc trực tiếp dữ liệu trong workspace.</p>
+              </div>
+              <div className="qs-ai-topic-card">
+              <b>Chủ đề</b>
               <div className="qs-ai-topic-grid">
                 {TOPICS.map(t => (
                   <div key={t.key} className={`qs-ai-topic-chip${t.wide ? ' wide' : ''}`}>
-                    <button className="qs-ai-chip" onClick={() => sendMessage(AI_TOPIC_LABELS[t.key] || t.label)}><Svg html={t.icon} />{t.label}</button>
+                    <button className={`qs-ai-chip${t.bug ? ' qs-ai-bug' : ''}`} onClick={() => (t.bug ? openBug() : sendMessage(AI_TOPIC_LABELS[t.key] || t.label))}><Svg html={t.icon} />{t.label}</button>
                   </div>
                 ))}
+              </div>
               </div>
             </div>
           ) : (

@@ -336,7 +336,7 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-recent-tg .chev{font-size:20px; line-height:1; color:var(--text-muted); transition:transform .15s;}
 .qsi-recent.open .qsi-recent-tg{background:var(--dash-accent-tint);}
 .qsi-recent.open .qsi-recent-tg .chev{transform:rotate(180deg); color:var(--dash-accent);}
-.qsi-recent-fly{position:absolute; left:calc(100% + 12px); top:0; z-index:30; width:min(720px, calc(100vw / var(--qs-zoom, .75) - 560px)); max-height:calc(80vh / var(--qs-zoom, .75)); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 18px 44px rgba(15,23,42,.22); overflow:hidden;}
+.qsi-recent-fly{position:absolute; left:calc(100% + 12px); top:0; z-index:30; width:min(720px, calc(100vw / var(--qs-vz, .75) - 560px)); max-height:calc(80vh / var(--qs-vz, .75)); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 18px 44px rgba(15,23,42,.22); overflow:hidden;}
 .qsi-recent-fly .qsi-recent-b{flex:1; min-height:0; overflow:auto;}
 .qsi-recent-fly .qsi-recent-h{display:flex; align-items:center; gap:8px;}
 .qsi-recent-x{margin-left:auto; width:28px; height:28px; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); cursor:pointer;}
@@ -345,7 +345,7 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 /* Khung Sản phẩm vừa nhập mở ra bên phải, neo theo mép trên cột trái (thẳng hàng mép trên form), cao ~88% màn hình */
 .qsi-left{position:relative;}
 .qsi-left .qsi-recent{position:static;}
-.qsi-recent-fly{top:0; height:calc(88vh / var(--qs-zoom, .75)); max-height:none;}
+.qsi-recent-fly{top:0; height:calc(88vh / var(--qs-vz, .75)); max-height:none;}
 @media(max-width:1180px){ .qsi-left{position:static;} .qsi-recent-fly{height:auto;} }
 /* Khung Sản phẩm vừa nhập mở ra = 1 cột riêng rộng BẰNG cột trái (không đè form); form bên phải dịch sang và co lại (responsive) */
 .qsi-recent-fly{width:100%; box-shadow:0 1px 5px rgba(11,31,58,.04);}
@@ -365,7 +365,7 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-stats-chart{cursor:zoom-in;}
 .qsi-stats-zoom{align-self:flex-end; margin-bottom:-6px; height:26px; padding:0 9px; display:inline-flex; align-items:center; gap:5px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer;}
 .qsi-stats-zoom:hover, .qsi-stats-zoom.on{border-color:var(--dash-accent); color:var(--dash-accent); background:var(--dash-accent-tint);}
-.qsi-stats-fly{position:absolute; left:calc(100% + 12px); top:0; z-index:30; width:var(--qsi-fly, 720px); height:calc(88vh / var(--qs-zoom, .75)); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 5px rgba(11,31,58,.04); overflow:hidden;}
+.qsi-stats-fly{position:absolute; left:calc(100% + 12px); top:0; z-index:30; width:var(--qsi-fly, 720px); height:calc(88vh / var(--qs-vz, .75)); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 5px rgba(11,31,58,.04); overflow:hidden;}
 .qsi-sf-h{display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border);}
 .qsi-sf-h > div{flex:1; min-width:0; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
 .qsi-sf-h b{font-size:15px;}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './Marketing.css'
 import { useTheme } from '../../hooks/useTheme'
 import { CATALOG, CAMPAIGNS, MAIN_TABS, M_STEPS } from '../../data/marketingData'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 import CampaignsTab from './components/CampaignsTab'
 import CampaignDetail from './components/CampaignDetail'
 import CatalogTab from './components/CatalogTab'
@@ -69,6 +70,9 @@ export default function Marketing() {
   const [aiResizing, setAiResizing] = useState(false)
 
   const tabLabel = id => (tabs.find(t => t.id === id) || { label: id }).label
+  // tab ẩn ở Cài đặt > Hiển thị (lưu trên máy; khác "Chỉnh sửa menu" chỉ ẩn trong phiên); tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/marketing')
+  useTabFallback(tabHidden, panel, tabs.filter(t => !t.hidden).map(t => t.id), id => setPanel(id))
 
   /* ===================== Chuyển tab chính ===================== */
   function goToTab(name) { setPanel(name) }
@@ -194,7 +198,7 @@ export default function Marketing() {
               <button
                 key={t.id}
                 className={`mk-tab${panel === t.id ? ' active' : ''}`}
-                style={t.hidden ? { display: 'none' } : undefined}
+                style={t.hidden || tabHidden.indexOf(t.id) >= 0 ? { display: 'none' } : undefined}
                 onClick={() => handleTabClick(t)}
               >
                 {renaming && renaming.id === t.id

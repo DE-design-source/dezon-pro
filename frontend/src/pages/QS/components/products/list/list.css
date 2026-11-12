@@ -698,7 +698,7 @@
 /* Modal Thông tin sản phẩm rộng hơn: gần trọn màn hình (92% bề ngang, tối đa 1500px; .qs-mroot bị zoom nên chia cho --qs-zoom),
    cao tối đa 90% màn hình, thân cuộn bên trong; cột ảnh rộng 400px, phần thông số chia 3 cột (màn vừa: 2, hẹp: 1) */
 .qspl-ov{align-items:center;}
-.qspl-pd{width:min(1500px, calc(92vw / var(--qs-zoom, .75))); max-height:calc(90vh / var(--qs-zoom, .75)); display:flex; flex-direction:column; padding:20px 26px;}
+.qspl-pd{width:min(1500px, calc(92vw / var(--qs-vz, .75))); max-height:calc(90vh / var(--qs-vz, .75)); display:flex; flex-direction:column; padding:20px 26px;}
 .qspl-pd > .qspl-pdm-grid{flex:1; min-height:0; overflow-y:auto;}
 .qspl-pdm-grid{grid-template-columns:400px minmax(0,1fr); gap:32px;}
 .qspl-pdm-right{columns:3; column-gap:32px;}
@@ -783,8 +783,8 @@
 .qspl-mp-gt:hover .qspl-mp-chev{background:var(--dash-accent-tint); color:var(--dash-accent);}
 /* Nút Ghi danh vào nhiều dự án trên dòng bảng + hộp chọn nhiều dự án mở từ bảng (cùng cỡ hộp ở trang Nhà cung cấp) */
 .qspl-act.multi{color:var(--dash-accent);}
-.qspl-pd.qspl-mpbox{position:relative; width:calc(70vw / var(--qs-zoom, .75)); max-width:calc(96vw / var(--qs-zoom, .75)); height:calc(88vh / var(--qs-zoom, .75)); padding:0;}
-@media (max-width:1400px){ .qspl-pd.qspl-mpbox{width:calc(92vw / var(--qs-zoom, .75));} }
+.qspl-pd.qspl-mpbox{position:relative; width:calc(70vw / var(--qs-vz, .75)); max-width:calc(96vw / var(--qs-vz, .75)); height:calc(88vh / var(--qs-vz, .75)); padding:0;}
+@media (max-width:1400px){ .qspl-pd.qspl-mpbox{width:calc(92vw / var(--qs-vz, .75));} }
 .qspl-mpbox .qspl-mp{inset:0;}
 /* Nút mở lại panel Sản phẩm trong dự án ở đầu băng xanh */
 .qspl-ppbtn{flex:none; height:40px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.25); border-radius:10px; background:rgba(255,255,255,.08); color:#fff; cursor:pointer;}
@@ -824,7 +824,7 @@ html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.sp-hl2, html[data-theme="da
 .qspl-pp-list .qspl-pp-prod.active, .qspl-pp-list .qspl-pp-row.active, .qspl-pp-list .qspl-pp-tile.active{border-color:var(--dash-accent); box-shadow:0 0 0 2px var(--dash-accent-tint); background:var(--dash-accent-tint);}
 /* cột Thông tin sản phẩm nằm giữa panel trái và bảng: rộng bằng panel trái (--qspl-pp-w), cao vừa khung nhìn (trang QS bị zoom nên chia --qs-zoom),
    dính khi cuộn trang; phần thân cuộn bên trong, thanh kéo chỉ hiện khi rê chuột vào */
-.qspl-ws > .qs-bd-info{margin-right:0; align-self:flex-start; position:sticky; top:0; width:var(--qspl-pp-w, 440px); height:calc((100vh - 120px) / var(--qs-zoom, .675));}
+.qspl-ws > .qs-bd-info{margin-right:0; align-self:flex-start; position:sticky; top:0; width:var(--qspl-pp-w, 440px); height:calc((100vh - 120px) / var(--qs-vz, .75));}
 .qspl-ws > .qs-bd-info .qs-bd-info-body{scrollbar-width:thin; scrollbar-color:transparent transparent;}
 .qspl-ws > .qs-bd-info:hover .qs-bd-info-body{scrollbar-color:var(--scrollbar-thumb, #c3ccd8) transparent;}
 .qspl-ws > .qs-bd-info .qs-bd-info-body::-webkit-scrollbar{width:8px;}

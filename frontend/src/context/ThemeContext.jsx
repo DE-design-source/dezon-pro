@@ -7,6 +7,10 @@ const ThemeContext = createContext(null)
 /* (index.html lặp lại hai số này trong đoạn script chạy trước khi vẽ trang) */
 export const FONT_SCALE_MIN = 10
 export const FONT_SCALE_MAX = 130
+/* Kích thước chuẩn của cả giao diện (phần trăm, Cài đặt ▸ Giao diện): mọi trang cùng một tỉ lệ (index.html lặp lại 2 số này) */
+export const UI_SCALE_MIN = 70
+export const UI_SCALE_MAX = 120
+export const uiScaleOf = c => Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, Math.round(Number(c && c.uiScale) || 100)))
 
 function systemPrefersDark() {
   try { return window.matchMedia('(prefers-color-scheme: dark)').matches } catch { return false }
@@ -57,6 +61,10 @@ export function ThemeProvider({ children }) {
     const root = document.documentElement
     root.setAttribute('data-accent', c.accent || 'blue')
     root.setAttribute('data-density', c.density || 'comfortable')
+    /* Tỉ lệ zoom của cả app = kích thước chuẩn x mật độ (Gọn = 0,88); global.css đọc --z-app */
+    const zApp = Math.round(uiScaleOf(c) / 100 * (c.density === 'compact' ? 0.88 : 1) * 1000) / 1000
+    root.style.setProperty('--z-app', String(zApp))
+    root.setAttribute('data-zoomed', zApp === 1 ? 'off' : 'on')
     root.setAttribute('data-sidebar-pos', c.sidebarPos || 'left')
     /* Cỡ chữ tự chỉnh (fontSize = 'custom'): fontScale là phần trăm, gán thẳng vào --fs-user (mức cỡ chữ người dùng chọn) */
     const scale = c.fontSize === 'custom' ? Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Number(c.fontScale) || 100)) : null

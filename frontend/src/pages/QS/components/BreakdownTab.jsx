@@ -8,9 +8,13 @@ import CatalogPanel from './breakdown/CatalogPanel'
 import SheetHeader from './breakdown/SheetHeader'
 import ProductInfo from './breakdown/ProductInfo'
 import SheetBody from './breakdown/SheetBody'
-import PhanThoPanel, { usePtTotals } from './phantho/PhanThoPanel'
+import PhanThoPanel, { usePtTotals, PtColsModule, PtPresetDock } from './phantho/PhanThoPanel'
 import { PtFilters, PtLibrary, usePtLibCount } from './phantho/PtLibrary'
 import PtDetail from './phantho/PtDetail'
+import { ptSetVat } from './phantho/ptActions'
+import { usePtUi } from './phantho/ptState'
+import { PT_COLS } from './phantho/ptModel'
+import { useFold, foldToggle_ } from './project/projectShell'
 import ProductThumb from './common/ProductThumb'
 import ImgViewer from './common/ImgViewer'
 import DocsPopover from './common/DocsPopover'
@@ -74,6 +78,8 @@ export default function BreakdownTab() {
      (renderPTLibrary phantho.js:1226-1295, ptShowDetail_ 1908-1932, ptTotalsBar_ 2331-2338, tkCount 2287) */
   const ptCount = usePtLibCount()
   const ptTot = usePtTotals()
+  const ptCols = usePtUi(s => s.cols)
+  const ptColsFold = useFold('cols') // true = đang ẩn hàng chip "Cột hiển thị" của Phần thô
   const facade = useLinesSheet({ node })
   const { groups } = facade
   const colState = useTkCols()
@@ -112,7 +118,9 @@ export default function BreakdownTab() {
   const [pop, setPop] = useState(null)   // {kind, anchor, ...}
   const [presetDock, setPresetDock] = useState(false)   // khung "Chọn nhanh cột" bên trái vùng bảng
   const [histDock, setHistDock] = useState(null)   // khung "Lịch sử" cạnh cột sản phẩm: 'recent' | 'ops'
-  const toggleHist = t => setHistDock(v => (v === t ? null : t))
+  const histLast = useRef('recent')   // 1 nút Lịch sử: mở lại đúng tab dùng lần trước
+  const toggleHist = () => setHistDock(v => (v ? null : histLast.current))
+  const pickHistTab = t => { histLast.current = t; setHistDock(t) }
   /* Khung "Chọn nhanh cột" và dải chip cột đi cặp: nút bộ cột mở cả hai, đóng bên nào cũng đóng cả hai (huỷ phần đang sửa) */
   function closeColTools() { cancelEdit(); setPresetDock(false); setPanel(p => (p === 'cols' ? null : p)) }
   const [toolSlot, setToolSlot] = useState(null)   // khung module thanh công cụ (SheetBody vẽ thanh công cụ vào đây)
@@ -695,6 +703,13 @@ export default function BreakdownTab() {
       <Icon name="edit" size={18} />
     </button>
   )
+  const histBtn = (
+    <span className="qs-bd-hchip">
+      <button className={`qs-bd-tb-btn${histDock ? ' on' : ''}`} title="Lịch sử — vừa thêm vào bảng / thao tác" onMouseDown={e => e.preventDefault()} onClick={toggleHist}>
+        <Icon name="history" size={18} />
+      </button>
+    </span>
+  )
   const catHistory = (
     <>
       <span className="qs-bd-hchip">
@@ -706,17 +721,12 @@ export default function BreakdownTab() {
       )}
       </span>
       <span className="qs-bd-headsep" />
-      {/* 2 nút lịch sử mở khung dọc "Lịch sử" bên phải cột sản phẩm (HistoryDock), không bật popup / dải trên bảng */}
-      <span className="qs-bd-hchip">
-      <button className={`qs-bd-tb-btn${histDock === 'recent' ? ' on' : ''}`} title="Vừa thêm vào bảng — xem lại / thêm lại" onMouseDown={e => e.preventDefault()} onClick={() => toggleHist('recent')}>
-        <Icon name="clock" size={18} />
-      </button>
-      <button className={`qs-bd-tb-btn${histDock === 'ops' ? ' on' : ''}`} title="Lịch sử thao tác" onMouseDown={e => e.preventDefault()} onClick={() => toggleHist('ops')}>
-        <Icon name="history" size={18} />
-      </button>
-      </span>
+      {/* 1 nút Lịch sử mở khung dọc "Lịch sử" bên phải cột sản phẩm (HistoryDock: tab Vừa thêm + Thao tác) */}
+      {histBtn}
     </>
   )
+  /* Phần thô: đầu cột thư viện có nút Lịch sử như các đề mục khác (cập nhật giá theo danh mục không áp dụng) */
+  const ptHeadTools = histBtn
   const colsStrip = <ColsStrip columns={columns} cols={colState.cols} editing={colState.edit} onToggle={k => { if (k === 'ten') { toast('Không thể ẩn cột Tên sản phẩm'); return } setColsMap({ ...colState.cols, [k]: !colState.cols[k] }) }} />
 
   return (
@@ -725,7 +735,7 @@ export default function BreakdownTab() {
         {catalogOpen && (
           <>
             <CatalogPanel
-              width={catalogW} headTools={catHistory}
+              width={catalogW} headTools={isPT ? ptHeadTools : catHistory}
               onAdd={(product, opts) => addProduct(product, opts || {})}
               onOpen={(product, opts) => { setDetail(product); setDetailSl((opts && opts.sl) || null) }}
               activeId={detail ? String(detail.recordId || detail.ma) : null}
@@ -752,28 +762,29 @@ export default function BreakdownTab() {
             onDragProduct={onDragProduct} onDragEnd={endDragProduct} />
         )}
         {catalogOpen && histDock && (
-          <HistoryDock width={catalogW} tab={histDock} onTab={setHistDock} onClose={() => setHistDock(null)}
+          <HistoryDock width={catalogW} tab={histDock} onTab={pickHistTab} onClose={() => setHistDock(null)}
             lines={lines} labels={facade.labels} onJump={facade.jumpTo}
             onGo={l => { if (l.nhom && l.nhom !== node) pickNode(l.nhom); flashTo(l.lineId, false) }}
             onPlus={l => { mutate.updateLine(l.lineId, { soLuong: (Number(l.soLuong) || 0) + 1 }); toast('+1 số lượng: ' + l.ten) }} />
         )}
         {/* #pdPanel của Phần thô vẫn hiện khi ẩn cột trái như bản gốc (#bocGrid.nocat.detail, PUB/index.html:5786) */}
         {isPT && <PtDetail />}
+        {isPT && !ptColsFold && <PtPresetDock width={catalogW} onClose={() => foldToggle_('cols')} />}
         {!isPT && !full && presetDock && <PresetDock width={catalogW} cols={colState.cols} onEdit={opts => { setPanel('cols'); startEdit(opts) }} onEndEdit={keep => (keep ? endEdit() : cancelEdit())} onClose={closeColTools} />}
         <div className="qs-bd-right">
           <SheetHeader
-            count={isPT ? ptTot.count : sheetLines.length} treeCount={isPT ? sheetLines.length : undefined} hideCols={isPT} nodeLabel={treeSel}
+            count={isPT ? ptTot.count : sheetLines.length} treeCount={isPT ? sheetLines.length : undefined} nodeLabel={treeSel}
             onOpenTree={e => { const at = e.currentTarget; setPop(p => (p && p.kind === 'tree' ? null : { kind: 'tree', anchor: at })) }}
-            treeOpen={!!pop && pop.kind === 'tree'} sheetChips={isPT ? ptChips : sheetChips}
+            treeOpen={!!pop && pop.kind === 'tree'} sheetChips={isPT ? null : sheetChips}
             subtotal={isPT ? ptTot.grand : subtotal} vat={isPT ? ptTot.vatPct : vatOf_({ vatHm: qs.projData && qs.projData.vatHm, cur }, node)} onVat={act.setVat}
             vatRieng={!isPT && cur && qs.projData && qs.projData.vatHm && qs.projData.vatHm[node] != null}
-            onVatHm={isPT || !cur ? null : v => act.setVatHm(node, v)}
+            onVatHm={!cur ? null : (isPT ? v => ptSetVat(v) : v => act.setVatHm(node, v))}
             view={view} onView={setView}
             catalogOpen={catalogOpen} onToggleCatalog={() => setCatalogOpen(o => !o)}
-            colsShown={visibleCols.length} colsTotal={columns.length}
-            colsOpen={panel === 'cols'} onOpenCols={() => setPanel(p => (p === 'cols' ? null : 'cols'))}
-            presetLabel={presetLabel(colState.cols)} presetOpen={presetDock}
-            onOpenPreset={() => (presetDock ? closeColTools() : (setPresetDock(true), setPanel('cols')))}
+            colsShown={isPT ? PT_COLS.filter(c => ptCols[c[0]]).length : visibleCols.length} colsTotal={isPT ? PT_COLS.length : columns.length}
+            colsOpen={isPT ? !ptColsFold : panel === 'cols'} onOpenCols={isPT ? () => foldToggle_('cols') : () => setPanel(p => (p === 'cols' ? null : 'cols'))}
+            presetLabel={isPT ? 'Cột Phần thô' : presetLabel(colState.cols)} presetOpen={isPT ? !ptColsFold : presetDock}
+            onOpenPreset={isPT ? () => foldToggle_('cols') : () => (presetDock ? closeColTools() : (setPresetDock(true), setPanel('cols')))}
           />
           {/* Module chip cột: ngay dưới hàng đầu bảng (toàn màn hình thì vẽ trong bảng như cũ) */}
           {!isPT && !full && panel === 'cols' && (
@@ -783,9 +794,10 @@ export default function BreakdownTab() {
               <button className="qs-bd-strip-close" title={colState.edit ? 'Đóng (huỷ phần đang sửa)' : 'Đóng'} onClick={closeColTools}><Icon name="x" size={15} /></button>
             </div>
           )}
+          {isPT && !ptColsFold && <PtColsModule />}
           {/* Thanh công cụ của bảng thành module riêng (khung riêng, cách bảng 12px); toàn màn hình thì về lại trong khung bảng */}
-          {!isPT && !full && <div className="qs-card qs-bd-toolmod" ref={setToolSlot} />}
-          {isPT ? <PhanThoPanel tools={extraTools} /> : (
+          {!full && <div className="qs-card qs-bd-toolmod" ref={setToolSlot} />}
+          {isPT ? <PhanThoPanel tools={catalogOpen ? null : recentTool} toolsSlot={toolSlot} /> : (
             <div
               className={`qs-card qs-bd-sheet${dragProduct ? ' drop-active' : ''}${full ? ' full' : ''}`}
               style={{ ...(grpH ? { '--qs-grp-h': grpH + 'px' } : null), ...(headH ? { '--qs-head-h': headH + 'px' } : null) }}

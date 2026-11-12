@@ -18,9 +18,10 @@ import WorkspaceTab from './components/WorkspaceTab'
 import RewardsTab from './components/RewardsTab'
 import SecurityTab from './components/SecurityTab'
 import PermissionsTab from './components/PermissionsTab'
+import DisplayTab from './components/DisplayTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import { QsDataProvider } from '../QS/state/QsData'
-import QsSettingsPanels, { QS_SETTINGS, useQsSettingsTabs } from '../QS/QsSettingsPanels'
+import QsSettingsPanels, { useQsSettingsTabs } from '../QS/QsSettingsPanels'
 
 const tabIcon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
@@ -39,6 +40,7 @@ const TABS = [
   { key: 'rewards', label: 'Đổi thưởng', Panel: RewardsTab, icon: <svg {...tabIcon}><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg> },
   { key: 'security', label: 'Bảo mật', Panel: SecurityTab, icon: <svg {...tabIcon}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /></svg> },
   { key: 'permissions', label: 'Phân quyền', Panel: PermissionsTab, icon: <svg {...tabIcon}><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> },
+  { key: 'display', label: 'Hiển thị', Panel: DisplayTab, icon: <svg {...tabIcon}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M13 8h5M13 12h5M13 16h3" /></svg> },
 ]
 
 /* Mục của QS Pro (Công ty / Admin, chuyển từ thanh tab của /qs): chỉ hiện với tài khoản QS có quyền */
@@ -61,7 +63,6 @@ function CaiDatRoot() {
   const [activeTab, setTab] = useState(() => params.get('tab') || 'account')
   const setActiveTab = key => { setTab(key); if (params.get('tab')) setParams({}, { replace: true }) }
   const qsTabs = useQsSettingsTabs()
-  const isQs = QS_SETTINGS.some(t => t.key === activeTab)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
@@ -88,9 +89,10 @@ function CaiDatRoot() {
         </button>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', display: 'flex', gap: 24 }}>
-        {/* Menu cài đặt bên trái */}
-        <div style={{ width: 190, flex: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Menu trái cố định (không cuộn theo nội dung), rộng bằng cột trái của QS trên màn hình:
+          CATALOG_DEFAULT 440 (BreakdownTab) x zoom .75 của .qs-page (QS.css) = 330px; khung nội dung bên phải tự cuộn, rộng hết phần còn lại */}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', gap: 12 }}>
+        <div className="cd-settings-nav" style={{ width: 330, flex: 'none', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 10 }}>
           {TABS.map(t => (
             <button key={t.key} className={`cd-settings-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
               {t.icon}
@@ -109,8 +111,8 @@ function CaiDatRoot() {
         </div>
 
         {/* Các panel — luôn mount (ẩn bằng display) để giữ giá trị đã nhập khi đổi tab, giống HTML.
-            Mục QS (Công ty / Admin) rộng như trong /qs nên bỏ giới hạn 900px */}
-        <div style={{ flex: 1, minWidth: 0, maxWidth: isQs ? 'none' : 900 }}>
+            Rộng hết khung bên phải (kể cả mục QS Công ty / Admin) */}
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
           <SettingsContext.Provider value={settings}>
             {TABS.map(({ key, Panel }) => (
               <div key={key} className="cd-settings-panel" style={{ ...panelStyle, display: activeTab === key ? 'flex' : 'none' }}>

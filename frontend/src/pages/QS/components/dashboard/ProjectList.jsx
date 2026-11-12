@@ -8,6 +8,7 @@ import { usePhuTrach, setPhuTrach, ptRoles_ } from './ptStore'
 import { statCache, loadStats_ } from '../project/projectStats'
 import ProjectCard from './ProjectCard'
 import { ProjectRow, ProjectTile, BarHeader, BAR_COLS, BAR_DENSITY } from './ProjectViews'
+import { useFitLevel } from '../common/useFitLevel'
 
 /* Chế độ xem danh sách: Thẻ (mặc định, như bản gốc) / Dạng thanh / Biểu tượng; nhớ lựa chọn ở localStorage qs_dash_view */
 const VIEWS = [
@@ -36,7 +37,7 @@ const saveLs_ = (k, v) => { try { localStorage.setItem(k, v) } catch (e) { /* b�
 /* Lọc nguồn dự án (qs_dash_src): '' tất cả · 'kd' từ Kinh doanh (có khách hàng ở trang Kinh doanh gắn mã dự án, sales_leads.project_code)
    · 'qs' phòng QS tự tạo (không khách hàng nào gắn) */
 const SRC_LS = 'qs_dash_src'
-const SRCS = [['', 'Tất cả'], ['kd', 'Từ kinh doanh'], ['qs', 'Từ phòng QS']]
+const SRCS = [['', 'Tất cả', 'Tất cả'], ['kd', 'Từ kinh doanh', 'KD'], ['qs', 'Từ phòng QS', 'QS']]
 function readSrc_() {
   try { const v = localStorage.getItem(SRC_LS); return SRCS.some(x => x[0] === v) ? v : '' } catch (e) { return '' }
 }
@@ -44,7 +45,7 @@ function readSrc_() {
 const TIME_LS = 'qs_dash_time'
 const TIMES = [['', 'Mọi thời gian'], ['7d', '7 ngày qua'], ['30d', '30 ngày qua'], ['week', 'Tuần này'], ['month', 'Tháng này'], ['quarter', 'Quý này'], ['year', 'Năm nay'], ['custom', 'Tuỳ chọn…']]
 /* Nút lọc nhanh cạnh ô chọn: bấm = lọc, bấm lại nút đang bật = bỏ lọc */
-const QUICK_T = [['week', 'Tuần'], ['month', 'Tháng'], ['quarter', 'Quý'], ['year', 'Năm']]
+const QUICK_T = [['week', 'Tuần', 'T'], ['month', 'Tháng', 'Th'], ['quarter', 'Quý', 'Q'], ['year', 'Năm', 'N']]
 function readTime_() {
   try { const v = JSON.parse(localStorage.getItem(TIME_LS) || '{}') || {}; return TIMES.some(x => x[0] === v.k) ? { k: v.k, from: v.from || '', to: v.to || '' } : { k: '', from: '', to: '' } } catch (e) { return { k: '', from: '', to: '' } }
 }
@@ -97,6 +98,11 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const setTime = t => { setTimeSt(t); saveLs_(TIME_LS, JSON.stringify(t)) }
   const [timeOpen, setTimeOpen] = useState(false)
   const timeRef = useRef(null)
+  /* Thanh nằm 1 hàng: hẹp (mở Dezbot, màn nhỏ) thì gọn dần theo chỗ trống thật (data-fit 1..5, dashboard.css):
+     1 nút Tạo dự án chỉ còn biểu tượng · 2 nguồn rút gọn (KD / QS), bỏ số đếm · 3 ô tìm hẹp lại · 4 nút chọn kỳ chỉ còn biểu tượng ·
+     5 Tuần / Tháng / Quý / Năm và Gọn / Vừa / Rộng rút còn chữ đầu (tên đủ ở chú thích khi rê chuột) */
+  const headRef = useRef(null)
+  useFitLevel(headRef, 5, '.qs-dash-views, .qs-dash-tmod')
   useEffect(() => {
     if (!timeOpen) return undefined
     const down = e => { if (timeRef.current && !timeRef.current.contains(e.target)) setTimeOpen(false) }
@@ -156,16 +162,15 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
 
   return (
     <div className="qs-dash-list">
-      <div className="qs-dash-list-head">
-        <Icon name="home" size={18} className="qs-dash-accent" />
-        <h3 className="qs-dash-title">Danh sách dự án</h3>
-        <span className="qs-dash-count">{groups.length}</span>
+      <div className="qs-dash-list-head" ref={headRef}>
+        {/* không tiêu đề "Danh sách dự án" (MarkUp 2026-11-12 15:12): số dự án đã có ở nút nguồn "Tất cả";
+            ô tìm đứng ngay sau bộ lọc thời gian, giãn hết chỗ trống để cả thanh nằm 1 hàng */}
         {kdMa && (
           <div className="qs-dash-views qs-dash-src" role="radiogroup" aria-label="Nguồn dự án">
-            {SRCS.map(([k, lb]) => (
+            {SRCS.map(([k, lb, sh]) => (
               <button key={k || 'all'} type="button" role="radio" aria-checked={src === k}
                 title={k === 'kd' ? 'Dự án có khách hàng ở trang Kinh doanh gắn vào' : k === 'qs' ? 'Dự án phòng QS tự tạo, chưa gắn khách hàng Kinh doanh' : 'Mọi dự án'}
-                className={`qs-dash-view${src === k ? ' on' : ''}`} onClick={() => setSrc(k)}>{lb}<small>{srcCnt[k]}</small></button>
+                className={`qs-dash-view${src === k ? ' on' : ''}`} onClick={() => setSrc(k)}><span className="lf">{lb}</span><span className="ls">{sh}</span><small>{srcCnt[k]}</small></button>
             ))}
           </div>
         )}
@@ -173,8 +178,8 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
         <div className="qs-dash-tmod">
         <div className="qs-dash-time" ref={timeRef}>
           <button type="button" className={'qs-dash-time-btn' + (time.k ? ' on' : '')} aria-haspopup="listbox" aria-expanded={timeOpen}
-            title="Lọc theo ngày tạo (bản nháp mới nhất)" onClick={() => setTimeOpen(o => !o)}>
-            <Icon name="calendar" size={14} /><span>{timeLb}</span><Icon name="chevronDown" size={13} />
+            title={"Lọc theo ngày tạo (bản nháp mới nhất): " + timeLb} onClick={() => setTimeOpen(o => !o)}>
+            <Icon name="calendar" size={14} /><span className="lf">{timeLb}</span><Icon name="chevronDown" size={13} />
           </button>
           {time.k && <button type="button" className="qs-dash-time-x" title="Bỏ lọc thời gian" onClick={() => setTime({ k: '', from: '', to: '' })}><Icon name="x" size={12} /></button>}
           {timeOpen && (
@@ -195,18 +200,21 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
           )}
         </div>
         <div className="qs-dash-views qs-dash-dens qs-dash-tquick" role="radiogroup" aria-label="Lọc nhanh theo thời gian">
-          {QUICK_T.map(([k, lb]) => (
+          {QUICK_T.map(([k, lb, sh]) => (
             <button key={k} type="button" role="radio" aria-checked={time.k === k} title={'Dự án tạo trong ' + lb.toLowerCase() + ' này' + (time.k === k ? ' - bấm lại để bỏ lọc' : '')}
-              className={`qs-dash-view${time.k === k ? ' on' : ''}`} onClick={() => setTime({ ...time, k: time.k === k ? '' : k })}>{lb}</button>
+              className={`qs-dash-view${time.k === k ? ' on' : ''}`} onClick={() => setTime({ ...time, k: time.k === k ? '' : k })}><span className="lf">{lb}</span><span className="ls">{sh}</span></button>
           ))}
         </div>
         </div>
-        <span style={{ flex: 1 }} />
+        <div className="qs-dash-search">
+          <Icon name="search" size={14} />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Tìm dự án, khách hàng…" />
+        </div>
         {view === 'bar' && (
           <div className="qs-dash-views qs-dash-dens" role="radiogroup" aria-label="Chiều cao dòng" title="Chiều cao dòng">
             {BAR_DENSITY.map(([k, lb]) => (
               <button key={k} type="button" role="radio" aria-checked={density === k}
-                className={`qs-dash-view${density === k ? ' on' : ''}`} onClick={() => setDensity(k)}>{lb}</button>
+                className={`qs-dash-view${density === k ? ' on' : ''}`} title={lb} onClick={() => setDensity(k)}><span className="lf">{lb}</span><span className="ls">{lb.charAt(0)}</span></button>
             ))}
           </div>
         )}
@@ -218,11 +226,7 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
             </button>
           ))}
         </div>
-        <div className="qs-dash-search">
-          <Icon name="search" size={14} />
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Tìm dự án, khách hàng…" />
-        </div>
-        <button type="button" className="qs-dash-create" onClick={() => (onCreate ? onCreate() : openProjDlg('create'))}><Icon name="plus" size={14} />Tạo dự án</button>
+        <button type="button" className="qs-dash-create" title="Tạo dự án" aria-label="Tạo dự án" onClick={() => (onCreate ? onCreate() : openProjDlg('create'))}><Icon name="plus" size={14} /><span className="lf">Tạo dự án</span></button>
       </div>
       <div className="qs-dash-list-body">
         {shown.length

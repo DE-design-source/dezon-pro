@@ -24,8 +24,9 @@ const (
 // + tkQuick: bộ cột gán vào nút nhanh trên thanh công cụ Bóc tách ("p:<id bộ có sẵn>" / "u:<tên bộ tự đặt>")
 // + tkOrder: thứ tự các bộ trong khung "Chọn nhanh cột" (mảng id như tkQuick)
 // + tkLastCols: cột đang hiện của bảng Bóc tách, tự lưu mỗi lần đổi (kiểm như *Cols)
-// + bgBiaMau: mẫu tờ bìa báo giá tự lưu [{id, ten, mau, cfg}] (tối đa 10).
-var prefKeys = []string{"tkCols", "cpCols", "daCols", "spCols", "tkPresets", "tkQuick", "tkOrder", "tkLastCols", "bgBiaMau"}
+// + bgBiaMau: mẫu tờ bìa báo giá tự lưu [{id, ten, mau, cfg}] (tối đa 10)
+// + ptCols / ptPresets / ptOrder: bộ "Của tôi", bộ tự đặt tên, thứ tự bộ của bảng Phần thô (kiểm như tkCols / tkPresets / tkOrder).
+var prefKeys = []string{"tkCols", "cpCols", "daCols", "spCols", "tkPresets", "tkQuick", "tkOrder", "tkLastCols", "bgBiaMau", "ptCols", "ptPresets", "ptOrder"}
 
 // Thông báo lỗi - nguyên văn của server/auth.js.
 const (

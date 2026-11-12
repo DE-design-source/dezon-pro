@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './QS.css'
 import { useTheme } from '../../hooks/useTheme'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 import Icon from '../../components/ui/Icon'
 import OverviewTab from './components/OverviewTab'
 import ProjectsTab from './components/ProjectsTab'
@@ -97,6 +98,9 @@ function QsRoot() {
   const ready = auth === 'ready'
   const me = session.me
   const can = t => !!me && session.canTab(t)
+  // tab ẩn ở Cài đặt > Hiển thị (chỉ ẩn khỏi thanh tab); tab đang mở bị ẩn thì sang tab được phép + hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/qs')
+  useTabFallback(tabHidden, tab, me ? TABS.filter(t => can(t.key)).map(t => t.key) : [], showTab)
 
   useEffect(() => { if (SETTINGS_TABS[tab]) showTab(session.firstAllowedTab() || 'dash') }, [tab, me])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -152,7 +156,7 @@ function QsRoot() {
         </div>
         <span className="qs-hdr-title">QS</span>
         <div className="qs-tabs-row">
-          {me && TABS.filter(t => can(t.key)).map(t => (
+          {me && TABS.filter(t => can(t.key) && tabHidden.indexOf(t.key) < 0).map(t => (
             <button key={t.key} className={`qs-tab${tab === t.key ? ' active' : ''}`} title={t.label} onClick={() => showTab(t.key)}>
               <Icon name={t.icon} size={18} className="qs-tab-ic" /><span className="qs-tab-t">{t.label}</span>
             </button>

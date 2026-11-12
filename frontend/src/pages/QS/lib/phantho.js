@@ -580,7 +580,9 @@ export const DT_BO=[{
       'Giá cọc theo báo giá nhà cung cấp thực tế']
   ]
 }];
-export const PT_CONTRACTORS=['H77','Decox','TTP','Unicons'];
+/* Dezon = nhà thầu mặc định (đơn giá của công ty): công tác không ghi nhà thầu tính là của Dezon */
+export const PT_NCC_MAC_DINH='Dezon';
+export const PT_CONTRACTORS=['Dezon','H77','Decox','TTP','Unicons'];
 
 /* ===== Thứ tự + nhà thầu của công tác CSDL (roadmap M5.2, M5.3 - không có trong bản gốc) ===== */
 /* Sắp công tác như máy chủ (ctList: loai, thu_tu, ngay_tao) nhưng làm lại ở máy: sửa Thứ tự xong (cache chỉ thay 1 dòng)
@@ -624,6 +626,8 @@ export function ptSecItemsNcc_(sec,ncc){
   var k=ptNccKey_(ncc);
   return (sec.items||[]).map(function(a,ii){ return {a:a,ii:ii}; }).filter(function(x){
     if(!k) return true;
-    var c=ctOf_(x.a); return !!c && ptNccKey_(c.ncc)===k;
+    var c=ctOf_(x.a);
+    if(k===ptNccKey_(PT_NCC_MAC_DINH)) return !c || !ptNccKey_(c.ncc) || ptNccKey_(c.ncc)===k;   // Dezon: cả dòng không ghi nhà thầu
+    return !!c && ptNccKey_(c.ncc)===k;
   });
 }

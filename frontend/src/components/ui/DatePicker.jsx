@@ -23,11 +23,16 @@ export default function DatePicker({ value, onChange, min, max, clearable, ariaL
   const v = parse(value)
 
   function place() {
-    const b = btnRef.current && btnRef.current.getBoundingClientRect()
+    const el = btnRef.current
+    const b = el && el.getBoundingClientRect()
     if (!b) return
-    const left = Math.max(8, Math.min(b.left, window.innerWidth - POP_W - 8))
-    const top = b.bottom + 6 + POP_H > window.innerHeight && b.top - 6 - POP_H > 0 ? b.top - 6 - POP_H : b.bottom + 6
-    setPos({ left, top })
+    /* Ô nằm trong vùng bị zoom (Kích thước chuẩn trên <html>, vùng QS...): toạ độ đo được là px màn hình,
+       còn left / top của lịch tính theo px của vùng -> đổi bằng tỉ lệ z = bề rộng thấy / bề rộng CSS */
+    const z = (el.offsetWidth && b.width / el.offsetWidth) || 1
+    const W = POP_W * z, H = POP_H * z
+    const left = Math.max(8, Math.min(b.left, window.innerWidth - W - 8))
+    const top = b.bottom + 6 + H > window.innerHeight && b.top - 6 - H > 0 ? b.top - 6 - H : b.bottom + 6
+    setPos({ left: left / z, top: top / z })
   }
   function show() {
     const base = v || parse(today())

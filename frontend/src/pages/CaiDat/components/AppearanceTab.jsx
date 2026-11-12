@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useThemeContext, FONT_SCALE_MIN, FONT_SCALE_MAX } from '../../../context/ThemeContext'
+import { useThemeContext, FONT_SCALE_MIN, FONT_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_MAX, uiScaleOf } from '../../../context/ThemeContext'
 import { ACCENTS, EXTRA_ACCENTS, FONTS, FONT_SIZES, GLASS_LEVELS, WALLPAPERS } from '../../../data/caiDatData'
 import { FONT_CATALOG, findFont, isFontAvailable } from '../../../data/fontCatalog'
 import FontPicker from './FontPicker'
@@ -33,6 +33,14 @@ function Check({ show }) {
     </span>
   )
 }
+
+/* Mức có sẵn của "Kích thước chuẩn" (customize.uiScale, phần trăm; 100 = không lưu) */
+const UI_SCALES = [
+  { pct: 80, label: 'Rất gọn', note: 'Xem được nhiều nhất', box: 30 },
+  { pct: 90, label: 'Gọn', note: 'Như QS trước đây', box: 36 },
+  { pct: 100, label: 'Chuẩn', note: 'Mặc định', box: 42 },
+  { pct: 110, label: 'Lớn', note: 'Dễ đọc', box: 48 },
+]
 
 const clampScale = v => Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Math.round(Number(v) || 100)))
 
@@ -103,6 +111,8 @@ export default function AppearanceTab() {
   const wallpaperStrength = customize.wallpaperStrength || 60
   const presetSize = FONT_SIZES.find(s => s.key === fontSize)
   const fontPct = fontSize === 'custom' ? clampScale(customize.fontScale) : (presetSize ? presetSize.percent : 100)
+  const uiScale = uiScaleOf(customize)
+  const setUiScale = v => { const p = uiScaleOf({ uiScale: v }); updateCustomize({ uiScale: p === 100 ? undefined : p }) }
 
   function pickFont(f) {
     updateCustomize({ fontFamily: f.value, fontRecent: [f.name, ...fontRecent.filter(n => n !== f.name)].slice(0, 5) })
@@ -269,6 +279,29 @@ export default function AppearanceTab() {
         <div className="cd-settings-row" style={{ marginTop: 6, paddingBottom: 0 }}>
           <RowText title="Số liệu dùng font đơn cách" desc="Tắt: số tiền, mã, ngày dùng chung font của app. Bật: dùng font kiểu máy đánh chữ như trước đây" />
           <ToggleSwitch on={monoNumbers} onClick={() => updateCustomize({ monoNumbers: !monoNumbers })} />
+        </div>
+      </Section>
+
+      <Section title="Kích thước chuẩn" desc="Một tiêu chuẩn kích thước cho tất cả các tab (QS, Mua hàng, Kinh doanh, HR…): khung, nút, chữ, khoảng cách cùng phóng / thu theo một tỉ lệ để các trang hiện giống nhau.">
+        <div style={grid(4)}>
+          {UI_SCALES.map(s => (
+            <div key={s.pct} className={`cd-fontsize-card${uiScale === s.pct ? ' active' : ''}`}
+              style={{ ...pickCard, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 92 }}
+              onClick={() => updateCustomize({ uiScale: s.pct === 100 ? undefined : s.pct })}>
+              <div style={{ margin: '0 auto 8px', width: s.box, height: s.box * 0.62, borderRadius: 4, border: '2px solid currentColor', opacity: .55 }} />
+              <div style={cardLabel}>{s.label} · {s.pct}%</div>
+              <div style={cardSub}>{s.note}</div>
+            </div>
+          ))}
+        </div>
+        <div className="cd-settings-row" style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingBottom: 0 }}>
+          <RowText title="Tự chỉnh kích thước" desc={`Kéo để chọn mức bất kỳ từ ${UI_SCALE_MIN}% đến ${UI_SCALE_MAX}% — áp ngay cho mọi tab, lưu trên máy này`} />
+          <div className="cd-range">
+            <button type="button" className="cd-step-btn" title="Nhỏ hơn" disabled={uiScale <= UI_SCALE_MIN} onClick={() => setUiScale(uiScale - 5)}>−</button>
+            <input type="range" min={UI_SCALE_MIN} max={UI_SCALE_MAX} step="1" value={uiScale} title="Kích thước chuẩn" onChange={e => setUiScale(e.target.value)} />
+            <button type="button" className="cd-step-btn" title="Lớn hơn" disabled={uiScale >= UI_SCALE_MAX} onClick={() => setUiScale(uiScale + 5)}>+</button>
+            <span className="cd-range-value">{uiScale}%</span>
+          </div>
         </div>
       </Section>
 

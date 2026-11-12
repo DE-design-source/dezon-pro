@@ -125,19 +125,20 @@ html[data-theme="dark"][data-accent="custom"] body [class*="-page"] {
   --primary-tint: color-mix(in srgb, var(--custom-accent, #2F5DA8) 26%, #12151C);
 }
 
-/* ===== Density & Font Size =====
-   Mật độ: thu nhỏ cả giao diện bằng zoom.
+/* ===== Kích thước chuẩn, Density & Font Size =====
+   Kích thước chuẩn (Cài đặt ▸ Giao diện) x Mật độ (Gọn = 0,88): thu / phóng cả giao diện bằng zoom trên <html>;
+   ThemeContext (và script trong index.html) tính sẵn tích này vào --z-app. Các vùng tự zoom riêng (trang QS, bảng điều khiển
+   Mua hàng) nhân thêm hệ số gốc của mình, nên mọi trang cùng theo một tiêu chuẩn.
    Cỡ chữ: chỉ phóng chữ — mọi font-size trong app được nhân với --fs lúc build (xem vite.config.js). */
-html { --z-density: 1; --fs-user: 1; --fs: var(--fs-user); zoom: var(--z-density); }
-html[data-density="compact"]  { --z-density: 0.88; }
+html { --z-app: 1; --fs-user: 1; --fs: var(--fs-user); zoom: var(--z-app); }
 html[data-fontsize="small"]   { --fs-user: 0.92; }
 html[data-fontsize="large"]   { --fs-user: 1.12; }
 html[data-fontsize="xlarge"]  { --fs-user: 1.24; }
 /* --fs-user là mức người dùng chọn (data-fontsize="custom": ThemeContext gán trực tiếp lên <html>);
    --fs là hệ số thực dùng, một vùng có thể nhân thêm hệ số riêng (vd. trang QS bù lại mức thu nhỏ của nó) */
-html[data-density="compact"] .app-shell {
-  width: calc(100vw / var(--z-density)) !important;
-  height: calc(100vh / var(--z-density)) !important;
+html[data-zoomed="on"] .app-shell {
+  width: calc(100vw / var(--z-app)) !important;
+  height: calc(100vh / var(--z-app)) !important;
 }
 
 /* ===== Font đồng nhất =====

@@ -449,8 +449,8 @@
 .qs-pg-ddf button.ok{margin-left:auto; border-color:var(--dash-accent); background:var(--dash-accent); color:#fff;}
 .qs-pg-ddm .qs-pg-ddf button{width:auto; justify-content:center; text-align:center;}
 /* Khung chọn nhiều to hơn: rộng 480px, danh sách cao ~70% màn hình (vùng QS bị zoom nên chia --qs-zoom), nút chân không xuống dòng */
-.qs-pg-ddm.multi{width:480px; max-width:calc(92vw / var(--qs-zoom, .75));}
-.qs-pg-ddl{max-height:calc(70vh / var(--qs-zoom, .75));}
+.qs-pg-ddm.multi{width:480px; max-width:calc(92vw / var(--qs-vz, .75));}
+.qs-pg-ddl{max-height:calc(70vh / var(--qs-vz, .75));}
 .qs-pg-ddi{padding:10px 12px; font-size:14px;}
 .qs-pg-ddm .qs-pg-ddf button{white-space:nowrap; height:34px; padding:0 14px; font-size:13px;}
 /* Lưới chia theo số cột chọn bằng thanh trượt (--cols); chữ / khoảng cách nhỏ dần khi nhiều cột */

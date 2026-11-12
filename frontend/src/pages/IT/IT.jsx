@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './IT.css'
+import { loadReports, subscribeReports, updateReport } from '../../services/itTicketService'
 import { useTheme } from '../../hooks/useTheme'
-import { TICKETS, ASSETS, ASSET_STATUS, isOpenTicket, TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, buildTicketTasks, statusFromTasks } from '../../data/itData'
+import { TICKETS, ASSETS, ASSET_STATUS, TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, buildTicketTasks, statusFromTasks } from '../../data/itData'
 import { INITIAL_HR_EMPLOYEES, deptOf } from '../../data/hrData'
 import FlowBoard from '../../components/kanban/FlowBoard'
 
@@ -12,8 +13,11 @@ const GROUP = Object.fromEntries(TICKET_GROUPS.map(([k, l, c]) => [k, { label: l
 const CATEGORY = Object.fromEntries(TICKET_CATEGORIES)
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { IT_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 import TicketList from './components/TicketList'
 import ReleaseNotes from './components/ReleaseNotes'
+import DashSide from './components/DashSide'
 import CreateTicketModal from './components/CreateTicketModal'
 
 function StatusBadge({ status }) {
@@ -21,19 +25,9 @@ function StatusBadge({ status }) {
   return <span className="it-badge" style={{ background: bg, color }}>{label}</span>
 }
 
-function Kpi({ label, value, valueColor, children }) {
+function Section({ id, icon, title, meta, headers, children }) {
   return (
-    <div className="it-card it-kpi-card">
-      <div className="it-kpi-label">{label}</div>
-      <div className="it-kpi-num" style={valueColor ? { color: valueColor } : undefined}>{value}</div>
-      {children}
-    </div>
-  )
-}
-
-function Section({ icon, title, meta, headers, children }) {
-  return (
-    <div className="it-card it-section-card">
+    <div id={id} className="it-card it-section-card">
       <div className="it-section-head">
         <div className="it-section-icon">{icon}</div>
         <h3>{title}</h3>
@@ -58,7 +52,21 @@ export default function IT() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
-  const [tickets, setTickets] = useState(TICKETS)
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/it')
+  useTabFallback(tabHidden, pageTab, IT_TABS.map(t => t.key), setPageTab)
+  /* Phiếu "Báo lỗi" gửi từ Dezbot (localStorage) đứng đầu danh sách; phiếu mới tới khi trang đang mở cũng tự thêm vào */
+  const [tickets, setTickets] = useState(() => [...loadReports(), ...TICKETS])
+  useEffect(() => subscribeReports(() => {
+    const reps = loadReports()
+    setTickets(prev => {
+      const ids = new Set(prev.map(t => t.id))
+      const add = reps.filter(r => !ids.has(r.id))
+      if (!add.length) return prev
+      setNewId(add[0].id)
+      return [...add, ...prev]
+    })
+  }), [])
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState(null)
   const [newId, setNewId] = useState(null)
@@ -76,6 +84,21 @@ export default function IT() {
     setTasksBy(m => ({ ...m, [t.id]: next }))
     const status = statusFromTasks(next, stagesOf(t), t.status)
     if (status !== t.status) setTickets(prev => prev.map(x => (x.id === t.id ? { ...x, status } : x)))
+    // phiếu từ "Báo lỗi": báo tiến độ (% công việc xong) + trạng thái về cho người báo
+    if (t.reported) {
+      const k = Object.fromEntries(stagesOf(t).map(s => [s.key, s]))
+      const live = next.filter(x => !k[x.stage]?.closed)
+      const progress = live.length ? Math.round(live.filter(x => k[x.stage]?.done).length / live.length * 100) : 0
+      updateReport(t.id, { status, progress, received: true })
+    }
+  }
+  /* Mở trang yêu cầu = IT đã tiếp nhận (phiếu Báo lỗi) */
+  function openTicket(t) {
+    setBoardId(t.id)
+    if (t.reported && !t.received) {
+      updateReport(t.id, { received: true })
+      setTickets(prev => prev.map(x => (x.id === t.id ? { ...x, received: true } : x)))
+    }
   }
 
   function createTicket(data) {
@@ -90,7 +113,11 @@ export default function IT() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  const openTickets = tickets.filter(isOpenTicket).length
+  /* Thao tác nhanh: cuộn tới khối Thiết bị / Ghi chú cập nhật, hoặc sang tab Cơ cấu phòng ban */
+  function gotoSection(key) {
+    if (key === 'nhansu' || key === 'assets') { setPageTab(key === 'assets' ? 'thietbi' : 'nhansu'); setBoardId(null); return }
+    document.getElementById('it-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div
@@ -103,8 +130,9 @@ export default function IT() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>IT</span>
         <div className="hdr-tabs" role="tablist">
-          <button className={`hdr-tab${pageTab === 'main' ? ' active' : ''}`} onClick={() => { setPageTab('main'); setBoardId(null) }}>Tổng quan</button>
-          <button className={`hdr-tab${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => { setPageTab('nhansu'); setBoardId(null) }}>Cơ cấu phòng ban</button>
+          {IT_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            <button key={t.key} className={`hdr-tab${pageTab === t.key ? ' active' : ''}`} onClick={() => { setPageTab(t.key); setBoardId(null) }}>{t.label}</button>
+          ))}
         </div>
         <button className="it-create-btn" onClick={() => setCreateOpen(true)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -117,26 +145,20 @@ export default function IT() {
         </button>
       </div>
 
-      <div className="it-scroll" style={pageTab === 'nhansu' || boardTicket ? { display: 'none' } : undefined}>
-        <div className="it-content">
-          <div className="it-kpi-grid">
-            <Kpi label="Ticket đang mở" value={openTickets}>
-              <div className="it-badge" style={{ background: 'var(--warn-tint)', color: 'var(--warn)' }}>Cần theo dõi</div>
-            </Kpi>
-            <Kpi label="Thiết bị đang quản lý" value="186">
-              <div className="it-kpi-sub">Laptop, máy chủ, camera, mạng</div>
-            </Kpi>
-            <Kpi label="Uptime hệ thống tháng này" value="99.8%" valueColor="var(--success)">
-              <div className="it-kpi-sub">Máy chủ &amp; hạ tầng mạng</div>
-            </Kpi>
-            <Kpi label="Yêu cầu hoàn thành tuần này" value="27">
-              <div className="it-badge" style={{ background: 'var(--success-tint)', color: 'var(--success)' }}>+5 so với tuần trước</div>
-            </Kpi>
+      <div className="it-scroll it-scroll-dash" style={pageTab !== 'main' || boardTicket ? { display: 'none' } : undefined}>
+        {/* Bảng điều khiển: cột trái thẻ tóm tắt + thao tác nhanh, cột phải danh sách yêu cầu (cùng bố cục Bảng điều khiển QS) */}
+        <div className="it-dash">
+          <DashSide tickets={tickets} onCreate={() => setCreateOpen(true)} onGoto={gotoSection} />
+          <div className="it-content it-dash-main">
+          <TicketList tickets={tickets} highlightId={newId} onOpen={openTicket} onCreate={() => setCreateOpen(true)} />
+          <div id="it-releases" className="it-content"><ReleaseNotes /></div>
           </div>
+        </div>
+      </div>
 
-          <TicketList tickets={tickets} highlightId={newId} onOpen={t => setBoardId(t.id)} />
-          <ReleaseNotes />
-
+      {/* Thiết bị & tài sản CNTT: module riêng (tab trên thanh tiêu đề), không hiện ở Bảng điều khiển */}
+      {pageTab === 'thietbi' && !boardTicket && (
+        <div className="it-scroll">
           <Section
             title="Thiết bị & tài sản CNTT"
             meta="Đang theo dõi 186 thiết bị"
@@ -153,7 +175,7 @@ export default function IT() {
             ))}
           </Section>
         </div>
-      </div>
+      )}
 
       {pageTab === 'nhansu' && (
         <div className="it-scroll">

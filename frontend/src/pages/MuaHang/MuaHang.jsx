@@ -2,17 +2,22 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import './MuaHang.css'
 import { useTheme } from '../../hooks/useTheme'
-import { PURCHASE_ORDERS, PO_STATUS, PO_FILTERS, KPIS } from '../../data/muaHangData'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import WorkGate from '../../components/ui/WorkGate'
+import { MH_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import PurchaseDashboard from './components/PurchaseDashboard'
 
 export default function MuaHang() {
   const { theme, toggleTheme } = useTheme()
-  const [filter, setFilter] = useState('all')
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/mua-hang')
+  useTabFallback(tabHidden, pageTab, MH_TABS.map(t => t.key), setPageTab)
 
   return (
     <div
@@ -25,8 +30,9 @@ export default function MuaHang() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>Mua hàng</span>
         <div className="hdr-tabs" role="tablist">
-          <button className={`hdr-tab${pageTab === 'main' ? ' active' : ''}`} onClick={() => setPageTab('main')}>Tổng quan</button>
-          <button className={`hdr-tab${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => setPageTab('nhansu')}>Cơ cấu phòng ban</button>
+          {MH_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            <button key={t.key} className={`hdr-tab${pageTab === t.key ? ' active' : ''}`} onClick={() => setPageTab(t.key)}>{t.label}</button>
+          ))}
         </div>
         <Link to="/qs" className="mh-qs-link">Xem bóc tách tại QS ›</Link>
         <button className="mh-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
@@ -36,63 +42,11 @@ export default function MuaHang() {
         </button>
       </div>
 
-      <div className="mh-scroll" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
-        <div className="mh-kpi-grid">
-          {KPIS.map(k => (
-            <div key={k.label} className="mh-card mh-kpi">
-              <div className="mh-kpi-label">{k.label}</div>
-              <div className={`mh-kpi-value${k.mono ? ' mono' : ''}`} style={k.color ? { color: k.color } : undefined}>{k.value}</div>
-              <div className="mh-kpi-sub">{k.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mh-card" style={{ padding: '6px 20px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 4px', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {PO_FILTERS.map(f => (
-                <button key={f} className={`mh-po-filter${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
-                  {f === 'all' ? 'Tất cả' : f}
-                </button>
-              ))}
-            </div>
-            <div className="mh-create-btn">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              Tạo đơn mua hàng
-            </div>
-          </div>
-          <div className="mh-po-grid mh-po-head">
-            <span>Mã PO</span><span>Nhà cung cấp</span><span>Số mặt hàng</span><span>Tổng giá trị</span><span>Ngày giao dự kiến</span><span>Trạng thái</span>
-          </div>
-          {PURCHASE_ORDERS.map((po, i) => {
-            if (filter !== 'all' && po.status !== filter) return null
-            const st = PO_STATUS[po.status]
-            // Viền dưới gắn với từng dòng theo thứ tự gốc (dòng cuối không viền), giống bản HTML khi lọc
-            const isLast = i === PURCHASE_ORDERS.length - 1
-            return (
-              <div key={po.code} className="mh-po-grid mh-po-row" style={isLast ? undefined : { borderBottom: '1px solid var(--border)' }}>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{po.code}</span>
-                <span style={{ fontSize: 12.5 }}>{po.supplier}</span>
-                <span className="mono" style={{ fontSize: 12 }}>{po.items}</span>
-                <span className="mono" style={{ fontSize: 12.5 }}>{po.total}</span>
-                <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{po.date}</span>
-                <span className="mh-pill" style={{ background: st.bg, color: st.color }}>{po.status}</span>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="mh-card" style={{ padding: '18px 20px' }}>
-          <h3 style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 14 }}>Nhà cung cấp</h3>
-          <div className="mh-supplier-grid">
-            {PURCHASE_ORDERS.map(po => (
-              <div key={po.supplier} className="mh-supplier">
-                <div style={{ fontWeight: 600, fontSize: 12.5 }}>{po.supplier}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>1 đơn · {po.status}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Tổng quan: gom thông tin mua hàng của QS, Quản lý thiết kế, Quản lý dự án (cần đăng nhập; quyền từng nguồn xét trong api.js) */}
+      <div className="mh-scroll mh-scroll-dash" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
+        <WorkGate title="Mua hàng">
+          <PurchaseDashboard />
+        </WorkGate>
       </div>
 
       {pageTab === 'nhansu' && (

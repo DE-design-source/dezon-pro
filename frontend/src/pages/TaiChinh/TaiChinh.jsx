@@ -6,6 +6,8 @@ import DuAnPanel from './components/DuAnPanel'
 import { HanhChinhPanel, NhanSuPanel, KinhDoanhPanel, MarketingPanel } from './components/CategoryPanels'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { TC_COCAU } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
 export default function TaiChinh() {
   const { theme, toggleTheme } = useTheme()
@@ -21,6 +23,10 @@ export default function TaiChinh() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/tai-chinh')
+  useTabFallback(tabHidden, pageTab === 'nhansu' ? TC_COCAU : category, FIN_CATEGORIES.map(c => c.key).concat(TC_COCAU),
+    k => { if (k === TC_COCAU) setPageTab('nhansu'); else { setCategory(k); setPageTab('main') } })
 
   const show = key => ({ display: category === key ? 'flex' : 'none' })
 
@@ -35,11 +41,11 @@ export default function TaiChinh() {
         </div>
         <span className="tc-header-title">Tài chính</span>
         <div className="hdr-tabs" role="tablist">
-          {FIN_CATEGORIES.map(c => (
+          {FIN_CATEGORIES.filter(c => tabHidden.indexOf(c.key) < 0).map(c => (
             <div key={c.key} className={`tc-cat${pageTab === 'main' && category === c.key ? ' active' : ''}`} onClick={() => { setCategory(c.key); setPageTab('main') }}>{c.label}</div>
           ))}
           {/* Nhân sự phòng Tài chính - Kế toán (từ HR) — khác danh mục chi phí "Nhân sự" bên cạnh */}
-          <div className={`tc-cat${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => setPageTab('nhansu')} title="Cơ cấu & nhân sự phòng Tài chính - Kế toán (từ HR)">Cơ cấu phòng ban</div>
+          {tabHidden.indexOf(TC_COCAU) < 0 && <div className={`tc-cat${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => setPageTab('nhansu')} title="Cơ cấu & nhân sự phòng Tài chính - Kế toán (từ HR)">Cơ cấu phòng ban</div>}
         </div>
         <button className="tc-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'

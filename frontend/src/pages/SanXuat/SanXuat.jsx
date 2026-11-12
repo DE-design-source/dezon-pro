@@ -12,10 +12,14 @@ import StockModal from './components/StockModal'
 import DetailModal from './components/DetailModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
 export default function SanXuat() {
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState('tongquan')
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/san-xuat')
+  useTabFallback(tabHidden, tab, SX_TABS.map(t => t.key), setTab)
   const [orders, setOrders] = useState(INITIAL_ORDERS)
   const [orderSeq, setOrderSeq] = useState(7)
   const [materials, setMaterials] = useState(INITIAL_MATERIALS)
@@ -63,7 +67,7 @@ export default function SanXuat() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>Sản xuất</span>
         <div className="hdr-tabs" role="tablist">
-          {SX_TABS.map(t => (
+          {SX_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
             <button key={t.key} className={`sx-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>

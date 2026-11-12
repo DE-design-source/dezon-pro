@@ -19,6 +19,19 @@ export const PT_COLS = [
   ['markup', 'Lợi nhuận/giá vốn (%)', 'n', 148], ['dg', 'Đơn giá', 'n', 134],
   ['tt', 'Thành tiền', 'n', 140], ['ghichu', 'Ghi chú', 'l', 210],
 ]
+/* Bộ cột dựng sẵn của khung "Chọn nhanh cột" Phần thô: [id, tên, danh sách cột | null = tất cả]; cột Nội dung luôn có */
+export const PT_PRESETS = [
+  ['all', 'Hiện tất cả cột', null],
+  ['nt', 'Nhà thầu', ['stt', 'noidung', 'dvt', 'dientich', 'heso', 'khoiluong', 'dgnt', 'ttnt', 'ghichu']],
+  ['kh', 'Báo giá cho khách', ['stt', 'noidung', 'dvt', 'khoiluong', 'dg', 'tt', 'ghichu']],
+  ['ln', 'Giá & lợi nhuận', ['stt', 'noidung', 'khoiluong', 'ttnt', 'lnvnd', 'margin', 'markup', 'dg', 'tt']],
+  ['gon', 'Tối giản', ['stt', 'noidung', 'dvt', 'khoiluong', 'tt']],
+]
+export function ptPresetCols_(list) {
+  const want = {}; (list || PT_COLS.map(c => c[0])).forEach(k => { want[k] = 1 }); want.noidung = 1
+  const m = {}; PT_COLS.forEach(c => { m[c[0]] = !!want[c[0]] }); return m
+}
+export function ptSameCols_(a, b) { return PT_COLS.every(c => !!(a || {})[c[0]] === !!(b || {})[c[0]]) }
 export function ptKeyLabel_(k) { const c = PT_COLS.filter(x => x[0] === k)[0]; return c ? c[1] : k }
 export const PT_BULK_F = [['noidung', 'Nội dung công việc'], ['dvt', 'Đơn vị tính'], ['dientich', 'Diện tích'],
   ['heso', 'Hệ số'], ['khoiluong', 'Khối lượng'], ['dgnt', 'Đơn giá (nhà thầu)'],

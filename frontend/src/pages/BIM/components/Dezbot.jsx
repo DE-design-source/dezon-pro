@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 import { AI_TOPICS, matchTopic } from '../../../data/bimData'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 
 export function loadAiPanelWidth() {
   try {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Dezbot bản BIM: không có hàng gợi ý / nút công cụ, câu trả lời đọc dữ liệu model qua `answer(topic)` */
@@ -104,6 +106,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                     <button className="bim-ai-chip" onClick={() => sendMessage(t.prompt)}>{t.label}</button>
                   </div>
                 ))}
+                <div className="bim-ai-topic-chip"><BugChip className="bim-ai-chip" onBefore={onClose} /></div>
               </div>
             </div>
           ) : (

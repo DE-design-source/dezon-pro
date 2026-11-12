@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 const THINKING = 'Đang tra dữ liệu workspace…'
 
 export function loadAiPanelWidth() {
@@ -10,7 +12,7 @@ export function loadAiPanelWidth() {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Câu trả lời mẫu (giống AI_KB trong marketing.html) */
@@ -49,7 +51,7 @@ const TOPICS = [
   { key: 'chamcong', label: 'Chấm công', prompt: 'Tình hình chấm công hôm nay?', icon: <svg {...iconProps}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> },
   { key: 'dongtien', label: 'Dòng tiền', prompt: 'Dòng tiền tháng này ra sao?', icon: <svg {...iconProps}><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20" /></svg> },
   { key: 'khachhang', label: 'Khách hàng', prompt: 'Khách hàng nào đang tiềm năng?', icon: <svg {...iconProps}><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /><path d="M2 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /><circle cx="8" cy="7" r="4" /></svg> },
-  { key: 'tinnhan', label: 'Tin nhắn', prompt: 'Tôi có tin nhắn nào chưa đọc?', wide: true, icon: <svg {...iconProps}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> },
+  { key: 'tinnhan', label: 'Tin nhắn', prompt: 'Tôi có tin nhắn nào chưa đọc?', icon: <svg {...iconProps}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> },
 ]
 
 const SUGGESTS = ['Chiến dịch nào đang vượt ngân sách?', 'Tóm tắt hiệu quả marketing tháng này', 'Tạo báo cáo chi phí quảng cáo']
@@ -143,6 +145,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                     <button className="mk-ai-chip" onClick={() => sendAiMessage(t.prompt)}>{t.icon}{t.label}</button>
                   </div>
                 ))}
+                <div className="mk-ai-topic-chip"><BugChip className="mk-ai-chip" onBefore={onClose} /></div>
               </div>
             </div>
           )}

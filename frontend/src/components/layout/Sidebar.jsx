@@ -4,6 +4,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useSidebar } from '../../hooks/useSidebar'
 import { NAV_MAIN, NAV_BOTTOM } from '../../data/navigation'
 import SidebarDock from './SidebarDock'
+import { useNavHidden } from '../../hooks/useNavHidden'
 import { useChatUnreadTotal } from '../../pages/Chat/state/chatStore'
 
 function NavIcon({ pathData }) {
@@ -59,6 +60,8 @@ export default function Sidebar() {
   const isCollapsed = level === 'icons'
   const isUltra = level === 'logo'
   const chatUnread = useChatUnreadTotal() // 0 = không hiện số (chưa đăng nhập chat / không có tin chưa đọc)
+  const navHidden = useNavHidden() // tab người dùng ẩn ở Cài đặt > Hiển thị
+  const shown = item => navHidden.indexOf(item.path) < 0
 
   /* Thu gọn tối đa: sidebar không chiếm chỗ, chỉ còn nút tròn nổi (SidebarDock) để mở menu */
   /* Báo mức thu gọn cho CSS (global.css chừa chỗ cho cụm nổi ở các trang có lề hẹp) */
@@ -203,14 +206,14 @@ export default function Sidebar() {
         {!isUltra && (
           // Màn hình thấp (laptop, cỡ chữ lớn): menu tự cuộn thay vì bị cắt mất các mục cuối
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-            {NAV_MAIN.map(item => (
+            {NAV_MAIN.filter(shown).map(item => (
               <NavItem key={item.path} item={item} collapsed={isCollapsed}
                 badge={item.path === '/chat' ? (chatUnread > 99 ? '99+' : chatUnread || null) : item.badge} />
             ))}
 
             <div className="sidebar-divider" style={{ margin: '10px 0 6px' }} />
 
-            {NAV_BOTTOM.map(item => (
+            {NAV_BOTTOM.filter(shown).map(item => (
               <NavItem key={item.path} item={item} collapsed={isCollapsed} />
             ))}
           </nav>

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { CAL_DOW_SHORT, WEEK_DATES, TODAY_IDX, HOUR_LABELS, DAYCOL_ROW_HEIGHT, GRID_HEIGHT, DAY_DATE_LABELS, cellMinutesFromTop, fmtHM } from '../../../data/lichData'
+import { useEffect, useRef, useState } from 'react'
+import { CAL_DOW_SHORT, WEEK_DATES, TODAY_IDX, HOUR_LABELS, DAYCOL_ROW_HEIGHT, GRID_HEIGHT, GRID_START, DAY_DATE_LABELS, cellMinutesFromTop, fmtHM } from '../../../data/lichData'
 
 const DRAG_THRESHOLD = 4
 const SNAP_PX = 20 // bước 30 phút
@@ -50,6 +50,11 @@ function overlapStyle(pos) {
 /* Lưới Tuần / Ngày — giống #calWeekGridWrap trong lich.html (kể cả kéo thả đổi ngày/giờ) */
 export default function WeekView({ hidden, view, dayIdx, events, setEvents, onOpenDetail }) {
   const colRefs = useRef([])
+  const scrollRef = useRef(null)
+  /* Lưới 24h: mở ra cuộn sẵn tới 7:00 (giờ làm việc), như lịch macOS */
+  useEffect(() => {
+    if (!hidden && scrollRef.current) scrollRef.current.scrollTop = (7 - GRID_START) * DAYCOL_ROW_HEIGHT
+  }, [hidden])
   const [draggingId, setDraggingId] = useState(null)
   const [dropIdx, setDropIdx] = useState(-1)
   const [tooltip, setTooltip] = useState(null)
@@ -162,35 +167,38 @@ export default function WeekView({ hidden, view, dayIdx, events, setEvents, onOp
   const cols = isDay ? '1fr' : 'repeat(7,1fr)'
   const showDay = i => !isDay || i === dayIdx
 
+  /* vạch giờ hiện tại (dữ liệu mẫu: 5:06 CH) — nhãn giờ trùng chỗ thì ẩn, như lịch macOS */
+  const NOW_TOP = Math.round((17 + 6 / 60 - GRID_START) * DAYCOL_ROW_HEIGHT)
+  const isWeekend = i => i === 0 || i === 6
+
   return (
-    <div style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', display: hidden ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flex: 'none' }}>
-        <div style={{ width: 52, flex: 'none' }} />
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: cols }}>
+    <div className="lc-cal-wk" style={{ display: hidden ? 'none' : 'flex' }}>
+      <div className="lc-cal-wk-head">
+        <div className="lc-cal-gutter" />
+        <div className="lc-cal-wk-days" style={{ gridTemplateColumns: cols }}>
           {WEEK_DATES.map((d, i) => {
             const today = i === TODAY_IDX
             return (
-              <div key={i} style={{ textAlign: 'center', padding: '9px 0', ...(today ? { background: 'var(--primary-tint)' } : {}), ...(showDay(i) ? {} : { display: 'none' }) }}>
-                <div style={{ fontSize: 10.5, color: today ? 'var(--primary)' : 'var(--text-muted)', fontWeight: today ? 700 : 600 }}>{CAL_DOW_SHORT[i]}</div>
-                <div className="mono" style={{ fontSize: 13, fontWeight: today ? 800 : 700, ...(today ? { color: 'var(--primary)' } : {}) }}>{d}</div>
+              <div key={i} className={`lc-cal-wk-day${today ? ' today' : ''}${isWeekend(i) ? ' weekend' : ''}`} style={showDay(i) ? undefined : { display: 'none' }}>
+                <span className="lc-dow">{CAL_DOW_SHORT[i]}</span>
+                <span className="lc-num">{d}</span>
               </div>
             )
           })}
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex' }}>
-        <div className="mono" style={{ width: 52, flex: 'none', position: 'relative', height: 560, color: 'var(--text-muted)', fontSize: 10 }}>
-          {HOUR_LABELS.map(([top, label]) => (
-            <div key={label} style={{ position: 'absolute', top, left: 0, right: 6, textAlign: 'right' }}>{label}</div>
-          ))}
-          <div style={{ position: 'absolute', top: 356, left: 0, right: 0, textAlign: 'right', color: 'var(--danger)', fontWeight: 700, fontSize: 9.5 }}>5:06 CH</div>
+      <div className="lc-cal-wk-scroll" ref={scrollRef}>
+        <div className="lc-cal-gutter lc-cal-hours" style={{ height: GRID_HEIGHT }}>
+          {HOUR_LABELS.filter(([top]) => Math.abs(top + 6 - NOW_TOP) > 14).map(([top, label]) => {
+            const [h, ap] = label.split(' ')
+            return <div key={label} className="lc-hr" style={{ top }}>{h}<small>{ap}</small></div>
+          })}
+          <div className="lc-now-pill" style={{ top: NOW_TOP }}>5:06</div>
         </div>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: cols, position: 'relative', height: 560 }}>
+        <div className="lc-cal-wk-grid" style={{ gridTemplateColumns: cols, height: GRID_HEIGHT }}>
           {/* vạch giờ hiện tại */}
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 364, height: 0, borderTop: '1.5px solid var(--danger)', zIndex: 4, pointerEvents: 'none' }}>
-            <span style={{ position: 'absolute', left: -5, top: -4, width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)' }} />
-          </div>
+          <div className="lc-now-line" style={{ top: NOW_TOP }} />
 
           {DAY_DATE_LABELS.map((label, i) => {
             const dayEvents = events.filter(ev => ev.day === i)
@@ -199,10 +207,11 @@ export default function WeekView({ hidden, view, dayIdx, events, setEvents, onOp
             <div
               key={i}
               ref={el => { colRefs.current[i] = el }}
-              className={`lc-cal-daycol${dropIdx === i ? ' drop-target' : ''}`}
+              className={`lc-cal-daycol${dropIdx === i ? ' drop-target' : ''}${isWeekend(i) ? ' weekend' : ''}${i === TODAY_IDX ? ' today' : ''}`}
               data-date={label}
-              style={{ ...(i === TODAY_IDX ? { background: 'var(--primary-tint)' } : {}), ...(showDay(i) ? {} : { display: 'none' }) }}
+              style={showDay(i) ? undefined : { display: 'none' }}
             >
+              {i === TODAY_IDX && <div className="lc-now-today" style={{ top: NOW_TOP }} />}
               {dayEvents.map(ev => (
                 <div
                   key={ev.id}
@@ -224,7 +233,7 @@ export default function WeekView({ hidden, view, dayIdx, events, setEvents, onOp
           })}
 
           {/* đường kẻ giờ (14 hàng x 40px) */}
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, pointerEvents: 'none', backgroundImage: 'repeating-linear-gradient(to bottom, var(--border) 0, var(--border) 1px, transparent 1px, transparent 40px)', opacity: 0.6 }} />
+          <div className="lc-cal-hourlines" />
         </div>
       </div>
 

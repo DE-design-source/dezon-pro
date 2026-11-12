@@ -21,6 +21,10 @@
           var c = JSON.parse(localStorage.getItem('siteflow-customize') || '{}');
           document.documentElement.setAttribute('data-accent', c.accent || 'blue');
           document.documentElement.setAttribute('data-density', c.density || 'comfortable');
+          /* Kích thước chuẩn x mật độ: lặp lại uiScaleOf / --z-app của ThemeContext (70 - 120%) */
+          var zApp = Math.round(Math.min(120, Math.max(70, Math.round(Number(c.uiScale) || 100))) / 100 * (c.density === 'compact' ? 0.88 : 1) * 1000) / 1000;
+          document.documentElement.style.setProperty('--z-app', String(zApp));
+          document.documentElement.setAttribute('data-zoomed', zApp === 1 ? 'off' : 'on');
           document.documentElement.setAttribute('data-sidebar-pos', c.sidebarPos || 'left');
           /* Cỡ chữ tự chỉnh + nền hệ thống: lặp lại logic của ThemeContext để không bị giật khi tải trang */
           var scale = c.fontSize === 'custom' ? Math.min(130, Math.max(10, Number(c.fontScale) || 100)) : 0;

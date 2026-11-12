@@ -546,7 +546,7 @@ textarea.qsq-tk2-f{height:auto; padding:9px 10px; line-height:1.55; resize:verti
 .qsq-dm-act > span{margin-right:auto;}
 .qsq-dm-act > span b{color:var(--text);}
 .qsq-dm-act .qsc-btn{height:28px; padding:0 10px; font-size:12px;}
-.qsq-dm-list{display:flex; flex-direction:column; max-height:min(420px, calc(55vh / var(--qs-zoom, .75))); overflow-y:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
+.qsq-dm-list{display:flex; flex-direction:column; max-height:min(420px, calc(55vh / var(--qs-vz, .75))); overflow-y:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
 .qsq-dm-it{display:grid; grid-template-columns:18px 52px minmax(0, 1fr) auto; align-items:center; gap:6px; min-height:32px; padding:4px 10px; border-bottom:1px solid var(--border); font-size:12.5px; cursor:pointer;}
 .qsq-dm-it:last-child{border-bottom:none;}
 .qsq-dm-it:hover{background:var(--dash-soft);}

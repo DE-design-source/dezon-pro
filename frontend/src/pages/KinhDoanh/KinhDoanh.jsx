@@ -21,6 +21,7 @@ import TaskModal from './components/TaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import WorkGate from '../../components/ui/WorkGate'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 import { useWorkSession } from '../../services/workSession'
 import * as kdApi from './api'
 
@@ -37,6 +38,9 @@ function KinhDoanhPage() {
   const { me } = useWorkSession()
   const meName = (me && (me.hoTen || me.username)) || ''
   const [tab, setTab] = useState('overview')
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/kinh-doanh')
+  useTabFallback(tabHidden, tab, SALES_TABS.map(t => t[0]), setTab)
 
   /* ---------- Dữ liệu pipeline ---------- */
   const [leads, setLeads] = useState([])
@@ -236,7 +240,7 @@ function KinhDoanhPage() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>Kinh doanh</span>
         <div className="hdr-tabs" role="tablist">
-          {SALES_TABS.map(([key, label]) => (
+          {SALES_TABS.filter(t => tabHidden.indexOf(t[0]) < 0).map(([key, label]) => (
             <button key={key} className={`kd-sales-tab${tab === key && !detail.open ? ' active' : ''}`} onClick={() => { setTab(key); setDetail(d => ({ ...d, open: false })) }}>{label}</button>
           ))}
         </div>

@@ -63,6 +63,16 @@ export function ptPersist(arr, keepHist) {
   projDataSet_('phanTho', arr); projDataSet_('ptVat', v)
   if (!keepHist) histClear_(maDA)
 }
+/* % VAT của bảng Phần thô (ô VAT trên thanh tiêu đề Bóc tách, như các đề mục khác) */
+export function ptSetVat(val) {
+  const { maDA } = ptNow()
+  if (!maDA) return
+  let v = Number(String(val == null ? '' : val).replace(',', '.'))
+  if (!isFinite(v) || v < 0) v = 0
+  if (v > 100) v = 100
+  try { localStorage.setItem(ptKey(maDA) + '_vat', String(v)) } catch (e) { /* bỏ qua */ }
+  projDataSet_('ptVat', v)
+}
 function needCur_() {
   if (!getState().cur) { toast('Chọn dự án trước khi thêm công tác vào bảng'); return false }
   return true

@@ -21,6 +21,29 @@ import {
 import { catCbKey_, ccSpecTxt_, spSpecs_, spMauCss_, catVarMau_, ctSecsOfNode_, popMatch_ } from './catalog/catalogModel'
 import { useSpecs } from './catalog/useSpecs'
 import { useComboCache, loadCombo } from './catalog/comboCache'
+import { PT_LOAI_NHOM, usePtLoai, mmLoai_ } from './sheet/ptLoai'
+import { usePtUi, setPtUi } from '../phantho/ptState'
+import { ctLoad } from '../../state/store'
+import { PtSidePop } from '../phantho/PtLibrary'
+
+/* Phần thô: 2 chip nhóm loại báo giá thay cho tiêu đề "Nội dung công việc" (Khái toán | Dự toán).
+   Bấm chip nhóm khác = sang loại đầu của nhóm (mmLoai_); số công việc hiện trong chip đang chọn. */
+function PtNhomChips() {
+  const lo = usePtLoai()
+  return (
+    <span className="qs-bd-ptchips" role="tablist" aria-label="Loại báo giá">
+      {PT_LOAI_NHOM.map(g => {
+        const on = lo.indexOf(g[0] + '_') === 0
+        return (
+          <button key={g[0]} type="button" role="tab" aria-selected={on} className={on ? 'on' : ''} title={g[3].map(x => x[1] + ' ' + x[2]).join(' · ')}
+            onClick={() => { if (!on) mmLoai_(g[0]) }}>
+            {g[2]}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
 import { useFilters, setF, toggleIn, clearAllFilters, clearTag } from './catalog/filterStore'
 
 const Caret = ({ up }) => <span className={`qs-bd-caret${up ? ' up' : ''}`} />
@@ -66,6 +89,9 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
   const searchRef = useRef(null)
 
   const isPT = node === '3.1'
+  const ptFav = usePtUi(s => s.favOnly)
+  const ptSide = usePtUi(s => s.sidePop) // khung bên phải của Phần thô: 'filter' | 'fav' | 'mau' | null
+  const ptLocN = usePtUi(s => (s.contractor ? 1 : 0) + (s.vtCat ? 1 : 0) + (s.favOnly ? 1 : 0))
   const vsOn = vsFltOn_(node)
   const ng = vsFltNganh_(node) || 'den'
   /* Đổi ngành (đèn <-> vệ sinh / sơn / công tắc): bỏ lọc hạng mục / thông số của ngành cũ (renderVsFilters_, app.js:574-577) */
@@ -386,12 +412,41 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
   return (
     <div className={`qs-card qs-bd-catalog${popOpen ? ' pop-open' : ''}`} style={{ width }}>
       <div className="qs-bd-catalog-head">
-        {isPT && <span className="qs-bd-h">Nội dung công việc</span>}
-        {isPT ? (ptCount ? <span className="qs-bd-badge">{ptCount}</span> : null) : <span className="qs-bd-badge qs-bd-badge-pill">{countText}</span>}
+        <span className="qs-bd-badge qs-bd-badge-pill" title={isPT ? ptCount : undefined}>{isPT ? ((String(ptCount || '').match(/^\d+/) || ['0'])[0] + ' công tác') : countText}</span>
+        {isPT && (
+          <>
+            <span className="qs-bd-headsep" />
+            <span className="qs-bd-headtools"><span className="qs-bd-hchip">
+              <button className="qs-bd-tb-btn" title="Tải lại thư viện công tác (đơn giá mới nhất)" onMouseDown={e => e.preventDefault()} onClick={() => ctLoad(true, true)}>
+                <Icon name="refresh" size={18} />
+              </button>
+            </span></span>
+            {headTools && <><span className="qs-bd-headsep" /><span className="qs-bd-headtools">{headTools}</span></>}
+            {/* Phím tắt mở thẳng khung "Dự án mẫu" bên phải - luôn hiện ở mọi loại báo giá
+                (ptApplyMau luôn lấy bộ Khái toán · Theo m2, không phụ thuộc loại đang chọn) */}
+            <span className="qs-bd-headsep" />
+            <span className="qs-bd-headtools"><span className="qs-bd-hchip">
+              <button className={`qs-bd-tb-btn${ptSide === 'mau' ? ' on' : ''}`} title="Dự án mẫu — lấy cả bộ đơn giá trọn gói" onMouseDown={e => e.preventDefault()}
+                onClick={() => setPtUi(s => ({ sidePop: s.sidePop === 'mau' ? null : 'mau' }))}>
+                <Icon name="layers" size={18} />
+              </button>
+            </span></span>
+            <span className="qs-bd-headsep" />
+            <button ref={filtBtnRef} title={'Bộ lọc' + (ptLocN > 0 ? ' (' + ptLocN + ' đang lọc)' : '')} aria-label="Bộ lọc"
+              className={`qs-bd-pill-btn qs-bd-icononly qs-bd-pop-anchor${ptSide === 'filter' ? ' on' : ''}`} onClick={() => setPtUi(s => ({ sidePop: s.sidePop === 'filter' ? null : 'filter' }))}>
+              <Icon name="filter" size={15} />{ptLocN > 0 && <span className="qs-bdc-badge">{ptLocN}</span>}
+            </button>
+            <span className="qs-bd-headsep" />
+            <button className={`qs-bd-fav-count qs-bdc-favgo qs-bd-pop-anchor${ptFav || ptSide === 'fav' ? ' on' : ''}`} title="Công tác yêu thích" aria-label="Công tác yêu thích"
+              onClick={() => setPtUi(s => ({ sidePop: s.sidePop === 'fav' ? null : 'fav' }))}>
+              <Icon name="star" size={15} />
+            </button>
+          </>
+        )}
         {/* headTools: nút của bảng đặt giữa ô đếm SKU và Bộ lọc (Bóc tách: Vừa thêm + Lịch sử thao tác) */}
         {!isPT && headTools && <><span className="qs-bd-headsep" /><span className="qs-bd-headtools">{headTools}</span></>}
         {/* có nhóm nút đầu cột thì các nhóm dàn đều (space-between, QS.css), không cần khoảng đẩy */}
-        {!(headTools && !isPT) && <span style={{ flex: 1 }} />}
+        {!(headTools && !isPT) && !isPT && <span style={{ flex: 1 }} />}
         {!isPT && headTools && <span className="qs-bd-headsep" />}
         {!isPT && (
           <button ref={filtBtnRef} title={'Bộ lọc' + (filtN > 0 ? ' (' + filtN + ' đang lọc)' : '')} aria-label="Bộ lọc" className={`qs-bd-pill-btn qs-bd-icononly qs-bd-pop-anchor${popOpen === 'filter' ? ' on' : ''}`} onClick={() => setPopOpen(o => (o === 'filter' ? false : 'filter'))}>
@@ -407,6 +462,9 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
           </button>
         )}
       </div>
+      {isPT && ptSide && (
+        <PtSidePop kind={ptSide} anchorRef={filtBtnRef} onClose={() => setPtUi({ sidePop: null })} />
+      )}
       {popOpen && !isPT && (
         popOpen === 'fav'
           ? (
@@ -430,9 +488,15 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
 
       {/* Thân cột (ô tìm + danh sách sản phẩm): module riêng, tách khỏi hàng nút đầu cột */}
       <div className="qs-bd-catbody">
-      {isPT && ptFilters ? (
-        <div className="qs-bdc-ptf" ref={filtersRef} style={filterH === null ? undefined : { height: filterH, maxHeight: 'none' }}>{ptFilters}</div>
-      ) : null}
+      {/* Phần thô: chip Khái toán | Dự toán + các bước chọn chung 1 module (khung viền) */}
+      {isPT && (
+        <div className="qs-bdc-ptmod">
+          <div className="qs-bdc-ptnhom"><PtNhomChips /></div>
+          {ptFilters ? (
+            <div className="qs-bdc-ptf" ref={filtersRef} style={filterH === null ? undefined : { height: filterH, maxHeight: 'none' }}>{ptFilters}</div>
+          ) : null}
+        </div>
+      )}
       {/* 3.1 cũng có thanh kéo + ô tìm như bản gốc (.catpanel-top -> cat-split -> #catFind, PUB/index.html:6670-6720);
           ô tìm ở đây không lọc thư viện Phần thô (renderPTLibrary bỏ qua catQ) */}
       {isPT && ptFilters && (

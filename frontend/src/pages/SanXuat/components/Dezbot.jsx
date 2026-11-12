@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 import { WORKERS, EQUIPMENT, materialStatus } from '../../../data/sanXuatData'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 const FALLBACK = 'Tôi có thể hỗ trợ thông tin về đơn sản xuất, kho vật tư, nhân công, máy móc và tiến độ hôm nay. Bạn thử hỏi lại theo các chủ đề này nhé.'
 
 export function loadAiPanelWidth() {
@@ -11,7 +13,7 @@ export function loadAiPanelWidth() {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Các chủ đề của Dezbot xưởng mộc — câu trả lời đọc dữ liệu hiện tại của trang */
@@ -160,6 +162,7 @@ export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChan
                 {TOPICS.map(t => (
                   <button key={t.key} className={`sx-ai-chip sx-ai-topic-chip${t.wide ? ' wide' : ''}`} onClick={() => openTopic(t)}>{t.label}</button>
                 ))}
+                <BugChip className="sx-ai-chip sx-ai-topic-chip" onBefore={onClose} />
               </div>
             </div>
           ) : (

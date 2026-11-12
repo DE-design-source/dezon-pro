@@ -311,13 +311,13 @@ func (s *Service) SetMyPref(ctx context.Context, a *actor.Actor, key, value any)
 	if !jsval.IsNullish(value) && strings.HasSuffix(k, "Cols") && !colsOK(value) {
 		return nil, apperr.New(msgPrefCols)
 	}
-	if !jsval.IsNullish(value) && k == "tkPresets" && !presetsOK(value) {
+	if !jsval.IsNullish(value) && (k == "tkPresets" || k == "ptPresets") && !presetsOK(value) {
 		return nil, apperr.New(msgPrefCols)
 	}
 	if str, ok := value.(string); !jsval.IsNullish(value) && k == "tkQuick" && (!ok || str == "" || jsval.Len16(str) >= 60) {
 		return nil, apperr.New(msgPrefCols)
 	}
-	if !jsval.IsNullish(value) && k == "tkOrder" && !idsOK(value) {
+	if !jsval.IsNullish(value) && (k == "tkOrder" || k == "ptOrder") && !idsOK(value) {
 		return nil, apperr.New(msgPrefCols)
 	}
 	if !jsval.IsNullish(value) && k == "bgBiaMau" && !biaMauOK(value) {

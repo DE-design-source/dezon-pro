@@ -146,6 +146,12 @@ a.qs-bd-bar-link{text-decoration:none;}
 .qs-pc .qs-pc-totals .qs-bd-totals b.qs-bd-total{font-size:15px; color:#fff;}
 .qs-pc-totals .qs-bd-vat{width:34px; height:16px; padding:0 4px; border-radius:5px; border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff; font-size:11px;}
 .qs-pc-totals .qs-bd-vat:focus{border-color:rgba(255,255,255,.6);}
+/* Ô nhập % VAT riêng của hạng mục trên băng (MarkUp 2026-11-12 15:14): nhỏ lại, cao bằng dòng số để ô VAT nằm gọn trong khung tiền cao 40,
+   nền tối trong suốt như các ô của băng thay cho nền trắng của ô nhập đầu bảng */
+.qs-pc-totals .qs-bd-vathm b{gap:2px; line-height:1;}
+.qs-pc-totals .qs-bd-vatin{width:30px; height:16px; padding:0 3px; border-radius:4px; border:1px dashed rgba(255,255,255,.3); background:rgba(255,255,255,.08); color:#fff; font-size:inherit; line-height:1;}
+.qs-pc-totals .qs-bd-vathm.rieng .qs-bd-vatin{border-style:solid; border-color:#7FB2E8; color:#fff;}
+.qs-pc-totals .qs-bd-vatin:focus{border-color:rgba(255,255,255,.7); background:rgba(255,255,255,.14);}
 
 /* Cụm "Hạng mục đã bóc" + nút chọn hạng mục của Bóc tách đưa lên băng dự án (SheetHeader portal vào .qs-pc-node), ngay sau tên dự án;
    cụm số liệu vẫn nằm giữa phần còn lại (margin-right:auto chuyển từ .qs-pc-main sang .qs-pc-node) */

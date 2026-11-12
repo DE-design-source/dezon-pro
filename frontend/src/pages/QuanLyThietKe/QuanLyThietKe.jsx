@@ -10,14 +10,11 @@ import TaskGameTab from './components/TaskGameTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import WorkGate from '../../components/ui/WorkGate'
 import { DeliveryProvider } from './delivery'
+import { TK_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
-const MAIN_TABS = [
-  { key: 'list', label: 'Danh sách dự án' },
-  { key: 'create', label: 'Thiết lập thiết kế' },
-  { key: 'tiendo', label: 'Tiến độ' },
-  { key: 'nhiemvu', label: 'Nhiệm vụ' },
-  { key: 'nhansu', label: 'Cơ cấu phòng ban' },
-]
+/* Tab đầu trang: data/pageTabs.js (dùng chung với Cài đặt > Hiển thị) */
+const MAIN_TABS = TK_TABS
 const VALID_TABS = ['list', 'create', 'tiendo', 'nhiemvu', 'nhansu', 'detail']
 const VALID_GTABS = ['overview', 'mission', 'rewards', 'leaderboard']
 
@@ -57,6 +54,10 @@ function QuanLyThietKePage() {
     setTab(name)
   }
 
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/quan-ly-thiet-ke')
+  useTabFallback(tabHidden, tab, MAIN_TABS.map(t => t.key), goToTab)
+
   const panelStyle = key => ({ display: tab === key ? 'flex' : 'none' })
 
   return (
@@ -71,7 +72,7 @@ function QuanLyThietKePage() {
           </div>
           <span className="tk-header-title">Quản lý thiết kế</span>
           <div className="hdr-tabs" role="tablist">
-            {MAIN_TABS.map(t => (
+            {MAIN_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
               <button key={t.key} className={`tk-proj-tab${tab === t.key ? ' active' : ''}`} onClick={() => goToTab(t.key)}>{t.label}</button>
             ))}
           </div>

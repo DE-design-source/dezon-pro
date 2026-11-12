@@ -14,6 +14,8 @@
   --danger:#C0392B; --danger-tint:#FBEBE9;
   --success:#1E8E5A; --success-tint:#E7F6EE;
   --qs:#6D4FC2; --qs-tint:#EEE9FB;
+  /* kiểu lịch macOS: đỏ "hôm nay / giờ hiện tại", nền cuối tuần, nền sidebar, đường lưới */
+  --lc-red:#E8453C; --weekend:#F8F8FA; --side-bg:#F5F6F8; --grid:#ECEDF1;
   --lc-font:var(--app-font, 'Montserrat'), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 html[data-theme="dark"] .lc-page {
@@ -25,6 +27,7 @@ html[data-theme="dark"] .lc-page {
   --danger:#E0685A; --danger-tint:#3A211E;
   --success:#4FC585; --success-tint:#15301F;
   --qs:#A796E8; --qs-tint:#2A2247;
+  --lc-red:#FF5F55; --weekend:#1D212A; --side-bg:#161A22; --grid:#272B35;
 }
 html[data-theme="light"][data-accent="purple"] .lc-page{--primary:#6D4FC2; --primary-tint:#EEE9FB;}
 html[data-theme="dark"][data-accent="purple"] .lc-page{--primary:#A796E8; --primary-tint:#2A2247;}
@@ -54,42 +57,88 @@ html[data-theme="dark"][data-accent="teal"] .lc-page{--primary:#3FC2B6; --primar
 .lc-page ::-webkit-scrollbar{width:8px; height:8px;}
 .lc-page ::-webkit-scrollbar-thumb{background:#cbd1da; border-radius:5px;}
 
-/* ---------- Thanh công cụ ---------- */
-.lc-cal-icon-btn{width:32px; height:32px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
-.lc-cal-icon-btn:hover{background:var(--surface-alt); color:var(--text);}
-.lc-cal-today-btn{border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:12.5px; font-weight:600; padding:0 14px; height:32px; border-radius:8px; cursor:pointer;}
-.lc-cal-today-btn:hover{background:var(--surface-alt);}
-.lc-cal-view-toggle{display:flex; background:var(--surface-alt); border-radius:9px; padding:3px; gap:2px;}
-.lc-cal-view-btn{border:none; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; padding:6px 13px; border-radius:7px; cursor:pointer;}
-.lc-cal-view-btn.active{background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08);}
-.lc-cal-create-btn{display:flex; align-items:center; gap:6px; background:var(--primary); color:#fff; border:none; padding:0 16px; height:34px; border-radius:9px; font-size:12.5px; font-weight:700; cursor:pointer;}
+/* ---------- Khung cửa sổ kiểu lịch macOS: sidebar nền mờ + vùng chính ---------- */
+.lc-cal-window{flex:1; display:flex; min-height:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 28px rgba(16,24,40,.06);}
+.lc-cal-side{position:relative; width:var(--lc-side-w, 320px); flex:none; display:flex; flex-direction:column; gap:12px; min-height:0; padding:12px 12px 10px; background:var(--side-bg); border-right:1px solid var(--border);}
+/* vạch kéo đổi độ rộng sidebar (mép phải), nhấp đúp = mặc định */
+.lc-side-rz{position:absolute; top:0; bottom:0; right:-5px; width:9px; z-index:5; cursor:col-resize; touch-action:none;}
+.lc-side-rz::after{content:''; position:absolute; top:0; bottom:0; left:3px; width:3px; border-radius:2px; background:transparent; transition:background .12s;}
+.lc-side-rz:hover::after, .lc-side-rz.on::after{background:var(--primary);}
+.lc-side-h{font-size:11px; font-weight:700; color:var(--text-muted); margin:0 0 4px 2px;}
+.lc-cal-main{flex:1; min-width:0; min-height:0; display:flex; flex-direction:column;}
+
+/* ---------- Thanh công cụ: tiêu đề trái · Ngày/Tuần/Tháng giữa · ‹ Hôm nay › phải ---------- */
+.lc-cal-toolbar{flex:none; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; padding:12px 16px 10px;}
+.lc-cal-title{display:flex; flex-direction:column; min-width:0;}
+.lc-cal-title > div{font-size:22px; font-weight:400; line-height:1.15; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.lc-cal-title b{font-weight:700;}
+.lc-cal-title > span{font-size:12px; color:var(--text-muted); margin-top:2px;}
+.lc-cal-toolbar-r{display:flex; align-items:center; justify-content:flex-end; gap:10px;}
+.lc-cal-nav{display:flex; align-items:center; gap:4px;}
+.lc-cal-icon-btn{width:30px; height:30px; border-radius:50%; border:none; background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.lc-cal-icon-btn:hover{background:var(--border); color:var(--text);}
+.lc-cal-today-btn{border:none; background:var(--surface-alt); color:var(--text); font-size:12px; font-weight:600; padding:0 14px; height:30px; border-radius:999px; cursor:pointer;}
+.lc-cal-today-btn:hover{background:var(--border);}
+.lc-cal-view-toggle{display:flex; background:var(--surface-alt); border-radius:999px; padding:3px; gap:2px;}
+.lc-cal-view-btn{border:none; background:transparent; color:var(--text); font-size:12px; font-weight:500; height:24px; padding:0 16px; border-radius:999px; cursor:pointer;}
+.lc-cal-view-btn.active{background:var(--surface); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.04);}
+.lc-cal-create-btn{display:flex; align-items:center; gap:6px; background:var(--primary); color:#fff; border:none; padding:0 16px; height:30px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;}
 .lc-cal-create-btn:hover{opacity:.9;}
 
-/* ---------- Lịch nhỏ ---------- */
-.lc-mini-cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px;}
-.lc-mini-cal-dow{font-size:10px; color:var(--text-muted); text-align:center; padding-bottom:4px; font-weight:600;}
-.lc-mini-cal-day{font-size:11px; text-align:center; padding:5px 0; border-radius:7px; color:var(--text); cursor:default;}
-.lc-mini-cal-day.muted{color:var(--text-muted); opacity:.45;}
-.lc-mini-cal-day.in-week{background:var(--primary-tint);}
-.lc-mini-cal-day.today{background:var(--primary); color:#fff; font-weight:700;}
+/* ---------- Lịch nhỏ (đáy sidebar, hôm nay = vòng đỏ) ---------- */
+.lc-mini-cal{padding:10px 8px 8px;}
+/* Mỗi khối của sidebar (Đang quản lý, Đang theo dõi, lịch nhỏ, danh sách của các tab khác) là 1 module có viền */
+.lc-side-card{padding:10px 10px 8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 2px rgba(16,24,40,.04);}
+.lc-side-card .lc-side-h{margin-bottom:6px;}
+/* Module danh sách lịch: ô tìm ở đầu, danh sách thấp (cuộn bên trong) để lịch nhỏ bên dưới được rộng */
+.lc-cal-lists{display:flex; flex-direction:column; gap:8px;}
+.lc-cal-lists-body{max-height:228px; overflow-y:auto; margin:0 -4px; padding:0 4px;}
+.lc-cal-find{position:relative; display:flex; align-items:center; gap:6px; height:32px; padding:0 8px 0 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--text-muted);}
+.lc-cal-find:focus-within{border-color:var(--primary); background:var(--surface);}
+.lc-cal-find input{flex:1; min-width:0; border:none; background:none; color:var(--text); font:inherit; font-size:12px; outline:none;}
+.lc-cal-find-x{border:none; background:none; color:var(--text-muted); font-size:11px; cursor:pointer; padding:2px;}
+.lc-cal-find-pop{position:absolute; left:-1px; right:-1px; top:calc(100% + 4px); z-index:20; display:flex; flex-direction:column; padding:4px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 10px 28px rgba(0,0,0,.14);}
+.lc-cal-find-pop button{display:flex; align-items:center; gap:8px; padding:6px 8px; border:none; border-radius:7px; background:none; color:var(--text); font:inherit; font-size:12.5px; text-align:left; cursor:pointer;}
+.lc-cal-find-pop button:hover{background:var(--surface-alt);}
+.lc-cal-find-pop button i{width:10px; height:10px; border-radius:3px; flex:none;}
+.lc-cal-find-pop button span{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.lc-cal-find-pop button em{font-style:normal; font-size:10.5px; color:var(--text-muted); flex:none;}
+.lc-cal-find-none{padding:8px; font-size:12px; color:var(--text-muted);}
+.lc-cal-find-note{padding:6px 8px 4px; border-top:1px solid var(--border); margin-top:2px; font-size:10.5px; color:var(--text-muted);}
+/* Lịch nhỏ mở rộng: chiếm hết phần cao còn lại của sidebar, ô ngày to theo */
+.lc-cal-sidebar-pane > .lc-mini-cal.grow{flex:1 0 auto; min-height:250px; display:flex; flex-direction:column;}
+.lc-mini-cal.grow .lc-mini-cal-h{font-size:13px; margin-bottom:8px;}
+.lc-mini-cal.grow .lc-mini-cal-grid:last-child{flex:1; grid-auto-rows:minmax(30px, 1fr); align-items:center;}
+.lc-mini-cal.grow .lc-mini-cal-dow{font-size:10.5px;}
+.lc-mini-cal.grow .lc-mini-cal-day{width:30px; height:30px; border-radius:15px; font-size:12.5px;}
+.lc-mini-cal-h{font-size:12px; font-weight:700; margin:0 0 6px 4px;}
+.lc-mini-cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:1px 0;}
+.lc-mini-cal-dow{font-size:9.5px; color:var(--text-muted); text-align:center; padding-bottom:3px; font-weight:600;}
+.lc-mini-cal-day{font-size:11px; width:24px; height:22px; margin:0 auto; display:flex; align-items:center; justify-content:center; border-radius:11px; color:var(--text); font-variant-numeric:tabular-nums; cursor:default;}
+.lc-mini-cal-day.muted{color:var(--text-muted); opacity:.5;}
+.lc-mini-cal-day.in-week{background:color-mix(in srgb, var(--text) 7%, transparent);}
+.lc-mini-cal-day.today{background:var(--lc-red); color:#fff; font-weight:700;}
 
 /* ---------- Lưới tháng ---------- */
-.lc-cal-month-cell{border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px; display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden; cursor:pointer;}
-.lc-cal-month-cell:hover{background:var(--surface-alt);}
+.lc-cal-mo{flex:1; min-width:0; min-height:0; flex-direction:column; border-top:1px solid var(--grid);}
+.lc-cal-mo-head{display:grid; grid-template-columns:repeat(7,1fr); flex:none; border-bottom:1px solid var(--grid);}
+.lc-cal-mo-head > div{text-align:right; padding:6px 10px; font-size:11.5px; font-weight:500; color:var(--text-muted);}
+.lc-cal-month-cell{border-right:1px solid var(--grid); border-bottom:1px solid var(--grid); padding:4px 5px; display:flex; flex-direction:column; gap:2px; min-height:0; overflow:hidden; cursor:pointer;}
+.lc-cal-month-cell.weekend{background:var(--weekend);}
+.lc-cal-month-cell:hover{background:color-mix(in srgb, var(--text) 4%, transparent);}
 .lc-cal-month-cell.muted{opacity:.4;}
-.lc-cal-month-cell.today{background:var(--primary-tint);}
-.lc-cmc-date{font-size:12px; font-weight:700; font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; flex:none;}
-.lc-cal-month-cell.today .lc-cmc-date{color:var(--primary);}
+.lc-cmc-date{align-self:flex-end; min-width:22px; height:22px; padding:0 5px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; flex:none;}
+.lc-cal-month-cell.today .lc-cmc-date{background:var(--lc-red); color:#fff;}
 .lc-cmc-events{display:flex; flex-direction:column; gap:2px; min-height:0; overflow:hidden;}
-.lc-cmc-chip{font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; background:color-mix(in srgb, var(--chip-c) 16%, transparent); color:var(--chip-c); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-left:2px solid var(--chip-c);}
+.lc-cmc-chip{font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:4px; background:color-mix(in srgb, var(--chip-c) 15%, var(--surface)); color:color-mix(in srgb, var(--chip-c) 78%, var(--text)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .lc-cmc-more{font-size:10px; color:var(--text-muted); font-weight:600; padding:1px 6px;}
 
 /* ---------- Danh sách lịch (đang quản lý / theo dõi) + chọn màu ---------- */
-.lc-cal-list-row{display:flex; align-items:center; gap:9px; padding:5px 2px; font-size:12.5px; cursor:pointer;}
+.lc-cal-list-row{display:flex; align-items:center; gap:9px; padding:4px 2px; font-size:12.5px; cursor:pointer;}
 .lc-cal-list-dot{width:14px; height:14px; border-radius:4px; flex:none; border:1.5px solid var(--dot-c); position:relative; cursor:pointer;}
 .lc-cal-list-dot.checked{background:var(--dot-c);}
 .lc-cal-list-dot.checked::after{content:""; position:absolute; left:3px; top:0px; width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg);}
-.lc-cal-list-tag{font-size:9.5px; padding:1px 6px; border-radius:20px; background:var(--surface-alt); color:var(--text-muted); font-weight:600; margin-left:auto;}
+.lc-cal-list-tag{flex:none; white-space:nowrap; font-size:9.5px; padding:1px 6px; border-radius:20px; background:var(--surface-alt); color:var(--text-muted); font-weight:600; margin-left:auto;}
 .lc-ev-color-dot{width:24px; height:24px; border-radius:50%; background:var(--dot-c); cursor:pointer; border:2px solid transparent; box-shadow:0 0 0 1px var(--border) inset; display:flex; align-items:center; justify-content:center; flex:none;}
 .lc-ev-color-dot[data-color=""]{background:var(--surface-alt); box-shadow:0 0 0 1.5px var(--dot-c) inset;}
 .lc-ev-color-dot.active{border-color:var(--surface); box-shadow:0 0 0 2px var(--dot-c);}
@@ -97,12 +146,35 @@ html[data-theme="dark"][data-accent="teal"] .lc-page{--primary:#3FC2B6; --primar
 .lc-ev-color-dot[data-color=""].active::after{color:var(--primary);}
 
 /* ---------- Lưới tuần / ngày + sự kiện ---------- */
-.lc-cal-daycol{position:relative; border-left:1px solid var(--border);}
+.lc-cal-wk{flex:1; min-width:0; min-height:0; flex-direction:column; background:var(--surface);}
+.lc-cal-wk-head{display:flex; flex:none; border-top:1px solid var(--grid); border-bottom:1px solid var(--grid); overflow-y:hidden; scrollbar-gutter:stable;}
+.lc-cal-gutter{width:56px; flex:none;}
+.lc-cal-wk-days{flex:1; display:grid;}
+.lc-cal-wk-day{display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 0; font-size:13px; color:var(--text);}
+.lc-cal-wk-day .lc-dow{color:var(--text-muted); font-weight:500;}
+.lc-cal-wk-day .lc-num{min-width:24px; height:24px; padding:0 6px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-weight:600; font-variant-numeric:tabular-nums;}
+.lc-cal-wk-day.weekend .lc-num{color:var(--text-muted);}
+.lc-cal-wk-day.today .lc-num{background:var(--lc-red); color:#fff;}
+.lc-cal-wk-scroll{flex:1; min-height:0; overflow-y:auto; scrollbar-gutter:stable; display:flex; padding:8px 0;}
+.lc-cal-hours{position:relative; font-size:10px; color:var(--text-muted); font-variant-numeric:tabular-nums;}
+.lc-cal-hours .lc-hr{position:absolute; left:0; right:8px; text-align:right; line-height:12px; font-weight:500;}
+.lc-cal-hours .lc-hr small{font-size:8px; margin-left:2px; letter-spacing:.02em;}
+.lc-now-pill{position:absolute; right:4px; transform:translateY(-50%); background:var(--lc-red); color:#fff; font-size:10px; font-weight:700; line-height:14px; padding:1px 6px; border-radius:7px; z-index:5;}
+.lc-cal-wk-grid{flex:1; display:grid; position:relative;}
+.lc-cal-hourlines{position:absolute; inset:0; pointer-events:none; background-image:repeating-linear-gradient(to bottom, var(--grid) 0, var(--grid) 1px, transparent 1px, transparent 40px);}
+/* vạch giờ hiện tại: mảnh mờ trên cả tuần, đậm + chấm đỏ ở cột hôm nay */
+.lc-now-line{position:absolute; left:0; right:0; height:0; border-top:1px solid color-mix(in srgb, var(--lc-red) 40%, transparent); z-index:4; pointer-events:none;}
+.lc-now-today{position:absolute; left:0; right:0; height:0; margin-top:-1px; border-top:2px solid var(--lc-red); z-index:5; pointer-events:none;}
+.lc-now-today::before{content:""; position:absolute; left:-4px; top:-5px; width:8px; height:8px; border-radius:50%; background:var(--lc-red);}
+.lc-cal-daycol{position:relative; border-left:1px solid var(--grid);}
+.lc-cal-daycol.weekend{background:var(--weekend);}
 .lc-cal-hourline{position:absolute; left:0; right:0; height:1px; background:var(--border);}
-.lc-cal-event{position:absolute; left:4px; right:4px; border-radius:6px; padding:4px 7px; overflow:hidden; cursor:pointer; border-left:3px solid var(--ev-c); background:var(--ev-tint); transition:opacity .12s ease;}
-.lc-cal-event .lc-t{font-weight:700; font-size:11px; line-height:1.25; color:var(--ev-c);}
-.lc-cal-event .lc-s{font-size:9.5px; color:var(--text-muted); margin-top:1px;}
-.lc-cal-event.compact{display:flex; align-items:center; gap:5px; padding:2px 7px;}
+/* sự kiện kiểu macOS: nền nhạt theo màu lịch, vạch màu bên trái, chữ đậm cùng tông */
+.lc-cal-event{position:absolute; left:2px; right:3px; border-radius:5px; padding:3px 6px 3px 9px; overflow:hidden; cursor:pointer; background:color-mix(in srgb, var(--ev-c) 15%, var(--surface)); transition:opacity .12s ease;}
+.lc-cal-event::before{content:""; position:absolute; left:2px; top:2px; bottom:2px; width:3px; border-radius:2px; background:var(--ev-c);}
+.lc-cal-event .lc-t{font-weight:600; font-size:11px; line-height:1.25; color:color-mix(in srgb, var(--ev-c) 78%, var(--text));}
+.lc-cal-event .lc-s{font-size:10px; color:color-mix(in srgb, var(--ev-c) 70%, var(--text-muted)); margin-top:1px; opacity:.9;}
+.lc-cal-event.compact{display:flex; align-items:center; gap:5px; padding:2px 6px 2px 9px;}
 .lc-cal-event.compact .lc-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .lc-cal-event.compact .lc-s{flex:none; margin-top:0; white-space:nowrap;}
 .lc-cal-event.dim{opacity:0; pointer-events:none;}
@@ -253,10 +325,30 @@ html[data-theme="dark"][data-accent="teal"] .lc-page{--primary:#3FC2B6; --primar
 .lc-sync-conflict-banner .lc-msg{flex:1; font-weight:600;}
 .lc-sync-conflict-banner button{border:none; background:var(--danger); color:#fff; font-size:11.5px; font-weight:700; padding:7px 13px; border-radius:8px; cursor:pointer; font-family:inherit;}
 .lc-sync-conflict-banner .lc-dismiss{background:transparent; color:var(--danger); padding:7px 8px;}
+/* Xung đột đồng bộ: icon cảnh báo trên thanh tiêu đề + pop-up Xem & xử lý / Bỏ qua */
+.lc-conflict{position:relative; flex:none;}
+.lc-conflict-btn{position:relative; width:34px; height:34px; border-radius:50%; border:1px solid color-mix(in srgb, var(--danger) 35%, transparent); background:var(--danger-tint); color:var(--danger); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.lc-conflict-btn:hover, .lc-conflict-btn.on{background:var(--danger); color:#fff;}
+.lc-conflict-n{position:absolute; top:-5px; right:-5px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; border:2px solid var(--surface); background:var(--danger); color:#fff; font-size:9.5px; font-weight:700; line-height:12px; text-align:center;}
+.lc-conflict-pop{position:absolute; top:calc(100% + 8px); left:0; z-index:60; width:300px; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 14px 34px rgba(0,0,0,.16);}
+.lc-conflict-h{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--danger);}
+.lc-conflict-msg{margin-top:6px; font-size:12px; line-height:1.55; color:var(--text);}
+.lc-conflict-acts{display:flex; justify-content:flex-end; gap:6px; margin-top:12px;}
+.lc-conflict-acts button{height:30px; padding:0 14px; border-radius:999px; border:none; font:inherit; font-size:12px; font-weight:700; cursor:pointer;}
+.lc-conflict-acts .lc-go{background:var(--danger); color:#fff;}
+.lc-conflict-acts .lc-go:hover{filter:brightness(1.08);}
+.lc-conflict-acts .lc-dismiss{background:var(--surface-alt); color:var(--text);}
+.lc-conflict-acts .lc-dismiss:hover{background:var(--border);}
+/* Thông báo đặt giữa thanh tiêu đề trang: gọn 1 dòng, chữ dài thì cắt "…" (di chuột xem đủ) */
+.lc-head-notice{flex:1; min-width:0; display:flex; justify-content:center; padding:0 8px;}
+.lc-head-notice .lc-sync-conflict-banner{max-width:720px; min-width:0; padding:5px 6px 5px 12px; gap:8px; font-size:12px; border-radius:9px;}
+.lc-head-notice .lc-sync-conflict-banner .lc-msg{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.lc-head-notice .lc-sync-conflict-banner button{flex:none; padding:5px 11px; font-size:11.5px; border-radius:7px;}
+.lc-head-notice .lc-sync-conflict-banner .lc-dismiss{padding:5px 6px;}
 
 /* ===================== Sidebar đa nhiệm kiểu Lark ===================== */
 .lc-cal-sidebar-tabs{display:flex; gap:2px; background:var(--surface-alt); border-radius:9px; padding:3px; flex:none;}
-.lc-cal-sidebar-tab{flex:1; border:none; background:transparent; color:var(--text-muted); font-size:11.5px; font-weight:600; padding:7px 4px; border-radius:7px; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:4px;}
+.lc-cal-sidebar-tab{flex:1; white-space:nowrap; border:none; background:transparent; color:var(--text-muted); font-size:11.5px; font-weight:600; padding:7px 4px; border-radius:7px; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:4px;}
 .lc-cal-sidebar-tab.active{background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08);}
 .lc-cal-sidebar-pane{display:none; flex-direction:column; gap:14px; overflow-y:auto; flex:1; min-height:0;}
 .lc-cal-sidebar-pane.active{display:flex;}

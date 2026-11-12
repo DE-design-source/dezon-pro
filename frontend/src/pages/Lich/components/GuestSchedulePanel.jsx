@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import {
-  CAL_DOW, WEEK_DATES, TODAY_IDX, HOUR_LABELS, GRID_HEIGHT, DAYCOL_ROW_HEIGHT, COLLEAGUE_SCHEDULE,
+  CAL_DOW, WEEK_DATES, TODAY_IDX, HOUR_LABELS, GRID_HEIGHT, GRID_START, DAYCOL_ROW_HEIGHT, COLLEAGUE_SCHEDULE,
   decHourToLabel,
 } from '../../../data/lichData'
 import Avatar from './Avatar'
 
-const GRID_START = 8 // lưới bắt đầu lúc 8:00
 const GRID_END = GRID_START + GRID_HEIGHT / DAYCOL_ROW_HEIGHT
 const COL_WIDTH = 150
 const GUTTER_WIDTH = 52

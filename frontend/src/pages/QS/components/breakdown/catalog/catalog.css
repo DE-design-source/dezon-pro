@@ -204,3 +204,101 @@ html[data-theme="dark"] .qs-bdc-cc.fav .qs-bdc-cc-h{color:#FBBF24; background:#3
 .qs-bd-ffind input{flex:1; min-width:0; height:100%; padding:0; border:none; outline:none; background:none; color:var(--text); font:inherit; font-size:12.5px;}
 .qs-bd-ffind button{width:20px; height:20px; flex:none; padding:0; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
 .qs-bd-fchips.finding{max-height:none;}
+
+/* Phần thô: chip nhóm Khái toán | Dự toán ở đầu cột thư viện (thay tiêu đề "Nội dung công việc") */
+.qs-bd-ptchips{display:inline-flex; gap:3px; padding:3px; border-radius:10px; background:var(--surface-alt);}
+.qs-bd-ptchips button{display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 12px; border:0; border-radius:8px; background:none; color:var(--text-muted); font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;}
+.qs-bd-ptchips button:hover{color:var(--text);}
+.qs-bd-ptchips button.on{background:var(--dash-navy, #0B2545); color:#fff; box-shadow:0 1px 3px rgba(15,23,42,.18);}
+.qs-bd-ptchips button em{font-style:normal; padding:0 7px; border-radius:99px; background:rgba(255,255,255,.18); font-size:11.5px; font-weight:700;}
+/* 2 chip chia đều chiều ngang đầu cột (50/50) */
+.qs-bd-catalog-head .qs-bd-ptchips{flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; min-width:0;}
+.qs-bd-ptchips button{justify-content:center; min-width:0;}
+
+/* Phần thô ① Hạng mục sản phẩm: 2 chip loại (chia đôi) thay cho ô chọn */
+.qspt-lchips{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px;}
+.qspt-lchips button{display:inline-flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; min-width:0; white-space:nowrap;}
+.qspt-lchips button:hover{border-color:var(--dash-accent, #2F5DA8);}
+.qspt-lchips button.on{border-color:var(--dash-navy, #0B2545); background:var(--dash-navy, #0B2545); color:#fff; font-weight:700;}
+.qspt-lchips button em{font-style:normal; padding:0 7px; border-radius:99px; background:var(--surface-alt); color:var(--text-muted); font-size:11.5px; font-weight:700;}
+.qspt-lchips button.on em{background:rgba(255,255,255,.18); color:#fff;}
+
+/* module thanh công cụ trống (Phần thô chưa có dòng nào) thì ẩn */
+.qs-bd-toolmod:empty{display:none;}
+
+/* Phần thô: khối chip Khái toán | Dự toán dời xuống thân cột (đầu cột là module bộ lọc như các đề mục khác) */
+.qs-bdc-ptnhom{padding:10px 12px 0;}
+.qs-bdc-ptnhom .qs-bd-ptchips{display:grid; grid-template-columns:1fr 1fr; width:100%; box-sizing:border-box;}
+
+/* Phần thô: khung Bộ lọc / Công tác yêu thích bên phải cột thư viện */
+.qspt-fpsec{display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface);}
+.qspt-fpsec + .qspt-fpsec{margin-top:10px;}
+.qspt-fpsec .hd{font-size:13.5px; font-weight:700;}
+.qspt-fpsec .grid{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px;}
+.qspt-fpchip{display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:34px; padding:4px 10px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer;}
+.qspt-fpchip span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qspt-fpchip em{flex:none; font-style:normal; font-size:11.5px; color:var(--text-muted);}
+.qspt-fpchip:hover{border-color:var(--dash-accent, #2F5DA8);}
+.qspt-fpchip.on{border-color:var(--dash-accent, #2F5DA8); background:var(--dash-accent-tint, rgba(47,93,168,.1)); color:var(--dash-accent, #2F5DA8); font-weight:700;}
+.qspt-fplist{display:flex; flex-direction:column; gap:6px;}
+.qspt-fpit{display:grid; grid-template-columns:minmax(0, 1fr) auto auto; grid-template-areas:'nm fav add' 'mt fav add'; align-items:center; gap:2px 8px; padding:9px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface);}
+.qspt-fpit .nm{grid-area:nm; display:flex; flex-direction:column; font-size:13px; font-weight:600; min-width:0;}
+.qspt-fpit .nm span{font-size:11px; font-weight:500; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qspt-fpit .mt{grid-area:mt; display:flex; gap:8px; font-size:12px;}
+.qspt-fpit .mt i{color:var(--text-muted);}
+.qspt-fpit .fav{grid-area:fav; border:0; background:none; color:#e0a100; cursor:pointer;}
+.qspt-fpit .add{grid-area:add; display:grid; place-items:center; width:28px; height:28px; border:1.5px solid var(--dash-navy, #0B2545); border-radius:50%; background:none; color:var(--dash-navy, #0B2545); cursor:pointer;}
+.qspt-fpempty{padding:14px; border:1px dashed var(--border); border-radius:10px; font-size:12.5px; color:var(--text-muted);}
+
+/* Phần thô: 1 module = chip Khái toán | Dự toán + bước chọn (hạng mục, nhà thầu...) */
+.qs-bdc-ptmod{flex:0 1 auto; min-height:0; max-height:60%; display:flex; flex-direction:column; margin-top:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden;}
+.qs-bdc-ptmod .qs-bdc-ptnhom{flex:none; padding:10px 10px 0;}
+.qs-bdc-ptmod .qs-bdc-ptf{flex:1 1 auto; max-height:none; padding:0 2px 4px;}
+.qs-bdc-ptmod .qspt-filters{border:0; box-shadow:none;}
+
+/* Phần thô - module chọn loại báo giá (thiết kế lại): nhóm = thanh chia đôi; các bước = số tròn nối bằng vạch dọc;
+   loại = 2 thẻ chọn; nhà thầu / hạng mục vật tư = ô chọn cao bằng ô nhập */
+.qs-bdc-ptmod{padding:12px; gap:14px;}
+.qs-bdc-ptmod .qs-bdc-ptnhom{padding:0;}
+.qs-bdc-ptmod .qs-bd-ptchips{height:40px; padding:3px; border-radius:11px; gap:3px;}
+.qs-bdc-ptmod .qs-bd-ptchips button{height:34px; border-radius:9px; font-size:13.5px;}
+.qs-bdc-ptmod .qs-bdc-ptf{padding:0;}
+.qs-bdc-ptmod .qspt-flow{gap:14px; padding:0 0 2px; margin:0; border-bottom:0;}
+.qs-bdc-ptmod .qspt-step{position:relative; gap:12px;}
+.qs-bdc-ptmod .qspt-step + .qspt-step::before{content:""; position:absolute; left:11px; top:-14px; width:2px; height:14px; border-radius:2px; background:var(--border);}
+.qs-bdc-ptmod .qspt-sn{width:24px; height:24px; margin-top:0; background:var(--surface-alt); color:var(--text-muted); font-size:12px;}
+.qs-bdc-ptmod .qspt-step:has(.qspt-lchips) .qspt-sn,
+.qs-bdc-ptmod .qspt-step:has(.qspt-msel.active) .qspt-sn{background:var(--dash-navy, #0B2545); color:#fff;}
+.qs-bdc-ptmod .qspt-sl{margin:4px 0 8px; font-size:11px; letter-spacing:.05em;}
+.qs-bdc-ptmod .qspt-lchips{gap:8px;}
+.qs-bdc-ptmod .qspt-lchips button{height:40px; border-radius:10px; border-color:var(--border); background:var(--surface); font-weight:600;}
+.qs-bdc-ptmod .qspt-lchips button.on{border-color:var(--dash-navy, #0B2545); background:var(--dash-soft, rgba(11,37,69,.06)); color:var(--dash-navy, #0B2545); box-shadow:inset 0 0 0 1px var(--dash-navy, #0B2545); font-weight:800;}
+.qs-bdc-ptmod .qspt-lchips button.on em{background:var(--dash-navy, #0B2545); color:#fff;}
+html[data-theme="dark"] .qs-bdc-ptmod .qspt-lchips button.on{color:#fff; border-color:var(--dash-accent); box-shadow:inset 0 0 0 1px var(--dash-accent);}
+.qs-bdc-ptmod .qspt-msel{height:40px; box-sizing:border-box; padding:0 12px; border-radius:10px; font-size:13.5px; background:var(--surface-alt); border-color:transparent;}
+.qs-bdc-ptmod .qspt-msel:hover{border-color:var(--border); background:var(--surface);}
+.qs-bdc-ptmod .qspt-msel.active{background:var(--dash-soft, rgba(11,37,69,.06)); border-color:var(--dash-navy, #0B2545);}
+
+.qspt-fpsec .hd .sub{margin-left:6px; font-size:11.5px; font-weight:500; color:var(--text-muted);}
+.qspt-fpmau{display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.qspt-fpmau b{font-size:13px;} .qspt-fpmau span{font-size:11.5px; color:var(--text-muted);}
+.qspt-fpmau:hover{border-color:var(--dash-accent, #2F5DA8); background:var(--dash-accent-tint, rgba(47,93,168,.08));}
+/* trong khung chọn: chip loại / ô chọn của module bên trái không tính là bấm ra ngoài (khung mở lại ngay) */
+
+/* Phần thô: nút mở + khung Danh sách dự án mẫu */
+.qspt-fpmore{display:flex; align-items:center; gap:8px; height:40px; padding:0 12px; border:1px dashed var(--dash-accent, #2F5DA8); border-radius:10px; background:var(--dash-accent-tint, rgba(47,93,168,.06)); color:var(--dash-accent, #2F5DA8); font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+.qspt-fpmore span{flex:1; text-align:left;}
+.qspt-fpmore em{font-style:normal; padding:0 7px; border-radius:99px; background:var(--dash-accent, #2F5DA8); color:#fff; font-size:11.5px;}
+.qspt-mauwrap{display:flex; flex-direction:column; gap:10px;}
+.qspt-mauq{height:38px; padding:0 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; outline:none;}
+.qspt-mauq:focus{border-color:var(--dash-accent, #2F5DA8);}
+.qspt-maucard{display:flex; flex-direction:column; gap:10px; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.qspt-maucard:hover{border-color:var(--dash-accent, #2F5DA8);}
+.qspt-maucard .tt{display:flex; flex-direction:column; gap:4px;}
+.qspt-maucard .tt b{font-size:14px; line-height:1.35;}
+.qspt-maucard .tt span{font-size:12px; color:var(--text-muted);}
+.qspt-maucard .ft{display:flex; align-items:center; justify-content:space-between; gap:10px; padding-top:10px; border-top:1px dashed var(--border);}
+.qspt-maucard .tg{font-size:12px; color:var(--text-muted);}
+.qspt-maucard .tg b{color:var(--text); font-size:13px;}
+.qspt-maucard .ft .qs-modal-btn{flex:none; height:34px; padding:0 14px; white-space:nowrap; line-height:1;}
+.qspt-maucard .tg{min-width:0;}

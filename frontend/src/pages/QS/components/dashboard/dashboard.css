@@ -529,3 +529,41 @@ button.qs-dash-draft-info:hover{border-color:var(--dash-accent-border); backgrou
 .qs-dash-draft .qs-dash-draft-n:hover{background:none; box-shadow:none; color:var(--dash-accent); text-decoration:underline; text-underline-offset:3px;}
 /* 2 nhãn trên có viền cùng màu chữ (MarkUp 10:11) */
 .qs-scroll-home .qs-dash-src-pill.qs, .qs-scroll-home .qs-dash-tt:not(.done):not(.run){border:1px solid currentColor; box-sizing:border-box;}
+/* Thanh "Danh sách dự án" khi hẹp (mở Dezbot, màn nhỏ): các cụm nút tự xuống hàng thay vì bị cắt mép phải,
+   tiêu đề giữ 1 dòng (không bẻ "Danh / sách / dự / án") - MarkUp 2026-11-12 14:57 */
+.qs-dash-list-head{flex-wrap:wrap; row-gap:8px;}
+.qs-dash-list-head .qs-dash-title{white-space:nowrap;}
+.qs-dash-list-head > *{flex-shrink:0;}
+.qs-dash-list-head .qs-dash-search{flex:1 1 160px; min-width:160px;}
+/* Thanh "Danh sách dự án" cùng cỡ với băng dự án của Bóc tách (.qs-pc, project.css): chữ nhỏ 10% như băng (--fs x .9),
+   đệm 8 / 14, mỗi cụm nút là 1 khung cao 40 bo 10 (như .qs-pc-mod), nút trong khung cao 28 chữ 12 - MarkUp 2026-11-12 15:16 */
+.qs-dash-list .qs-dash-list-head{--fs:calc(var(--fs-user, 1) * var(--qs-text, 1.3333) * .9); min-height:56px; padding:8px 14px; gap:12px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-title{font-size:14px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-count{font-size:11.5px;}
+.qs-dash-list-head .qs-dash-views, .qs-dash-list-head .qs-dash-tmod{height:40px; padding:0 6px; gap:2px; border-radius:10px;}
+.qs-dash-list-head .qs-dash-view, .qs-dash-list-head .qs-dash-tmod .qs-dash-time-btn, .qs-dash-list-head .qs-dash-tmod .qs-dash-view{height:28px; border-radius:7px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-src .qs-dash-view, .qs-scroll-home .qs-dash-list-head .qs-dash-dens .qs-dash-view,
+.qs-scroll-home .qs-dash-list-head .qs-dash-tmod .qs-dash-time-btn, .qs-scroll-home .qs-dash-list-head .qs-dash-tmod .qs-dash-view{font-size:12px; padding:0 12px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-src .qs-dash-view small{font-size:10.5px;}
+.qs-dash-list-head .qs-dash-view:not(.qs-dash-dens .qs-dash-view):not(.qs-dash-src .qs-dash-view):not(.qs-dash-tmod .qs-dash-view){width:30px;}
+.qs-dash-list-head .qs-dash-tmod .qs-dash-tquick{height:28px;}
+.qs-dash-list-head .qs-dash-search input{height:40px; border-radius:10px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-search input{font-size:12px;}
+.qs-dash-list-head .qs-dash-create{height:40px; padding:0 14px; border-radius:10px;}
+.qs-scroll-home .qs-dash-list-head .qs-dash-create{font-size:12.5px;}
+/* Thanh "Danh sách dự án" luôn 1 hàng (MarkUp 2026-11-12 15:23): ProjectList đo tràn chữ (useFitLevel) rồi gán data-fit 0..5,
+   mỗi mức gọn hơn: 1 Tạo dự án chỉ còn (+) · 2 nguồn rút còn Tất cả / KD / QS, bỏ số đếm · 3 ô tìm hẹp lại ·
+   4 nút chọn kỳ chỉ còn biểu tượng lịch · 5 Tuần / Tháng / Quý / Năm và Gọn / Vừa / Rộng rút còn chữ đầu. Tên đủ ở chú thích khi rê chuột */
+.qs-dash-list .qs-dash-list-head{flex-wrap:nowrap; row-gap:0;}
+.qs-dash-list-head .ls{display:none;}
+.qs-dash-list-head .qs-dash-create{justify-content:center;}
+.qs-dash-list-head[data-fit]:not([data-fit="0"]) .qs-dash-create{width:40px; padding:0;}
+.qs-dash-list-head[data-fit]:not([data-fit="0"]) .qs-dash-create .lf{display:none;}
+.qs-dash-list-head:is([data-fit="2"], [data-fit="3"], [data-fit="4"], [data-fit="5"]) .qs-dash-src .lf,
+.qs-dash-list-head:is([data-fit="2"], [data-fit="3"], [data-fit="4"], [data-fit="5"]) .qs-dash-src small{display:none;}
+.qs-dash-list-head:is([data-fit="2"], [data-fit="3"], [data-fit="4"], [data-fit="5"]) .qs-dash-src .ls{display:inline;}
+.qs-dash-list-head:is([data-fit="3"], [data-fit="4"], [data-fit="5"]) .qs-dash-search{flex-basis:110px; min-width:110px;}
+.qs-dash-list-head:is([data-fit="4"], [data-fit="5"]) .qs-dash-time-btn .lf{display:none;}
+.qs-dash-list-head[data-fit="5"] .qs-dash-tquick .lf, .qs-dash-list-head[data-fit="5"] .qs-dash-dens .lf{display:none;}
+.qs-dash-list-head[data-fit="5"] .qs-dash-tquick .ls, .qs-dash-list-head[data-fit="5"] .qs-dash-dens .ls{display:inline;}
+.qs-dash-list-head[data-fit="5"] .qs-dash-search{flex-basis:90px; min-width:90px;}

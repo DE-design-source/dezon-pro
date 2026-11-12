@@ -9,8 +9,9 @@ export const CAL_COLOR_VARS = {
   hr: ['var(--success)', 'var(--success-tint)'],
 }
 
-export const DAYCOL_ROW_HEIGHT = 40 // px mỗi giờ, lưới bắt đầu lúc 8:00
-export const GRID_HEIGHT = 560
+export const DAYCOL_ROW_HEIGHT = 40 // px mỗi giờ
+export const GRID_START = 0 // lưới đủ 24 giờ: 0:00 - 24:00
+export const GRID_HEIGHT = 24 * DAYCOL_ROW_HEIGHT
 
 /* Người đang đăng nhập (chủ sự kiện). avatar = đường dẫn ảnh, để trống thì hiện chữ viết tắt */
 export const CURRENT_USER = { name: 'Chu Quang Thành', color: 'var(--primary)', avatar: '' }
@@ -74,12 +75,12 @@ export const DAY_DATE_LABELS = ['20/09', '21/09', '22/09', '23/09', '24/09', '25
 export const TODAY_IDX = 3 // Thứ Tư 23/09 = "hôm nay" trong dữ liệu mẫu
 
 /* Nhãn giờ ở cột bên trái lưới tuần/ngày: [top px, nhãn] */
-export const HOUR_LABELS = [
-  [-6, '8 SA'], [34, '9 SA'], [74, '10 SA'], [114, '11 SA'], [154, '12 CH'], [194, '1 CH'], [234, '2 CH'],
-  [274, '3 CH'], [314, '4 CH'], [354, '5 CH'], [394, '6 CH'], [434, '7 CH'], [474, '8 CH'], [514, '9 CH'],
-]
+export const HOUR_LABELS = Array.from({ length: 24 - GRID_START }, (_, i) => {
+  const h = GRID_START + i
+  return [i * DAYCOL_ROW_HEIGHT - 6, (h % 12 || 12) + (h < 12 ? ' SA' : ' CH')]
+})
 
-/* Sự kiện mẫu trong tuần (day = chỉ số cột 0..6) */
+/* Sự kiện mẫu trong tuần (day = chỉ số cột 0..6); top tính từ 8:00, đổi sang lưới 24h ở INITIAL_EVENTS */
 const RAW_EVENTS = [
   { day: 1, cal: 'finance', top: 80, height: 20, compact: true, title: 'Họp nhanh tài chính', sub: '10:00' },
   { day: 1, cal: 'qs', top: 100, height: 20, compact: true, title: 'Check-in ứng dụng', sub: '10:30' },
@@ -107,6 +108,7 @@ export const INITIAL_EVENTS = RAW_EVENTS.map((e, i) => ({
   color: CAL_COLOR_VARS[e.cal][0],
   tint: CAL_COLOR_VARS[e.cal][1],
   ...e,
+  top: e.top + (8 - GRID_START) * DAYCOL_ROW_HEIGHT,
 }))
 
 /* Lịch nhỏ tháng 9/2026: [ngày, trạng thái] — muted / in-week / today */
@@ -223,7 +225,7 @@ export function timeToDecimalHour(str) {
   return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60
 }
 
-export function cellMinutesFromTop(px) { return Math.round(px / DAYCOL_ROW_HEIGHT * 60) + 8 * 60 }
+export function cellMinutesFromTop(px) { return Math.round(px / DAYCOL_ROW_HEIGHT * 60) + GRID_START * 60 }
 
 export function fmtHM(totalMin) {
   const hh = Math.floor(totalMin / 60), mm = totalMin % 60

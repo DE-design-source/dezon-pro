@@ -11,10 +11,11 @@ function lsJson(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'n
 const allCols = () => { const o = {}; PT_COLS.forEach(c => { o[c[0]] = true }); return o }
 
 let st = {
-  contractor: '', libCol: {}, detail: null, infoEdit: false, dtVer: 0,
+  contractor: '', vtCat: '', favOnly: false, sidePop: null, libCol: {}, detail: null, infoEdit: false, dtVer: 0,
   cf: lsJson('qs_ptcf', {}) || {},
   cols: allCols(), order: PT_COLS.map(c => c[0]), colW: {}, sort: '', sortDir: 'asc', filter: {},
   freeze: 0, frzRows: 0, sel: {}, anchor: null, newRow: null, libDrag: null, hist: {},
+  colEdit: null, prefVer: 0,   // chế độ sửa bộ cột (ptPresets.js) · tăng mỗi lần ghi bộ cột để khung vẽ lại
 }
 const subs = new Set()
 export function ptUi() { return st }

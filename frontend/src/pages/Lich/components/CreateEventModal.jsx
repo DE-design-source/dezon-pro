@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { EVENT_COLORS, DATE_OPTIONS, CAL_OPTIONS, ROOMS, COLLEAGUE_DIRECTORY, COLLEAGUE_SCHEDULE, CURRENT_USER, DAYCOL_ROW_HEIGHT, decHourToLabel, timeToDecimalHour, randCode } from '../../../data/lichData'
+import { EVENT_COLORS, DATE_OPTIONS, CAL_OPTIONS, ROOMS, COLLEAGUE_DIRECTORY, COLLEAGUE_SCHEDULE, CURRENT_USER, DAYCOL_ROW_HEIGHT, GRID_START, decHourToLabel, timeToDecimalHour, randCode } from '../../../data/lichData'
 import GuestSchedulePanel from './GuestSchedulePanel'
 import Avatar from './Avatar'
 
@@ -139,7 +139,7 @@ export default function CreateEventModal({ open, onClose, onCreate, events = [] 
   const dayIdx = parseInt(date, 10)
   const myEvents = events
     .filter(ev => ev.cal === 'me' && ev.day === dayIdx && !ev.allday)
-    .map(ev => ({ id: ev.id, title: ev.title, color: ev.color, tint: ev.tint, start: 8 + ev.top / DAYCOL_ROW_HEIGHT, end: 8 + (ev.top + ev.height) / DAYCOL_ROW_HEIGHT }))
+    .map(ev => ({ id: ev.id, title: ev.title, color: ev.color, tint: ev.tint, start: GRID_START + ev.top / DAYCOL_ROW_HEIGHT, end: GRID_START + (ev.top + ev.height) / DAYCOL_ROW_HEIGHT }))
 
   const host = withPhoto(CURRENT_USER)
   const shownGuests = guests.map(withPhoto)

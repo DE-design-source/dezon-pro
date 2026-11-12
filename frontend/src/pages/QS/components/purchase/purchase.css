@@ -275,7 +275,7 @@ html[data-theme="dark"] .qs-po-pm-i.tot b{color:#4ADE80;}
 .qs-po-side > .qs-card{border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 3px rgba(15, 23, 42, .06); overflow:hidden;}
 @media (max-width:1280px){ .qs-po-side{order:2; width:100%;} }
 /* cột tóm tắt trái kéo tới đáy khung nhìn (trang QS bị zoom nên chia --qs-zoom); thẻ cuối giãn lấp phần còn lại */
-.qs-po-side{align-self:flex-start; min-height:calc((100vh - 150px) / var(--qs-zoom, .675));}
+.qs-po-side{align-self:flex-start; min-height:calc((100vh - 150px) / var(--qs-vz, .75));}
 .qs-po-side > .qs-card:last-child{flex:1 0 auto;}
 @media (max-width:1280px){ .qs-po-side{min-height:0;} .qs-po-side > .qs-card:last-child{flex:none;} }
 /* đầu các thẻ cột trái (Tổng hợp đơn · Đơn đã gửi · Phiếu đề xuất đã gửi) cao như đầu thẻ cột trái Bảng điều khiển */
@@ -290,7 +290,7 @@ html[data-theme="dark"] .qs-po-pm-i.tot b{color:#4ADE80;}
    cách hàng hạng mục / tìm kiếm phía trên 12px, cách cột trái 16px */
 .qs-po-main{margin-top:12px; align-items:stretch;}
 .qs-po-list{align-self:stretch; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 1px 3px rgba(15, 23, 42, .06);
-  min-height:calc((100vh - 150px) / var(--qs-zoom, .675));}
+  min-height:calc((100vh - 150px) / var(--qs-vz, .75));}
 /* mỗi thẻ NCC viền đậm (navy pha) để tách rõ từng nhà cung cấp; thẻ đang chọn viền màu nhấn */
 .qs-po-list{gap:16px;}
 .qs-po-list > .qs-po-card{border:1.5px solid color-mix(in srgb, var(--dash-navy) 40%, var(--border)); border-radius:10px; box-shadow:0 2px 6px rgba(15, 23, 42, .08);}

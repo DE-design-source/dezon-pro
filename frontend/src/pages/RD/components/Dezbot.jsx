@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 import { PROJECTS, IDEAS, isActiveProject } from '../../../data/rdData'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 const FALLBACK = 'Tôi có thể hỗ trợ thông tin về dự án nghiên cứu, ý tưởng & đề xuất, ngân sách R&D và bằng sáng chế. Bạn thử hỏi lại theo các chủ đề này nhé.'
 
 export function loadAiPanelWidth() {
@@ -11,7 +13,7 @@ export function loadAiPanelWidth() {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Các chủ đề của Dezbot bộ phận R&D (giống AI_TOPICS trong rd.html) */
@@ -143,6 +145,7 @@ export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChan
                 {TOPICS.map(t => (
                   <button key={t.key} className={`rd-ai-chip rd-ai-topic-chip${t.wide ? ' wide' : ''}`} onClick={() => openTopic(t)}>{t.label}</button>
                 ))}
+                <BugChip className="rd-ai-chip rd-ai-topic-chip" onBefore={onClose} />
               </div>
             </div>
           ) : (

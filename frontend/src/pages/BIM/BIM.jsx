@@ -8,6 +8,8 @@ import ProjectListView from './components/ProjectListView'
 import LinkedView from './components/LinkedView'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { BIM_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
 const DEFAULT_SUBTITLE = 'Không gian dữ liệu BIM liên kết SketchUp'
 
@@ -38,6 +40,9 @@ export default function BIM() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/bim')
+  useTabFallback(tabHidden, pageTab, BIM_TABS.map(t => t.key), setPageTab)
 
   const project = projects.find(p => p.code === projectCode) || null
   const subtitle = view === 'linked' && project ? `${project.name} · ${DEFAULT_SUBTITLE}` : DEFAULT_SUBTITLE
@@ -102,8 +107,9 @@ export default function BIM() {
         <div className="bim-header-icon"><Icon name="cube" size={16} /></div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>BIM</span>
         <div className="hdr-tabs" role="tablist">
-          <button className={`hdr-tab${pageTab === 'main' ? ' active' : ''}`} onClick={() => setPageTab('main')}>Tổng quan</button>
-          <button className={`hdr-tab${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => setPageTab('nhansu')}>Cơ cấu phòng ban</button>
+          {BIM_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            <button key={t.key} className={`hdr-tab${pageTab === t.key ? ' active' : ''}`} onClick={() => setPageTab(t.key)}>{t.label}</button>
+          ))}
         </div>
         <button className="bim-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'

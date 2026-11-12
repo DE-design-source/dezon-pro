@@ -65,7 +65,7 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 
 /* ---------- Xem ảnh lớn (imgPop_, PUB/index.html:450-452, 1800-1807) ---------- */
 .qsc-iv{position:fixed; inset:0; z-index:99; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.72); cursor:zoom-out;}
-.qsc-iv img{max-width:calc(76vw / var(--qs-zoom, .75)); max-height:calc(80vh / var(--qs-zoom, .75)); object-fit:contain; background:#fff; border-radius:10px; box-shadow:0 12px 48px rgba(0,0,0,.4); cursor:default;}
+.qsc-iv img{max-width:calc(76vw / var(--qs-vz, .75)); max-height:calc(80vh / var(--qs-vz, .75)); object-fit:contain; background:#fff; border-radius:10px; box-shadow:0 12px 48px rgba(0,0,0,.4); cursor:default;}
 .qsc-iv-x{position:fixed; top:18px; right:22px; color:#fff; font-size:26px; line-height:1; cursor:pointer; opacity:.85; border:none; background:none; padding:0;}
 .qsc-iv-x:hover{opacity:1;}
 .qsc-iv-nav{position:fixed; top:50%; transform:translateY(-50%); width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.12); color:#fff; font-size:26px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .13s;}
@@ -155,9 +155,9 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 .qsc-ss-in .clr{width:22px; height:22px; flex:none; padding:0; border:none; border-radius:50%; background:var(--surface-alt); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
 .qsc-ss-in .clr:hover{background:var(--danger); color:#fff;}
 .qsc-ss-pop{position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:40; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 14px 32px rgba(15, 23, 42, .18); overflow:hidden;}
-.qsc-ss-list{max-height:min(560px, calc(62vh / var(--qs-zoom, .75))); overflow-y:auto; padding:4px;}
+.qsc-ss-list{max-height:min(560px, calc(62vh / var(--qs-vz, .75))); overflow-y:auto; padding:4px;}
 .qsc-ss.inline .qsc-ss-pop{position:static; margin-top:4px; box-shadow:none;}
-.qsc-ss.inline .qsc-ss-list{max-height:min(360px, calc(45vh / var(--qs-zoom, .75)));}
+.qsc-ss.inline .qsc-ss-list{max-height:min(360px, calc(45vh / var(--qs-vz, .75)));}
 .qsc-ss-list button{width:100%; min-height:34px; padding:6px 10px; border:none; border-radius:7px; background:none; color:var(--text); font:inherit; font-size:13.5px; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;}
 .qsc-ss-list button span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .qsc-ss-list button.all{color:var(--text-muted); font-style:italic;}

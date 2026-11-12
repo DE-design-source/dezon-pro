@@ -3,6 +3,7 @@ import SheetBody from '../breakdown/SheetBody'
 import { colLetter, ROW_NUM_WIDTH } from '../breakdown/sheet/tkModel'
 import '../breakdown/sheet/sheet.css'
 import QsIcon from '../common/QsIcon'
+import Icon from '../../../../components/ui/Icon'
 import { qsToast as toast } from '../common/dialogs'
 import { money, tkNum_ } from '../../lib/format.js'
 import { PT_ROMAN } from '../../lib/phantho.js'
@@ -22,7 +23,7 @@ import { PtSheetMenu } from './PtMenus'
    Ô sửa ghi bằng đúng ptEdit của bảng thường (qua ptSheetWrite); ô không sửa được theo kiểu tính của nhóm thì bỏ qua (ptSheetSua_).
    Hoàn tác / làm lại chỉ lùi các ô người dùng gõ (như onundo của Jspreadsheet); thêm / xoá / kéo dòng xoá lịch sử.
    Định dạng ô lưu projData.btFmt khoá 'pt:<si>:<ii>' như bản gốc (btFmtKey_).
-   Props: data = usePhanTho(), tpl, showCols (fold 'cols'), visible. */
+   Props: data = usePhanTho(), tpl, visible (dải chip cột: PtColsModule ở BreakdownTab). */
 
 const NO_FAVS = new Set()
 const NO_HIDDEN = new Set()
@@ -35,7 +36,7 @@ const parseId = id => { const a = String(id).split(':'); return { si: +a[1], ii:
 const mapKeys = (o, fn) => { if (!o) return o; const r = {}; Object.keys(o).forEach(k => { r[fn(k)] = o[k] }); return r }
 const collapsed = {}   // gập nhóm theo dự án (chỉ hiển thị)
 
-export default function PtSheet({ data, tpl, showCols, visible, tools }) {
+export default function PtSheet({ data, tpl, visible, tools, toolsSlot = null, plain = false }) {
   const { phanTho, comp, maDA } = data
   const ui = usePtUi()
   const btFmt = useQsStore(s => (s.projData && s.projData.btFmt) || null)
@@ -203,33 +204,19 @@ export default function PtSheet({ data, tpl, showCols, visible, tools }) {
         onBlur={ev => { if (ev.target.value !== shown) A.ptSheetWrite([{ si: e.gi, ii: -1, f: 'up', val: ev.target.value }], 'Sửa đơn giá nhóm') }} />
     )
   }
-  const extraTools = (<>
-    {tools}
-    <button className="qs-bd-tb-btn qspt-tbcols" title="Ẩn / hiện hàng chọn cột hiển thị" onMouseDown={e => e.preventDefault()}
-      onClick={() => { try { const v = JSON.parse(localStorage.getItem('qs_fold') || 'null') || { cols: true }; v.cols = !v.cols; delete v._all; localStorage.setItem('qs_fold', JSON.stringify(v)); window.dispatchEvent(new Event('qs:fold')) } catch (x) { /* bỏ qua */ } }}>
-      <QsIcon name="sliders" size={15} /> Cột
-    </button>
+  /* Góc phải thanh công cụ (chỗ nút Thêm tầng / Hạng mục của tab Thiết bị đèn): Xoá hết + Thêm hạng mục Phần thô */
+  const addNode = (<>
+    <button className="qs-bd-tb-btn" title="Xoá hết bảng Phần thô" onMouseDown={e => e.preventDefault()} onClick={A.ptReset}><Icon name="trash" size={18} /></button>
+    <button className="qs-bd-add-row" title="Thêm hạng mục Phần thô" onClick={A.ptAddSection}><Icon name="plusCircle" size={16} />Hạng mục</button>
   </>)
 
   return (
     <div className="qspt-wrap">
-      <div className="qspt-toolbar">
-        <div className="qspt-tt">Bảng ước tính chi phí — <b>Xây dựng thô</b></div>
-        <div className="qspt-sp" />
-        <button className="qspt-btn ghost sm" onClick={A.ptReset}><QsIcon name="trash" size={14} /> Xoá hết</button>
-        <button className="qspt-btn blue sm" onClick={A.ptAddSection}><QsIcon name="plus" size={14} /> Thêm hạng mục</button>
-      </div>
-      {showCols && (
-        <div className="qspt-colchips">
-          <span className="qspt-collbl">Cột hiển thị</span>
-          {Object.keys(ui.filter || {}).length > 0 && <button className="qspt-btn ghost sm on" title="Bỏ mọi bộ lọc cột" onClick={() => setPtUi({ filter: {} })}>Đang lọc {Object.keys(ui.filter).length} cột ✕</button>}
-          {PT_COLS.map(c => <span key={c[0]} className={`qspt-chip${ui.cols[c[0]] ? ' on' : ''}`} onClick={() => setPtUi(s => ({ cols: { ...s.cols, [c[0]]: !s.cols[c[0]] } }))}>{c[1]}</span>)}
-        </div>
-      )}
       <div className={`qs-card qs-bd-sheet qspt-sheet${full ? ' full' : ''}`} ref={sheetEl}>
         <SheetBody
           sheet={facade}
-          plain={false}
+          plain={plain}
+          toolsSlot={full ? null : toolsSlot}
           hiddenCols={NO_HIDDEN} onHiddenCols={() => {}}
           panel={panel} onPanel={setPanel}
           favorites={NO_FAVS}
@@ -238,8 +225,8 @@ export default function PtSheet({ data, tpl, showCols, visible, tools }) {
           fileName={'phan-tho-' + maDA}
           printTitle={'Bảng ước tính chi phí — Xây dựng thô'}
           columns={columns} flatten={flatten} initialSel={INITIAL_SEL}
-          footer={false}
-          adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv', 'fav']} extraTools={extraTools}
+          footerInTools addNode={addNode}
+          adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv', 'fav', 'cols']} extraTools={tools}
           onRenameGroup={(g, name) => A.ptSheetWrite([{ si: g.si, ii: -1, f: 't', val: name }], 'Đổi tên hạng mục')}
           onInsertRow={e => (e.type === 'item' ? A.ptInsertItem(e.r.si, e.r.ii) : (e.type === 'group' ? A.ptAddItem(e.gi) : null))}
           onDuplicate={ids => A.ptDupMany(ids.map(parseId))}
@@ -258,9 +245,11 @@ export default function PtSheet({ data, tpl, showCols, visible, tools }) {
             ord.splice(i, 0, P(from)); setPtUi({ order: ord })
           }}
           renderCell={renderCell} plainFmt={false}
-          gridClass="qs-tk-grid qspt-grid"
-          emptyNode={<div className="qs-tk-empty qspt-sheet-empty"><QsIcon name="layers" size={30} /><b>Bảng đang trống</b><span>Chọn hạng mục từ danh sách bên trái — bấm ＋ để thêm từng công tác, hoặc ＋ ở tên nhóm để thêm cả nhóm.</span></div>}
-          emptyReplace
+          gridClass={`qs-tk-grid qspt-sgrid${plain ? ' qs-tk-plain' : ''}`}
+          emptyNode={plain
+            ? <div className="qs-tk-emptyrow">Bảng đang trống. Chọn hạng mục từ danh sách bên trái — bấm ＋ để thêm từng công tác, hoặc ＋ ở tên nhóm để thêm cả nhóm.</div>
+            : <div className="qs-tk-empty qspt-sheet-empty"><QsIcon name="layers" size={30} /><b>Bảng đang trống</b><span>Chọn hạng mục từ danh sách bên trái — bấm ＋ để thêm từng công tác, hoặc ＋ ở tên nhóm để thêm cả nhóm.</span></div>}
+          emptyReplace={!plain}
           colCount={{ shown: vis.length, total: PT_COLS.length }}
         />
       </div>

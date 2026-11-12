@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import { BugChip } from '../../../components/ui/BugReport'
 import { AI_KB, AI_TOPIC_LABELS, AI_SUGGESTIONS, matchTopic } from '../../../data/wikiData'
 
 const MIN_W = 320
 const MAX_W = 720
-const WIDTH_KEY = 'siteflow-ai-panel-width'
+/* mặc định rộng bằng cột trái QS trên màn hình (CATALOG_DEFAULT 440 x zoom .75 = 330); khoá _v2 bỏ độ rộng 440 cũ đã nhớ */
+const WIDTH_KEY = 'siteflow-ai-panel-width-v2'
 
 export function loadAiPanelWidth() {
   try {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10)
     if (saved) return saved
   } catch { /* localStorage không khả dụng */ }
-  return 440
+  return 330
 }
 
 /* Icon dùng chung (giống wiki.html) */
@@ -28,7 +30,7 @@ const TOPICS = [
   { key: 'chamcong', label: 'Chấm công', icon: ICON_USERS },
   { key: 'dongtien', label: 'Dòng tiền', icon: <><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20" /></> },
   { key: 'khachhang', label: 'Khách hàng', icon: <><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /><path d="M2 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /><circle cx="8" cy="7" r="4" /></> },
-  { key: 'tinnhan', label: 'Tin nhắn', icon: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />, wide: true },
+  { key: 'tinnhan', label: 'Tin nhắn', icon: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /> },
 ]
 
 export default function Dezbot({ open, onToggle, onClose, onResize, onResizingChange }) {
@@ -123,6 +125,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                     <button className="wk-ai-chip" onClick={() => sendMessage(AI_TOPIC_LABELS[t.key] || t.label)}><Icon size={14}>{t.icon}</Icon>{t.label}</button>
                   </div>
                 ))}
+                <div className="wk-ai-topic-chip"><BugChip className="wk-ai-chip" onBefore={onClose} /></div>
               </div>
             </div>
           ) : (

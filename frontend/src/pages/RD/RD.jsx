@@ -4,6 +4,8 @@ import { useTheme } from '../../hooks/useTheme'
 import { PROJECTS, STAGE_LABEL, IDEAS, IDEA_STATUS, isActiveProject, initialsOf } from '../../data/rdData'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { RD_TABS } from '../../data/pageTabs'
+import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 
 function Kpi({ label, value, valueColor, children }) {
   return (
@@ -40,6 +42,9 @@ export default function RD() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
+  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHidden = usePageTabsHidden('/rd')
+  useTabFallback(tabHidden, pageTab, RD_TABS.map(t => t.key), setPageTab)
 
   const activeProjects = PROJECTS.filter(isActiveProject).length
 
@@ -54,8 +59,9 @@ export default function RD() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>R&amp;D</span>
         <div className="hdr-tabs" role="tablist">
-          <button className={`hdr-tab${pageTab === 'main' ? ' active' : ''}`} onClick={() => setPageTab('main')}>Tổng quan</button>
-          <button className={`hdr-tab${pageTab === 'nhansu' ? ' active' : ''}`} onClick={() => setPageTab('nhansu')}>Cơ cấu phòng ban</button>
+          {RD_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            <button key={t.key} className={`hdr-tab${pageTab === t.key ? ' active' : ''}`} onClick={() => setPageTab(t.key)}>{t.label}</button>
+          ))}
         </div>
         <button className="rd-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'
