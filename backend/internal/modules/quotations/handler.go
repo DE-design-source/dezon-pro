@@ -85,7 +85,7 @@ func (s *Service) exportBang(c *gin.Context) {
 		response.Fail(c, 400, "Không có cột nào để xuất")
 		return
 	}
-	buf, err := s.BuildBangXlsx(b)
+	buf, err := s.BuildBangXlsx(c.Request.Context(), b)
 	if err != nil {
 		logger.Error("export bảng", "lỗi:", err.Error())
 		response.Fail(c, 500, err.Error())

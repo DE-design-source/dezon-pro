@@ -286,6 +286,75 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-pc-btn{width:28px; height:28px; display:grid; place-items:center; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); cursor:pointer; padding:0;}
 .qsi-pc-btn:hover{border-color:var(--dash-accent); color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qsi-pc-btn.qsi-del:hover{border-color:#f0a3a3; color:#c33; background:#fff5f5;}
+
+/* Ảnh theo biến thể (khối Nhập biến thể) */
+.qsi-varimg{margin-top:12px; border-top:1px dashed var(--border); padding-top:10px;}
+.qsi-varimg-h{font-size:12px; color:var(--text-muted, #64748b); margin-bottom:8px;}
+.qsi-varimg-h b{color:var(--text);}
+.qsi-varimg-box{position:relative; width:72px; height:72px; min-height:0; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; cursor:pointer;}
+.qsi-varimg-box img{width:100%; height:100%; object-fit:cover;}
+.qsi-varimg-box .qsi-upx{opacity:1;}
+.qsi-varimg-link{font-size:10.5px; color:var(--dash-accent, #2563eb); background:none; border:0; padding:0; cursor:pointer;}
+.qsi-varimg-more{font-size:11px; align-self:center;}
+
+/* Ghi danh nhiều dự án */
+.qsi-ghi-da{grid-column:span 2;}
+.qsi-ghi-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; min-height:24px; align-items:center;}
+.qsi-ghi-chip{display:inline-flex; align-items:center; gap:6px; background:var(--dash-accent-tint); color:var(--text); border-radius:99px; padding:3px 6px 3px 10px; font-size:12px; font-weight:500;}
+.qsi-ghi-chip button{border:0; background:rgba(18,50,76,.15); color:inherit; width:16px; height:16px; border-radius:50%; font-size:9px; line-height:16px; padding:0; cursor:pointer;}
+.qsi-ghi-none{font-size:12px; color:var(--text-muted, #64748b);}
+
+/* Bảng biến thể: Ảnh · Biến thể · Mã · Giá */
+.qsi-vartbl{display:flex; flex-direction:column; gap:6px;}
+.qsi-vartbl-r{display:grid; grid-template-columns:64px minmax(140px,1.4fr) 1fr 1fr; gap:10px; align-items:center;}
+.qsi-vartbl-h{font-size:11px; font-weight:600; color:var(--text-muted, #64748b); text-transform:uppercase; letter-spacing:.03em;}
+.qsi-vartbl-r input{height:34px; border:1px solid var(--border); border-radius:8px; padding:0 10px; font:inherit; font-size:13px; min-width:0; background:var(--surface); color:var(--text);}
+.qsi-vartbl-r input.num{text-align:right;}
+.qsi-vartbl-lb{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsi-varimg-cell{display:flex; flex-direction:column; align-items:center; gap:2px;}
+.qsi-vartbl .qsi-varimg-box{width:48px; height:48px;}
+
+/* Panel Sản phẩm vừa nhập: tab Phiên này / Lịch sử nhập */
+.qsi-recent-tabs{display:flex; gap:4px; padding:6px 12px; border-bottom:1px solid var(--border);}
+.qsi-recent-tabs button{flex:1; height:28px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; font-weight:600; cursor:pointer;}
+.qsi-recent-tabs button.on{background:var(--dash-accent, #1d4ed8); border-color:var(--dash-accent, #1d4ed8); color:#fff;}
+.qsi-hist-who{display:flex; align-items:center; gap:6px; padding:8px 12px; font-size:12px; font-weight:600; color:var(--text-muted);}
+.qsi-hist-who select{flex:1; min-width:0; height:28px; border:1px solid var(--border); border-radius:8px; padding:0 6px; font:inherit; font-size:12px; background:var(--surface); color:var(--text);}
+.qsi-hist-r{display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer; border-bottom:1px solid var(--border);}
+.qsi-hist-r:hover{background:var(--dash-soft);}
+.qsi-hist-mid{flex:1; min-width:0; display:flex; flex-direction:column;}
+.qsi-hist-mid b{font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsi-hist-mid i{font-style:normal; font-size:11px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsi-hist-t{font-size:11px; color:var(--text-muted);}
+.qsi-hist-more{padding:8px 12px; font-size:11px; color:var(--text-muted);}
+
+/* Bảng thống kê nhập liệu */
+.qsi-hist-stats{margin:0 12px 6px; width:calc(100% - 24px); justify-content:center;}
+.qspe-dlg.qsi-stats{width:min(980px, calc(96vw / var(--qs-zoom, .75)));}
+.qsi-stats-f{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+.qsi-stats-f label{display:flex; align-items:center; gap:6px;}
+.qsi-stats-f input, .qsi-stats-f select{height:30px; border:1px solid var(--border); border-radius:8px; padding:0 8px; font:inherit; font-size:12.5px; background:var(--surface); color:var(--text);}
+.qsi-stats-sum{margin-left:auto; color:var(--text);}
+.qsi-stats-b{max-height:calc(60vh / var(--qs-zoom, .75)); overflow:auto; border:1px solid var(--border); border-radius:10px;}
+.qsi-stats-t{width:100%; border-collapse:collapse; font-size:12.5px;}
+.qsi-stats-t th{position:sticky; top:0; background:var(--dash-soft); text-align:left; padding:8px 10px; font-size:11.5px; font-weight:700; border-bottom:1px solid var(--border);}
+.qsi-stats-t td{padding:7px 10px; border-bottom:1px solid var(--border);}
+.qsi-stats-t .num{text-align:right;}
+.qsi-stats-t td i{font-style:normal; color:var(--text-muted);}
+.qsi-stats-t tfoot td{background:var(--dash-soft); font-weight:600;}
+
+/* Hạng mục "Khác — tự điền" */
+.qsi-field .qsi-hm-khac{margin-top:6px;}
+
+/* Nhập hàng loạt: ghi danh cả lô vào dự án */
+.qsi-bulk-ghi{margin-top:12px; border-top:1px dashed var(--border); padding-top:10px;}
+.qsi-bulk-ghi-h{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; margin-bottom:8px; color:var(--text);}
+.qsi-bulk-ghi-h i{font-style:normal; font-weight:500; color:var(--text-muted);}
+
+/* Thương hiệu / NCC mới (chưa có trong danh mục) */
+.qsi-gy-new{display:block; margin-top:3px; font-size:11px; color:#b45309;}
+.qsi-field input.qsi-trung{border-color:#dc2626 !important; background:#fef2f2; color:#991b1b;}
+.qsi-trung-m{display:block; margin-top:3px; font-size:11px; font-weight:600; color:#dc2626;}
 /* Panel Sản phẩm vừa nhập ở cột TRÁI, cùng bề rộng cột trái của Bóc tách / Danh sách sản phẩm */
 .qsi-layout{grid-template-columns:440px minmax(0, 1fr);}
 @media(max-width:1280px){.qsi-layout{grid-template-columns:340px minmax(0, 1fr);}}

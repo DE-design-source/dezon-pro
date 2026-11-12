@@ -134,6 +134,13 @@ type xSheet struct {
 	merges [][4]int // top, left, bottom, right
 	ySplit int      // > 0: cố định ySplit dòng đầu
 	images []xImage
+	pend   []pendImg // ảnh chờ tải (bảng dep của buildBang): BuildBangXlsx tải rồi nhúng; không ghi ra file
+}
+
+// pendImg: ảnh của 1 ô (dòng, cột tính từ 1) cần tải theo url rồi nhúng.
+type pendImg struct {
+	row, col int
+	url      string
 }
 
 type xBook struct {

@@ -102,7 +102,8 @@ func (s *Service) SaveDbProduct(ctx context.Context, a *actor.Actor, data *omap.
 		}
 	}
 	// Điện lạnh (chỉ bản Go, theo QS Pro): hạng mục ghi chung -> hạng mục con đoán theo tên SP
-	if row.Val("nganh") == "dl" && jsval.Truthy(row.Val("hang_muc")) {
+	// Hạng mục tự điền ("Khác — tự điền", vd Remote) giữ nguyên; chỉ hạng mục ghi chung mới đoán theo tên
+	if row.Val("nganh") == "dl" && jsval.Truthy(row.Val("hang_muc")) && specs.DLLaChung(row.Val("hang_muc")) {
 		row.Set("hang_muc", specs.DLDoanHM(row.Val("hang_muc"), ten))
 	}
 	ma := jsval.Trim(jsval.S(data.Val(nhanMa)))
@@ -388,7 +389,11 @@ func (s *Service) UpdateProductGated(ctx context.Context, a *actor.Actor, key an
 	if !edit {
 		return nil, apperr.New("Tài khoản không có quyền sửa sản phẩm")
 	}
-	return s.UpdateDbProductTracked(ctx, a, key, data, nil)
+	r, err := s.UpdateDbProductTracked(ctx, a, key, data, nil)
+	if err == nil && r != nil && r.Val("updated") == true {
+		s.baoDuyet(ctx, a, 0, 1, jsval.S(r.Val("ten")))
+	}
+	return r, err
 }
 
 // CreateProductGated = createProductGated (A:535-539). data không phải object -> không có tên -> lỗi "Chưa có Tên sản phẩm.".
@@ -400,5 +405,13 @@ func (s *Service) CreateProductGated(ctx context.Context, a *actor.Actor, data a
 	if !edit {
 		return nil, apperr.New("Tài khoản không có quyền thêm/sửa sản phẩm")
 	}
-	return s.SaveDbProduct(ctx, a, jsval.AsMap(data), nil)
+	r, err := s.SaveDbProduct(ctx, a, jsval.AsMap(data), nil)
+	if err == nil && r != nil {
+		if r.Val("created") == true {
+			s.baoDuyet(ctx, a, 1, 0, jsval.S(r.Val("ten")))
+		} else {
+			s.baoDuyet(ctx, a, 0, 1, jsval.S(r.Val("ten")))
+		}
+	}
+	return r, err
 }

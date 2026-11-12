@@ -1,6 +1,6 @@
 import Icon from '../../../../components/ui/Icon'
 import { useQs } from '../../state/QsData'
-import { draftName_ } from '../../lib/dashModel.js'
+import { draftName_, ttChuan_ } from '../../lib/dashModel.js'
 import { fmtDate } from '../../lib/format.js'
 import { projInfoModal } from '../project/projectActions'
 
@@ -19,7 +19,7 @@ export default function ProjectBanner({ cur, idx }) {
       </span>
       <span className="qs-dash-banner-meta">
         <span>{cur.maDA}</span><span>·</span><span>Tạo {fmtDate(cur.ngayTao)}</span><span>·</span>
-        <span className="qs-dash-banner-pill">{cur.trangThai || 'Bản nháp'}</span>
+        <span className="qs-dash-banner-pill">{ttChuan_(cur.trangThai)}</span>
       </span>
       <span className="qs-dash-banner-acts">
         <button type="button" className="qs-dash-act primary" onClick={() => navigate('boc')}><Icon name="layers" size={13} />Mở bóc tách</button>

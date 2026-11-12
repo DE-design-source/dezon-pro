@@ -211,6 +211,19 @@ a.qs-dash-link{text-decoration:none;}
   .qs-dash-main .qs-dash-kpi-grid{grid-template-columns:minmax(0, 1fr);}
 }
 
+/* Phân loại dự án: trạng thái + năm */
+.qs-dash-filter{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--border);}
+.qs-dash-tt{display:flex; gap:4px; flex-wrap:wrap;}
+.qs-dash-tt-b{height:28px; padding:0 11px; border:1px solid var(--border); border-radius:99px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.qs-dash-tt-b span{margin-left:4px; font-size:11px; color:var(--text-muted); font-weight:600;}
+.qs-dash-tt-b.on{background:var(--dash-accent, #1d4ed8); border-color:var(--dash-accent, #1d4ed8); color:#fff;}
+.qs-dash-tt-b.on span{color:rgba(255,255,255,.85);}
+.qs-dash-year{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+.qs-dash-year select{height:28px; border:1px solid var(--border); border-radius:8px; padding:0 8px; font:inherit; font-size:12.5px; background:var(--surface); color:var(--text);}
+.qs-dash-tt-hint{font-size:11.5px; color:var(--text-muted);}
+.qs-dash-yhead{padding:10px 16px 4px; font-size:13px; font-weight:700; color:var(--text);}
+.qs-dash-yhead span{margin-left:6px; font-size:11.5px; font-weight:500; color:var(--text-muted);}
+
 /* ---------- Thang cỡ chữ chung của Bảng điều khiển (px của vùng QS, trước zoom) ----------
    xl 22 = số KPI · lg 15 = tiêu đề module · md 13.5 = chữ chính (tên dự án, khách hàng, giá trị, nhóm, thao tác nhanh)
    sm 12.5 = chữ phụ (ngày, nút, ô tìm, bộ lọc) · xs 11.5 = chú thích (tiêu đề cột, nhãn KPI, nhãn màu, dòng phụ).

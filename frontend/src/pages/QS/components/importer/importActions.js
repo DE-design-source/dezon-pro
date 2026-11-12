@@ -4,7 +4,8 @@ import * as api from '../../api/qsApi'
 import { qsToast, qsConfirm } from '../common/dialogs'
 import { coSpec_, specNganh_, nganhCuaSP_ } from '../../lib/productFields'
 import { impGet, impSet, impForm, emptyForm_, pendingAdd_, waitUploads_, bulkCleared_ } from './importStore'
-import { pendNganhLoai_, pendFormOf_, varCombos_, varList_, btLabel_ } from './importLogic'
+import { pendNganhLoai_, pendFormOf_, varCombos_, varList_, btLabel_, ghiDs_, ndOfNganh_ } from './importLogic'
+import { getState } from '../../state/store'
 import { readB64_ } from './imgUpload'
 
 const toast = qsToast
@@ -131,9 +132,13 @@ export async function impCommitBulk_(setBtn) {
   if (missing > 0 && !await qsConfirm('Còn ' + missing + ' sản phẩm CHƯA có ảnh.\nBạn nên bấm ô ＋ ở cột Ảnh để tải hình cho từng SP.\n\nVẫn tiếp tục?')) return
   // KHÔNG lưu ngay: đưa cả lô vào danh sách CHỜ LƯU — bấm "Thêm sản phẩm" ở panel phải mới ghi vào Database
   const ng = coSpec_(b.nganh) ? b.nganh : ''
+  // Ghi danh CẢ LÔ vào các dự án đã chọn ở khối nhập file (mỗi SP số lượng như nhau)
+  const g = b.ghi || {}, maDAs = ghiDs_(g, getState().cur)
+  if (g.on && !maDAs.length) { toast('Đã tick "Thêm vào dự án" nhưng chưa chọn dự án nào'); return }
+  const ghi = g.on ? { maDAs, qty: Math.max(1, Number(g.qty) || 1), prod: { nhom: ndOfNganh_(ng) } } : null
   pendingAdd_(ps.map(p => {
     if (ng) p._nganh = ng   // máy chủ đóng dấu ngành + lọc thông số theo hạng mục
-    return { kind: 'file', prod: p, ten: p.ten, ma: p.ma, thuongHieu: p.thuongHieu, ncc: p.ncc, hinhAnh: p.hinhAnh, nganh: ng || 'den' }
+    return Object.assign({ kind: 'file', prod: p, ten: p.ten, ma: p.ma, thuongHieu: p.thuongHieu, ncc: p.ncc, hinhAnh: p.hinhAnh, nganh: ng || 'den' }, ghi ? { ghi } : {})
   }))
   toast('Đã đưa ' + ps.length + ' sản phẩm vào danh sách chờ — bấm "Thêm sản phẩm" để lưu vào Database')
   bulkSet_(x => ({ products: [], headers: [], res: null, msg: null, fileSeq: (x.fileSeq || 0) + 1 }))

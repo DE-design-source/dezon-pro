@@ -15,6 +15,13 @@ export function projectGroups(projects){
   order.forEach(function(k){ groups[k].drafts.sort(function(a,b){ return String(a.ngayTao||'').localeCompare(String(b.ngayTao||'')); }); });
   return order.map(function(k){ return groups[k]; });
 }
+/* Trạng thái dự án (cột trang_thai của từng bản nháp). Giá trị cũ: "Bản nháp" = Đang báo giá, "Hoàn thành" = Đã thực hiện.
+   Trạng thái của DỰ ÁN = mức cao nhất trong các bản nháp (có bản đã thực hiện -> Đã thực hiện; có bản đang làm -> Đang thực hiện). */
+export var TT_DU_AN=['Đang báo giá','Đang thực hiện','Đã thực hiện'];
+export function ttChuan_(v){ v=String(v||'').trim(); if(v==='Hoàn thành') return 'Đã thực hiện'; return TT_DU_AN.indexOf(v)>=0?v:'Đang báo giá'; }
+export function groupStatus_(g){ var r=0; (g.drafts||[]).forEach(function(d){ r=Math.max(r, TT_DU_AN.indexOf(ttChuan_(d.trangThai))); }); return TT_DU_AN[r]; }
+// Năm của dự án = năm tạo bản nháp đầu tiên ('' nếu không có ngày)
+export function groupYear_(g){ var d=(g.drafts&&g.drafts[0]&&g.drafts[0].ngayTao)||''; var m=/^(\d{4})/.exec(String(d)); return m?m[1]:''; }
 // Tìm dự án (nhóm bản nháp) theo MÃ của một bản nháp bất kỳ trong nhóm
 export function projGroupOf_(projects,key){
   key=String(key||''); if(!key) return null;
