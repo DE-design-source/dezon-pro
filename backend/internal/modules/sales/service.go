@@ -24,8 +24,10 @@ const Tab = "kinhdoanh"
 var (
 	stages    = set("tiep-can", "giao-ns", "tu-van", "bao-gia", "dam-phan", "chot-hd", "bao-gia-thi-cong", "thiet-ke", "thi-cong", "khong-tham-gia", "truot-thau", "spam")
 	wonStages = set("chot-hd", "thiet-ke", "thi-cong") // = closedWon của giao diện (OverviewTab.jsx)
-	// syncStages = SYNC_STAGES cũ đã lọc như ProjectListTab cũ: khách ở đây có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án
-	syncStages  = set("tu-van", "dam-phan", "thiet-ke")
+	// deliveryKindList: các trang triển khai, thứ tự gọi delivery cố định (xem deliveryKinds)
+	deliveryKindList = []string{"design", "construction"}
+	// handoffKind: phòng nhận phiếu bàn giao (HANDOFF_CONFIG.deptOptions của giao diện) -> trang triển khai; QS không có trang
+	handoffKind = map[string]string{"Thiết kế": "design", "Thi công": "construction"}
 	boardStages = set("intake", "concept", "drafting", "review", "approved", "prep", "structure", "finishing", "acceptance", "handover")
 	depts       = set("dan-dung", "du-an")
 	kinds       = set("call", "meeting", "site", "zalo", "email", "quote", "note")
@@ -82,10 +84,52 @@ func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) er
 	return s.db.Tx(ctx, fn)
 }
 
-// saveAndDeliver: chạy write (chèn / sửa khách hàng) rồi đồng bộ dự án triển khai (thiết kế + thi công) - CHỈ khi giai đoạn
-// đổi qua ranh giới syncStages hoặc tên / loại công trình đổi; sửa thứ khác (người phụ trách, bảng con, ghi chú...) không đụng
-// dự án. old = dòng trước khi sửa (nil khi tạo mới). Vào syncStages -> tạo / hiện lại dự án (giá trị = giá trị ước tính, chỉ
-// khi tạo); rời -> ẩn (xoá nếu còn nguyên); vẫn trong -> đổi tên dự án theo khách nếu đội chưa tự đặt tên.
+// handoffOf: phiếu bàn giao gần nhất của khách -> (giai đoạn gửi phiếu, phòng nhận); phiếu cũ (trước khi ghi giai đoạn) có stage "".
+func handoffOf(l *omap.Map) (stage, dept string) {
+	if h, ok := l.Val("ban_giao").(*omap.Map); ok {
+		return jsval.Str(h.Val("stage")), jsval.Str(h.Val("dept"))
+	}
+	return "", ""
+}
+
+// deliveryKinds: trang triển khai khách cần có dự án - gửi tới phòng nào thì chỉ hiện ở trang phòng đó. Phiếu bàn giao gửi
+// từ chính giai đoạn đang đứng tới Phòng Thiết kế -> Quản lý thiết kế, Phòng Thi công -> Quản lý dự án. Chưa có phiếu đó (hoặc
+// gửi QS): cột "Dự án (Thiết kế)" / "Dự án (Thi công)" -> trang của cột; tu-van / dam-phan -> chưa trang nào. Phiếu cũ không ghi
+// giai đoạn chỉ còn tính ở tu-van / dam-phan (như lúc chuyển đổi, migration 0044). Giai đoạn khác -> không trang nào.
+func deliveryKinds(l *omap.Map) map[string]bool {
+	st := jsval.Str(l.Val("giai_doan"))
+	switch st {
+	case "tu-van", "dam-phan", "thiet-ke", "thi-cong":
+		hs, dept := handoffOf(l)
+		if k := handoffKind[dept]; k != "" && (hs == st || (hs == "" && (st == "tu-van" || st == "dam-phan"))) {
+			return map[string]bool{k: true}
+		}
+	}
+	switch st {
+	case "thiet-ke":
+		return map[string]bool{"design": true}
+	case "thi-cong":
+		return map[string]bool{"construction": true}
+	}
+	return nil
+}
+
+// routeChanged: giai đoạn hoặc phiếu bàn giao (giai đoạn gửi, phòng nhận) đổi -> trang cần có có thể đổi.
+func routeChanged(old, out *omap.Map) bool {
+	if old == nil {
+		return true
+	}
+	os, od := handoffOf(old)
+	ns, nd := handoffOf(out)
+	return jsval.Str(old.Val("giai_doan")) != jsval.Str(out.Val("giai_doan")) || os != ns || od != nd
+}
+
+// saveAndDeliver: chạy write (chèn / sửa khách hàng) rồi đồng bộ dự án triển khai theo deliveryKinds - CHỈ khi giai đoạn /
+// phiếu bàn giao đổi (routeChanged) hoặc tên / loại công trình đổi; sửa thứ khác (người phụ trách, bảng con, ghi chú...) không
+// đụng dự án. old = dòng trước khi sửa (nil khi tạo mới). Đồng bộ theo dòng VỪA GHI (out), không so với old, để 2 lệnh sửa gần
+// nhau (kéo thẻ rồi gửi phiếu) không lệch: trang cần -> tạo / hiện lại dự án (giá trị = giá trị ước tính, chỉ khi tạo; cả 2 lời
+// gọi của delivery chạy lại được); trang không cần -> ẩn (xoá nếu còn nguyên). Tên khách đổi -> đổi tên mọi dự án gắn khách
+// (cả dự án đang ẩn) nếu đội chưa tự đặt tên.
 func (s *Service) saveAndDeliver(ctx context.Context, a *actor.Actor, old *omap.Map, write func(ctx context.Context) (*omap.Map, error)) (*omap.Map, any, error) {
 	var out *omap.Map
 	var q any
@@ -97,19 +141,25 @@ func (s *Service) saveAndDeliver(ctx context.Context, a *actor.Actor, old *omap.
 		if q, err = s.getQuote(ctx, out); err != nil || s.delivery == nil {
 			return err
 		}
-		was := old != nil && syncStages[jsval.Str(old.Val("giai_doan"))]
-		switch is := syncStages[jsval.Str(out.Val("giai_doan"))]; {
-		case is && !was:
-			v := jsval.ToNumber(out.Val("gia_tri_vnd"))
-			for _, k := range []string{"design", "construction"} {
-				if _, err = s.delivery.EnsureFromLead(ctx, a, out, v, k); err != nil {
-					return err
-				}
+		if old != nil && nameChanged(old, out) {
+			if err = s.delivery.RenameFromLead(ctx, old, out); err != nil {
+				return err
 			}
-		case is && nameChanged(old, out):
-			return s.delivery.RenameFromLead(ctx, old, out)
-		case was && !is:
-			return s.delivery.DetachFromLead(ctx, out.Val("id"), false)
+		}
+		if !routeChanged(old, out) {
+			return nil
+		}
+		is := deliveryKinds(out)
+		for _, k := range deliveryKindList {
+			switch {
+			case is[k]:
+				_, err = s.delivery.EnsureFromLead(ctx, a, out, jsval.ToNumber(out.Val("gia_tri_vnd")), k)
+			case old != nil:
+				err = s.delivery.DetachFromLead(ctx, out.Val("id"), k, false)
+			}
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -315,7 +365,7 @@ func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (a
 	// gỡ dự án triển khai trước (khoá ngoại chỉ set null), cùng transaction với lệnh xoá
 	err := s.tx(ctx, func(ctx context.Context) error {
 		if s.delivery != nil {
-			if err := s.delivery.DetachFromLead(ctx, id, true); err != nil {
+			if err := s.delivery.DetachFromLead(ctx, id, "", true); err != nil {
 				return err
 			}
 		}
@@ -477,7 +527,7 @@ func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
 	if b.Has("handoff") {
 		if m, ok := b.Val("handoff").(*omap.Map); ok {
 			h := omap.New()
-			for _, k := range []string{"status", "dept", "requestedAt", "assignee"} {
+			for _, k := range []string{"status", "dept", "requestedAt", "assignee", "stage"} {
 				if v := m.Val(k); jsval.IsNullish(v) {
 					h.Set(k, nil)
 				} else {

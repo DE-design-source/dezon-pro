@@ -5,7 +5,8 @@
 //
 // Tài khoản chat là bảng riêng chat_users (danh tính = số điện thoại HOẶC email, 0019_chat_email.sql), KHÔNG phải users của QS và KHÔNG thuộc công ty
 // (dùng chung mọi công ty như Zalo): access token JWT HS256 + refresh token xoay vòng của chính module, phiên QS không
-// dùng được ở đây và ngược lại.
+// dùng được ở đây và ngược lại - trừ POST /chat/auth/dezon: phiên QS đổi lấy phiên chat của tài khoản chat gắn với users.id
+// (chat_users.qs_user_id, 0045, service_dezon.go).
 //
 // Truy cập dữ liệu: SQL thô qua database.DB.Pool() (pgx, transaction riêng) với tên bảng / cột tiếng Anh. Lớp
 // database.DB kiểu PostgREST không diễn đạt được "last_seq = last_seq + 1 RETURNING", GREATEST(...), upsert hay các câu
@@ -26,6 +27,7 @@ import (
 	"qspro-backend/internal/modules/chat/realtime"
 	"qspro-backend/internal/platform/database"
 	"qspro-backend/internal/platform/logger"
+	"qspro-backend/internal/shared/contracts"
 )
 
 // Gateway: WebSocket gateway (*realtime.Hub). nil = chưa bật realtime: REST vẫn chạy, phân phối tin chạy đồng bộ
@@ -67,7 +69,10 @@ type Deps struct {
 	// Phải là nil interface thật, không phải con trỏ nil bọc trong interface.
 	Media MediaStore
 	Scan  MediaScanner // nil = logScanner (chưa quét virus, coi như sạch)
-	Now   func() time.Time
+	// Users / UserFmt: đọc tài khoản Dezon Pro cho POST /chat/auth/dezon (module users); nil = route đó trả 500.
+	Users   contracts.UserReader
+	UserFmt contracts.UserFormatter
+	Now     func() time.Time
 }
 
 // Service: nghiệp vụ chat.
@@ -77,6 +82,9 @@ type Service struct {
 	mail MailSender
 	push PushSender
 	now  func() time.Time
+
+	users   contracts.UserReader    // đăng nhập bằng tài khoản Dezon Pro (service_dezon.go)
+	userFmt contracts.UserFormatter // PermsArr của users.perms
 
 	media         MediaStore   // nil = tắt tệp
 	scan          MediaScanner // không nil khi media != nil
@@ -118,6 +126,7 @@ type Service struct {
 	msgSearchLimit *limiter // tìm tin: 30 lần / phút / người
 	qrPollLimit    *limiter // poll phiên QR: 3 lần / 3 giây / qr_id (client poll mỗi 2 giây)
 	qrScanLimit    *limiter // quét / gõ mã QR (kể cả sai): 20 lần / phút / người
+	dezonLimit     *limiter // POST /chat/auth/dezon: 30 lần / 10 phút / tài khoản Dezon Pro
 
 	pushQ       chan pushJob
 	pushStartMu sync.Mutex
@@ -163,7 +172,7 @@ func New(d Deps) *Service {
 		refreshDays = 30
 	}
 	s := &Service{
-		db: d.DB, sms: d.SMS, mail: d.Mail, push: d.Push, now: now,
+		db: d.DB, sms: d.SMS, mail: d.Mail, push: d.Push, now: now, users: d.Users, userFmt: d.UserFmt,
 		jwtKey:     []byte(secret),
 		otpKey:     []byte(hmacHex([]byte(secret), "qspro-chat-otp")),
 		accessTTL:  time.Duration(accessMin * float64(time.Minute)),
@@ -183,6 +192,7 @@ func New(d Deps) *Service {
 		msgSearchLimit: newLimiter(30, time.Minute, now),
 		qrPollLimit:    newLimiter(3, 3*time.Second, now),
 		qrScanLimit:    newLimiter(20, time.Minute, now),
+		dezonLimit:     newLimiter(30, dezonLimitPer, now),
 
 		pushQ:     make(chan pushJob, 1000),
 		pushQuit:  make(chan struct{}),

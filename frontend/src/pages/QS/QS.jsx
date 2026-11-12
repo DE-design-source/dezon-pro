@@ -25,7 +25,6 @@ import ErrorBoundary from './components/common/ErrorBoundary'
 import { QsDataProvider } from './state/QsData'
 import { useQsStore, showTab, retryBoot } from './state/store'
 import { useQsSession } from './session/QsSession'
-import LoginScreen from './session/LoginScreen'
 import { API_BASE, apiConfigured, reportClientError } from './api/http'
 import { logoUrl } from './api/files'
 import DevSheetProbe from './state/DevSheetProbe'
@@ -188,7 +187,7 @@ function QsRoot() {
         onResizingChange={setAiResizing}
       />
 
-      {auth === 'login' && <LoginScreen message={session.loginMsg} />}
+      {/* Đăng nhập: màn chung của ứng dụng (components/layout/AppGate.jsx), QS không còn thẻ đăng nhập riêng */}
       {showSplash && (
         <StatusView kind="splash" message={bootStep || 'Đang khởi động…'} done={!loading} logoSrc={logoUrl()}
           onHidden={() => { splashShown = true; setSplashGone(true) }} />

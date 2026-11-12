@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import PageGuard from './PageGuard'
 import useHeaderTabsFit from '../../hooks/useHeaderTabsFit'
 
 export default function AppShell() {
@@ -8,7 +9,7 @@ export default function AppShell() {
     <div className="app-shell">
       <Sidebar />
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Outlet />
+        <PageGuard inline><Outlet /></PageGuard>
       </div>
     </div>
   )

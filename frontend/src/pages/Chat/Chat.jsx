@@ -16,7 +16,7 @@ import { loadKdRequests, saveKdRequests } from '../../services/kdRequestService'
 import { jumpToMessage, setOpenConversation, takeOpenTarget, useChat } from './state/chatStore'
 import { JOIN_TOKEN_KEY, joinTokenFromPath } from './state/chatLogic'
 
-/* Token link mời chờ tham gia (chưa đăng nhập chat: qua cổng đăng nhập rồi quay lại) - sessionStorage của tab */
+/* Token link mời chờ tham gia (phiên chat chưa sẵn sàng: chờ tự đăng nhập bằng tài khoản Dezon Pro rồi quay lại) - sessionStorage của tab */
 function pendingJoin(v) {
   try {
     if (v === undefined) return sessionStorage.getItem(JOIN_TOKEN_KEY) || ''
@@ -77,7 +77,6 @@ export default function Chat() {
   const [memberPop, setMemberPop] = useState(null)
   const [view, setView] = useState(() => ((location.hash || '') === '#contacts' ? 'contacts' : 'chat')) // chat | contacts
   const [dialog, setDialog] = useState(null) // null | 'direct' | 'group'
-  const [adding, setAdding] = useState(false) // bộ chọn tài khoản ▸ Thêm tài khoản: cổng đăng nhập ở chế độ thêm
 
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
@@ -145,7 +144,7 @@ export default function Chat() {
   }, [serverActive])
 
   /* Đổi tài khoản / đăng xuất: bỏ hội thoại đang mở của tài khoản cũ (tài khoản mới mở là 403) và #c<id> trên URL,
-     đóng cổng "thêm tài khoản" / hộp thoại của tài khoản cũ. Lần gắn đầu không đụng tới: link #c<id> từ thông báo đẩy vẫn
+     đóng hộp thoại của tài khoản cũ. Lần gắn đầu không đụng tới: link #c<id> từ thông báo đẩy vẫn
      mở đúng hội thoại. Đổi tài khoản do bấm thông báo của tài khoản kia: mở hội thoại của thông báo. */
   const meId = chat.me ? chat.me.id : null
   const prevMe = useRef(meId)
@@ -153,7 +152,6 @@ export default function Chat() {
     const was = prevMe.current
     prevMe.current = meId
     if (was === meId) return
-    setAdding(false)
     setSearch(null)
     const target = meId != null ? takeOpenTarget(meId) : null
     if (target != null) { setView('chat'); setActiveId(target); setMemberPop(null); setDialog(null); return }
@@ -166,8 +164,8 @@ export default function Chat() {
     if (/^#c\d+$/.test(location.hash)) navigate({ pathname: location.pathname, hash: '' }, { replace: true })
   }, [meId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Báo store hội thoại đang mở (tải tin, báo đã xem, đăng ký online); rời trang / đang thêm tài khoản thì bỏ */
-  useEffect(() => { setOpenConversation(ready && view === 'chat' && !adding && !joinToken && !qrPath ? serverActive : null) }, [ready, serverActive, view, adding, joinToken, qrPath])
+  /* Báo store hội thoại đang mở (tải tin, báo đã xem, đăng ký online); rời trang thì bỏ */
+  useEffect(() => { setOpenConversation(ready && view === 'chat' && !joinToken && !qrPath ? serverActive : null) }, [ready, serverActive, view, joinToken, qrPath])
   /* Trang vừa mở (kể cả sau khi bấm thông báo ở trang khác): hội thoại lấy từ #c<id>, bỏ hội thoại chờ mở còn sót */
   useEffect(() => { takeOpenTarget(null); return () => setOpenConversation(null) }, [])
 
@@ -181,7 +179,6 @@ export default function Chat() {
 
   function select(id) {
     if (id === 'bot') setBotUnread(0)
-    setAdding(false)
     setActiveId(id)
     setMemberPop(null)
     setView('chat')
@@ -223,7 +220,7 @@ export default function Chat() {
   const meName = (chat.me && chat.me.display_name) || 'Bạn'
 
   /* Bảng tìm tin (cột phải, thay cột thông tin) */
-  const searchPanel = search && ready && !joinToken && !qrPath && !adding ? (
+  const searchPanel = search && ready && !joinToken && !qrPath ? (
     <SearchPanel
       key={'s' + (search.cid == null ? 'all' : search.cid) + ':' + search.q}
       conversationId={search.cid}
@@ -234,9 +231,7 @@ export default function Chat() {
   ) : null
 
   let main
-  if (adding) {
-    main = <ChatGate key="add" chat={chat} mode="add" onCancel={() => setAdding(false)} onDone={() => setAdding(false)} />
-  } else if (joinToken && ready) {
+  if (joinToken && ready) {
     main = <JoinGroup key={'j' + joinToken} chat={chat} token={joinToken} onOpen={cid => leaveJoin(cid)} onClose={() => leaveJoin(null)} />
   } else if (joinToken) {
     main = <ChatGate chat={chat} />
@@ -325,9 +320,8 @@ export default function Chat() {
               onTab={setFilterTab}
               onSearch={setSearchTerm}
               onSelect={select}
-              onOpenDirectory={() => { if (ready) { setAdding(false); setView('contacts') } else select(null) }}
-              onNewChat={() => { setAdding(false); setDialog('direct') }}
-              onAddAccount={() => { setMemberPop(null); setAdding(true) }}
+              onOpenDirectory={() => { if (ready) setView('contacts'); else select(null) }}
+              onNewChat={() => setDialog('direct')}
               onSearchMessages={term => { if (ready) setSearch({ cid: null, q: String(term || '') }) }}
             />
             {main}

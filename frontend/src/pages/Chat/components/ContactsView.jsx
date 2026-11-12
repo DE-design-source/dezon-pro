@@ -5,7 +5,6 @@ import {
   rejectFriend, searchByContact, sendFriendRequest, sortedConversations, startDirect, unblockUser, unfriend, updateMe,
 } from '../state/chatStore'
 import { SearchIcon, colorFor, errText, initials } from './shared'
-import { confirmSignOut } from './AccountSwitcher'
 
 /* Icon nét 2 (24x24) cho menu danh bạ */
 const I = {
@@ -19,7 +18,6 @@ const I = {
   chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   phone: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2z" />,
   mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 6L2 7" /></>,
-  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
 }
 const Ic = ({ n, size = 18, fill }) => <svg width={size} height={size} viewBox="0 0 24 24" fill={fill || 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I[n]}</svg>
 
@@ -231,10 +229,6 @@ export default function ContactsView({ chat, onOpenConv, onNewGroup, onBack }) {
             {m.key === 'requests' && incoming.length > 0 && <span className="ch-ct-badge">{incoming.length}</span>}
           </button>
         ))}
-        <button className="ch-ct-item" onClick={() => confirmSignOut(chat)}>
-          <span className="ch-ct-ico" style={{ color: 'var(--text-muted)' }}><Ic n="logout" /></span>
-          <span className="ch-ct-label">Đăng xuất</span>
-        </button>
       </aside>
 
       <section className="ch-ct-panel">
@@ -250,11 +244,11 @@ export default function ContactsView({ chat, onOpenConv, onNewGroup, onBack }) {
   )
 }
 
-/* Thẻ của tôi: tên hiển thị, số điện thoại / email, "cho người khác biết tôi đã xem", thông báo đẩy, đăng xuất */
+/* Thẻ của tôi: tên hiển thị (lấy từ tài khoản Dezon Pro, máy chủ đồng bộ mỗi lần đăng nhập nên không sửa ở đây), số điện
+   thoại / email, "cho người khác biết tôi đã xem", thông báo đẩy. Đăng xuất là đăng xuất Dezon Pro. */
 function MyCard({ chat }) {
   const me = chat.me
   const push = chat.push
-  const [name, setName] = useState(me.display_name || '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -283,22 +277,11 @@ function MyCard({ chat }) {
       <div className="ch-ct-card">
         <div className="ch-ct-card-top">
           <Avatar id={me.id} name={me.display_name} size={64} />
-          <div><b>{me.display_name}</b><span>Tài khoản Dezon Chat</span>{me.created_at && <span>Tham gia {fmtDate(me.created_at)}</span>}</div>
+          <div><b>{me.display_name}</b><span>Đăng nhập bằng tài khoản Dezon Pro</span>{me.created_at && <span>Tham gia {fmtDate(me.created_at)}</span>}</div>
         </div>
         {me.phone && <div className="ch-ct-card-line"><Ic n="phone" size={15} />{L.formatPhone(me.phone)}</div>}
         {me.email && <div className="ch-ct-card-line"><Ic n="mail" size={15} />{me.email}</div>}
-        <form className="ch-ct-field" onSubmit={e => {
-          e.preventDefault()
-          const n = name.trim()
-          if (!n || n.length > 100) { setMsg('Tên hiển thị từ 1 đến 100 ký tự'); return }
-          save({ display_name: n }, 'Đã lưu tên hiển thị')
-        }}>
-          <span>Tên hiển thị</span>
-          <div className="ch-ct-inline">
-            <input maxLength={100} value={name} onChange={e => setName(e.target.value)} />
-            <button className="ch-ct-btn" disabled={busy || !name.trim() || name.trim() === me.display_name}>Lưu</button>
-          </div>
-        </form>
+        <div className="ch-ct-hint">Tên hiển thị lấy theo họ tên của tài khoản Dezon Pro (đổi ở Cài đặt &gt; Tài khoản).</div>
         <label className="ch-ct-toggle">
           <input type="checkbox" checked={me.show_read_receipts !== false} disabled={busy}
             onChange={e => save({ show_read_receipts: e.target.checked }, e.target.checked ? 'Người khác sẽ thấy bạn đã xem' : 'Đã tắt báo "đã xem"')} />
@@ -306,7 +289,6 @@ function MyCard({ chat }) {
         </label>
         <div className="ch-ct-card-push">{pushPart}</div>
         {(msg || push.error) && <div className="ch-ct-hint">{msg || push.error}</div>}
-        <button className="ch-ct-btn ghost" onClick={() => confirmSignOut(chat)}>Đăng xuất</button>
       </div>
     </div>
   )

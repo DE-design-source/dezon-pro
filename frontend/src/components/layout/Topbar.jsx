@@ -1,8 +1,57 @@
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTheme } from '../../hooks/useTheme'
 import { useSidebar } from '../../hooks/useSidebar'
 import NotificationBell from './NotificationBell'
+import { useWorkSession } from '../../services/workSession'
+
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+// chữ đầu của từ đầu + từ cuối: "Trần Anh" -> "TA"
+const initials = s => { const w = String(s || '').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase() }
+const menuItem = { display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: 'var(--text)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }
+
+/* Nút tài khoản (tài khoản Dezon Pro đang đăng nhập): bấm mở menu Tài khoản / Đăng xuất */
+function UserMenu() {
+  const { me, congTy, logout } = useWorkSession()
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const out = e => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
+    const esc = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', out)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc) }
+  }, [open])
+  if (!me) return null
+  const name = me.hoTen || me.username || ''
+  const cty = (congTy && congTy.ten) || (me.role === 'super' ? 'Toàn hệ thống' : '')
+  return (
+    <div ref={box} style={{ position: 'relative', flex: 'none' }}>
+      <button type="button" onClick={() => setOpen(o => !o)} title={name} aria-haspopup="menu" aria-expanded={open} style={{
+        width: 36, height: 36, borderRadius: '50%', border: 'none',
+        background: 'var(--primary-tint)', color: 'var(--primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+      }}>{initials(name)}</button>
+      {open && (
+        <div role="menu" style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 200, minWidth: 220, maxWidth: 'calc(100vw - 32px)',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+          boxShadow: '0 12px 32px rgba(15,30,60,.16)', overflow: 'hidden', padding: '4px 0',
+        }}>
+          <div style={{ padding: '10px 14px 9px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{[ROLE_LBL[me.role] || 'Nhân viên', cty].filter(Boolean).join(' · ')}</div>
+          </div>
+          <Link role="menuitem" to="/cai-dat?tab=account" style={menuItem} onClick={() => setOpen(false)}>Tài khoản</Link>
+          <button role="menuitem" type="button" style={{ ...menuItem, color: 'var(--danger)' }} onClick={() => { setOpen(false); logout() }}>Đăng xuất</button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Topbar({ title, subtitle, icon, children }) {
   const { theme, toggleTheme } = useTheme()
@@ -98,14 +147,8 @@ export default function Topbar({ title, subtitle, icon, children }) {
         }
       </button>
 
-      {/* 4. User avatar */}
-      <div style={{
-        width: 36, height: 36, borderRadius: '50%',
-        background: 'var(--primary-tint)', color: 'var(--primary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 700, fontSize: 13, flex: 'none',
-        cursor: 'pointer',
-      }}>TA</div>
+      {/* 4. Tài khoản đang đăng nhập */}
+      <UserMenu />
     </div>
   )
 }

@@ -237,6 +237,7 @@ REST (`backend/docs/API.md` mục "Giai đoạn 2"), chỉ phần đẩy thay đ
 | --- | --- | --- |
 | POST | `/auth/otp/request` | Gửi OTP về số điện thoại |
 | POST | `/auth/otp/verify` | Xác thực OTP, trả về access + refresh token |
+| POST | `/auth/dezon` | Đổi phiên Dezon Pro (token QS) lấy access + refresh token chat, không cần OTP (mục 6.7) |
 | POST | `/auth/refresh` | Lấy access token mới |
 | GET | `/conversations?cursor=` | Danh sách hội thoại, sắp theo tin mới nhất, kèm số tin chưa đọc |
 | POST | `/conversations` | Tạo chat 1-1 hoặc nhóm |
@@ -286,6 +287,27 @@ Người dùng mới sau đó tải danh bạ lên (chỉ gửi hash số điệ
 cấu hình thì ghi log) với cùng giới hạn như SMS (5 mã / giờ / email, đếm chung theo IP, sai 5 lần khoá 15 phút). Email chưa có tài khoản thì tạo
 tài khoản mới không có số điện thoại (tên mặc định = phần trước `@`). Tài khoản email và tài khoản số là HAI tài khoản riêng, chưa liên kết.
 Tìm bạn bằng email: `GET /users/search?email=` (chỉ khớp đúng email), rồi gửi lời mời kết bạn bằng `user_id` như với số.
+
+**6.7. Đăng nhập bằng tài khoản Dezon Pro** (migration 0045, `service_dezon.go`): giao diện web dùng MỘT đăng nhập - phiên Dezon Pro, không OTP.
+Trang Chat gọi `POST /api/v1/chat/auth/dezon` với `Authorization: Bearer <token Dezon Pro>` (token QS, không phải token chat) và thân
+`{"device":{"platform":"web","name":"..."}}`; route quyền `rpc.Login` + `middleware.RequireLogin()` (chưa đăng nhập -> 401
+`{"error":"Chưa đăng nhập","code":"NOAUTH"}`). Kết quả đúng như `/auth/otp/verify` (`access_token`, `refresh_token`, `expires_in`, `device_id`,
+`user`, `is_new`); sau đó client dùng token chat như mọi tài khoản khác (refresh, WebSocket, đăng xuất).
+1. Quyền: admin / super luôn được; nhân viên cần khoá `chat` trong `users.perms` (quản trị viên cấp quyền), thiếu -> 403 `CHAT_NO_PERM`
+   "Tài khoản chưa được cấp quyền Chat. Nhờ quản trị viên cấp quyền.". Tài khoản Dezon Pro đã khoá / không còn -> 401 `NOAUTH`.
+   Giới hạn 30 lần / 10 phút / tài khoản Dezon Pro (`RATE_LIMIT`); mỗi lần tạo một thiết bị (`chat_devices.login_method = 'dezon'`).
+2. Tài khoản: mỗi `users.id` gắn đúng một `chat_users` qua `qs_user_id` (unique, không khoá ngoại: xoá tài khoản Dezon Pro vẫn giữ lịch sử chat).
+   Chưa có thì tạo (không số điện thoại / email, `is_new = true`); tên hiển thị = họ tên Dezon Pro, trống thì username (tối đa 100 ký tự),
+   đồng bộ lại ở mỗi lần đăng nhập. KHÔNG tự gắn tài khoản OTP cũ trùng email (email Dezon Pro không được xác minh -> chiếm được tài khoản
+   người khác); tài khoản OTP / QR vẫn đăng nhập như cũ (app di động).
+3. Đồng nghiệp: lúc TẠO tài khoản chat, kết bạn sẵn (accepted hai chiều) với tài khoản chat gắn Dezon Pro của mọi người đang hoạt động cùng
+   công ty (super không công ty: không ai) -> danh bạ, chat 1-1, tạo nhóm dùng được ngay. Chỉ chạy lúc tạo (khoá advisory theo công ty để hai
+   người tạo cùng lúc vẫn thấy nhau): ai đã huỷ kết bạn / chặn đồng nghiệp thì lần đăng nhập sau không bị đổi lại.
+   Chuyển công ty (migration 0046, `chat_users.qs_company_id` = công ty lúc đăng nhập Dezon Pro gần nhất): lần đăng nhập sau thấy
+   `users.company_id` khác -> bỏ kết bạn (dòng accepted) với tài khoản gắn Dezon Pro thuộc công ty cũ, kết bạn đồng nghiệp công ty mới
+   (bỏ qua người đã có dòng quan hệ bất kỳ, kể cả blocked / pending), ghi công ty mới. Bạn OTP / QR, bạn ở công ty khác, dòng chặn giữ nguyên.
+4. Refresh: `/auth/refresh` của tài khoản gắn Dezon Pro kiểm lại tài khoản Dezon Pro (còn, đang hoạt động, admin / super hoặc có quyền
+   `chat`); không đạt -> xoá thiết bị, 401 `REFRESH_INVALID` (client đăng xuất chat). Tài khoản OTP / QR không bị kiểm.
 
 ## 7. Luồng kết nối realtime
 

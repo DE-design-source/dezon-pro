@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-10 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-11 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -41,7 +41,7 @@
 
 | Module | Tên | Trạng thái | Còn lại |
 |---|---|---|---|
-| [M14](#xong-14) | Tài khoản & phân quyền | ✅ | - |
+| [M14](#xong-14) | Tài khoản & phân quyền | 🟡 | [M14.2](#m14-2) |
 | [M15](#xong-15) | Duyệt yêu cầu (xoá sản phẩm, mua hàng, đề xuất) | ✅ | - |
 | [M16](#xong-16) | Nhật ký hoạt động | ✅ | - |
 | [M17](#xong-17) | Công ty (quản trị hệ thống) | ✅ | - |
@@ -72,6 +72,7 @@
 
 | Mã | Tính năng | App | Trạng thái |
 |---|---|---|---|
+| <a id="m14-2"></a>M14.2 | Đăng nhập một lần cho cả web (màn đăng nhập chung ở mọi trang, bỏ khung đăng nhập riêng của QS / Kinh doanh / Thiết kế / Dự án / HR, đồng bộ đăng xuất giữa các tab) + phân quyền từng trang trên sidebar (form Thêm / Sửa tài khoản có nhóm "QS Pro" và "Các trang"; nhân viên chỉ thấy trang được tick, gõ thẳng đường dẫn bị chặn; admin / super thấy hết; Cài đặt luôn hiện) + Chat dùng tài khoản Dezon Pro (`POST /api/v1/chat/auth/dezon`, bỏ OTP / QR / đa tài khoản ở giao diện, cần quyền "chat", tự kết bạn đồng nghiệp cùng công ty, refresh kiểm lại quyền; migration 0045, 0046). Đã code + build + test Go (có DB thử), còn thử trên app thật | Toàn hệ thống | 🟡 |
 | <a id="m8-4"></a>M8.4 | Xuất báo giá - dàn trang A4 ngang: mọi trang cùng cỡ chữ gốc (chia trang theo chiều cao dòng đo thật thay vì thu nhỏ chữ), khối tổng ở cuối bảng hạng mục tờ bìa (1 module: tổng · chiết khấu · VAT · tổng gồm VAT + bằng chữ; Tuỳ biến > Khối tổng: nền 3 kiểu dòng, cỡ chữ, font), tờ bìa dài tự sang trang "(tiếp)", Tuỳ biến tiêu đề cột (nền, màu chữ, cỡ, font) + khung & nét áp cả hàng tiêu đề, Lưu làm mặc định / ô nhanh (1)(2)(3) áp được lên bản xem trước, VAT theo hạng mục (ô VAT ở đầu bảng Bóc tách, projData vatHm; báo giá cộng VAT theo % từng hạng mục, đầu trang mỗi hạng mục có Chưa VAT · VAT · Thành tiền (VAT); Excel: tờ bìa thêm VAT + Tổng gồm VAT, sheet hạng mục thêm VAT + Thành tiền (VAT)), tiến độ thanh toán + ghi chú + ô ký thành trang bìa sau (trang cuối riêng), thanh sheet ở chân vùng xem (mỗi phần / hạng mục 1 thẻ kèm khoảng trang, bấm nhảy tới trang đầu), mức 100% = trang rộng đúng khung xem. Đã code + build + thử dữ liệu giả, còn thử trên app thật; Excel chưa theo bố cục tờ bìa / trang bìa sau mới; Phần thô vẫn chia theo số dòng | User | 🟡 |
 | <a id="m10-3"></a>M10.3 | Danh sách sản phẩm: chọn chế độ xem Bảng · Lưới thẻ · Danh sách (nhớ trong máy, `qs_splayout`; dạng thẻ có ảnh, giá, duyệt, yêu thích, thêm vào dự án, chọn nhiều) + tiêu đề bảng đồng bộ kiểu Bóc tách (IN HOA, căn giữa, xuống dòng, nút phễu mở menu sắp xếp / ẩn cột) + thanh công cụ / hàng chọn cột / bảng tách thành module riêng, thanh công cụ 1 dòng tự gọn khi hẹp (Yêu thích chỉ biểu tượng, "Tất cả" không lặp tên hạng mục). Đã code + build (`SpCards.jsx`, `list.css`), còn thử trên app thật | User | 🟡 |
 | <a id="m10-5"></a>M10.5 | Modal Thông tin sản phẩm: nút "Ghi danh vào nhiều dự án" (tìm + tick nhiều dự án, số lượng, Lưu; trùng SP thì cộng số lượng, không thì thêm vào Chưa phân tầng). Đã code + build, còn thử trên app thật | User | 🟡 |
@@ -388,6 +389,7 @@
 - Luôn giữ ít nhất một admin đang hoạt động cho mỗi công ty
 - Chặn tạo tài khoản khi công ty đã đủ số người dùng của gói
 - Tên đăng nhập duy nhất trong toàn hệ thống
+- Cài đặt > Tài khoản (giao diện React) hiện tài khoản Dezon Pro đang đăng nhập thay dữ liệu mẫu; tự sửa họ tên / email (`PATCH /api/v1/auth/me`, kiểm email như admin sửa), đổi mật khẩu, đăng xuất; tên đăng nhập / phòng ban / vai trò / công ty chỉ xem (2026-11-11)
 - Quản trị hệ thống chọn công ty, chuyển công ty và gán công ty cho tài khoản chưa có
 - Ghi nhật ký tạo, sửa, khoá, mở, đặt lại mật khẩu, xoá tài khoản
 - Sửa email tài khoản ở hộp Sửa tài khoản tab Admin (M14.1): lưu chữ thường, để trống = xoá, báo "Email không hợp lệ" khi sai dạng; không trùng tài khoản khác trong CÙNG công ty (khác công ty được phép, đăng nhập tự chọn đúng tài khoản); email cũ sai dạng vẫn sửa được các mục khác; đăng nhập được bằng email mới. Giả định: đường tạo tài khoản giữ như cũ (kiểm dạng ở giao diện); email có `*`, `%`, `\` lưu được nhưng không dùng để đăng nhập (có cảnh báo)
@@ -528,7 +530,7 @@
 
 - Migration 0015 (`sales_leads`, `sales_lead_activities`) và 0016 (`delivery_projects` + thành viên, thầu phụ, đề mục, công việc, bình luận); module Go `sales`, `delivery` (REST chỉ bản Go `/api/v1/sales/...`, `/api/v1/delivery/...`)
 - Kinh doanh: khách hàng, kéo-thả giai đoạn, bảng con Thiết kế / Thi công, người phụ trách, lịch sử chăm sóc lưu trên máy chủ; gắn dự án QS (giá trị lấy theo tổng báo giá); Tổng quan tính từ dữ liệu thật (doanh số theo ngày chốt)
-- Khách ở Tư vấn / Đàm phán / Dự án (Thiết kế) tự có dự án ở cả Quản lý thiết kế lẫn Quản lý dự án (tạo / cập nhật tên, khách, giá trị ước tính; rời giai đoạn hoặc xoá khách thì gỡ, dự án đã có dữ liệu chỉ bỏ liên kết; cùng transaction) - như logic bản tĩnh cũ
+- Khách gửi tới phòng nào thì chỉ có dự án ở trang phòng đó (2026-11-11, migration 0044): phiếu bàn giao gửi Phòng Thiết kế -> Quản lý thiết kế, Phòng Thi công -> Quản lý dự án; chưa có phiếu (hoặc gửi QS) thì cột Dự án (Thiết kế) / (Thi công) vào trang của cột, Tư vấn / Đàm phán chưa vào trang nào (tạo / cập nhật tên, khách, giá trị ước tính; rời trang hoặc xoá khách thì gỡ, dự án đã có dữ liệu chỉ ẩn / bỏ liên kết; cùng transaction) - 🟡 đã kiểm bằng test + dữ liệu local, chưa thử kéo thẻ trên giao diện
 - Quản lý thiết kế / Quản lý dự án dùng chung component: danh sách dự án, thiết lập chung, nhân sự, thầu phụ, tiến độ Gantt (đề mục, công việc, mốc thu chi, kéo giãn, khung mẫu dời về hôm nay), bình luận; "hôm nay" là ngày thật
 - 2026-11-04: giao diện 2 trang trả về đúng bản 8686a37 (component riêng của Quản lý dự án, chọn dự án "Chung cư Riverside / Giai đoạn 2", chip lọc giai đoạn, kanban mua hàng, KPI), chỉ thay dữ liệu mẫu bằng API; migration 0032 (trạng thái "Thiết kế", tiến độ nhập tay + màu thanh ở danh sách, sơ đồ tổ chức theo dự án, đơn mua hàng của công việc); `infra/scripts/seed-demo-delivery.mjs` nạp dữ liệu mẫu bản cũ vào công ty demo - 🟡 chưa thử trên trình duyệt
 - 2026-11-10: Tiến độ - bấm công việc "Mua hàng & cung ứng" mở "Phiếu thông tin mua hàng" ở khung phải (timeline vẫn hiện); phiếu chi tiết đơn mua hàng theo bộ trường Lark (From Today, Status, Pc/Sm/Pm Order, Mua hàng đặt hàng, Order Due Kế Toán tính lùi từ Start At Site / Lead Time / Bù trừ; ngày thực tế, PM / Thu mua / Kế toán / CHT/GS / PC, tệp đính kèm, Thanh toán), 3 chế độ xem Default / Columns / Groups - 🟡 chưa thử trên dữ liệu thật

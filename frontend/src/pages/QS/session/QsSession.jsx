@@ -1,10 +1,12 @@
-/* Phiên đăng nhập của riêng trang QS (không đụng phần còn lại của SiteFlow).
+/* Phiên đăng nhập nhìn từ trang QS. Đăng nhập / đăng xuất đi qua phiên chung của ứng dụng (services/workSession.js);
+   store QS chỉ nhận me / congTy (adoptSession) và nạp dữ liệu riêng.
    useQsSession() -> {auth, loginMsg, me, congTy, viewAs, isAdmin, isSuper, canTab(tab), firstAllowedTab(),
                       login(user, pw), logout(), changePassword(oldPw, newPw), setViewAs(id|null), retry()}
    auth: 'init' | 'unconfigured' | 'checking' | 'login' | 'unreachable' | 'ready' (xem state/store.js). */
 import {
-  useQsStore, canTab, firstAllowedTab_, isAdminRole_, login, logout, changePassword, setViewAs, retrySession,
+  useQsStore, canTab, firstAllowedTab_, isAdminRole_, changePassword, setViewAs, retrySession,
 } from '../state/store'
+import { login, logout } from '../../../services/workSession'
 
 export function useQsSession() {
   const auth = useQsStore(s => s.auth)

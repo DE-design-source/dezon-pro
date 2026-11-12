@@ -227,24 +227,24 @@ type ReportRunner interface {
 	DaGuiHomNay(ctx context.Context) bool
 }
 
-// DeliveryFromLead - chủ: delivery (chỉ bản Go). Khách hàng Kinh doanh ở giai đoạn tu-van / dam-phan / thiet-ke -> có dự án
-// ở CẢ trang Quản lý thiết kế lẫn Quản lý dự án (kind "design" / "construction"). Module sales chỉ gọi khi giai đoạn
-// (hoặc tên / loại công trình) đổi so với dòng đã lưu, không gọi khi sửa thứ khác của khách. Chạy trong ctx của nơi gọi
-// (cùng transaction nếu có). Không bao giờ xoá dự án đội thiết kế / thi công đã đụng tới.
+// DeliveryFromLead - chủ: delivery (chỉ bản Go). Khách hàng Kinh doanh gửi tới phòng nào thì có dự án ở trang của phòng đó
+// (kind "design" = Quản lý thiết kế, "construction" = Quản lý dự án); sales quyết định trang nào (deliveryKinds). Module sales
+// chỉ gọi khi trang cần có đổi (giai đoạn / phòng nhận phiếu bàn giao) hoặc tên / loại công trình đổi, không gọi khi sửa thứ
+// khác của khách. Chạy trong ctx của nơi gọi (cùng transaction nếu có). Không bao giờ xoá dự án đội thiết kế / thi công đã đụng tới.
 //
-// EnsureFromLead: khách vào các giai đoạn trên. lead là dòng kd_khach_hang (tên cột trong code), valueVnd = giá trị ước tính
+// EnsureFromLead: khách cần có dự án ở trang kind. lead là dòng kd_khach_hang (tên cột trong code), valueVnd = giá trị ước tính
 // khách nhập (chỉ dùng khi tạo). Chưa có dự án (lead, kind) -> tạo, trả (true, nil); có rồi (kể cả đang ẩn) -> hiện lại,
 // KHÔNG ghi đè tên / khách / giá trị HĐ, trả (false, nil). Dự án người dùng đã xoá chỉ được tạo lại qua lời gọi này.
 //
-// RenameFromLead: khách đổi tên / loại công trình / quy mô khi vẫn ở các giai đoạn trên. Chỉ đổi tên dự án còn đúng tên
+// RenameFromLead: khách đổi tên / loại công trình / quy mô khi vẫn còn dự án. Chỉ đổi tên dự án còn đúng tên
 // sinh từ old (đội chưa tự đặt tên khác), tên khách của dự án còn đúng tên khách cũ; không đụng giá trị HĐ.
 //
-// DetachFromLead: khách rời các giai đoạn trên (leadDeleted = false) hoặc bị xoá (true). Dự án còn nguyên như lúc tạo
-// (chưa sửa thông tin, chỉ có 2 đề mục cốt lõi trống, không công việc / thành viên / thầu phụ / bình luận) -> xoá. Còn lại:
-// rời giai đoạn -> ẩn khỏi danh sách, giữ liên kết để quay lại thì hiện đúng dự án cũ; khách bị xoá -> bỏ liên kết, hiện
-// như dự án tạo tay.
+// DetachFromLead: khách không còn cần dự án ở trang kind ("" = mọi trang) (leadDeleted = false) hoặc bị xoá (true, kind "").
+// Dự án còn nguyên như lúc tạo (chưa sửa thông tin, chỉ có 2 đề mục cốt lõi trống, không công việc / thành viên / thầu phụ /
+// bình luận) -> xoá. Còn lại: rời -> ẩn khỏi danh sách, giữ liên kết để quay lại thì hiện đúng dự án cũ; khách bị xoá ->
+// bỏ liên kết, hiện như dự án tạo tay.
 type DeliveryFromLead interface {
 	EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, valueVnd float64, kind string) (bool, error)
 	RenameFromLead(ctx context.Context, old, lead *omap.Map) error
-	DetachFromLead(ctx context.Context, leadID any, leadDeleted bool) error
+	DetachFromLead(ctx context.Context, leadID any, kind string, leadDeleted bool) error
 }

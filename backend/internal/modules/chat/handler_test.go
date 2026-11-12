@@ -147,7 +147,7 @@ func TestRegisterRPCMatchesRoutes(t *testing.T) {
 		have[rt.Method+" "+rt.Path] = true
 	}
 	gs := reg.GoRoutes()
-	if len(gs) != 67 {
+	if len(gs) != 68 {
 		t.Errorf("số route chat: %d", len(gs))
 	}
 	for _, g := range gs {
@@ -156,6 +156,13 @@ func TestRegisterRPCMatchesRoutes(t *testing.T) {
 		}
 		public := g.Path == "/chat/auth/otp/request" || g.Path == "/chat/auth/otp/verify" || g.Path == "/chat/auth/refresh" ||
 			g.Path == "/chat/auth/qr/start" || g.Path == "/chat/auth/qr/poll"
+		// auth/dezon: phiên Dezon Pro (rpc.Login + middleware.RequireLogin), không phải token chat
+		if g.Path == "/chat/auth/dezon" {
+			if g.Perm != rpc.Login {
+				t.Errorf("quyền của %s: %d", g.Path, g.Perm)
+			}
+			continue
+		}
 		if public != (g.Perm == rpc.Public) || (!public && g.Perm != rpc.SelfAuth) {
 			t.Errorf("quyền của %s: %d", g.Path, g.Perm)
 		}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as api from '../../api/qsApi'
 import * as hrApi from '../../../ChamCong/api'
-import { GRANT_TABS as PERM_TABS } from '../../state/store'
+import { PERM_TABS, WORK_TABS, PAGE_TABS, GRANT_TABS } from '../../state/store'
 import { qsToast } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
 import { MrootPortal } from '../common/Mroot'
@@ -10,6 +10,14 @@ import './admin.css'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+$/   // như máy chủ (users.reEmail, M14.1)
 const EMAIL_NOLOGIN_RE = /[*%\\]/     // đăng nhập chặn email có * % \ (auth reWildcard): lưu được nhưng không đăng nhập bằng nó
 const normEmail = v => String(v || '').trim().toLowerCase()
+// Nhóm "Các trang": WORK_TABS + PAGE_TABS theo thứ tự thanh bên
+const SITE_ORDER = ['newsfeed', 'chat', 'marketing', 'kinhdoanh', 'thietke', 'thicong', 'hr', 'taichinh', 'bim', 'sanxuat', 'it', 'rd', 'banlamviec', 'lich', 'wiki']
+const SITE_ALL = WORK_TABS.concat(PAGE_TABS)
+const SITE_TABS = SITE_ORDER.map(k => SITE_ALL.find(t => t[0] === k)).filter(Boolean)
+  .concat(SITE_ALL.filter(t => SITE_ORDER.indexOf(t[0]) < 0))
+const GRANT_KEYS = GRANT_TABS.map(t => t[0])
+// Khoá quyền con do các khối riêng bên dưới quản lý (không giữ nguyên lúc lưu mà dựng lại từ lv / daDuyet)
+const SUB_KEYS = ['sp_edit', 'sp_duyet', 'da_duyet']
 
 /* Hộp Thêm / Sửa tài khoản (port admUserModal / admModalRole / admSubSync_ / admPermAll / admModalSave, PUB/admin.js:162-272).
    Props: user (null = tạo mới), isSuper, companies (S._admCt), defaultCt (công ty đang làm việc), onClose(), onSaved(msg).
@@ -27,7 +35,9 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const mac = u.congTyId || defaultCt || ''
   const [ct, setCt] = useState(mac)
   const [role, setRole] = useState(u.role !== 'admin' ? 'staff' : 'admin')
-  const [perms, setPerms] = useState(() => PERM_TABS.filter(t => perms0.indexOf(t[0]) >= 0).map(t => t[0]))
+  const [perms, setPerms] = useState(() => GRANT_KEYS.filter(k => perms0.indexOf(k) >= 0))
+  // Khoá đã lưu mà giao diện này không biết (bản mới hơn / cũ hơn thêm vào): giữ nguyên khi lưu, không âm thầm xoá
+  const [extra] = useState(() => perms0.filter((k, i) => k && GRANT_KEYS.indexOf(k) < 0 && SUB_KEYS.indexOf(k) < 0 && perms0.indexOf(k) === i))
   // Quyền trong tab Danh sách SP: CHỌN MỘT — chỉ sửa, hoặc sửa và duyệt
   const [lv, setLv] = useState(perms0.indexOf('sp_duyet') >= 0 ? 'sp_duyet' : (perms0.indexOf('sp_edit') >= 0 ? 'sp_edit' : ''))
   // Duyệt yêu cầu sửa thông tin dự án (migration 0037, trang chi tiết dự án): quyền riêng, không gắn với tab nào
@@ -55,13 +65,18 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const emailBad = emailChanged && normEmail(email) !== '' && !EMAIL_RE.test(normEmail(email))
   const emailOldBad = !emailChanged && normEmail(email) !== '' && !EMAIL_RE.test(normEmail(email))
   const emailNoLogin = !emailBad && !emailOldBad && EMAIL_NOLOGIN_RE.test(normEmail(email))
-  const togglePerm = (k, on) => setPerms(p => (on ? PERM_TABS.map(t => t[0]).filter(x => x === k || p.indexOf(x) >= 0) : p.filter(x => x !== k)))
+  const togglePerm = (k, on) => setPerms(p => (on ? GRANT_KEYS.filter(x => x === k || p.indexOf(x) >= 0) : p.filter(x => x !== k)))
+  const permBox = t => (
+    <label key={t[0]} className={`qsa-ck${has(t[0]) ? ' on' : ''}`}>
+      <input type="checkbox" value={t[0]} checked={has(t[0])} onChange={e => togglePerm(t[0], e.target.checked)} />{t[1]}
+    </label>
+  )
 
   function save() {
     // quyền = các tab được tích + mức quyền trong tab Danh sách SP (radio, có thể bỏ trống)
     let ps = []
     if (role !== 'admin') {
-      ps = perms.slice()
+      ps = perms.concat(extra)
       if (lv && ps.indexOf('sanpham') >= 0) ps.push(lv)
       if (daDuyet) ps.push('da_duyet')
     }
@@ -170,19 +185,18 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
             {role === 'admin' ? null : (
               <div className="qsa-sec">
                 <div className="qsa-sec-h">Quyền truy cập
-                  <span className="qsa-sec-n">{perms.length}/{PERM_TABS.length}</span>
+                  <span className="qsa-sec-n">{perms.length}/{GRANT_KEYS.length}</span>
                   <span className="qsa-sec-quick">
-                    <a onClick={() => setPerms(PERM_TABS.map(t => t[0]))}>Chọn tất cả</a>
+                    <a onClick={() => setPerms(GRANT_KEYS.slice())}>Chọn tất cả</a>
                     <a onClick={() => setPerms([])}>Bỏ hết</a>
                   </span>
                 </div>
-                <div className="qsa-perms">
-                  {PERM_TABS.map(t => (
-                    <label key={t[0]} className={`qsa-ck${has(t[0]) ? ' on' : ''}`}>
-                      <input type="checkbox" value={t[0]} checked={has(t[0])} onChange={e => togglePerm(t[0], e.target.checked)} />{t[1]}
-                    </label>
-                  ))}
-                </div>
+                <div className="qsa-pgrp-h">QS Pro</div>
+                <div className="qsa-perms">{PERM_TABS.map(permBox)}</div>
+                <i className="qsa-f-hint">Mua hàng mở cả tab Mua hàng trong QS Pro và trang Mua hàng trên thanh bên.</i>
+                <div className="qsa-pgrp-h">Các trang</div>
+                <div className="qsa-perms">{SITE_TABS.map(permBox)}</div>
+                <i className="qsa-f-hint">Nhân viên chỉ thấy các trang được tick ở đây.</i>
                 {/* Khối quyền con chỉ hiện khi đã cấp tab Danh sách sản phẩm */}
                 {has('sanpham') ? (
                   <div className="qsa-sub">

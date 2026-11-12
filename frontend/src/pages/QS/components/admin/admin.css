@@ -186,6 +186,8 @@ html[data-theme="dark"] .qsa-permchip{color:#a5b4fc;}
 .qsa-seg-i b{display:block; font-size:13px; font-weight:650; color:var(--text);}
 .qsa-seg-i i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.5;}
 .qsa-perms{display:grid; grid-template-columns:1fr 1fr; gap:7px;}
+.qsa-pgrp-h{font-size:11.5px; font-weight:650; color:var(--text); margin:12px 0 7px;}
+.qsa-sec-h + .qsa-pgrp-h{margin-top:0;}
 .qsa-ck{display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:8px; padding:9px 12px; font-size:13px; color:var(--text); cursor:pointer;}
 .qsa-ck:hover{background:var(--dash-soft);}
 .qsa-ck.on{border-color:var(--dash-accent); background:var(--dash-accent-tint);}

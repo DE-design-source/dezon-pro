@@ -325,7 +325,7 @@ func leadProjectName(lead *omap.Map) string {
 	return jsval.Str(lead.Val("ten_khach")) + " — " + typ
 }
 
-// EnsureFromLead: cài contracts.DeliveryFromLead (module sales gọi khi khách VÀO tu-van / dam-phan / thiet-ke).
+// EnsureFromLead: cài contracts.DeliveryFromLead (module sales gọi khi khách bắt đầu cần dự án ở trang kind).
 // Đã có dự án gắn khách -> chỉ hiện lại nếu đang ẩn, không ghi đè thông tin đội thiết kế / thi công đã sửa.
 // Không kiểm quyền tab: người kéo thẻ ở Kinh doanh không cần quyền vào trang thiết kế / thi công.
 func (s *Service) EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, valueVnd float64, kind string) (bool, error) {
@@ -390,14 +390,17 @@ func (s *Service) RenameFromLead(ctx context.Context, old, lead *omap.Map) error
 	return nil
 }
 
-// DetachFromLead: cài contracts.DeliveryFromLead - khách rời tu-van / dam-phan / thiet-ke (leadDeleted = false) hoặc bị xoá.
-// Chỉ xoá dự án còn nguyên như lúc tạo; còn lại: rời giai đoạn -> ẩn, giữ liên kết; khách bị xoá -> bỏ liên kết, hiện lại.
-func (s *Service) DetachFromLead(ctx context.Context, leadID any, leadDeleted bool) error {
+// DetachFromLead: cài contracts.DeliveryFromLead - khách không còn cần dự án ở trang kind ("" = mọi trang, leadDeleted = false)
+// hoặc bị xoá. Chỉ xoá dự án còn nguyên như lúc tạo; còn lại: rời -> ẩn, giữ liên kết; khách bị xoá -> bỏ liên kết, hiện lại.
+func (s *Service) DetachFromLead(ctx context.Context, leadID any, kind string, leadDeleted bool) error {
 	ps, err := s.repo.ProjectsOfLead(ctx, leadID)
 	if err != nil {
 		return err
 	}
 	for _, p := range ps {
+		if kind != "" && jsval.Str(p.Val("loai")) != kind {
+			continue
+		}
 		id := jsval.ToNumber(p.Val("id"))
 		clean, err := s.pristine(ctx, p)
 		if err != nil {

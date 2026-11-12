@@ -449,8 +449,8 @@ html[data-theme="dark"] .ch-req-wrap.t-thi-cong{--req-accent:#E8935A;}
 .ch-acct-act:hover{background:var(--surface-alt);}
 .ch-acct-act svg{color:var(--text-muted);}
 .ch-acct-act.danger, .ch-acct-act.danger svg{color:var(--danger);}
-.ch-gate-accounts{display:flex; flex-direction:column; gap:4px; border-top:1px solid var(--border); padding-top:12px; font-size:12.5px;}
-.ch-gate-accounts .ch-acct-row{border:1px solid var(--border); margin-top:4px;}
+div.ch-acct-row{cursor:default;}
+div.ch-acct-row:hover{background:var(--primary-tint);}
 .ch-gate-back{align-self:center;}
 .ch-gate-method{background:var(--surface-alt); border-radius:9px; padding:3px; gap:3px;}
 .ch-gate-method button{flex:1; padding:6px 10px; font-family:inherit;}
