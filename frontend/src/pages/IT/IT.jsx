@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import './IT.css'
 import { useTheme } from '../../hooks/useTheme'
-import { TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, buildTicketTasks, statusFromTasks } from '../../data/itData'
+import { TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, statusFromTasks } from '../../data/itData'
 import { listTickets, createTicket as apiCreateTicket, updateTicket, listStaff, fileToDataUrl, rolesToServer } from './api'
 import { mediaUrl } from '../QS/api/files'
 import FlowBoard from '../../components/kanban/FlowBoard'
@@ -12,7 +12,6 @@ import DeptStaff from '../../components/hr/DeptStaff'
 import { IT_TABS } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
 import TicketList from './components/TicketList'
-import ReleaseNotes from './components/ReleaseNotes'
 import DashSide from './components/DashSide'
 import CreateTicketModal from './components/CreateTicketModal'
 import AssetsTab from './components/AssetsTab'
@@ -22,8 +21,8 @@ const CATEGORY = Object.fromEntries(TICKET_CATEGORIES)
 const POLL_MS = 30000 // hỏi lại danh sách (phiếu Báo lỗi mới, thay đổi của người khác)
 const SAVE_DELAY = 400 // gộp các lần sửa bảng liên tiếp thành 1 lệnh gửi
 const errMsg = e => (e && e.message) || 'Lỗi không xác định'
-const executorsOf = t => t.roles?.find(r => /thực thi/i.test(r.label))?.people || []
-const tasksOf = t => t.tasks || buildTicketTasks(t, executorsOf(t))
+/* Bảng xử lý bắt đầu trống: IT tự thêm công việc (không còn dựng sẵn công việc mẫu theo hạng mục, 2026-11-16) */
+const tasksOf = t => t.tasks || []
 const stagesOf = t => t.stages || IT_STAGES
 /* % công việc xong (không tính việc đã hủy) */
 function progressOf(tasks, stages) {
@@ -216,10 +215,9 @@ export default function IT() {
     showToast(`Đã tạo yêu cầu #${t.id}${notified.length ? ` · đã gửi thông báo tới ${notified.join(', ')}` : ''}`)
   }
 
-  /* Thao tác nhanh: cuộn tới khối Ghi chú cập nhật, hoặc sang tab Thiết bị / Cơ cấu phòng ban */
+  /* Thao tác nhanh: sang tab Thiết bị / Cơ cấu phòng ban */
   function gotoSection(key) {
-    if (key === 'nhansu' || key === 'assets') { setPageTab(key === 'assets' ? 'thietbi' : 'nhansu'); setBoardId(null); return }
-    document.getElementById('it-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setPageTab(key === 'assets' ? 'thietbi' : 'nhansu'); setBoardId(null)
   }
 
   return (
@@ -263,7 +261,6 @@ export default function IT() {
             <DashSide tickets={tickets} onCreate={() => setCreateOpen(true)} onGoto={gotoSection} />
             <div className="it-content it-dash-main">
               <TicketList tickets={tickets} title={canManage ? 'Danh sách yêu cầu' : 'Yêu cầu của tôi'} highlightId={newId} onOpen={openTicket} onCreate={() => setCreateOpen(true)} />
-              <div id="it-releases" className="it-content"><ReleaseNotes /></div>
             </div>
           </div>
         )}
@@ -314,10 +311,11 @@ export default function IT() {
             ...(boardTicket.roles?.length ? boardTicket.roles.map(r => ({ label: r.label, value: r.people.join(', ') })) : [{ label: 'Phụ trách', value: boardTicket.assignee || '—' }]),
           ]}
           info={(boardTicket.desc || boardTicket.images?.length) ? (
-            <>
-              {boardTicket.desc && <p className="it-board-desc">{boardTicket.desc}</p>}
-              {boardTicket.images?.length > 0 && <div className="it-tl-imgs">{boardTicket.images.map(im => <a key={im.url} href={mediaUrl(im.url)} target="_blank" rel="noreferrer"><img src={mediaUrl(im.url)} alt={im.name} /></a>)}</div>}
-            </>
+            <div className="it-board-info">
+              {/* phiếu Báo lỗi cũ có dòng "Trang: ... · gửi từ Dezbot" ghép vào mô tả: đã có ô "Trang báo lỗi" ở hàng thông tin nên bỏ */}
+              {boardTicket.desc && <p className="it-board-desc">{boardTicket.reported ? boardTicket.desc.replace(/\n*Trang: [^\n]*· gửi từ Dezbot\s*$/, '') : boardTicket.desc}</p>}
+              {boardTicket.images?.length > 0 && <div className="it-board-imgs">{boardTicket.images.map(im => <a key={im.url} href={mediaUrl(im.url)} target="_blank" rel="noreferrer" title={im.name}><img src={mediaUrl(im.url)} alt={im.name} /></a>)}</div>}
+            </div>
           ) : null}
         />
       )}

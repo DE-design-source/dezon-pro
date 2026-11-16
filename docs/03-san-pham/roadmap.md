@@ -154,6 +154,7 @@
 
 - Đăng nhập bằng tên đăng nhập hoặc email cùng mật khẩu
 - Tự vào thẳng ứng dụng khi trình duyệt còn phiên hợp lệ
+- 2026-11-16: Vào QS không còn màn chờ kiểu intro; từ lần thứ 2 trên cùng máy (kể cả F5 / tab mới) QS hiện ngay từ bản đệm IndexedDB (dự án + danh mục SP + dòng của dự án đang mở, theo phiên + công ty, xoá khi đăng xuất / hết phiên) rồi đồng bộ bản mới ở nền; trong lúc đồng bộ chặn thao tác (nhãn "Đang đồng bộ…", khoá ghi ở tầng API) - 🟡 đã thử Chrome headless ở local + 2 vòng rà soát, chưa deploy
 - Phiên làm việc 7 ngày, một tài khoản dùng được nhiều máy cùng lúc
 - Chặn đăng nhập khi tài khoản bị khoá, chưa thuộc công ty, công ty tạm khoá hoặc hết hạn
 - Kiểm tra lại tài khoản và công ty ở mỗi thao tác, mất phiên trong tối đa 30 giây khi bị khoá

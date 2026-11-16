@@ -6,6 +6,7 @@
    Mỗi lần auth thành 'ready' / 'login' phát window CustomEvent 'dezon:auth' {state, me} (Chat nghe để đổi phiên chat). */
 import { useSyncExternalStore } from 'react'
 import { apiConfigured, readToken, writeToken, readViewAs, ping } from '../pages/QS/api/http'
+import { cacheClear } from '../pages/QS/state/bootCache'
 import * as qsApi from '../pages/QS/api/qsApi'
 import * as qsStore from '../pages/QS/state/store'
 import { loadSysDefaults } from './systemDefaultsService'
@@ -61,7 +62,7 @@ function start() {
     } catch (e) {
       if (!live()) return
       if (e && e.name === 'QsUnreachableError') set({ auth: 'unreachable', error: e.message })
-      else { writeToken(''); curToken = ''; if (!(await devLogin()) && live()) set({ auth: 'login', me: null, congTy: null }) }
+      else { writeToken(''); curToken = ''; cacheClear(); if (!(await devLogin()) && live()) set({ auth: 'login', me: null, congTy: null }) }
     }
   })()
   return started

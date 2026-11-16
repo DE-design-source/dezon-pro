@@ -80,6 +80,19 @@ function QsRoot() {
   const bootStep = useQsStore(s => s.bootStep)
   const bootError = useQsStore(s => s.bootError)
   const bootErrorKind = useQsStore(s => s.bootErrorKind)
+  /* Vẽ từ bản đệm, đang chờ bản mới (store.js boot()): chặn bấm / gõ / phím tắt trên vùng nội dung để không thao tác nào
+     dựa trên dữ liệu cũ (thường dưới 1-2 s); chỉ chuyển trang / F5 vẫn được */
+  const syncing = useQsStore(s => s.syncing)
+  useEffect(() => {
+    if (!syncing) return undefined
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+    const block = e => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && /^[rRlL]$/.test(e.key))) return
+      e.preventDefault(); e.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', block, true)
+    return () => window.removeEventListener('keydown', block, true)
+  }, [syncing])
   const visSeq = useQsStore(s => s.visSeq)
   const curMa = useQsStore(s => (s.cur ? s.cur.maDA : ''))
   const [aiOpen, setAiOpen] = useState(false)
@@ -173,7 +186,8 @@ function QsRoot() {
         </div>
       </div>
 
-      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}${tab === 'dash' ? ' qs-scroll-home' : ''}`} style={tab === 'boc' || tab === 'export' ? { display: 'flex', flexDirection: 'column', gap: 12, padding: 12 } : (tab === 'sanpham' ? { padding: 12 } : undefined)}>
+      {syncing && <div className="qs-sync-pill" role="status">Đang đồng bộ dữ liệu mới nhất…</div>}
+      <div className={`qs-scroll${tab === 'sanpham' ? '' : ' qs-scroll-dash'}${tab === 'dash' ? ' qs-scroll-home' : ''}${syncing ? ' qs-syncing' : ''}`} aria-busy={syncing || undefined} style={tab === 'boc' || tab === 'export' ? { display: 'flex', flexDirection: 'column', gap: 12, padding: 12 } : (tab === 'sanpham' ? { padding: 12 } : undefined)}>
         {body}
       </div>
 

@@ -103,7 +103,6 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
         <div className="it-quick">
           <button onClick={onCreate}>{ic(<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>)}Tạo yêu cầu</button>
           <button onClick={() => onGoto('assets')}>{ic(<><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></>)}Thiết bị</button>
-          <button onClick={() => onGoto('releases')}>{ic(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>)}Ghi chú cập nhật</button>
           <button onClick={() => onGoto('nhansu')}>{ic(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>)}Cơ cấu phòng ban</button>
         </div>
       </section>

@@ -104,10 +104,23 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', () => { roiTrang = false })
 }
 
+/* Khoá ghi tạm thời: QS vừa vẽ từ bản đệm (state/bootCache.js) và đang tải bản mới (store.js boot()) -> chặn mọi request
+   ghi (không phải GET) tới khi bản mới về, để thao tác không đè lên dữ liệu cũ của bản đệm. Đăng nhập / đăng xuất, chat,
+   thông báo không bị chặn. */
+let writeLock = ''
+export function setWriteLock(msg) { writeLock = msg || '' }
+const LOCK_FREE = /^\/(auth|chat|notifications)(\/|$)/
+
 /* request(method, path, {body, query, signal}) -> result (đã bóc {ok,result}) */
 export async function request(method, path, opts = {}) {
   const { body, query, signal, noLog } = opts
   if (!API_BASE) throw new QsNotConfiguredError()
+  if (writeLock && method !== 'GET' && method !== 'HEAD' && !LOCK_FREE.test(path)) {
+    const e = new QsApiError(writeLock, 423)
+    e.src = method + ' ' + path
+    e.noLog = true
+    throw e
+  }
   const hasBody = body !== undefined && method !== 'GET' && method !== 'HEAD'
   let res
   try {

@@ -243,21 +243,8 @@ html[data-theme="dark"] .it-page{--bar-2:#7FA8F5;}
 .it-tl-bug{display:inline-flex; align-items:center; height:18px; margin-right:6px; padding:0 6px; border-radius:5px; background:var(--danger-tint); color:var(--danger); font-style:normal; font-size:10.5px; font-weight:700; vertical-align:2px;}
 .it-tl-empty{padding:24px; text-align:center; font-size:13px; color:var(--text-muted);}
 
-/* Tiêu đề thẻ Ghi chú cập nhật */
-.it-rn-head{display:flex; align-items:baseline; gap:12px; padding-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
-.it-rn-head h2{margin:0; font-size:20px; font-weight:800; letter-spacing:-.01em; color:var(--text);}
 .it-tl-updated{font-size:14px; color:var(--text-muted);}
 
-/* ===== Ghi chú cập nhật hệ thống ===== */
-.it-rn{padding:20px 24px 18px;}
-.it-rn-head{width:100%; border-top:none; border-left:none; border-right:none; background:none; font:inherit; text-align:left; cursor:pointer;}
-.it-rn-toggle{align-self:center; width:28px; text-align:center; font-size:18px; color:var(--text-muted);}
-.it-rn-body{display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding-top:16px;}
-.it-rn-tag{display:inline-flex; align-items:center; justify-content:center; min-width:120px; height:30px; padding:0 18px; border-radius:999px; color:#fff; font-size:12.5px; font-weight:800; text-transform:uppercase; letter-spacing:.02em; margin-top:4px;}
-.it-rn-tag.improve{background:linear-gradient(90deg, #5BC0BE, #3E9A98);}
-.it-rn-tag.fix{background:linear-gradient(90deg, #EF6A5E, #D9473C); margin-top:12px;}
-.it-rn-line{display:flex; align-items:center; gap:14px; padding-left:18px; font-size:14.5px; color:var(--text);}
-.it-rn-ic{display:grid; place-items:center; width:30px; height:30px; flex:none; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted);}
 @media (max-width:760px){ .it-tl-search{width:100%;} }
 
 /* ===== Tạo yêu cầu ===== */
@@ -340,7 +327,12 @@ html[data-theme="dark"] .it-page{--bar-2:#7FA8F5;}
 
 /* Trang yêu cầu (kanban) — thông tin trên đầu */
 .it-meta-dot{display:inline-block; width:9px; height:9px; border-radius:50%;}
-.it-board-desc{margin:0; flex:1; line-height:1.5; white-space:pre-wrap;}
+.it-board-desc{margin:0; flex:1; min-width:0; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere;}
+/* Khung mô tả + ảnh ở trang yêu cầu: mô tả chiếm phần còn lại, ảnh nhỏ xếp bên phải (hẹp thì xuống dưới) */
+.it-board-info{display:flex; align-items:flex-start; gap:14px; width:100%; min-width:0;}
+.it-board-imgs{flex:none; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:50%;}
+.it-board-imgs img{display:block; width:84px; height:62px; object-fit:cover; border-radius:8px; border:1px solid var(--border);}
+@media (max-width:760px){ .it-board-info{flex-direction:column;} .it-board-imgs{max-width:none; justify-content:flex-start;} }
 /* Thanh tiêu đề Danh sách yêu cầu gọn 1 dòng: nút Tạo yêu cầu cùng hàng với ô tìm (MarkUp 2026-11-12 18:00).
    Thiếu chỗ thì ô tìm co lại trước, rồi dải lọc trạng thái cuộn ngang; màn hẹp mới xuống dòng */
 .it-tl-head{flex-wrap:nowrap;}

@@ -9,25 +9,6 @@ export const TICKET_GROUPS = [
   ['dong', 'Đóng', '#8A8F98'],
 ]
 
-/* Ghi chú cập nhật các hệ thống nội bộ do IT vận hành */
-export const RELEASES = [
-  { version: 'SiteFlow 2.4.1', date: '24/09/2026', improvements: [
-    'Bảng mua hàng: giao nhiều người & phòng ban phụ trách mỗi bước, gửi thông báo khi chuyển bước.',
-    'Sơ đồ tổ chức hiển thị theo tập đoàn — công ty thành viên — phòng ban.',
-  ], fixes: [
-    'Sửa lỗi thanh cuộn ngang của Pipeline khách hàng nằm khuất cuối trang.',
-    'Sửa lỗi màu phân bổ kiêm nhiệm trùng nhau trong hồ sơ nhân sự.',
-    'Sửa lỗi đồng bộ lịch Outlook bị lệch múi giờ.',
-  ] },
-  { version: 'VPN & Mạng nội bộ — bản vá 09/2026', date: '15/09/2026', improvements: [
-    'Nâng cấp firmware router UniFi Dream Machine lên 4.0.6.',
-    'Tách mạng khách (Guest) tại văn phòng HCM.',
-  ], fixes: [
-    'Sửa lỗi VPN ngắt kết nối sau 30 phút không hoạt động.',
-    'Sửa lỗi camera công trường mất kết nối khi đổi IP động.',
-  ] },
-]
-
 export const PRIO_LABEL = { urgent: 'Khẩn cấp', high: 'Quan trọng', medium: 'Bình thường', low: 'Thấp' }
 export const PRIO_COLOR = { urgent: '#C2185B', high: 'var(--danger)', medium: 'var(--warn)', low: 'var(--text-muted)' }
 /* Hạng mục yêu cầu */
@@ -89,30 +70,6 @@ export function categoryOf(t) {
   if (/mật khẩu|tài khoản|quyền|chữ ký|dung lượng|khoá sau/.test(x)) return 'account'
   if (/cài|license|phần mềm|excel|outlook|teams|autocad|revit|chạy chậm|email/.test(x)) return 'software'
   return 'hardware'
-}
-const TASKS_BY_CATEGORY = {
-  hardware: ['Kiểm tra hiện trạng thiết bị', 'Xác định linh kiện / nguyên nhân hỏng', 'Đặt linh kiện thay thế', 'Thay thế & cấu hình lại', 'Bàn giao & hướng dẫn người dùng'],
-  software: ['Xác nhận lỗi / yêu cầu với người dùng', 'Kiểm tra bản quyền & cấu hình máy', 'Cài đặt / cập nhật phần mềm', 'Kiểm thử chức năng', 'Bàn giao & hướng dẫn sử dụng'],
-  network: ['Khảo sát tín hiệu tại vị trí', 'Kiểm tra thiết bị mạng & cấu hình', 'Bổ sung / thay thiết bị phát', 'Đo kiểm tốc độ & độ ổn định', 'Bàn giao cho người dùng'],
-  account: ['Xác minh danh tính người yêu cầu', 'Cấp / khôi phục tài khoản & quyền', 'Thông báo & hướng dẫn người dùng'],
-  other: ['Tiếp nhận & làm rõ yêu cầu', 'Xử lý yêu cầu', 'Bàn giao kết quả'],
-}
-/* Công việc của 1 yêu cầu — sinh từ hạng mục & trạng thái hiện tại */
-export function buildTicketTasks(t, executors = []) {
-  const titles = TASKS_BY_CATEGORY[categoryOf(t)] || TASKS_BY_CATEGORY.other
-  const n = titles.length
-  const exec = executors.length ? executors : [t.assignee].filter(Boolean)
-  const stageOf = i => {
-    if (t.status === 'hoanthanh') return 'xong'
-    if (t.status === 'dong') return i === 0 ? 'xong' : 'huy'
-    if (t.status === 'moi') return 'tiepnhan'
-    if (t.status === 'chodoi') return i < Math.ceil(n / 2) - 1 ? 'xong' : i === Math.ceil(n / 2) - 1 ? 'cho' : 'tiepnhan'
-    return i < 1 ? 'xong' : i === 1 ? 'xuly' : i === 2 ? 'chandoan' : 'tiepnhan' // đang xử lý
-  }
-  return titles.map((title, i) => ({
-    id: `${t.id}-${i + 1}`, code: `#${t.id}.${i + 1}`, title, sub: '', due: i === n - 1 ? (t.deadline || '') : '',
-    assignees: i === 0 ? [t.assignee].filter(Boolean) : exec, dept: 'IT', stage: stageOf(i),
-  }))
 }
 /* Trạng thái yêu cầu suy ra từ công việc trên bảng */
 export function statusFromTasks(tasks, stages, fallback) {

@@ -8,12 +8,13 @@
 import { useSyncExternalStore } from 'react'
 import * as api from '../api/qsApi'
 import {
-  apiConfigured, readToken, writeToken, readViewAs, writeViewAs, isAbort, setErrorTab, ping,
+  apiConfigured, readToken, writeToken, readViewAs, writeViewAs, isAbort, setErrorTab, ping, setWriteLock,
 } from '../api/http'
 import { qsToast, qsConfirm, qsCloseDialogs } from '../components/common/dialogs'
 import { recalcLine_ } from '../lib/calc.js'
 import { projDataLoad_, projDataFlush_, projDataReset_, projDataSet_ } from './projData'
 import { qbRecentPush_ } from './useRecentNodes'
+import { cacheKey, cacheGet, cachePut, cacheClear } from './bootCache'
 
 export const DEFAULT_NODE = '3.2.6.1'
 export const PERM_TABS = [['dash', 'Bảng điều khiển'], ['boc', 'Bóc tách'], ['chiphi', 'Chi phí'], ['export', 'Xuất báo giá'],
@@ -38,6 +39,7 @@ const dataInit = () => ({
   projData: {}, pdOk: null, pdErr: null, pdSeq: 0,
   congTac: [], ctStatus: 'idle', ctError: '',
   notifUnread: 0,
+  syncing: false,   // đang vẽ từ bản đệm, chờ bản mới (khoá ghi) - boot()
   hist: {}, histVer: 0,
 })
 
@@ -140,6 +142,7 @@ function resetForKey(keepCur) {
   projDataReset_()
   bootPromise = null
   editSeq = {}
+  setWriteLock('')
   setState({ key: k, ...dataInit(), cur: curMa ? { maDA: curMa } : null })
 }
 
@@ -174,6 +177,7 @@ export function startSession() {
     if (isAbort(e)) { setState({ auth: 'init' }); return }
     if (e && e.name === 'QsUnreachableError') { setState({ auth: 'unreachable', bootError: e.message }); return }
     writeToken('')
+    cacheClear()
     setState({ auth: 'login' })
   })
   return sessionPromise
@@ -199,6 +203,8 @@ export function clearSession() {
   writeViewAs(''); writeSs('qs_cur', '')
   try { localStorage.removeItem('qs_user') } catch (e) { /* bỏ qua */ }
   projDataReset_()
+  cacheClear()   // bản đệm khởi động (bootCache.js) không để lại sau khi đăng xuất
+  setWriteLock('')
   bootPromise = null; sessionPromise = null; editSeq = {}
   qsCloseDialogs()
   setState({ key: '', ...dataInit(), me: null, congTy: null, viewAs: '', auth: 'login', loginMsg: '' })
@@ -225,6 +231,7 @@ if (typeof window !== 'undefined' && !window.__qsNoauthBound) {
   window.addEventListener('qs:noauth', e => {
     if (S.auth === 'login') return
     stopNotifPoll()
+    cacheClear()
     sessionPromise = null; bootPromise = null
     setState({ auth: 'login', loginMsg: (e.detail && e.detail.message) || 'Phiên đã hết, mời đăng nhập lại.' })
   })
@@ -247,28 +254,70 @@ export function boot(force) {
   if (bootPromise && !force) return bootPromise
   const sig = ctl.signal
   const myKey = S.key
+  // khoá đệm theo token + công ty THẬT đang gửi đi (keyNow), không theo S.key có thể đã cũ (đa tab, super đổi "xem như")
+  const realKey = keyNow()
+  const ck = cacheKey(realKey)
+  const mine = () => S.key === myKey && keyNow() === realKey
+  /* Có bản đệm IndexedDB (bootCache.js) của đúng phiên + dự án đang nhớ -> vẽ ngay rồi tải bản mới ở nền. Trong lúc chờ:
+     syncing = true (QS.jsx phủ lớp chặn bấm / gõ / phím tắt trên vùng nội dung) và KHOÁ GHI ở tầng API (http.js setWriteLock)
+     để không thao tác nào dựa trên dữ liệu cũ. Bản mới về thì THAY TOÀN BỘ (dự án, danh mục, dòng của ĐÚNG dự án đang hiện,
+     xoá lịch sử hoàn tác), mở khoá ghi, nạp projData, rồi mới bỏ lớp chặn. Lỗi / huỷ: như khi không có đệm
+     (huỷ -> 'idle' để lần mở /qs sau nạp lại; lỗi -> thẻ lỗi + Thử lại). Mọi bước kiểm phiên còn đúng (mine). */
+  let shown = false
+  const unlock = () => { if (shown && mine()) { setWriteLock(''); setState({ syncing: false }) } }
   bootPromise = (async () => {
-    setState({ boot: 'loading', bootStep: 'Đang tải dự án & danh mục sản phẩm…', bootError: '', bootErrorKind: '' })
     const remembered = (S.cur && S.cur.maDA) || readSs('qs_cur') || null
-    const b = await api.bootstrap(remembered, sig)
-    if (S.key !== myKey) return
+    if (!force) {
+      const c = await cacheGet(ck)
+      if (!mine()) return
+      const cc = c && (c.projects.filter(p => p.maDA === (remembered || c.cur))[0] || null)
+      if (c && cc && c.cur === cc.maDA && Array.isArray(c.lines)) {
+        shown = true
+        setWriteLock('Đang đồng bộ dữ liệu mới nhất, thử lại sau giây lát')
+        setState({ projects: c.projects, products: c.products, cur: cc, lines: c.lines, syncing: true })
+        writeSs('qs_cur', cc.maDA)
+        hmInit_()
+        setState({ boot: 'ready', bootStep: '', bootError: '', bootErrorKind: '' })
+        bumpVisible(S.tab)
+      }
+    }
+    if (!shown) setState({ boot: 'loading', bootStep: 'Đang tải dự án & danh mục sản phẩm…', bootError: '', bootErrorKind: '' })
+    // đã vẽ từ đệm thì giữ đúng dự án đang hiện (tab mới không có qs_cur: đệm vẽ c.cur, không được nhảy sang projects[0])
+    const want = shown ? (S.cur && S.cur.maDA) : remembered
+    const b = await api.bootstrap(want, sig)
+    if (!mine()) return
     const projects = (b && b.projects) || []
-    let cur = remembered ? projects.filter(p => p.maDA === remembered)[0] : null
+    const products = (b && b.products) || []
+    let cur = want ? projects.filter(p => p.maDA === want)[0] : null
     cur = cur || projects[0] || null
-    setState({ projects, products: (b && b.products) || [] })
-    if (cur) setState({ bootStep: 'Đang tải bảng bóc tách “' + (cur.ten || cur.maDA) + '”…' })
+    if (!shown) {
+      setState({ projects, products })
+      if (cur) setState({ bootStep: 'Đang tải bảng bóc tách “' + (cur.ten || cur.maDA) + '”…' })
+    }
     const lines = cur ? ((await api.getLines(cur.maDA, sig)) || []) : []
-    if (S.key !== myKey) return
-    setState({ cur, lines })
+    if (!mine()) return
+    if (shown) {
+      editSeq = {}
+      setState({ projects, products, cur, lines, hist: {}, histVer: S.histVer + 1 })
+      setWriteLock('')   // projDataLoad_ có thể đẩy hàng đợi cũ: không để bị khoá chặn
+    } else setState({ cur, lines })
     writeSs('qs_cur', cur ? cur.maDA : '')
     if (cur) await projDataLoad_(cur.maDA)
-    setState({ bootStep: 'Đang dựng giao diện…' })
-    hmInit_()
-    setState({ boot: 'ready', bootStep: '' })
-    bumpVisible(S.tab)
+    if (!mine()) return
+    if (!shown) {
+      setState({ bootStep: 'Đang dựng giao diện…' })
+      hmInit_()
+      setState({ boot: 'ready', bootStep: '' })
+      bumpVisible(S.tab)
+    }
+    unlock()
     ctLoad(true)
+    // bản đệm = đúng dữ liệu máy chủ vừa trả (chưa ai sửa được vì đang chặn); ghi khi rảnh, lúc đó phiên phải còn đúng
+    if (cur) cachePut(ck, { projects, products, cur: cur.maDA, lines }, mine)
   })().catch(e => {
+    if (!mine()) return   // boot của phiên / công ty cũ: không đụng khoá, trạng thái của boot mới
     bootPromise = null
+    unlock()
     if (isAbort(e)) { setState({ boot: 'idle' }); return }
     if (e && e.name === 'QsAuthError') return
     setState({ boot: 'error', bootError: e.message, bootErrorKind: e.name === 'QsUnreachableError' ? 'unreachable' : 'error' })

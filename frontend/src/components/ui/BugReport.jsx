@@ -456,7 +456,7 @@ export default function BugReport({ open, onClose, pageName = '' }) {
     const reqName = form.requester.trim()
     const data = {
       title: form.title.trim(), priority: form.priority, category: form.category,
-      desc: (form.desc.trim() ? form.desc.trim() + '\n\n' : '') + 'Trang: ' + where + ' · gửi từ Dezbot',
+      desc: form.desc.trim(),   // trang gửi lưu riêng ở page (ô "Trang báo lỗi" của trang IT), không ghép vào mô tả
       page: where, requester: reqName,
       // đổi tên người báo khác tài khoản đang đăng nhập thì không gắn tài khoản (máy chủ vẫn biết ai tạo phiếu)
       requesterUsername: me && reqName === acctName ? me.username || '' : '',

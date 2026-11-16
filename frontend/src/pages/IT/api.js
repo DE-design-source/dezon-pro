@@ -1,7 +1,7 @@
 /* REST /api/v1/it (backend/internal/modules/it). Yêu cầu hỗ trợ + thiết bị + tài khoản để chọn người.
    Ticket từ máy chủ đã theo khoá của giao diện (itData.js): {id, issue, desc, priority, category, status, deadline (yyyy-mm-dd | ''),
    requester, requesterUsername, roles: [{label, people: [{name, username}]}], images: [{name, url}], stages (null = IT_STAGES),
-   tasks (null = chưa dựng, giao diện tự dựng buildTicketTasks), source ('manual' | 'report'), reported, page, received, progress,
+   tasks (null = chưa có công việc nào, bảng bắt đầu trống), source ('manual' | 'report'), reported, page, received, progress,
    mine, date (dd/mm/yyyy), createdAt, updatedAt}.
    fromServer thêm: assignee (người thực thi đầu tiên, như bản mẫu), roles[].people chuyển thành mảng tên (people) + giữ users. */
 import { request, enc } from '../QS/api/http'
