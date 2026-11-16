@@ -849,3 +849,13 @@ html[data-theme="dark"] .qs-bd-strip-chip.qs-colchip.sp-hl2, html[data-theme="da
 .qspl-ws > .qs-bd-info .qs-bd-info-body::-webkit-scrollbar-thumb{border-radius:8px; background:transparent;}
 .qspl-ws > .qs-bd-info:hover .qs-bd-info-body::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb, #c3ccd8);}
 @media (max-width:1000px){ .qspl-ws > .qs-bd-info{width:100%; min-height:0;} }
+/* ô Ảnh ở chế độ sửa nhanh (SpImgCell): thanh nút Tải / Dán / Copy / Xoá hiện khi rê chuột hoặc ô đang chọn */
+.qspl-imgc{position:relative; display:inline-flex; flex-direction:column; align-items:center; gap:4px; outline:none; border-radius:9px; padding:2px;}
+.qspl-imgc:focus-visible, .qspl-imgc:focus-within{box-shadow:0 0 0 2px var(--dash-accent);}
+.qspl-imgc-bar{display:flex; gap:3px; opacity:.6; transition:opacity .12s;}
+.qspl-imgc:hover .qspl-imgc-bar, .qspl-imgc:focus-within .qspl-imgc-bar{opacity:1;}
+.qspl-imgc-bar button{width:28px; height:26px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); cursor:pointer; padding:0;}
+.qspl-imgc-bar button:hover:not(:disabled){border-color:var(--dash-accent); color:var(--dash-accent);}
+.qspl-imgc-bar button.del:hover:not(:disabled){border-color:#dc2626; color:#dc2626;}
+.qspl-imgc-bar button:disabled{opacity:.4; cursor:default;}
+.qspl-imgc-busy{position:absolute; inset:2px 2px auto 2px; padding:2px 0; border-radius:7px; background:rgba(0,0,0,.55); color:#fff; font-size:10.5px; text-align:center;}

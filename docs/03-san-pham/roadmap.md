@@ -321,6 +321,7 @@
 - Sửa hàng loạt: ô tìm trường (gõ không dấu được), danh sách trường xếp theo chữ cái
 - Thanh tiến độ % khi sửa / xoá hàng loạt
 - Tab "Trùng mã": lọc sản phẩm trùng mã + NCC, mỗi bản 1 dòng xếp cạnh nhau để xoá bản dư; form Nhập dữ liệu báo đỏ mã đã có (trùng cả NCC thì ghi rõ)
+- Sửa nhanh: ô Ảnh tải / dán (Ctrl+V, kéo thả) / copy sang SP khác / xoá hình đại diện ngay trên bảng, không cần mở Cập nhật SP
 - Thông báo "Sản phẩm chờ duyệt" cho admin + tài khoản có quyền duyệt khi nhân viên thêm / sửa SP (gom 1 phút thành 1 thông báo, chỉ bản Go)
 - Chế độ Edit đi bằng bàn phím như bảng tính: ↑ ↓ sang dòng trên / dưới cùng cột, Enter lưu + xuống dòng (Shift+Enter lên), ← → ở đầu / cuối chữ sang ô bên cạnh, Tab như cũ
 - Xem danh mục theo bốn khung nhìn: Tất cả, Chưa duyệt, Đã duyệt, Yêu thích

@@ -5,6 +5,7 @@ import { mediaUrl } from '../../../api/files'
 import { money, fmtDate, safeUrl_, ptQty } from '../../../lib/format.js'
 import { SP_ALWAYS, spColVal_, spEditRaw_, spColW_, spKey_, fmtDateTime_, spMauCss_ } from './spModel'
 import { spInlineSave, spPrivateCopy } from './spActions'
+import SpImgCell from './SpImgCell'
 
 /* Bảng Danh sách SP (spRenderHead_ / spFilter / spAllCols_ / spInp_ / spNameEdit_ / spEditCell_ / spRowActions_ / spFreeze_ /
    spInitCols_, PUB/sanpham.js:218-293, 597-600, 616-655, 803-856, 920-950, 1488-1666).
@@ -207,7 +208,7 @@ function thCls(c) {
   const cl = c.cls || '', hl = cl.indexOf('sp-hl') >= 0 ? ' sp-hl' : ''   // 3 cột giá: tiêu đề tô màu nổi bật
   if (cl.indexOf('num') >= 0) return 'num' + hl; if (cl.indexOf('ct') >= 0) return 'ct' + hl; if (cl.indexOf('thumbcol') >= 0) return 'thumbcol'; return hl.trim()
 }
-function editable(c, p) { return !!c.e && !p.spChung }
+function editable(c, p) { return (!!c.e || c.kind === 'thumb') && !p.spChung }
 
 /* Ô hiển thị (cột ở chế độ xem) */
 function Cell({ c, p, r, on, skuCount, ts }) {
@@ -252,6 +253,7 @@ function EditCell({ c, p, r, on, skuCount, ts }) {
       </span>
     )
   }
+  if (c.kind === 'thumb') return <SpImgCell p={p} ts={ts} />
   if (!c.e) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} />
   return <SpInp p={p} e={c.e} val={spEditRaw_(p, c.e.col)} />
 }

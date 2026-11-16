@@ -155,6 +155,7 @@ export function spPatchLocal_(p0, lark, col, v) {
   if (prop) p[prop] = SP_DISPUNIT[col] ? spAddUnit_(v, SP_DISPUNIT[col]) : v
   if (col === 'ten_sp') p.ten = v
   else if (col === 'ma_sp') p.ma = v
+  else if (col === 'anh_sp') { p.anhTatCa = v; p.hinhAnh = String(v || '').split('\n')[0].trim() }   // ô Ảnh sửa nhanh (SpImgCell)
   else if (col === 'gia_ban_le') p.giaBanLe = tkNum_(v)
   else if (col === 'ck_dai_ly_pct') p.ckDaiLy = tkNum_(v)
   // GIÁ ĐẠI LÝ là cột generated trong DB: round(giá bán lẻ × (1 − CK/100))
