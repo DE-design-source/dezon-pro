@@ -3,18 +3,18 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { NAV_BOTTOM, NAV_MAIN } from '../../data/navigation'
 import { PRIO_LABEL, TICKET_CATEGORIES } from '../../data/itData'
-import { addReport, loadReports, subscribeReports } from '../../services/itTicketService'
+import { addReport, loadReports, subscribeReports, isLoggedIn, reportErrorText, dataUrlBytes, MAX_IMAGE_BYTES } from '../../services/itTicketService'
+import { useWorkSession } from '../../services/workSession'
+import { mediaUrl } from '../../pages/QS/api/files'
 import './BugReport.css'
 
-/* Báo lỗi gửi phòng IT (mở từ Dezbot): chụp màn hình -> vẽ đánh dấu -> viết lỗi + mô tả -> gửi.
-   Phiếu hiện ở Bảng điều khiển IT; người báo xem tiến độ ở tab "Đã gửi". */
+/* Báo lỗi gửi phòng IT (mở từ Dezbot): chụp màn hình -> vẽ đánh dấu -> viết lỗi + mô tả -> gửi (POST /api/v1/it/tickets).
+   Phiếu hiện ở Bảng điều khiển IT; người báo xem tiến độ ở tab "Đã gửi" (đọc từ máy chủ, hỏi lại 30 s khi hộp mở). */
 const MAX_W = 2880   // giữ gần độ phân giải gốc (màn 2K / Retina) để ảnh sắc nét khi phòng IT phóng to
 const COLORS = ['#E5483B', '#F59E0B', '#16A34A', '#2E7DD6', '#111827']
 const TOOLS = [['select', 'Chọn / sửa nét đã vẽ (V)'], ['rect', 'Khung (R)'], ['arrow', 'Mũi tên (A)'], ['curve', 'Mũi tên uốn A -> B, kéo 2 nút giữa để uốn (C)'], ['pen', 'Bút (P)'], ['text', 'Chữ (T)']]
 const PRIOS = ['low', 'medium', 'high', 'urgent']
 const STEPS = ['Đã gửi', 'IT tiếp nhận', 'Đang xử lý', 'Hoàn thành']
-const NAME_KEY = 'siteflow-bug-reporter'
-const readName = () => { try { return localStorage.getItem(NAME_KEY) || '' } catch { return '' } }
 
 /* Bước hiện tại của phiếu (0..3) theo trạng thái IT cập nhật */
 export function reportStep(t) {
@@ -205,6 +205,8 @@ const IC_TRASH = ico(<><path d="M4.5 6.5h15" /><path d="M9.5 6.5V5a1.5 1.5 0 0 1
 
 export default function BugReport({ open, onClose, pageName = '' }) {
   const nav = useNavigate()
+  const { me } = useWorkSession()
+  const acctName = (me && (me.hoTen || me.username)) || ''
   const [view, setView] = useState('new')       // new | done | mine
   const [phase, setPhase] = useState('idle')     // idle | capturing | edit
   const [img, setImg] = useState('')
@@ -213,10 +215,13 @@ export default function BugReport({ open, onClose, pageName = '' }) {
   const [color, setColor] = useState(COLORS[0])
   const [size, setSize] = useState(DEF_W)        // độ dày nét (thanh kéo)
   const [textAt, setTextAt] = useState(null)     // {x, y, cx, cy} ô gõ chữ đang mở
-  const [form, setForm] = useState({ title: '', desc: '', priority: 'medium', category: 'software', requester: readName() })
+  const [form, setForm] = useState({ title: '', desc: '', priority: 'medium', category: 'software', requester: acctName })
   const [err, setErr] = useState('')
+  const [warn, setWarn] = useState('')            // gửi được nhưng có lưu ý (vd bỏ ảnh quá lớn)
+  const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(null)
-  const [mine, setMine] = useState(loadReports)
+  const [mine, setMine] = useState({ list: [], loading: false, error: '', loaded: false })
+  const mineSeq = useRef(0)
   const canvasRef = useRef(null)
   const imgEl = useRef(null)
   const draft = useRef(null)
@@ -246,7 +251,23 @@ export default function BugReport({ open, onClose, pageName = '' }) {
   }
   const canPick = s => s && EDITABLE[s.type] && (tool === 'select' || tool === s.type)
 
-  useEffect(() => subscribeReports(() => setMine(loadReports())), [])
+  /* Danh sách "Đã gửi": tải khi hộp mở, sau khi gửi xong và mỗi 30 s trong lúc hộp mở */
+  const refreshMine = useCallback(() => {
+    if (!isLoggedIn()) { setMine({ list: [], loading: false, error: '', loaded: true }); return }
+    const seq = ++mineSeq.current
+    setMine(m => ({ ...m, loading: true }))
+    loadReports().then(
+      list => { if (seq === mineSeq.current) setMine({ list, loading: false, error: '', loaded: true }) },
+      e => { if (seq === mineSeq.current) setMine(m => ({ ...m, loading: false, error: reportErrorText(e), loaded: true })) },
+    )
+  }, [])
+  useEffect(() => {
+    if (!open) return undefined
+    refreshMine()
+    return subscribeReports(refreshMine)
+  }, [open, refreshMine])
+  // phiên nạp xong sau khi hộp mở: điền tên người báo nếu ô còn trống
+  useEffect(() => { if (acctName) setForm(f => (f.requester ? f : { ...f, requester: acctName })) }, [acctName])
   useEffect(() => { if (sel >= 0 && !canPick(shapes[sel])) setSel(-1); if (canvasRef.current) canvasRef.current.style.cursor = '' }, [tool]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (sel >= shapes.length || (sel >= 0 && !EDITABLE[shapes[sel].type])) setSel(-1) }, [shapes, sel])
   /* Đổi màu / cỡ nét khi đang chọn 1 nét thì áp cho nét đó */
@@ -269,7 +290,7 @@ export default function BugReport({ open, onClose, pageName = '' }) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const reset = () => { setImg(''); setShapes([]); setSel(-1); clearHist(); setTextAt(null); setErr(''); setSent(null); setForm(f => ({ ...f, title: '', desc: '', priority: 'medium' })) }
+  const reset = () => { setImg(''); setShapes([]); setSel(-1); clearHist(); setTextAt(null); setErr(''); setWarn(''); setSent(null); setForm(f => ({ ...f, title: '', desc: '', priority: 'medium', requester: acctName || f.requester })) }
   const newImage = url => { setImg(url); setShapes([]); setSel(-1); clearHist() }
 
   const doCapture = useCallback(async () => {
@@ -407,35 +428,53 @@ export default function BugReport({ open, onClose, pageName = '' }) {
     setTextAt(null)
   }
 
-  function submit() {
+  /* Ảnh gửi đi (không có khung chọn), JPEG; quá 8 MB (giới hạn máy chủ) thì thu nhỏ dần, vẫn quá thì '' */
+  function shotForSend() {
+    const c = canvasRef.current
+    if (!img || !c) return ''
+    redraw(false)
+    try {
+      let shot = c.toDataURL('image/jpeg', 0.9)
+      for (const [w, q] of [[1600, 0.85], [1280, 0.7]]) {
+        if (dataUrlBytes(shot) <= MAX_IMAGE_BYTES) break
+        const k = Math.min(1, w / c.width), sm = document.createElement('canvas')
+        sm.width = Math.round(c.width * k); sm.height = Math.round(c.height * k)
+        const sctx = sm.getContext('2d'); sctx.imageSmoothingQuality = 'high'; sctx.drawImage(c, 0, 0, sm.width, sm.height)
+        shot = sm.toDataURL('image/jpeg', q)
+      }
+      return dataUrlBytes(shot) <= MAX_IMAGE_BYTES ? shot : ''
+    } finally { redraw() }
+  }
+
+  async function submit() {
+    if (sending) return
     if (!form.title.trim()) { setErr('Nhập tên lỗi'); return }
     if (!form.requester.trim()) { setErr('Nhập tên người báo'); return }
-    try { localStorage.setItem(NAME_KEY, form.requester.trim()) } catch { /* bỏ qua */ }
-    // ảnh gửi đi không có khung chọn; JPEG 0.9 cho rõ chữ, quá lớn thì addReport trả null -> gửi không ảnh (bên dưới)
-    if (img && canvasRef.current) redraw(false)
-    const shot = img && canvasRef.current ? canvasRef.current.toDataURL('image/jpeg', 0.9) : ''
-    if (img && canvasRef.current) redraw()
+    if (!isLoggedIn()) { setErr('Cần đăng nhập để gửi báo lỗi cho phòng IT.'); return }
+    const shot = shotForSend()
     const where = (pageName ? pageName + ' · ' : '') + window.location.pathname
-    const base = {
-      requester: form.requester.trim(), issue: form.title.trim(), priority: form.priority, category: form.category,
+    const reqName = form.requester.trim()
+    const data = {
+      title: form.title.trim(), priority: form.priority, category: form.category,
       desc: (form.desc.trim() ? form.desc.trim() + '\n\n' : '') + 'Trang: ' + where + ' · gửi từ Dezbot',
-      page: where, assignee: 'Lê Trung Kiên',
+      page: where, requester: reqName,
+      // đổi tên người báo khác tài khoản đang đăng nhập thì không gắn tài khoản (máy chủ vẫn biết ai tạo phiếu)
+      requesterUsername: me && reqName === acctName ? me.username || '' : '',
+      images: shot ? [{ name: 'anh-chup-man-hinh.jpg', data: shot }] : [],
     }
-    let t = addReport({ ...base, images: shot ? [{ url: shot, name: 'anh-chup-man-hinh.jpg' }] : [] })
-    // bộ nhớ trình duyệt không đủ cho ảnh nét cao: thử lại bản nhỏ hơn (1600px) trước khi bỏ ảnh
-    if (!t && shot) {
-      const c = canvasRef.current, k = Math.min(1, 1600 / c.width), sm = document.createElement('canvas')
-      sm.width = Math.round(c.width * k); sm.height = Math.round(c.height * k)
-      redraw(false); const sctx = sm.getContext('2d'); sctx.imageSmoothingQuality = 'high'; sctx.drawImage(c, 0, 0, sm.width, sm.height); redraw()
-      t = addReport({ ...base, images: [{ url: sm.toDataURL('image/jpeg', 0.85), name: 'anh-chup-man-hinh.jpg' }] })
-    }
-    if (!t && shot) { t = addReport({ ...base, images: [] }); if (t) setErr('Ảnh quá lớn để lưu, đã gửi phiếu không kèm ảnh.') }
-    if (!t) { setErr('Không lưu được phiếu (bộ nhớ trình duyệt đầy).'); return }
-    setSent(t); setView('done')
+    setSending(true); setErr(''); setWarn('')
+    try {
+      const t = await addReport(data)
+      if (img && !shot) setWarn('Ảnh quá lớn (trên 8 MB), đã gửi phiếu không kèm ảnh.')
+      setSent(t); setView('done')
+    } catch (e) {
+      setErr(reportErrorText(e))   // giữ nguyên nội dung đã gõ + ảnh để gửi lại
+    } finally { setSending(false) }
   }
 
   if (!open || phase === 'capturing' || phase === 'idle') return null
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  const logged = isLoggedIn()
 
   return createPortal(
     <div className="bgr-ov" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -445,7 +484,7 @@ export default function BugReport({ open, onClose, pageName = '' }) {
           <h3>Báo lỗi cho phòng IT</h3>
           <div className="bgr-tabs">
             <button className={view !== 'mine' ? 'on' : ''} onClick={() => { if (view === 'mine') { setView('new'); reset() } }}>Báo lỗi mới</button>
-            <button className={view === 'mine' ? 'on' : ''} onClick={() => setView('mine')}>Đã gửi {mine.length > 0 && <small>{mine.length}</small>}</button>
+            <button className={view === 'mine' ? 'on' : ''} onClick={() => { setView('mine'); refreshMine() }}>Đã gửi {mine.list.length > 0 && <small>{mine.list.length}</small>}</button>
           </div>
           <button className="bgr-x" onClick={onClose} aria-label="Đóng">✕</button>
         </div>
@@ -510,10 +549,11 @@ export default function BugReport({ open, onClose, pageName = '' }) {
               </label>
               <label><span>Người báo *</span><input value={form.requester} onChange={set('requester')} placeholder="Họ tên" /></label>
               <div className="bgr-meta">Trang: {(pageName ? pageName + ' · ' : '') + window.location.pathname}</div>
-              {err && <div className="bgr-err">{err}</div>}
+              {!logged && <div className="bgr-err">Cần đăng nhập để gửi báo lỗi cho phòng IT.</div>}
+              {err && <div className="bgr-err" role="alert">{err}</div>}
               <div className="bgr-acts">
-                <button className="ghost" onClick={onClose}>Huỷ</button>
-                <button className="primary" onClick={submit}>Gửi phòng IT</button>
+                <button className="ghost" onClick={onClose} disabled={sending}>Huỷ</button>
+                <button className="primary" onClick={submit} disabled={sending || !logged}>{sending ? 'Đang gửi…' : err ? 'Gửi lại' : 'Gửi phòng IT'}</button>
               </div>
             </div>
           </div>
@@ -524,7 +564,7 @@ export default function BugReport({ open, onClose, pageName = '' }) {
             <div className="bgr-ok">✓</div>
             <h4>Đã gửi yêu cầu #{sent.id} tới phòng IT</h4>
             <p>{sent.issue}</p>
-            {err && <div className="bgr-err">{err}</div>}
+            {warn && <div className="bgr-err">{warn}</div>}
             <Steps t={sent} />
             <div className="bgr-acts c">
               <button className="ghost" onClick={() => setView('mine')}>Xem các lỗi đã gửi</button>
@@ -536,10 +576,12 @@ export default function BugReport({ open, onClose, pageName = '' }) {
 
         {view === 'mine' && (
           <div className="bgr-mine">
-            {!mine.length && <div className="bgr-none">Chưa gửi lỗi nào từ trình duyệt này.</div>}
-            {mine.map(t => (
+            {!logged && <div className="bgr-none">Cần đăng nhập để xem các lỗi đã gửi.</div>}
+            {logged && mine.error && <div className="bgr-err">{mine.error} <button className="ghost" onClick={refreshMine}>Thử lại</button></div>}
+            {logged && !mine.list.length && !mine.error && <div className="bgr-none">{mine.loading || !mine.loaded ? 'Đang tải…' : 'Bạn chưa gửi lỗi nào.'}</div>}
+            {mine.list.map(t => (
               <div key={t.id} className="bgr-mi">
-                {t.images?.[0] ? <img src={t.images[0].url} alt="" /> : <span className="bgr-noimg">#{t.id}</span>}
+                {t.images?.[0] ? <a href={mediaUrl(t.images[0].url)} target="_blank" rel="noreferrer"><img src={mediaUrl(t.images[0].url)} alt="" /></a> : <span className="bgr-noimg">#{t.id}</span>}
                 <div className="bgr-mt">
                   <b>#{t.id} · {t.issue}</b>
                   <small>{t.date} · {PRIO_LABEL[t.priority]} · {t.page || ''}</small>
@@ -548,7 +590,7 @@ export default function BugReport({ open, onClose, pageName = '' }) {
               </div>
             ))}
             <div className="bgr-acts">
-              <span className="bgr-meta">Phiếu lưu ở trình duyệt này; phòng IT cập nhật trạng thái trên trang IT.</span>
+              <span className="bgr-meta">{mine.loading && mine.list.length ? 'Đang cập nhật…' : 'Phòng IT cập nhật trạng thái trên trang IT; danh sách tự làm mới mỗi 30 giây.'}</span>
               <button className="ghost" onClick={() => { onClose(); nav('/it') }}>Mở Bảng điều khiển IT</button>
             </div>
           </div>

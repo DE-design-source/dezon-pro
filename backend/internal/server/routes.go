@@ -18,6 +18,7 @@ import (
 	"qspro-backend/internal/modules/estimates"
 	"qspro-backend/internal/modules/files"
 	"qspro-backend/internal/modules/hr"
+	"qspro-backend/internal/modules/it"
 	"qspro-backend/internal/modules/materials"
 	"qspro-backend/internal/modules/notifications"
 	"qspro-backend/internal/modules/projects"
@@ -155,13 +156,15 @@ func (s *Server) modules() []Module {
 	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
 	// cài đặt mặc định toàn hệ thống (super lưu, mọi tài khoản đăng nhập đọc), không gọi module khác
 	settingsSvc := settings.New(settings.Deps{DB: d.DB, Cfg: d.Cfg})
+	// IT: yêu cầu hỗ trợ + thiết bị; báo người được giao qua Notifier, ảnh đính kèm lưu vào kho file
+	itSvc := it.New(it.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Notifier: notifSvc, Uploader: d.Storage})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
 	s.expiry = compSvc
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc, settingsSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc, settingsSvc, itSvc,
 	}
 }
 

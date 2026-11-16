@@ -1430,5 +1430,46 @@
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
   }
+ },
+ "it_yeu_cau": {
+  "table": "it_tickets",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "tieu_de": "title",
+   "mo_ta": "description",
+   "muc_do": "priority",
+   "hang_muc": "category",
+   "trang_thai": "status",
+   "han_xu_ly": "deadline_date",
+   "nguoi_yeu_cau": "requester_name",
+   "nguoi_yeu_cau_tk": "requester_username",
+   "vai_tro": "roles",
+   "hinh_anh": "images",
+   "quy_trinh": "stages",
+   "cong_viec": "tasks",
+   "nguon": "source",
+   "trang_bao": "page_ref",
+   "da_tiep_nhan": "is_received",
+   "tien_do": "progress_pct",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "it_thiet_bi": {
+  "table": "it_assets",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "ten": "asset_name",
+   "loai": "asset_type",
+   "nguoi_dung": "holder",
+   "trang_thai": "status",
+   "ghi_chu": "note",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
  }
 }

@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import './IT.css'
-import { loadReports, subscribeReports, updateReport } from '../../services/itTicketService'
 import { useTheme } from '../../hooks/useTheme'
-import { TICKETS, ASSETS, ASSET_STATUS, TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, buildTicketTasks, statusFromTasks } from '../../data/itData'
-import { INITIAL_HR_EMPLOYEES, deptOf } from '../../data/hrData'
+import { TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, IT_STAGES, IT_FLOW_TEMPLATES, categoryOf, buildTicketTasks, statusFromTasks } from '../../data/itData'
+import { listTickets, createTicket as apiCreateTicket, updateTicket, listStaff, fileToDataUrl, rolesToServer } from './api'
+import { mediaUrl } from '../QS/api/files'
 import FlowBoard from '../../components/kanban/FlowBoard'
-
-/* Nhân sự & phòng ban cho bảng quy trình (lấy từ HR) */
-const BOARD_PEOPLE = INITIAL_HR_EMPLOYEES.filter(e => e.status !== 'left').map(e => ({ name: e.name, role: e.position, dept: deptOf(e.dept).name }))
-const BOARD_DEPTS = [...new Set(BOARD_PEOPLE.map(p => p.dept))]
-const GROUP = Object.fromEntries(TICKET_GROUPS.map(([k, l, c]) => [k, { label: l, color: c }]))
-const CATEGORY = Object.fromEntries(TICKET_CATEGORIES)
+import NotifBell from '../../components/ui/NotifBell'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { IT_TABS } from '../../data/pageTabs'
@@ -19,101 +15,208 @@ import TicketList from './components/TicketList'
 import ReleaseNotes from './components/ReleaseNotes'
 import DashSide from './components/DashSide'
 import CreateTicketModal from './components/CreateTicketModal'
+import AssetsTab from './components/AssetsTab'
 
-function StatusBadge({ status }) {
-  const [label, color, bg] = status
-  return <span className="it-badge" style={{ background: bg, color }}>{label}</span>
+const GROUP = Object.fromEntries(TICKET_GROUPS.map(([k, l, c]) => [k, { label: l, color: c }]))
+const CATEGORY = Object.fromEntries(TICKET_CATEGORIES)
+const POLL_MS = 30000 // hỏi lại danh sách (phiếu Báo lỗi mới, thay đổi của người khác)
+const SAVE_DELAY = 400 // gộp các lần sửa bảng liên tiếp thành 1 lệnh gửi
+const errMsg = e => (e && e.message) || 'Lỗi không xác định'
+const executorsOf = t => t.roles?.find(r => /thực thi/i.test(r.label))?.people || []
+const tasksOf = t => t.tasks || buildTicketTasks(t, executorsOf(t))
+const stagesOf = t => t.stages || IT_STAGES
+/* % công việc xong (không tính việc đã hủy) */
+function progressOf(tasks, stages) {
+  const k = Object.fromEntries(stages.map(s => [s.key, s]))
+  const live = tasks.filter(x => !k[x.stage]?.closed)
+  return live.length ? Math.round(live.filter(x => k[x.stage]?.done).length / live.length * 100) : 0
 }
-
-function Section({ id, icon, title, meta, headers, children }) {
-  return (
-    <div id={id} className="it-card it-section-card">
-      <div className="it-section-head">
-        <div className="it-section-icon">{icon}</div>
-        <h3>{title}</h3>
-        <span style={{ flex: 1 }} />
-        <span className="it-section-meta">{meta}</span>
-      </div>
-      <div className="it-table-wrap">
-        <table className="it-table">
-          <thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead>
-          <tbody>{children}</tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-const iconProps = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }
+/* Tài khoản -> người trên bảng xử lý (FlowBoard: name, role, dept) */
+const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.it ? 'Phòng IT' : 'Nhân viên')
 
 export default function IT() {
   const { theme, toggleTheme } = useTheme()
+  const [params, setParams] = useSearchParams()
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
-  const [pageTab, setPageTab] = useState('main') // main | nhansu
+  const [pageTab, setPageTab] = useState('main') // main | thietbi | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
   const tabHidden = usePageTabsHidden('/it')
   useTabFallback(tabHidden, pageTab, IT_TABS.map(t => t.key), setPageTab)
-  /* Phiếu "Báo lỗi" gửi từ Dezbot (localStorage) đứng đầu danh sách; phiếu mới tới khi trang đang mở cũng tự thêm vào */
-  const [tickets, setTickets] = useState(() => [...loadReports(), ...TICKETS])
-  useEffect(() => subscribeReports(() => {
-    const reps = loadReports()
-    setTickets(prev => {
-      const ids = new Set(prev.map(t => t.id))
-      const add = reps.filter(r => !ids.has(r.id))
-      if (!add.length) return prev
-      setNewId(add[0].id)
-      return [...add, ...prev]
-    })
-  }), [])
+
+  const [tickets, setTicketsState] = useState([])
+  const ticketsRef = useRef([])
+  const setTickets = useCallback(next => {
+    const v = typeof next === 'function' ? next(ticketsRef.current) : next
+    ticketsRef.current = v
+    setTicketsState(v)
+  }, [])
+  const [canManage, setCanManage] = useState(false)
+  const [load, setLoad] = useState({ state: 'loading', error: '' }) // loading | ready | error
+  const [staff, setStaff] = useState([])
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
   const [newId, setNewId] = useState(null)
   const [boardId, setBoardId] = useState(null) // yêu cầu đang mở dạng kanban
-  const [tasksBy, setTasksBy] = useState({}) // id yêu cầu → công việc trên bảng
-  const [stagesBy, setStagesBy] = useState({}) // id yêu cầu → quy trình đã chỉnh
+  const [boardRev, setBoardRev] = useState(0) // tăng để dựng lại bảng (trả quy trình về như cũ)
+  const pending = useRef({}) // id -> {patch, prev, timer}: lệnh sửa chờ gửi
+  const inflight = useRef({}) // id -> số lệnh đang gửi
+  const loaded = useRef(false)
+
+  const showToast = useCallback((msg, ms = 3500) => {
+    setToast(msg)
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), ms)
+  }, [])
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  /* Tải danh sách; yêu cầu đang chờ / đang lưu giữ bản trên máy để không bị bản cũ của máy chủ đè */
+  const reload = useCallback(async (initial = false) => {
+    if (initial) setLoad({ state: 'loading', error: '' })
+    try {
+      const r = await listTickets()
+      const local = Object.fromEntries(ticketsRef.current.map(t => [t.id, t]))
+      const merged = r.tickets.map(t => ((pending.current[t.id] || inflight.current[t.id]) && local[t.id] ? local[t.id] : t))
+      if (loaded.current) {
+        const added = merged.filter(t => !local[t.id])
+        if (added.length) setNewId(added[0].id)
+      }
+      loaded.current = true
+      setTickets(merged)
+      setCanManage(r.canManage)
+      setLoad({ state: 'ready', error: '' })
+    } catch (e) {
+      if (initial || !loaded.current) setLoad({ state: 'error', error: errMsg(e) })
+    }
+  }, [setTickets])
+
+  useEffect(() => {
+    reload(true)
+    listStaff().then(setStaff).catch(() => setStaff([]))
+    const tick = () => { if (!document.hidden && loaded.current) reload() }
+    const iv = setInterval(tick, POLL_MS)
+    window.addEventListener('focus', tick)
+    return () => { clearInterval(iv); window.removeEventListener('focus', tick) }
+  }, [reload])
+  // rời trang: gửi nốt các lệnh đang chờ
+  useEffect(() => () => { Object.keys(pending.current).forEach(id => flushRef.current?.(id)) }, [])
+
+  const boardPeople = staff.map(e => ({ name: e.name, role: roleLabel(e), dept: e.department || 'Khác' }))
+  const boardDepts = [...new Set(boardPeople.map(p => p.dept))]
   const boardTicket = tickets.find(t => t.id === boardId)
-  const executorsOf = t => t.roles?.find(r => /thực thi/i.test(r.label))?.people || []
-  const tasksOf = t => tasksBy[t.id] || buildTicketTasks(t, executorsOf(t))
-  const stagesOf = t => stagesBy[t.id] || IT_STAGES
-  // Công việc thay đổi → cập nhật trạng thái yêu cầu theo bảng
-  function changeTasks(fn) {
-    const t = boardTicket
-    const next = fn(tasksOf(t))
-    setTasksBy(m => ({ ...m, [t.id]: next }))
-    const status = statusFromTasks(next, stagesOf(t), t.status)
-    if (status !== t.status) setTickets(prev => prev.map(x => (x.id === t.id ? { ...x, status } : x)))
-    // phiếu từ "Báo lỗi": báo tiến độ (% công việc xong) + trạng thái về cho người báo
-    if (t.reported) {
-      const k = Object.fromEntries(stagesOf(t).map(s => [s.key, s]))
-      const live = next.filter(x => !k[x.stage]?.closed)
-      const progress = live.length ? Math.round(live.filter(x => k[x.stage]?.done).length / live.length * 100) : 0
-      updateReport(t.id, { status, progress, received: true })
-    }
-  }
-  /* Mở trang yêu cầu = IT đã tiếp nhận (phiếu Báo lỗi) */
-  function openTicket(t) {
-    setBoardId(t.id)
-    if (t.reported && !t.received) {
-      updateReport(t.id, { received: true })
-      setTickets(prev => prev.map(x => (x.id === t.id ? { ...x, received: true } : x)))
-    }
+
+  const patchLocal = (id, patch) => setTickets(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)))
+
+  /* Gửi lệnh sửa đang chờ của 1 yêu cầu. Lỗi: báo + trả yêu cầu về như trước đợt sửa */
+  const flush = useCallback(id => {
+    const p = pending.current[id]
+    if (!p) return
+    clearTimeout(p.timer)
+    delete pending.current[id]
+    inflight.current[id] = (inflight.current[id] || 0) + 1
+    updateTicket(id, p.patch)
+      .then(t => {
+        inflight.current[id]--
+        if (!pending.current[id] && !inflight.current[id]) setTickets(prev => prev.map(x => (x.id === t.id ? t : x)))
+      })
+      .catch(e => {
+        inflight.current[id]--
+        const q = pending.current[id]
+        if (q) { clearTimeout(q.timer); delete pending.current[id] }
+        setTickets(prev => prev.map(x => (x.id === p.prev.id ? p.prev : x)))
+        setBoardRev(n => n + 1)
+        showToast('Không lưu được thay đổi: ' + errMsg(e), 5000)
+      })
+  }, [setTickets, showToast])
+  const flushRef = useRef(flush)
+  flushRef.current = flush
+
+  function queueSave(t, patch) {
+    const p = pending.current[t.id] || { patch: {}, prev: t }
+    clearTimeout(p.timer)
+    p.patch = { ...p.patch, ...patch }
+    p.timer = setTimeout(() => flush(t.id), SAVE_DELAY)
+    pending.current[t.id] = p
   }
 
-  function createTicket(data) {
-    const id = Math.max(...tickets.map(t => t.id)) + 1
-    const today = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    setTickets(prev => [{ id, status: 'moi', date: today, assignee: data.roles.find(r => /thực thi/i.test(r.label))?.people[0] || '', ...data }, ...prev])
+  const readOnly = () => { showToast('Chỉ phòng IT cập nhật được tiến độ'); setBoardRev(n => n + 1) }
+
+  // Công việc thay đổi -> trạng thái + tiến độ yêu cầu theo bảng; giao diện đổi ngay, gửi máy chủ sau SAVE_DELAY
+  function changeTasks(fn) {
+    if (!canManage) { readOnly(); return }
+    const t = ticketsRef.current.find(x => x.id === boardId)
+    if (!t) return
+    const stages = stagesOf(t)
+    const tasks = fn(tasksOf(t))
+    const status = statusFromTasks(tasks, stages, t.status)
+    const progress = progressOf(tasks, stages)
+    patchLocal(t.id, { tasks, status, progress })
+    queueSave(t, { tasks, status, progress })
+  }
+  function changeStages(stages) {
+    if (!canManage) { readOnly(); return }
+    const t = ticketsRef.current.find(x => x.id === boardId)
+    if (!t) return
+    const tasks = tasksOf(t)
+    const status = statusFromTasks(tasks, stages, t.status)
+    const patch = status !== t.status ? { stages, status, progress: progressOf(tasks, stages) } : { stages }
+    patchLocal(t.id, patch)
+    queueSave(t, patch)
+  }
+
+  /* Mở trang yêu cầu = IT đã tiếp nhận */
+  const openTicket = useCallback(t => {
+    setBoardId(t.id)
+    setPageTab('main')
+    if (canManage && !t.received) {
+      patchLocal(t.id, { received: true })
+      updateTicket(t.id, { received: true }).catch(() => patchLocal(t.id, { received: false }))
+    }
+  }, [canManage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* /it?ticket=<id> (từ thông báo): mở yêu cầu khi danh sách đã tải, rồi xoá tham số */
+  const ticketParam = params.get('ticket')
+  useEffect(() => {
+    if (!ticketParam || load.state !== 'ready') return
+    const t = ticketsRef.current.find(x => String(x.id) === ticketParam)
+    if (t) openTicket(t)
+    else showToast(`Không tìm thấy yêu cầu #${ticketParam} hoặc bạn không có quyền xem`)
+    setParams(p => { const n = new URLSearchParams(p); n.delete('ticket'); return n }, { replace: true })
+  }, [ticketParam, load.state, openTicket, setParams, showToast])
+
+  /* Thông báo it_* trên chuông: mở yêu cầu ngay trên trang, không điều hướng */
+  function onNotif(n) {
+    if (!/^it_/.test((n && n.kind) || '') || n.refId == null) return false
+    const t = ticketsRef.current.find(x => String(x.id) === String(n.refId))
+    if (t) { openTicket(t); return true }
+    reload().then(() => {
+      const u = ticketsRef.current.find(x => String(x.id) === String(n.refId))
+      if (u) openTicket(u)
+      else showToast(`Không tìm thấy yêu cầu #${n.refId}`)
+    })
+    return true
+  }
+
+  async function createTicket(data) {
+    const images = await Promise.all(data.images.map(async im => ({ name: im.name, data: await fileToDataUrl(im.file) })))
+    const t = await apiCreateTicket({
+      title: data.issue, desc: data.desc, priority: data.priority, category: data.category,
+      deadline: data.deadline || '', requester: data.requester, requesterUsername: data.requesterUsername,
+      roles: rolesToServer(data.roles), images, source: 'manual',
+    })
+    data.images.forEach(im => { try { URL.revokeObjectURL(im.url) } catch { /* bỏ qua */ } })
+    setTickets(prev => [t, ...prev.filter(x => x.id !== t.id)])
     setCreateOpen(false)
     setPageTab('main')
-    setNewId(id)
+    setBoardId(null)
+    setNewId(t.id)
     const notified = [...new Set(data.roles.flatMap(r => r.people))]
-    setToast(`Đã tạo yêu cầu #${id}${notified.length ? ` · đã gửi thông báo tới ${notified.join(', ')}` : ''}`)
-    setTimeout(() => setToast(null), 3500)
+    showToast(`Đã tạo yêu cầu #${t.id}${notified.length ? ` · đã gửi thông báo tới ${notified.join(', ')}` : ''}`)
   }
 
-  /* Thao tác nhanh: cuộn tới khối Thiết bị / Ghi chú cập nhật, hoặc sang tab Cơ cấu phòng ban */
+  /* Thao tác nhanh: cuộn tới khối Ghi chú cập nhật, hoặc sang tab Thiết bị / Cơ cấu phòng ban */
   function gotoSection(key) {
     if (key === 'nhansu' || key === 'assets') { setPageTab(key === 'assets' ? 'thietbi' : 'nhansu'); setBoardId(null); return }
     document.getElementById('it-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -138,6 +241,7 @@ export default function IT() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Tạo yêu cầu
         </button>
+        <NotifBell onOpen={onNotif} />
         <button className="it-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -146,34 +250,29 @@ export default function IT() {
       </div>
 
       <div className="it-scroll it-scroll-dash" style={pageTab !== 'main' || boardTicket ? { display: 'none' } : undefined}>
-        {/* Bảng điều khiển: cột trái thẻ tóm tắt + thao tác nhanh, cột phải danh sách yêu cầu (cùng bố cục Bảng điều khiển QS) */}
-        <div className="it-dash">
-          <DashSide tickets={tickets} onCreate={() => setCreateOpen(true)} onGoto={gotoSection} />
-          <div className="it-content it-dash-main">
-          <TicketList tickets={tickets} highlightId={newId} onOpen={openTicket} onCreate={() => setCreateOpen(true)} />
-          <div id="it-releases" className="it-content"><ReleaseNotes /></div>
+        {load.state === 'loading' && <div className="it-state">Đang tải danh sách yêu cầu…</div>}
+        {load.state === 'error' && (
+          <div className="it-state err">
+            <span>Không tải được danh sách yêu cầu: {load.error}</span>
+            <button onClick={() => reload(true)}>Thử lại</button>
           </div>
-        </div>
+        )}
+        {/* Bảng điều khiển: cột trái thẻ tóm tắt + thao tác nhanh, cột phải danh sách yêu cầu (cùng bố cục Bảng điều khiển QS) */}
+        {load.state === 'ready' && (
+          <div className="it-dash">
+            <DashSide tickets={tickets} onCreate={() => setCreateOpen(true)} onGoto={gotoSection} />
+            <div className="it-content it-dash-main">
+              <TicketList tickets={tickets} title={canManage ? 'Danh sách yêu cầu' : 'Yêu cầu của tôi'} highlightId={newId} onOpen={openTicket} onCreate={() => setCreateOpen(true)} />
+              <div id="it-releases" className="it-content"><ReleaseNotes /></div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Thiết bị & tài sản CNTT: module riêng (tab trên thanh tiêu đề), không hiện ở Bảng điều khiển */}
       {pageTab === 'thietbi' && !boardTicket && (
         <div className="it-scroll">
-          <Section
-            title="Thiết bị & tài sản CNTT"
-            meta="Đang theo dõi 186 thiết bị"
-            headers={['Thiết bị', 'Loại', 'Người / vị trí sử dụng', 'Trạng thái']}
-            icon={<svg {...iconProps}><rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></svg>}
-          >
-            {ASSETS.map(a => (
-              <tr key={a.name}>
-                <td style={{ fontWeight: 700 }}>{a.name}</td>
-                <td>{a.type}</td>
-                <td>{a.owner}</td>
-                <td><StatusBadge status={ASSET_STATUS[a.status]} /></td>
-              </tr>
-            ))}
-          </Section>
+          <AssetsTab canManage={canManage} />
         </div>
       )}
 
@@ -185,45 +284,50 @@ export default function IT() {
 
       {boardTicket && (
         <FlowBoard
+          key={boardTicket.id + ':' + boardRev}
           open
           variant="page"
           backLabel="Danh sách yêu cầu"
           onClose={() => setBoardId(null)}
           accent="var(--it)"
-          kicker={`Yêu cầu hỗ trợ #${boardTicket.id}`}
+          kicker={`Yêu cầu hỗ trợ #${boardTicket.id}${canManage ? '' : ' · chỉ xem'}`}
           title={boardTicket.issue}
           itemNoun="công việc"
           codePrefix={`#${boardTicket.id}`}
           codeSep="."
           stages={stagesOf(boardTicket)}
-          onStagesChange={s => setStagesBy(m => ({ ...m, [boardTicket.id]: s }))}
+          onStagesChange={changeStages}
           templates={IT_FLOW_TEMPLATES}
-          people={BOARD_PEOPLE}
-          depts={BOARD_DEPTS}
+          people={boardPeople}
+          depts={boardDepts}
           items={tasksOf(boardTicket)}
           onItemsChange={changeTasks}
           meta={[
             { label: 'Trạng thái', value: <><i className="it-meta-dot" style={{ background: GROUP[boardTicket.status]?.color }} />{GROUP[boardTicket.status]?.label}</> },
+            { label: 'Tiến độ', value: `${Math.round(boardTicket.progress || 0)}%` },
             { label: 'Người yêu cầu', value: boardTicket.requester },
             { label: 'Mức độ', value: <><i className="it-meta-dot" style={{ background: PRIO_COLOR[boardTicket.priority] }} />{PRIO_LABEL[boardTicket.priority]}</> },
             { label: 'Hạng mục', value: CATEGORY[categoryOf(boardTicket)] },
             { label: 'Ngày tạo', value: boardTicket.date },
             ...(boardTicket.deadline ? [{ label: 'Deadline dự kiến', value: boardTicket.deadline }] : []),
+            ...(boardTicket.page ? [{ label: 'Trang báo lỗi', value: boardTicket.page }] : []),
             ...(boardTicket.roles?.length ? boardTicket.roles.map(r => ({ label: r.label, value: r.people.join(', ') })) : [{ label: 'Phụ trách', value: boardTicket.assignee || '—' }]),
           ]}
           info={(boardTicket.desc || boardTicket.images?.length) ? (
             <>
               {boardTicket.desc && <p className="it-board-desc">{boardTicket.desc}</p>}
-              {boardTicket.images?.length > 0 && <div className="it-tl-imgs">{boardTicket.images.map(im => <a key={im.url} href={im.url} target="_blank" rel="noreferrer"><img src={im.url} alt={im.name} /></a>)}</div>}
+              {boardTicket.images?.length > 0 && <div className="it-tl-imgs">{boardTicket.images.map(im => <a key={im.url} href={mediaUrl(im.url)} target="_blank" rel="noreferrer"><img src={mediaUrl(im.url)} alt={im.name} /></a>)}</div>}
             </>
           ) : null}
         />
       )}
-      <CreateTicketModal open={createOpen} onClose={() => setCreateOpen(false)} onCreate={createTicket} />
+      <CreateTicketModal open={createOpen} staff={staff} onClose={() => setCreateOpen(false)} onCreate={createTicket} />
       {toast && <div className="it-toast">{toast}</div>}
 
       <Dezbot
         open={aiOpen}
+        tickets={tickets}
+        canManage={canManage}
         onOpen={() => setAiOpen(true)}
         onClose={() => setAiOpen(false)}
         onResize={setAiWidth}

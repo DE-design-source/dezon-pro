@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BugChip } from '../../../components/ui/BugReport'
-import { TICKETS, ASSETS, isOpenTicket } from '../../../data/itData'
+import { isOpenTicket } from '../../../data/itData'
+import { listAssets } from '../api'
 
 const MIN_W = 320
 const MAX_W = 720
@@ -22,35 +23,40 @@ const ticketLine = t => `${t.requester} — ${t.issue}`
 const TOPICS = [
   {
     key: 'ticket', label: 'Ticket hỗ trợ', keywords: ['ticket', 'yêu cầu hỗ trợ', 'yêu cầu', 'sự cố'],
-    reply: () => {
-      const open = TICKETS.filter(isOpenTicket)
-      const high = open.filter(t => t.priority === 'high')
-      return <>Hiện có <strong>{open.length}</strong> ticket đang mở trên tổng {TICKETS.length} ticket gần đây. {high.length
+    reply: ({ tickets }) => {
+      const open = tickets.filter(isOpenTicket)
+      const high = open.filter(t => t.priority === 'high' || t.priority === 'urgent')
+      return <>Hiện có <strong>{open.length}</strong> ticket đang mở trên tổng {tickets.length} ticket. {high.length
         ? `Ưu tiên cao: ${high.map(ticketLine).join('; ')}.`
         : 'Không có ticket ưu tiên cao nào đang mở.'}</>
     },
   },
   {
     key: 'thietbi', label: 'Thiết bị CNTT', keywords: ['thiết bị', 'laptop', 'máy in', 'camera', 'tài sản'],
-    reply: () => {
-      const broken = ASSETS.filter(a => a.status === 'broken')
-      const maint = ASSETS.filter(a => a.status === 'maintenance')
-      return <>Đang quản lý <strong>186</strong> thiết bị CNTT (laptop, máy chủ, camera, thiết bị mạng...). {broken.length > 0 && `${broken.map(a => a.name).join(', ')} đang hỏng, chờ sửa. `}
+    reply: ({ assets, canManage }) => {
+      if (!canManage) return 'Danh sách thiết bị CNTT chỉ phòng IT xem được. Thiết bị gặp sự cố, bạn bấm Tạo yêu cầu để báo phòng IT.'
+      if (!assets) return 'Chưa đọc được danh sách thiết bị, bạn mở tab Thiết bị & tài sản để xem.'
+      const broken = assets.filter(a => a.status === 'broken')
+      const maint = assets.filter(a => a.status === 'maintenance')
+      return <>Đang quản lý <strong>{assets.length}</strong> thiết bị CNTT (laptop, máy chủ, camera, thiết bị mạng...). {broken.length > 0 && `${broken.map(a => a.name).join(', ')} đang hỏng, chờ sửa. `}
         {maint.length > 0 && `${maint.map(a => a.name).join(', ')} cần bảo trì định kỳ.`}</>
     },
   },
   {
     key: 'mang', label: 'Mạng & máy chủ', keywords: ['mạng', 'wifi', 'máy chủ', 'server', 'vpn'],
-    reply: () => 'Hệ thống mạng và máy chủ hoạt động ổn định. Wifi công trường Quận 9 đang được kỹ thuật viên xử lý do tín hiệu chậm — dự kiến hoàn tất trong hôm nay.',
+    reply: ({ tickets }) => {
+      const net = tickets.filter(t => isOpenTicket(t) && t.category === 'network')
+      return net.length ? `Đang có ${net.length} yêu cầu về mạng & kết nối chưa xong: ${net.map(ticketLine).join('; ')}.` : 'Không có yêu cầu nào về mạng & kết nối đang mở.'
+    },
   },
   {
     key: 'uptime', label: 'Uptime hệ thống', keywords: ['uptime', 'thời gian hoạt động', 'downtime', 'sự cố hệ thống'],
-    reply: () => <>Uptime hệ thống tháng này đạt <strong>99.8%</strong>, không có sự cố nghiêm trọng nào ảnh hưởng đến vận hành.</>,
+    reply: () => 'Chưa nối dữ liệu giám sát uptime hệ thống. Gặp sự cố gián đoạn, bạn bấm Tạo yêu cầu để báo phòng IT.',
   },
   {
     key: 'uutien', label: 'Yêu cầu ưu tiên cao', keywords: ['ưu tiên cao', 'cần xử lý gấp', 'gấp'], wide: true,
-    reply: () => {
-      const high = TICKETS.filter(t => t.priority === 'high' && isOpenTicket(t))
+    reply: ({ tickets }) => {
+      const high = tickets.filter(t => (t.priority === 'high' || t.priority === 'urgent') && isOpenTicket(t))
       if (!high.length) return 'Hiện không có yêu cầu ưu tiên cao nào đang chờ xử lý.'
       return `Các yêu cầu ưu tiên cao cần xử lý: ${high.map(ticketLine).join('; ')}.`
     },
@@ -62,7 +68,12 @@ const MonitorIcon = ({ size }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
 )
 
-export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChange }) {
+export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChange, tickets = [], canManage = false }) {
+  const [assets, setAssets] = useState(null)
+  // câu trả lời đọc dữ liệu mới nhất (trả lời chạy trễ trong setTimeout)
+  const ctx = useRef({})
+  ctx.current = { tickets, assets, canManage }
+  useEffect(() => { if (open && canManage) listAssets().then(setAssets).catch(() => setAssets(null)) }, [open, canManage])
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [resizing, setResizing] = useState(false)
@@ -77,7 +88,7 @@ export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChan
   const push = (...msgs) => setMessages(prev => [...prev, ...msgs.map(m => ({ ...m, id: ++seq.current }))])
 
   function openTopic(topic) {
-    push({ role: 'user', content: topic.label }, { role: 'bot', content: topic.reply() })
+    push({ role: 'user', content: topic.label }, { role: 'bot', content: topic.reply(ctx.current) })
   }
 
   function send() {
@@ -87,7 +98,7 @@ export default function Dezbot({ open, onOpen, onClose, onResize, onResizingChan
     setInput('')
     const topic = matchTopic(text)
     timers.current.push(setTimeout(() => {
-      push({ role: 'bot', content: topic ? topic.reply() : FALLBACK })
+      push({ role: 'bot', content: topic ? topic.reply(ctx.current) : FALLBACK })
     }, 300))
   }
 

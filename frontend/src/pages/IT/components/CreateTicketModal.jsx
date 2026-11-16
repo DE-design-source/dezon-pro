@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { INITIAL_HR_EMPLOYEES, deptOf, initials, avatarColor } from '../../../data/hrData'
+import { initials } from '../../../data/hrData'
+import DatePicker from '../../../components/ui/DatePicker'
+import { useWorkSession } from '../../../services/workSession'
 import { PRIO_LABEL, TICKET_CATEGORIES } from '../../../data/itData'
 
-const PEOPLE = INITIAL_HR_EMPLOYEES.filter(e => e.status !== 'left')
-const personOf = id => PEOPLE.find(e => e.id === id)
 const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase()
 const PRIOS = ['urgent', 'high', 'medium', 'low']
 const DEFAULT_ROLES = [
@@ -11,25 +11,22 @@ const DEFAULT_ROLES = [
   { key: 'coord', label: 'Điều phối', hint: 'Phân công, đôn đốc tiến độ' },
   { key: 'exec', label: 'Nhân sự thực thi', hint: 'Trực tiếp xử lý' },
 ]
-const ME_ID = 2 // Trần Anh — người dùng đang đăng nhập
+const AV = ['#2E7DD6', '#0E9F9A', '#8B3FD9', '#D9822B', '#C2185B', '#1E8E5A']
+const avatarColor = k => AV[[...String(k || '')].reduce((h, ch) => h + ch.charCodeAt(0), 0) % AV.length]
+const deptLabel = e => e.department || (e.it ? 'IT' : 'Khác')
+const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.it ? 'Phòng IT' : 'Nhân viên')
 
-/* dd/mm/yyyy ⇄ yyyy-mm-dd */
-const toISO = v => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v); return m ? `${m[3]}-${m[2]}-${m[1]}` : '' }
-const fromISO = v => (v ? v.split('-').reverse().join('/') : '')
-const validDate = v => { const iso = toISO(v); if (!iso) return false; const d = new Date(iso); return !isNaN(d) && fromISO(d.toISOString().slice(0, 10)) === v }
-// Gõ số → tự chèn "/" thành dd/mm/yyyy
-const maskDate = raw => { const d = raw.replace(/\D/g, '').slice(0, 8); return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join('/') }
+const Avatar = ({ e, size = 22 }) => <span className="it-ct-avatar" style={{ background: avatarColor(e.username), width: size, height: size, fontSize: size * 0.38 }}>{initials(e.name)}</span>
 
-const Avatar = ({ e, size = 22 }) => <span className="it-ct-avatar" style={{ background: avatarColor(e.id), width: size, height: size, fontSize: size * 0.38 }}>{initials(e.name)}</span>
-
-/* Chọn nhiều người (tìm theo tên, chức danh, phòng ban) */
-function PeoplePick({ value, onChange, placeholder }) {
+/* Chọn nhiều người (tìm theo tên, tài khoản, phòng ban); value = mảng username */
+function PeoplePick({ people, value, onChange, placeholder }) {
+  const personOf = u => people.find(e => e.username === u)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [hi, setHi] = useState(0)
   const t = norm(q.trim())
-  const list = PEOPLE.filter(e => !value.includes(e.id) && (!t || norm(`${e.name} ${e.position} ${deptOf(e.dept).name}`).includes(t))).slice(0, 8)
-  const add = e => { if (!e) return; onChange([...value, e.id]); setQ(''); setHi(0) }
+  const list = people.filter(e => !value.includes(e.username) && (!t || norm(`${e.name} ${e.username} ${e.department || ''}`).includes(t))).slice(0, 8)
+  const add = e => { if (!e) return; onChange([...value, e.username]); setQ(''); setHi(0) }
   return (
     <div className="it-ct-pick">
       {value.map(id => { const e = personOf(id); return e && (
@@ -48,8 +45,8 @@ function PeoplePick({ value, onChange, placeholder }) {
           <div className="it-ct-pick-list" onMouseDown={e => e.preventDefault()}>
             {list.length === 0 && <div className="it-ct-pick-empty">Không tìm thấy nhân sự</div>}
             {list.map((e, i) => (
-              <button type="button" key={e.id} className={i === hi ? 'hi' : ''} onMouseEnter={() => setHi(i)} onClick={() => add(e)}>
-                <Avatar e={e} size={24} /><span><b>{e.name}</b><em>{e.position} · {deptOf(e.dept).name}</em></span>
+              <button type="button" key={e.username} className={i === hi ? 'hi' : ''} onMouseEnter={() => setHi(i)} onClick={() => add(e)}>
+                <Avatar e={e} size={24} /><span><b>{e.name}</b><em>{roleLabel(e)} · {deptLabel(e)} · {e.username}</em></span>
               </button>
             ))}
           </div>
@@ -60,16 +57,27 @@ function PeoplePick({ value, onChange, placeholder }) {
 }
 
 /* Bảng nhập thông tin yêu cầu hỗ trợ IT */
-export default function CreateTicketModal({ open, onClose, onCreate }) {
-  const blank = () => ({ title: '', desc: '', images: [], priority: 'medium', category: 'hardware', deadline: '', requester: [ME_ID], roles: DEFAULT_ROLES.map(r => ({ ...r, people: [] })) })
+/* staff: [{username, name, department, role, it}] từ listStaff() (trang IT tải sẵn).
+   onCreate(data) trả Promise: xong thì trang đóng bảng; lỗi thì hiện thông báo trong bảng, giữ nguyên nội dung đã nhập.
+   data = {issue, desc, images: [{name, url, file}], priority, category, deadline (yyyy-mm-dd | ''), requester, requesterUsername,
+   roles: [{label, people: [tên], peopleUsers: [{name, username}]}]} */
+export default function CreateTicketModal({ open, onClose, onCreate, staff = [] }) {
+  const { me } = useWorkSession()
+  const meUser = me?.username || ''
+  // tài khoản đang đăng nhập luôn chọn được (kể cả khi chưa có trong danh sách, vd quản trị hệ thống)
+  const people = meUser && !staff.some(e => e.username === meUser)
+    ? [{ username: meUser, name: me?.hoTen || meUser, department: '', role: me?.role || '' }, ...staff]
+    : staff
+  const personOf = u => people.find(e => e.username === u)
+  const blank = () => ({ title: '', desc: '', images: [], priority: 'medium', category: 'hardware', deadline: '', requester: meUser ? [meUser] : [], roles: DEFAULT_ROLES.map(r => ({ ...r, people: [] })) })
   const [f, setF] = useState(blank)
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const [newRole, setNewRole] = useState(null) // tên vai trò đang thêm
   const fileRef = useRef(null)
-  const dateRef = useRef(null)
   const set = patch => { setErr(''); setF(x => ({ ...x, ...patch })) }
 
-  useEffect(() => { if (open) { setF(blank()); setErr(''); setNewRole(null) } }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) { setF(blank()); setErr(''); setNewRole(null); setBusy(false) } }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open) return
     const onKey = e => { if (e.key === 'Escape') onClose() }
@@ -79,19 +87,24 @@ export default function CreateTicketModal({ open, onClose, onCreate }) {
   if (!open) return null
 
   const addFiles = files => {
-    const imgs = [...files].filter(x => x.type.startsWith('image/')).map(x => ({ name: x.name, url: URL.createObjectURL(x), size: x.size }))
+    const imgs = [...files].filter(x => x.type.startsWith('image/')).map(x => ({ name: x.name, url: URL.createObjectURL(x), size: x.size, file: x }))
     if (imgs.length) set({ images: [...f.images, ...imgs].slice(0, 8) })
   }
   const setRole = (i, patch) => set({ roles: f.roles.map((r, j) => (j === i ? { ...r, ...patch } : r)) })
   function submit() {
+    if (busy) return
     if (!f.title.trim()) { setErr('Nhập tiêu đề yêu cầu'); return }
-    if (f.deadline && !validDate(f.deadline)) { setErr('Deadline không hợp lệ — nhập theo dạng dd/mm/yyyy'); return }
-    const req = personOf(f.requester[0]) || personOf(ME_ID)
-    onCreate({
-      issue: f.title.trim(), desc: f.desc.trim(), images: f.images, priority: f.priority, category: f.category,
-      deadline: f.deadline || '', requester: req.name,
-      roles: f.roles.filter(r => r.people.length).map(r => ({ label: r.label, people: r.people.map(id => personOf(id)?.name).filter(Boolean) })),
+    const req = personOf(f.requester[0])
+    if (!req) { setErr('Chọn người yêu cầu'); return }
+    const roles = f.roles.filter(r => r.people.length).map(r => {
+      const users = r.people.map(personOf).filter(Boolean).map(e => ({ name: e.name, username: e.username }))
+      return { label: r.label, people: users.map(u => u.name), peopleUsers: users }
     })
+    setBusy(true)
+    Promise.resolve(onCreate({
+      issue: f.title.trim(), desc: f.desc.trim(), images: f.images, priority: f.priority, category: f.category,
+      deadline: f.deadline || '', requester: req.name, requesterUsername: req.username, roles,
+    })).catch(e => setErr((e && e.message) || 'Không tạo được yêu cầu')).finally(() => setBusy(false))
   }
 
   return (
@@ -146,17 +159,11 @@ export default function CreateTicketModal({ open, onClose, onCreate }) {
 
           <div className="it-ct-field">
             <span>Deadline dự kiến</span>
-            <div className={`it-ct-date${f.deadline && !validDate(f.deadline) ? ' err' : ''}`}>
-              <input inputMode="numeric" placeholder="dd/mm/yyyy" value={f.deadline} onChange={e => set({ deadline: maskDate(e.target.value) })} />
-              <button type="button" title="Chọn ngày" onClick={() => { try { dateRef.current?.showPicker() } catch { dateRef.current?.click() } }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
-              </button>
-              <input ref={dateRef} type="date" className="it-ct-date-native" tabIndex={-1} value={toISO(f.deadline)} onChange={e => set({ deadline: fromISO(e.target.value) })} />
-            </div>
+            <DatePicker value={f.deadline} onChange={v => set({ deadline: v || '' })} clearable ariaLabel="Deadline dự kiến" className="it-ct-date" />
           </div>
           <div className="it-ct-field">
             <span>Người yêu cầu</span>
-            <PeoplePick value={f.requester} onChange={v => set({ requester: v.slice(-1) })} placeholder="Chọn người yêu cầu" />
+            <PeoplePick people={people} value={f.requester} onChange={v => set({ requester: v.slice(-1) })} placeholder="Chọn người yêu cầu" />
           </div>
 
           <div className="it-ct-field full">
@@ -168,7 +175,7 @@ export default function CreateTicketModal({ open, onClose, onCreate }) {
                     <b>{r.label}</b>{r.hint && <em>{r.hint}</em>}
                     {r.custom && <button type="button" className="it-ct-role-del" onClick={() => set({ roles: f.roles.filter((_, j) => j !== i) })} title="Bỏ vai trò">×</button>}
                   </div>
-                  <PeoplePick value={r.people} onChange={v => setRole(i, { people: v })} placeholder="Tìm nhân sự…" />
+                  <PeoplePick people={people} value={r.people} onChange={v => setRole(i, { people: v })} placeholder="Tìm nhân sự…" />
                 </div>
               ))}
               {newRole === null
@@ -189,7 +196,7 @@ export default function CreateTicketModal({ open, onClose, onCreate }) {
           {err && <span className="it-ct-err">{err}</span>}
           <span style={{ flex: 1 }} />
           <button className="it-ct-btn ghost" onClick={onClose}>Hủy</button>
-          <button className="it-ct-btn primary" onClick={submit}>Tạo yêu cầu</button>
+          <button className="it-ct-btn primary" onClick={submit} disabled={busy}>{busy ? 'Đang gửi…' : 'Tạo yêu cầu'}</button>
         </div>
       </div>
     </div>

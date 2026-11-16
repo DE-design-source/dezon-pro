@@ -274,6 +274,13 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |
 | `GET` | `/sales/leads/:id/activities` | `kdListActivities` | `rpc.Login` | sales | Lịch sử chăm sóc |
 | `POST` | `/sales/leads/:id/activities` | `kdAddActivity` | `rpc.Login` | sales | Ghi 1 lần chăm sóc |
+| `GET` | `/it/tickets` | `itListTickets` | `rpc.Login` | it | Yêu cầu hỗ trợ IT mới nhất trước (`{tickets, canManage}`): quyền IT (admin / perms `it`) thấy cả công ty, người khác hoặc `?mine=1` chỉ thấy yêu cầu mình gửi |
+| `POST` | `/it/tickets` | `itCreateTicket` | `rpc.Login` | it | Tạo yêu cầu (trang IT / nút Báo lỗi, `source=report`, `page`); ảnh `data:image/...;base64` lưu vào kho file `/files/it/...` (tối đa 8 ảnh, 8 MB); báo người trong `roles` có `username`, không ai thì báo nhân viên có perms `it` |
+| `PATCH` | `/it/tickets/:id` | `itUpdateTicket` | `rpc.Login` | it | Sửa 1 phần (quyền IT): `tasks` / `stages` (bảng xử lý), `status`, `progress` 0-100, `received`, thông tin; báo người VỪA được thêm vào `roles` |
+| `DELETE` | `/it/tickets/:id` | `itDeleteTicket` | `rpc.Login` | it | Xoá hẳn yêu cầu (chỉ admin) |
+| `GET` | `/it/staff` | `itStaff` | `rpc.Login` | it | Tài khoản đang hoạt động của công ty để chọn người (`{staff: [{username, name, department, role, it}]}`), người có quyền IT xếp trước |
+| `GET / POST` | `/it/assets` | `itListAssets / itCreateAsset` | `rpc.Login` | it | Thiết bị & tài sản CNTT (quyền IT): danh sách / thêm (`name` bắt buộc, `status` `active` / `maintenance` / `broken`) |
+| `PATCH / DELETE` | `/it/assets/:id` | `itUpdateAsset / itDeleteAsset` | `rpc.Login` | it | Sửa / xoá thiết bị (quyền IT) |
 | `GET` | `/delivery/projects` | `tkListProjects` | `rpc.Login` | delivery | Dự án theo `?kind=design|construction`, kèm `progress`, `taskCount`, `members` |
 | `POST` | `/delivery/projects` | `tkCreateProject` | `rpc.Login` | delivery | Tạo dự án bằng tay |
 | `GET` | `/delivery/projects/:id` | `tkGetProject` | `rpc.Login` | delivery | Chi tiết: thành viên, thầu phụ, giai đoạn + công việc, bình luận theo công việc |

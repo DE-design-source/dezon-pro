@@ -1,0 +1,18 @@
+/* Chuông thông báo dùng chung (components/ui/NotifBell.jsx). Màu nhấn đổi theo trang qua --nb-accent / --nb-accent-tint */
+.nb{position:relative; flex:none;}
+.nb-btn{position:relative; width:34px; height:34px; border-radius:9px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;}
+.nb-btn:hover{color:var(--text);}
+.nb-badge{position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; box-sizing:border-box; border-radius:99px; background:var(--danger, #C0392B); color:#fff; font-size:10.5px; font-weight:700; line-height:17px; text-align:center;}
+.nb-dd{position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:340px; max-width:calc(100vw - 32px); background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.14); overflow:hidden;}
+.nb-hd{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--border); font-size:14px; color:var(--text);}
+.nb-hd button{border:none; background:none; padding:0; font:inherit; font-size:12px; color:var(--nb-accent, var(--primary)); cursor:pointer;}
+.nb-hd button:hover{text-decoration:underline;}
+.nb-list{max-height:60vh; overflow:auto;}
+.nb-empty{padding:24px 14px; text-align:center; color:var(--text-muted); font-size:13px;}
+.nb-item{display:block; width:100%; text-align:left; padding:10px 14px; border:none; border-bottom:1px solid var(--border); background:none; font:inherit; color:var(--text); cursor:pointer;}
+.nb-item:last-child{border-bottom:none;}
+.nb-item:hover{background:var(--surface-alt);}
+.nb-item.unread{background:var(--nb-accent-tint, var(--primary-tint));}
+.nb-item b{display:block; font-size:13px;}
+.nb-item span{display:block; margin-top:2px; font-size:12px; color:var(--text-muted);}
+.nb-item i{display:block; margin-top:3px; font-size:11px; font-style:normal; color:var(--text-muted);}

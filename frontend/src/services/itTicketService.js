@@ -1,43 +1,50 @@
-/* Yêu cầu hỗ trợ gửi từ nút "Báo lỗi" (Dezbot) tới phòng IT.
-   Trang IT chưa có server nên phiếu lưu ở localStorage của trình duyệt (cùng máy mới thấy);
-   trang IT đọc / cập nhật trạng thái + tiến độ, người báo xem lại tiến độ trong hộp Báo lỗi. */
-import { TICKETS } from '../data/itData'
+/* Yêu cầu hỗ trợ gửi từ nút "Báo lỗi" (Dezbot) tới phòng IT: lớp mỏng trên REST /api/v1/it/tickets (pages/IT/api.js).
+   Phiếu lưu trên máy chủ (source 'report'); trang IT cập nhật trạng thái + tiến độ, người báo xem lại ở tab "Đã gửi". */
+import { createTicket, listMyTickets } from '../pages/IT/api'
+import { readToken } from '../pages/QS/api/http'
 
-const KEY = 'siteflow-it-reported'
 const EVT = 'siteflow-it-reported-change'
+export const MAX_IMAGE_BYTES = 8 << 20   // máy chủ nhận tối đa 8 MB / ảnh (sau giải mã base64)
 
-export function loadReports() {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) || '[]')
-    return Array.isArray(v) ? v : []
-  } catch { return [] }
+export const isLoggedIn = () => !!readToken()
+/* Số byte thật của data URL base64 */
+export function dataUrlBytes(u) {
+  const i = String(u || '').indexOf(',')
+  if (i < 0) return 0
+  const b64 = u.slice(i + 1)
+  return Math.floor(b64.length * 3 / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0)
 }
 
-function saveReports(list) {
-  try { localStorage.setItem(KEY, JSON.stringify(list)) } catch { return false }
-  window.dispatchEvent(new Event(EVT))
-  return true
+/* data: {title, desc, priority, category, requester, requesterUsername, page, images: [{name, data: dataURL}]}.
+   Trả về phiếu máy chủ (fromServer); lỗi ném lại (reportErrorText đổi thành câu tiếng Việt) */
+export async function addReport(data) {
+  const t = await createTicket({
+    title: data.title, desc: data.desc || '', priority: data.priority, category: data.category,
+    requester: data.requester || '', requesterUsername: data.requesterUsername || '',
+    images: (data.images || []).slice(0, 8), source: 'report', page: data.page || '',
+  })
+  try { window.dispatchEvent(new Event(EVT)) } catch { /* bỏ qua */ }
+  return t
 }
 
-/* Thêm phiếu mới; trả về phiếu đã lưu (null nếu không lưu được, vd ảnh quá lớn) */
-export function addReport(data) {
-  const list = loadReports()
-  const id = Math.max(0, ...TICKETS.map(t => t.id), ...list.map(t => t.id)) + 1
-  const today = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const t = { id, status: 'moi', progress: 0, date: today, createdAt: Date.now(), reported: true, assignee: '', ...data }
-  return saveReports([t, ...list]) ? t : null
-}
+/* Phiếu người đang đăng nhập đã gửi, mới nhất trước */
+export const loadReports = () => listMyTickets()
 
-export function updateReport(id, patch) {
-  const list = loadReports()
-  if (!list.some(t => t.id === id)) return
-  saveReports(list.map(t => (t.id === id ? { ...t, ...patch } : t)))
-}
-
-/* Báo khi danh sách đổi (cùng tab hoặc tab khác) */
-export function subscribeReports(fn) {
-  const onStorage = e => { if (e.key === KEY) fn() }
+/* Báo khi vừa gửi xong phiếu (trong trang) + hỏi lại định kỳ (mặc định 30 s, bỏ qua khi tab đang ẩn).
+   Gọi khi hộp Báo lỗi đang mở; trả về hàm huỷ */
+export function subscribeReports(fn, interval = 30000) {
   window.addEventListener(EVT, fn)
-  window.addEventListener('storage', onStorage)
-  return () => { window.removeEventListener(EVT, fn); window.removeEventListener('storage', onStorage) }
+  const timer = interval > 0 ? setInterval(() => { if (!document.hidden) fn() }, interval) : null
+  return () => { window.removeEventListener(EVT, fn); if (timer) clearInterval(timer) }
+}
+
+/* Lỗi gọi API -> câu tiếng Việt cho người báo */
+export function reportErrorText(e) {
+  const n = e && e.name
+  if (n === 'QsAuthError') return 'Phiên đăng nhập đã hết, mời đăng nhập lại rồi gửi lại.'
+  if (n === 'QsUnreachableError') return 'Không kết nối được máy chủ. Kiểm tra mạng rồi bấm gửi lại.'
+  if (n === 'QsNotConfiguredError') return 'Chưa cấu hình địa chỉ máy chủ (VITE_API_URL).'
+  if (e && e.status === 413) return 'Ảnh quá lớn, máy chủ không nhận. Thử chụp lại vùng nhỏ hơn.'
+  if (e && e.status >= 500 && /^HTTP \d+$/.test(e.message || '')) return 'Máy chủ đang lỗi (' + e.message + '), thử lại sau.'
+  return (e && e.message) || 'Không gửi được, thử lại sau.'
 }

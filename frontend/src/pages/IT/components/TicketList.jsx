@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { TICKETS, TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, categoryOf } from '../../../data/itData'
+import { TICKET_GROUPS, PRIO_LABEL, PRIO_COLOR, TICKET_CATEGORIES, categoryOf } from '../../../data/itData'
 
 const PAGE_SIZE = 10
 const CATEGORY = Object.fromEntries(TICKET_CATEGORIES)
 const GROUP = Object.fromEntries(TICKET_GROUPS.map(([key, label, color]) => [key, { label, color }]))
-const toISO = d => d.split('/').reverse().join('-')
+// createdAt / updatedAt: thời điểm ISO của máy chủ
+const fmtDay = v => { const d = new Date(v); return isNaN(d) ? '' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
 const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase()
 const initials = n => String(n || '').trim().split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase()
 const AV_COLORS = ['#2E7DD6', '#0E9F9A', '#8B3FD9', '#D9822B', '#C2185B', '#1E8E5A']
@@ -15,14 +16,15 @@ const HEADERS = [['', ''], ['Yêu cầu', ''], ['Người yêu cầu', ''], ['Ph
 
 /* Danh sách yêu cầu hỗ trợ — cùng dáng "Danh sách dự án" của Bảng điều khiển QS:
    thanh tiêu đề xanh đậm (lọc trạng thái, tìm kiếm, tạo yêu cầu) + bảng cột; bấm 1 dòng mở trang yêu cầu */
-export default function TicketList({ tickets = TICKETS, highlightId, onOpen, onCreate }) {
+export default function TicketList({ tickets = [], title = 'Danh sách yêu cầu', highlightId, onOpen, onCreate }) {
   const [status, setStatus] = useState('all')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
 
-  const sorted = [...tickets].sort((a, b) => toISO(b.date).localeCompare(toISO(a.date)) || b.id - a.id)
+  const sorted = [...tickets].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')) || b.id - a.id)
+  const lastAt = tickets.reduce((m, t) => { const v = String(t.updatedAt || t.createdAt || ''); return v > m ? v : m }, '')
   const term = norm(q.trim())
-  const searched = sorted.filter(t => !term || norm(`#${t.id} ${t.issue} ${t.requester}`).includes(term))
+  const searched = sorted.filter(t => !term || norm(`#${t.id} ${t.issue || ''} ${t.requester || ''}`).includes(term))
   const list = status === 'all' ? searched : searched.filter(t => t.status === status)
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
   const cur = Math.min(page, pages)
@@ -37,7 +39,7 @@ export default function TicketList({ tickets = TICKETS, highlightId, onOpen, onC
         <span className="it-tl-hic">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
         </span>
-        <h2>Danh sách yêu cầu</h2>
+        <h2>{title}</h2>
         <span className="it-tl-count">{tickets.length}</span>
         <div className="it-tl-seg" role="tablist" aria-label="Lọc theo trạng thái">
           <button className={status === 'all' ? 'on' : ''} onClick={() => pick('all')}>Tất cả <small>{count('all')}</small></button>
@@ -66,7 +68,7 @@ export default function TicketList({ tickets = TICKETS, highlightId, onOpen, onC
             <div className="it-tl-row it-tl-th">
               {HEADERS.map(([h, c], i) => <span key={i} className={c}>{h}</span>)}
             </div>
-            {rows.length === 0 && <div className="it-tl-empty">Không có yêu cầu phù hợp</div>}
+            {rows.length === 0 && <div className="it-tl-empty">{tickets.length ? 'Không có yêu cầu phù hợp' : 'Chưa có yêu cầu nào' + (onCreate ? ' · bấm Tạo yêu cầu để gửi phòng IT' : '')}</div>}
             {rows.map(t => {
               const g = GROUP[t.status]
               const who = t.roles?.find(r => /thực thi/i.test(r.label))?.people || [t.assignee].filter(Boolean)
@@ -98,7 +100,7 @@ export default function TicketList({ tickets = TICKETS, highlightId, onOpen, onC
           </div>
         </div>
         <div className="it-tl-foot">
-          <span>Hiển thị {rows.length ? (cur - 1) * PAGE_SIZE + 1 : 0}–{(cur - 1) * PAGE_SIZE + rows.length} / {list.length} yêu cầu · cập nhật {sorted[0]?.date}</span>
+          <span>Hiển thị {rows.length ? (cur - 1) * PAGE_SIZE + 1 : 0}–{(cur - 1) * PAGE_SIZE + rows.length} / {list.length} yêu cầu{lastAt ? ' · cập nhật ' + fmtDay(lastAt) : ''}</span>
           <div className="it-tl-pager">
             <button disabled={cur <= 1} onClick={() => go(1)} title="Trang đầu"><Chevron d="m11 17-5-5 5-5M18 17l-5-5 5-5" /></button>
             <button disabled={cur <= 1} onClick={() => go(cur - 1)} title="Trang trước"><Chevron d="m15 18-6-6 6-6" /></button>

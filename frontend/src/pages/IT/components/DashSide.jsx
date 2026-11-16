@@ -6,6 +6,14 @@ const CAT_MAX = 4
 
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0)
 const fmtPct = n => String(n).replace('.', ',') + '%'
+/* Đầu tuần (thứ Hai 00:00, giờ máy) cách tuần này n tuần */
+const weekStart = (n = 0) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7 * n); return d.getTime() }
+/* Yêu cầu xong trong [from, to): trạng thái Xong, lấy thời điểm cập nhật cuối làm lúc xong (máy chủ không lưu riêng ngày xong) */
+const doneIn = (tickets, from, to) => tickets.filter(t => {
+  if (t.status !== 'hoanthanh') return false
+  const at = new Date(t.updatedAt || t.createdAt).getTime()
+  return at >= from && at < to
+}).length
 const ic = d => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
 
 /* Cột trái Bảng điều khiển IT — cùng dáng cột trái Bảng điều khiển QS (DashSummary + QuickActions):
@@ -14,6 +22,9 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
   const total = tickets.length
   const open = tickets.filter(isOpenTicket)
   const done = total - open.length
+  const w0 = weekStart(0), w1 = weekStart(1)
+  const doneWeek = doneIn(tickets, w0, Infinity)
+  const diffWeek = doneWeek - doneIn(tickets, w1, w0)
   const urgent = open.filter(t => t.priority === 'high' || t.priority === 'urgent').length
   const byStatus = TICKET_GROUPS.map(([k, l, c]) => ({ k, l, c, n: tickets.filter(t => t.status === k).length })).filter(x => x.n)
   const cats = TICKET_CATEGORIES.map(([k, l]) => ({ k, l, n: tickets.filter(t => categoryOf(t) === k).length })).filter(x => x.n).sort((a, b) => b.n - a.n)
@@ -43,8 +54,8 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
         <div className="it-sm-hero">
           <div className="it-sm-big">{open.length}</div>
           <div className="it-sm-chiprow">
-            <span className="it-sm-chip"><i>▲</i>27 xong tuần này</span>
-            <span>+5 so với tuần trước</span>
+            <span className="it-sm-chip" title="Yêu cầu chuyển sang Xong từ thứ Hai tuần này (theo lần cập nhật cuối)">{diffWeek >= 0 ? <i>▲</i> : <i>▼</i>}{doneWeek} xong tuần này</span>
+            <span>{diffWeek === 0 ? 'bằng tuần trước' : (diffWeek > 0 ? '+' : '') + diffWeek + ' so với tuần trước'}</span>
           </div>
           <div className="it-sm-split">
             <span className="it-sm-cap">Phân bổ theo trạng thái</span>
@@ -59,7 +70,7 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
         </div>
         <dl className="it-sm-rows">
           <div><dt>Quan trọng đang mở</dt><dd><b className={urgent ? 'warn' : ''}>{urgent}</b></dd></div>
-          <div><dt>Hoàn thành tuần này</dt><dd><b>27</b></dd></div>
+          <div><dt>Hoàn thành tuần này</dt><dd><b>{doneWeek}</b></dd></div>
         </dl>
       </section>
 
@@ -72,7 +83,7 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
             </button>
           )}
         </div>
-        <div className="it-sm-grp">{cats.slice(0, CAT_MAX).map(catRow)}</div>
+        <div className="it-sm-grp">{cats.length ? cats.slice(0, CAT_MAX).map(catRow) : <div className="it-sm-empty">Chưa có yêu cầu</div>}</div>
       </section>
       {/* Ô "Yêu cầu theo hạng mục" đầy đủ: mở bên phải cột trái, đè lên danh sách (như "Giá trị theo nhóm" của QS) */}
       {catOpen && (

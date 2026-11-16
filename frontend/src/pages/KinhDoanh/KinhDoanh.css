@@ -718,24 +718,8 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-cp-dsec.folded .kd-cp-dfold{transform:rotate(-90deg);}
 .kd-cp-detail .kd-cp-dsec.folded > span{border-bottom:none; padding-bottom:0; margin-bottom:0;}
 
-/* Chuông thông báo trang Kinh doanh (KdNotifBell): được giao phụ trách khách hàng + thông báo chung của tài khoản */
-.kd-nb{position:relative; flex:none;}
-.kd-nb-btn{position:relative; width:34px; height:34px; border-radius:9px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
-.kd-nb-btn:hover{color:var(--text);}
-.kd-nb-badge{position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; box-sizing:border-box; border-radius:99px; background:var(--danger); color:#fff; font-size:10.5px; font-weight:700; line-height:17px; text-align:center;}
-.kd-nb-dd{position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:340px; max-width:calc(100vw - 32px); background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.14); overflow:hidden;}
-.kd-nb-hd{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--border); font-size:14px;}
-.kd-nb-hd button{border:none; background:none; padding:0; font:inherit; font-size:12px; color:var(--sales); cursor:pointer;}
-.kd-nb-hd button:hover{text-decoration:underline;}
-.kd-nb-list{max-height:60vh; overflow:auto;}
-.kd-nb-empty{padding:24px 14px; text-align:center; color:var(--text-muted); font-size:13px;}
-.kd-nb-item{display:block; width:100%; text-align:left; padding:10px 14px; border:none; border-bottom:1px solid var(--border); background:none; font:inherit; color:var(--text); cursor:pointer;}
-.kd-nb-item:last-child{border-bottom:none;}
-.kd-nb-item:hover{background:var(--surface-alt);}
-.kd-nb-item.unread{background:var(--sales-tint);}
-.kd-nb-item b{display:block; font-size:13px;}
-.kd-nb-item span{display:block; margin-top:2px; font-size:12px; color:var(--text-muted);}
-.kd-nb-item i{display:block; margin-top:3px; font-size:11px; font-style:normal; color:var(--text-muted);}
+/* Chuông thông báo dùng chung (components/ui/NotifBell): màu nhấn của trang Kinh doanh */
+.kd-page .nb{--nb-accent:var(--sales); --nb-accent-tint:var(--sales-tint);}
 /* Đặt lịch hẹn: hộp nổi + dòng lịch hẹn trong "Lịch chăm sóc sắp tới" (MarkUp 2026-11-16 17:20) */
 .kd-appt-ov{position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:16px; background:rgba(15,23,42,.38);}
 .kd-appt{width:min(520px, 100%); box-sizing:border-box; box-shadow:0 24px 60px -12px rgba(15,23,42,.35);}
