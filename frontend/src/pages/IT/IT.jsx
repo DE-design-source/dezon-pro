@@ -235,10 +235,6 @@ export default function IT() {
             <button key={t.key} className={`hdr-tab${pageTab === t.key ? ' active' : ''}`} onClick={() => { setPageTab(t.key); setBoardId(null) }}>{t.label}</button>
           ))}
         </div>
-        <button className="it-create-btn" onClick={() => setCreateOpen(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          Tạo yêu cầu
-        </button>
         <NotifBell onOpen={onNotif} />
         <button className="it-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'

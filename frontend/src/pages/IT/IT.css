@@ -248,8 +248,6 @@ html[data-theme="dark"] .it-page{--bar-2:#7FA8F5;}
 @media (max-width:760px){ .it-tl-search{width:100%;} }
 
 /* ===== Tạo yêu cầu ===== */
-.it-create-btn{display:flex; align-items:center; gap:6px; height:34px; padding:0 14px; border:none; border-radius:9px; background:var(--it); color:#fff; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; flex:none;}
-.it-create-btn:hover{filter:brightness(1.07);}
 .it-toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:200; max-width:min(720px, 90vw); padding:11px 18px; border-radius:10px; background:var(--text); color:var(--surface); font-size:13px; font-weight:600; box-shadow:0 12px 30px rgba(0,0,0,.3);}
 .it-tl-imgs{flex-basis:100%; display:flex; gap:8px; flex-wrap:wrap;}
 .it-tl-imgs img{width:84px; height:62px; object-fit:cover; border-radius:8px; border:1px solid var(--border);}
