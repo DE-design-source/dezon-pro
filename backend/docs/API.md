@@ -268,6 +268,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `GET` | `/system-defaults` | `getSystemDefaults` | `rpc.Login` | settings | Cài đặt mặc định toàn hệ thống `{appearance, general, display, updatedAt, updatedBy}` (mục chưa lưu = null; chưa migrate 0047 -> toàn null, ghi log) |
 | `PUT` | `/system-defaults/:section` | `saveSystemDefault` | `rpc.Super` | settings | Lưu mặc định 1 mục (`appearance` / `general` / `display`), thân `{value: object \| null}` (null / thiếu = xoá, tối đa 64 KB) -> `{ok}`; bảng `system_settings` (migration 0047, không theo công ty) |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
+| `GET` | `/sales/staff` | `kdListStaff` | `rpc.Login` | sales | Tài khoản đang hoạt động của công ty để giao phụ trách (`{staff: [{username, name, department, role, sales}]}`); người được giao lưu kèm `username` trong `assignees` |
 | `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng (`createdAt` / `wonAt` yyyy-mm-dd tuỳ chọn, chỉ khi tạo: nạp dữ liệu mẫu) |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
 | `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |

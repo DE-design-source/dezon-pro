@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import { INITIAL_HR_EMPLOYEES } from '../../../data/hrData'
+import { listStaff } from '../api'
 import { lmInitials } from '../utils'
 
 /* Phiếu yêu cầu nhân sự kinh doanh phụ trách: hiện khi kéo thẻ vào giai đoạn "Nhân sự KD phụ trách" (giao-ns).
-   Chọn / gõ nhân sự (gợi ý nhân sự 2 phòng kinh doanh theo HR) + vai trò + ghi chú; "Giao & chuyển" = thêm người vào phu_trach
-   rồi chuyển thẻ sang giao-ns. Huỷ = thẻ giữ nguyên giai đoạn cũ. Thẻ đã có nhân sự (khác Admin KD) thì chuyển được ngay.
+   Chọn nhân sự từ TÀI KHOẢN của công ty (GET /sales/staff; người vào được Kinh doanh xếp trước) + vai trò + ghi chú;
+   người được giao lưu kèm username. Không tải được danh sách tài khoản thì cho gõ tên tự do như trước.
+   "Giao & chuyển" = thêm người vào phu_trach rồi chuyển thẻ sang giao-ns. Huỷ = thẻ giữ nguyên giai đoạn cũ.
+   Thẻ đã có nhân sự (khác Admin KD) thì chuyển được ngay.
    Ghi chú yêu cầu (máy chủ không lưu thêm trường trong phu_trach) ghi thành 1 dòng Lịch sử chăm sóc loại Ghi chú.
    Props: open, lead, onClose(), onConfirm(assignees mới, ghi chú) */
 const ADMIN_KD = 'Admin Kinh doanh'
-const KD_STAFF = INITIAL_HR_EMPLOYEES.filter(e => (e.dept === 'kddd' || e.dept === 'kdda') && e.status !== 'left')
+
+// Danh sách tài khoản dùng chung giữa các lần mở phiếu (null = chưa tải / tải lỗi)
+let staffCache = null
 
 export default function StaffRequestModal({ open, lead, onClose, onConfirm }) {
   const has = ((lead && lead.assignees) || []).filter(a => a && a.role !== ADMIN_KD)
@@ -16,25 +20,60 @@ export default function StaffRequestModal({ open, lead, onClose, onConfirm }) {
   const [name, setName] = useState('')
   const [role, setRole] = useState('Nhân sự kinh doanh')
   const [note, setNote] = useState('')
+  const [staff, setStaff] = useState(staffCache)
+  const [loadErr, setLoadErr] = useState(false)
+  const [err, setErr] = useState('')
   useEffect(() => {
     if (!open) return undefined
     const k = e => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', k)
     return () => document.removeEventListener('keydown', k)
   }, [open, onClose])
+  useEffect(() => {
+    if (!open) return undefined
+    let off = false
+    listStaff().then(s => { staffCache = s; if (!off) { setStaff(s); setLoadErr(false) } }, () => { if (!off) setLoadErr(true) })
+    return () => { off = true }
+  }, [open])
   if (!open || !lead) return null
-  const add = () => {
-    const n = name.trim(); if (!n) return
-    if (![...has, ...picked].some(a => a.name === n)) setPicked(l => [...l, { name: n, role: role.trim() }])
-    setName('')
+
+  const list = staff || []
+  const dupName = n => list.filter(s => s.name === n).length > 1
+  // Giá trị trong ô gợi ý: họ tên; trùng họ tên thì kèm @username cho phân biệt
+  const optVal = s => (dupName(s.name) ? `${s.name} (@${s.username})` : s.name)
+  const lc = v => String(v || '').trim().toLowerCase()
+  const resolve = v => {
+    const t = lc(v).replace(/^@/, '')
+    return list.find(s => lc(optVal(s)) === t || lc(s.username) === t || (!dupName(s.name) && lc(s.name) === t)) || null
   }
-  const pending = name.trim() && ![...has, ...picked].some(a => a.name === name.trim()) ? [{ name: name.trim(), role: role.trim() }] : []
+  const strict = !!staff && !loadErr
+  const taken = a => [...has, ...picked].some(x => (a.username && x.username === a.username) || (!a.username && x.name === a.name))
+  // ô đang gõ -> người được giao ({name, role, username}); null = chưa gõ / không khớp tài khoản
+  const toAssignee = v => {
+    const n = v.trim(); if (!n) return null
+    const s = resolve(n)
+    if (s) return { name: s.name, role: role.trim(), username: s.username }
+    return strict ? null : { name: n, role: role.trim() }
+  }
+  const add = () => {
+    if (!name.trim()) return
+    const a = toAssignee(name)
+    if (!a) { setErr(`Không có tài khoản "${name.trim()}" trong công ty. Chọn trong danh sách gợi ý.`); return }
+    if (!taken(a)) setPicked(l => [...l, a])
+    setName(''); setErr('')
+  }
+  const cur = toAssignee(name)
+  const pending = cur && !taken(cur) ? [cur] : []
   const all = [...picked, ...pending]
   const canGo = has.length + all.length > 0
   const go = () => {
     if (!canGo) return
     onConfirm(all, note.trim())
   }
+  const chip = (a, i, extra) => (
+    <span key={i} className={extra ? 'new' : undefined}><i>{lmInitials(a.name)}</i>{a.name}
+      {a.username ? <em> @{a.username}</em> : null}{a.role ? <em> · {a.role}</em> : null}{extra}</span>
+  )
   return (
     <div className="kd-srq-ov" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="kd-srq" role="dialog" aria-modal="true" aria-label="Phiếu yêu cầu nhân sự kinh doanh phụ trách">
@@ -49,23 +88,29 @@ export default function StaffRequestModal({ open, lead, onClose, onConfirm }) {
           {has.length > 0 && (
             <div className="kd-srq-sec">
               <label>Đang phụ trách</label>
-              <div className="kd-srq-chips">{has.map((a, i) => <span key={i}><i>{lmInitials(a.name)}</i>{a.name}{a.role ? <em> · {a.role}</em> : null}</span>)}</div>
+              <div className="kd-srq-chips">{has.map((a, i) => chip(a, i))}</div>
             </div>
           )}
           <div className="kd-srq-sec">
             <label>Giao nhân sự kinh doanh {has.length ? '(thêm)' : '*'}</label>
             <div className="kd-srq-row">
-              <input list="kd-srq-staff" value={name} placeholder="Gõ tên nhân sự kinh doanh…" onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} autoFocus />
+              <input list="kd-srq-staff" value={name} placeholder={strict ? 'Gõ tên hoặc tên đăng nhập…' : 'Gõ tên nhân sự kinh doanh…'}
+                onChange={e => { setName(e.target.value); setErr('') }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} autoFocus />
               <input value={role} placeholder="Vai trò" onChange={e => setRole(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
               <button type="button" onClick={add}>Thêm</button>
             </div>
-            <datalist id="kd-srq-staff">{KD_STAFF.map(e => <option key={e.id} value={e.name}>{e.position}</option>)}</datalist>
+            <datalist id="kd-srq-staff">
+              {list.map(s => (
+                <option key={s.username} value={optVal(s)}>
+                  {'@' + s.username + (s.department ? ' · ' + s.department : '') + (s.sales ? '' : ' · chưa có quyền Kinh doanh')}
+                </option>
+              ))}
+            </datalist>
+            {err && <div className="kd-srq-err">{err}</div>}
+            {!err && loadErr && <div className="kd-srq-err">Không tải được danh sách tài khoản, đang cho gõ tên tự do.</div>}
             {picked.length > 0 && (
               <div className="kd-srq-chips">
-                {picked.map((a, i) => (
-                  <span key={i} className="new"><i>{lmInitials(a.name)}</i>{a.name}{a.role ? <em> · {a.role}</em> : null}
-                    <button type="button" onClick={() => setPicked(l => l.filter((_, j) => j !== i))} aria-label="Bỏ">×</button></span>
-                ))}
+                {picked.map((a, i) => chip(a, i, <button type="button" onClick={() => setPicked(l => l.filter((_, j) => j !== i))} aria-label="Bỏ">×</button>))}
               </div>
             )}
           </div>

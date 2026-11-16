@@ -38,6 +38,8 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	tag := "Kinh doanh"
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdListLeads", Method: "GET", Path: "/sales/leads", Perm: rpc.Login, Tag: tag,
 		Summary: "Danh sách khách hàng tiềm năng của công ty, kèm tổng báo giá QS (chưa VAT) nếu đã gắn dự án"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdListStaff", Method: "GET", Path: "/sales/staff", Perm: rpc.Login, Tag: tag,
+		Summary: "Tài khoản đang hoạt động của công ty để giao phụ trách khách hàng: {staff: [{username, name, department, role, sales}]}, sales = vào được Kinh doanh"})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdCreateLead", Method: "POST", Path: "/sales/leads", Perm: rpc.Login, Tag: tag,
 		Summary: "Thêm khách hàng tiềm năng", Fields: leadBody})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdUpdateLead", Method: "PATCH", Path: "/sales/leads/:id", Perm: rpc.Login, Tag: tag,
@@ -71,6 +73,10 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	}
 	g.GET("/leads", func(c *gin.Context) {
 		r, err := s.ListLeads(c.Request.Context(), actor.FromGin(c))
+		response.Result(c, r, err)
+	})
+	g.GET("/staff", func(c *gin.Context) {
+		r, err := s.ListStaff(c.Request.Context(), actor.FromGin(c))
 		response.Result(c, r, err)
 	})
 	g.POST("/leads", func(c *gin.Context) {

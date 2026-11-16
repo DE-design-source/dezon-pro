@@ -6,7 +6,7 @@ import { mediaUrl } from '../../QS/api/files'
 /* ===================== Modal: Chi tiết lead (đầy đủ thông tin đã nhập từ modal +Thêm) ===================== */
 
 const capLabel = mb => ({ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: mb })
-const noteBox = { fontSize: 12.5, lineHeight: 1.6, background: 'var(--surface-alt)', borderRadius: 10, padding: '10px 12px' }
+const noteBox = { fontSize: 12.5, lineHeight: 1.6, background: 'var(--surface-alt)', borderRadius: 10, padding: '10px 12px', whiteSpace: 'pre-line', overflowWrap: 'anywhere' }
 
 function LdRow({ label, value }) {
   if (value === undefined || value === null || value === '') return null

@@ -235,8 +235,8 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               </div>
               <DSec id="tai-lieu" title="Tài liệu & ghi chú" fold={fold} onFold={onFold}>
                 {l.boqFile && <div className="kd-cp-file"><Ic d={FILE_IC} />{l.boqFile}</div>}
-                {l.concept && <p className="kd-cp-note"><b>Concept:</b> {l.concept}</p>}
-                {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
+                {l.concept && <p className="kd-cp-note"><b>Concept:</b>{l.concept}</p>}
+                {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b>{l.notes}</p>}
                 {!l.boqFile && !l.concept && !l.notes && <em className="kd-cp-dnone">Chưa có BOQ, concept hay ghi chú</em>}
               </DSec>
               <DSec id="hinh" title={'Hình đính kèm' + (imgs.length ? ' (' + imgs.length + ')' : '')} fold={fold} onFold={onFold}>

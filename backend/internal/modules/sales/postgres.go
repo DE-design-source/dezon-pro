@@ -18,6 +18,7 @@ type Repository interface {
 	DeleteLead(ctx context.Context, id float64) (int, error)
 	ListActivities(ctx context.Context, leadID float64) ([]*omap.Map, error)
 	InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	ListStaff(ctx context.Context) ([]*omap.Map, error)
 }
 
 type pgRepo struct{ db *database.DB }
@@ -63,4 +64,9 @@ func (r *pgRepo) ListActivities(ctx context.Context, leadID float64) ([]*omap.Ma
 
 func (r *pgRepo) InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map, error) {
 	return first(r.db.InsertOne(ctx, "kd_cham_soc", row))
+}
+
+// ListStaff: tài khoản đang hoạt động của công ty (users thuộc TenantTables nên tự lọc theo công ty; super không có công ty nên không lẫn vào).
+func (r *pgRepo) ListStaff(ctx context.Context) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "users", database.SelectOpt{Select: "id,username,ho_ten,phong_ban,role,perms", Filter: database.Eq("active", true), Order: "username.asc", Limit: 1000})
 }
