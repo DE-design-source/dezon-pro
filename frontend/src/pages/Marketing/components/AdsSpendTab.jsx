@@ -702,6 +702,10 @@ export default function AdsSpendTab({ visible }) {
         ) : null}
         data={data}
         kenh={v.theoKenh.map(x => x.k)}
+        Picker={KenhPicker}
+        combo={combo}
+        onSaveCombo={luuCombo}
+        onDelCombo={boCombo}
       />}
 
       {/* chi theo kênh: bấm để bật / tắt kênh khỏi tổng (ô số, biểu đồ) */}

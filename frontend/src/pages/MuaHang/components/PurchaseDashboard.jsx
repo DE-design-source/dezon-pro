@@ -159,6 +159,8 @@ export default function PurchaseDashboard() {
         <section className="mh-sm" aria-label="Giá trị mua hàng">
           <div className="mh-sm-h"><h3>Giá trị mua hàng</h3>
             <span className="mh-sm-sub"><Icon name="filter" size={11} />{src === 'all' ? 'Tất cả nguồn' : 'Từ ' + SRC[src].pageLabel}{time.k ? ' · ' + timeLb : ''}</span>
+            {/* nút tải lại dời từ thanh đầu danh sách lên đây cho thanh đó gọn (MarkUp 2026-11-12 18:01) */}
+            <button type="button" className="mh-dash-reload sm" onClick={load} disabled={loading} title="Tải lại dữ liệu"><Icon name="refresh" size={13} /></button>
           </div>
           {loading && <div className="mh-sum-load"><i style={{ width: (prog.total ? prog.done / prog.total * 100 : 5) + '%' }} />Đang gom dữ liệu {prog.done}/{prog.total || '…'} dự án…</div>}
           {!loading && warn.map(s => {
@@ -278,7 +280,6 @@ export default function PurchaseDashboard() {
           <label className="mh-dash-search"><Icon name="search" size={14} />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm mã, dự án, hạng mục, NCC…" />
           </label>
-          <button type="button" className="mh-dash-reload" onClick={load} disabled={loading} title="Tải lại dữ liệu"><Icon name="refresh" size={14} /></button>
         </div>
 
         {/* Bảng cùng dáng "Danh sách dự án" của Bảng điều khiển QS: nút mở | biểu tượng | Dự án (2 dòng) | ... | NCC dạng nhãn xanh đậm;

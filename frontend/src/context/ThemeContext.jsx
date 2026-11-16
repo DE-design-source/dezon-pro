@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { loadAppFont } from '../data/fontCatalog'
+import { sysSection, useSysDefaults } from '../services/systemDefaultsService'
 
 const ThemeContext = createContext(null)
 
@@ -16,25 +17,43 @@ function systemPrefersDark() {
   try { return window.matchMedia('(prefers-color-scheme: dark)').matches } catch { return false }
 }
 
+const MODES = ['light', 'dark', 'system']
+/* Lựa chọn RIÊNG của người dùng (null = chưa tự chọn -> theo mặc định hệ thống của Siêu quản trị viên, N17).
+   Cờ "-own" ghi khi người dùng tự chọn; bản cũ không có cờ: giá trị khác mặc định gốc ('system' / 'default') coi là tự chọn. */
+function readOwn(key, flag, base) {
+  try {
+    const v = localStorage.getItem(key)
+    return v && (localStorage.getItem(flag) === '1' || v !== base) ? v : null
+  } catch { return null }
+}
+function writeOwn(key, flag, v) {
+  try {
+    if (v) { localStorage.setItem(key, v); localStorage.setItem(flag, '1') } else { localStorage.removeItem(key); localStorage.removeItem(flag) }
+  } catch { /* bỏ qua */ }
+}
+const PERSONAL = ['fontPins', 'fontRecent']   // danh sách cá nhân, không thuộc mặc định hệ thống
+
 export function ThemeProvider({ children }) {
-  /* Chế độ người dùng chọn: 'light' | 'dark' | 'system' (theo hệ điều hành).
-     Bản cũ chỉ lưu 'siteflow-theme' — nếu có thì coi như người dùng đã chọn cố định sáng/tối. */
-  const [themeMode, setThemeMode] = useState(() => {
-    try {
-      return localStorage.getItem('siteflow-theme-mode') || localStorage.getItem('siteflow-theme') || 'system'
-    } catch { return 'light' }
-  })
+  const sysA = sysSection('appearance', useSysDefaults()) || {}
+
+  /* Chế độ: 'light' | 'dark' | 'system' (theo hệ điều hành). Hiệu lực = người dùng tự chọn > mặc định hệ thống > 'system' */
+  const [ownMode, setOwnMode] = useState(() => readOwn('siteflow-theme-mode', 'siteflow-theme-own', 'system'))
+  const themeMode = ownMode || (MODES.includes(sysA.themeMode) ? sysA.themeMode : 'system')
+  const setThemeMode = m => setOwnMode(MODES.includes(m) ? m : null)
   const [systemDark, setSystemDark] = useState(systemPrefersDark)
 
-  const [customize, setCustomize] = useState(() => {
+  /* own = chỉ các khoá người dùng tự chỉnh; customize hiệu lực = mặc định hệ thống + phần tự chỉnh */
+  const [own, setOwn] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('siteflow-customize') || '{}')
     } catch { return {} }
   })
+  const sysC = sysA.customize && typeof sysA.customize === 'object' ? sysA.customize : null
+  const customize = useMemo(() => (sysC ? { ...sysC, ...own } : own), [sysC, own])
 
-  const [uiTheme, setUiTheme] = useState(() => {
-    try { return localStorage.getItem('siteflow-ui-theme') || 'default' } catch { return 'default' }
-  })
+  const [ownUi, setOwnUi] = useState(() => readOwn('siteflow-ui-theme', 'siteflow-ui-theme-own', 'default'))
+  const uiTheme = ownUi || (typeof sysA.uiTheme === 'string' && sysA.uiTheme) || 'default'
+  const setUiTheme = v => setOwnUi(v || null)
 
   /* Giao diện thực tế đang áp dụng (các trang chỉ cần biết sáng hay tối) */
   const theme = themeMode === 'system' ? (systemDark ? 'dark' : 'light') : themeMode
@@ -50,11 +69,10 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem('siteflow-theme', theme)
-      localStorage.setItem('siteflow-theme-mode', themeMode)
-    } catch {}
-  }, [theme, themeMode])
+    try { localStorage.setItem('siteflow-theme', theme) } catch {}
+  }, [theme])
+  useEffect(() => { writeOwn('siteflow-theme-mode', 'siteflow-theme-own', ownMode) }, [ownMode])
+  useEffect(() => { writeOwn('siteflow-ui-theme', 'siteflow-ui-theme-own', ownUi) }, [ownUi])
 
   useEffect(() => {
     const c = customize
@@ -84,12 +102,11 @@ export function ThemeProvider({ children }) {
     /* Màu chủ đạo tự chọn (data-accent="custom") — global.css đọc biến này */
     if (c.accent === 'custom' && c.accentCustom) root.style.setProperty('--custom-accent', c.accentCustom)
     else root.style.removeProperty('--custom-accent')
-    try { localStorage.setItem('siteflow-customize', JSON.stringify(c)) } catch {}
   }, [customize])
+  useEffect(() => { try { localStorage.setItem('siteflow-customize', JSON.stringify(own)) } catch {} }, [own])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-ui-theme', uiTheme)
-    try { localStorage.setItem('siteflow-ui-theme', uiTheme) } catch {}
   }, [uiTheme])
 
   function toggleTheme() {
@@ -97,22 +114,29 @@ export function ThemeProvider({ children }) {
   }
 
   function updateCustomize(patch) {
-    setCustomize(prev => ({ ...prev, ...patch }))
+    setOwn(prev => ({ ...prev, ...patch }))
   }
 
-  /* Đưa toàn bộ tuỳ chỉnh giao diện về mặc định */
+  /* Đưa toàn bộ tuỳ chỉnh giao diện về mặc định (= mặc định hệ thống nếu Siêu quản trị viên đã đặt) */
   function resetAppearance() {
-    setThemeMode('system')
-    setUiTheme('default')
+    setOwnMode(null)
+    setOwnUi(null)
     /* Font đã ghim / dùng gần đây là danh sách cá nhân, không phải tuỳ chỉnh hiển thị nên giữ lại */
-    setCustomize(prev => ({
+    setOwn(prev => ({
       ...(prev.fontPins ? { fontPins: prev.fontPins } : {}),
       ...(prev.fontRecent ? { fontRecent: prev.fontRecent } : {}),
     }))
   }
 
+  /* Giao diện đang hiệu lực, dạng lưu làm mặc định hệ thống (Siêu quản trị viên) */
+  function appearanceSnapshot() {
+    const c = {}
+    Object.keys(customize).forEach(k => { if (!PERSONAL.includes(k) && customize[k] !== undefined) c[k] = customize[k] })
+    return { themeMode, uiTheme, customize: c }
+  }
+
   return (
-    <ThemeContext.Provider value={{ theme, themeMode, setThemeMode, toggleTheme, customize, updateCustomize, uiTheme, setUiTheme, resetAppearance }}>
+    <ThemeContext.Provider value={{ theme, themeMode, setThemeMode, toggleTheme, customize, updateCustomize, uiTheme, setUiTheme, resetAppearance, appearanceSnapshot }}>
       {children}
     </ThemeContext.Provider>
   )

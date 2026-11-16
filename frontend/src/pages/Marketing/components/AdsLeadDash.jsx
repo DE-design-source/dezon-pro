@@ -8,7 +8,9 @@ import DatePicker from '../../../components/ui/DatePicker'
    - Tổng quan: 5 ô tổng + bảng theo kênh (chi tiêu, lead, chi phí / lead, đã chốt, tỉ lệ chốt, giá trị cơ hội); lead nguồn khác gộp 1 dòng
    - Biểu đồ: chi tiêu / lead / chi phí mỗi lead / tỉ lệ chốt theo kênh (mỗi biểu đồ 1 số đo) + lead và chi tiêu theo ngày
    - Từng page: chọn 1 kênh -> số tổng, từng ngày (chi tiêu, lead) và danh sách lead của kênh
-   Props: data {kenh, ngay: [{d, v: [số theo kênh]}]}, kenh [tên kênh được xem], visible, access (khối người được xem, chỉ quản trị) */
+   Props: data {kenh, ngay: [{d, v: [số theo kênh]}]}, kenh [tên kênh được xem], visible, access (khối người được xem, chỉ quản trị),
+   Picker (ô Chọn kênh của AdsSpendTab), combo [{ten, kenh}], onSaveCombo(ks), onDelCombo(ten): bộ lọc kênh riêng của báo cáo này
+   (MarkUp 2026-11-16 16:40) - chỉ lọc ở đây, không đổi lựa chọn của "Chi theo kênh" */
 const WON = ['chot-hd', 'bao-gia-thi-cong', 'thiet-ke', 'thi-cong']
 const VIEWS = [['tong', 'Tổng quan'], ['bieudo', 'Biểu đồ'], ['page', 'Từng page']]
 const KY = [['homnay', 'Hôm nay'], ['thang', 'Tháng này'], ['truoc', 'Tháng trước'], ['7n', '7 ngày'], ['30n', '30 ngày'], ['tuy', 'Tuỳ chọn'], ['tat', 'Mọi lúc']]
@@ -77,7 +79,10 @@ function Days({ title, days, get, fmt, note }) {
 }
 
 let cache = null
-export default function AdsLeadDash({ data, kenh, visible, access }) {
+export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Picker, combo = [], onSaveCombo, onDelCombo }) {
+  const [tat, setTat] = useState({})   // kênh bỏ khỏi báo cáo {tên: 1}
+  const kenh = kenhAll.filter(k => !tat[k])
+  const datChon = ks => { const m = {}; kenhAll.forEach(k => { if (ks.indexOf(k) < 0) m[k] = 1 }); setTat(m) }
   const [leads, setLeads] = useState(cache)
   const [loi, setLoi] = useState('')
   const [view, setView] = useState('tong')
@@ -94,7 +99,8 @@ export default function AdsLeadDash({ data, kenh, visible, access }) {
   const r = range(ky, tuy)
   const inR = d => d && (!r.tu || d >= r.tu) && (!r.den || d <= r.den)
   const ds = (leads || []).filter(l => inR(String(l.createdAt || '').slice(0, 10)))
-  const kSet = new Set(kenh.map(ten))
+  const kSet = new Set(kenh.map(ten))          // kênh đang chọn
+  const kSetAll = new Set(kenhAll.map(ten))   // mọi kênh quảng cáo: lead ngoài các kênh này mới là "nguồn khác"
   const ngay = (data.ngay || []).filter(x => inR(x.d))
   const chiK = k => { const i = data.kenh.indexOf(k); return i < 0 ? 0 : ngay.reduce((a, x) => a + (Number(x.v[i]) || 0), 0) }
   const sum = list => ({
@@ -103,7 +109,7 @@ export default function AdsLeadDash({ data, kenh, visible, access }) {
     val: list.reduce((a, l) => a + (Number(l.valueVnd) || 0), 0),
   })
   const rows = kenh.map(k => ({ k, chi: chiK(k), list: ds.filter(l => ten(l.source) === ten(k)) })).map(x => ({ ...x, ...sum(x.list) }))
-  const khac = sum(ds.filter(l => !kSet.has(ten(l.source))))
+  const khac = sum(ds.filter(l => !kSetAll.has(ten(l.source))))
   const t = rows.reduce((a, x) => ({ chi: a.chi + x.chi, lead: a.lead + x.lead, won: a.won + x.won, val: a.val + x.val }), { chi: 0, lead: 0, won: 0, val: 0 })
   const maxLead = Math.max(1, ...rows.map(x => x.lead))
   const cpl = x => (x.lead && x.chi ? x.chi / x.lead : 0)
@@ -145,6 +151,23 @@ export default function AdsLeadDash({ data, kenh, visible, access }) {
         <div className="mk-ld-seg" role="tablist" aria-label="Chế độ xem">
           {VIEWS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}
         </div>
+        {/* bộ lọc kênh: Chọn kênh + combo đã lưu + Lưu combo (giống "Chi theo kênh") */}
+        {Picker && (
+          <div className="mk-ld-kloc">
+            <Picker ds={kenhAll} chon={kenh} onChange={datChon} />
+            {combo.map(c => {
+              const co = c.kenh.filter(k => kenhAll.indexOf(k) >= 0)
+              const dang = co.length && co.length === kenh.length && co.every(k => kenh.indexOf(k) >= 0)
+              return (
+                <span key={c.ten} className={'mk-ads-cb' + (dang ? ' on' : '')} title={c.ten + ': ' + c.kenh.join(' + ')}>
+                  <button type="button" onClick={() => datChon(co)}>{c.ten}<i>{co.length}</i></button>
+                  {onDelCombo && <button type="button" className="x" title={'Xoá combo ' + c.ten} onClick={() => onDelCombo(c.ten)}>×</button>}
+                </span>
+              )
+            })}
+            {onSaveCombo && <button type="button" className="mk-ads-cbmoi" onClick={() => onSaveCombo(kenh)} title="Lưu các kênh đang chọn thành 1 combo (dùng chung với Chi theo kênh)">+ Lưu combo</button>}
+          </div>
+        )}
         <div className="mk-ld-ky">
           <div className="mk-ld-seg sm" role="tablist" aria-label="Thời gian">
             {KY.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={ky === k} className={ky === k ? 'on' : ''} onClick={() => setKy(k)}>{l}</button>)}

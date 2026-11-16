@@ -25,6 +25,7 @@ import (
 	"qspro-backend/internal/modules/quotations"
 	"qspro-backend/internal/modules/reports"
 	"qspro-backend/internal/modules/sales"
+	"qspro-backend/internal/modules/settings"
 	"qspro-backend/internal/modules/system"
 	"qspro-backend/internal/modules/takeoff"
 	"qspro-backend/internal/modules/users"
@@ -152,13 +153,15 @@ func (s *Server) modules() []Module {
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
 	s.OnShutdown(chatSvc.Shutdown)
 	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
+	// cài đặt mặc định toàn hệ thống (super lưu, mọi tài khoản đăng nhập đọc), không gọi module khác
+	settingsSvc := settings.New(settings.Deps{DB: d.DB, Cfg: d.Cfg})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
 	s.expiry = compSvc
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc, settingsSvc,
 	}
 }
 

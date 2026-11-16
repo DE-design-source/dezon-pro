@@ -12,13 +12,18 @@
     <script>
       (function () {
         try {
+          /* Mặc định hệ thống của Siêu quản trị viên (bản đệm của systemDefaultsService, N17): áp khi người dùng chưa tự chọn */
+          var sa = {};
+          try { sa = (JSON.parse(localStorage.getItem('siteflow-sys-defaults') || '{}') || {}).appearance || {}; } catch (e) { sa = {}; }
           var mode = localStorage.getItem('siteflow-theme-mode');
-          var t = mode === 'system' ? null : (mode || localStorage.getItem('siteflow-theme'));
+          if (!(mode && (localStorage.getItem('siteflow-theme-own') === '1' || mode !== 'system'))) { mode = sa.themeMode || 'system'; }
+          var t = mode === 'system' ? null : mode;
           if (t !== 'light' && t !== 'dark') { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
           document.documentElement.setAttribute('data-theme', t);
         } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
         try {
           var c = JSON.parse(localStorage.getItem('siteflow-customize') || '{}');
+          if (sa.customize && typeof sa.customize === 'object') { c = Object.assign({}, sa.customize, c); }
           document.documentElement.setAttribute('data-accent', c.accent || 'blue');
           document.documentElement.setAttribute('data-density', c.density || 'comfortable');
           /* Kích thước chuẩn x mật độ: lặp lại uiScaleOf / --z-app của ThemeContext (70 - 120%) */
@@ -40,6 +45,7 @@
         } catch (e) {}
         try {
           var uiTheme = localStorage.getItem('siteflow-ui-theme');
+          if (!(uiTheme && (localStorage.getItem('siteflow-ui-theme-own') === '1' || uiTheme !== 'default'))) { uiTheme = sa.uiTheme || 'default'; }
           document.documentElement.setAttribute('data-ui-theme', uiTheme || 'default');
         } catch (e) {}
       })();

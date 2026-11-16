@@ -265,6 +265,8 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
 | `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); bảng route gốc `/mau-nhap-*.xlsx` (`RootRoutes`) đóng băng nên ngành mới đi dưới `/api/v1` |
+| `GET` | `/system-defaults` | `getSystemDefaults` | `rpc.Login` | settings | Cài đặt mặc định toàn hệ thống `{appearance, general, display, updatedAt, updatedBy}` (mục chưa lưu = null; chưa migrate 0047 -> toàn null, ghi log) |
+| `PUT` | `/system-defaults/:section` | `saveSystemDefault` | `rpc.Super` | settings | Lưu mặc định 1 mục (`appearance` / `general` / `display`), thân `{value: object \| null}` (null / thiếu = xoá, tối đa 64 KB) -> `{ok}`; bảng `system_settings` (migration 0047, không theo công ty) |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
 | `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng (`createdAt` / `wonAt` yyyy-mm-dd tuỳ chọn, chỉ khi tạo: nạp dữ liệu mẫu) |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |

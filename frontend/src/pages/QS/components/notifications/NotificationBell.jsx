@@ -55,19 +55,20 @@ export default function NotificationBell() {
     setOpen(false)
     const refId = n.refId != null ? String(n.refId) : ''
     const isAdmin = isAdminRole_(me)
-    const openAdmin = intent => { if (intent !== undefined) setIntent('admin', intent); navigate(qsSettingsPath('admin')) }
+    // mục 'yeucau' (Yêu cầu xoá SP / mua hàng) dùng chung AdminTab và ý định 'admin', chỉ khác phần hiển thị
+    const openAdmin = (intent, sec = 'admin') => { if (intent !== undefined) setIntent('admin', intent); navigate(qsSettingsPath(sec)) }
     if (/^purchase_/.test(kind)) {
-      if (isAdmin && refId) openAdmin({ purDetail: refId })
+      if (isAdmin && refId) openAdmin({ purDetail: refId }, 'yeucau')
       else { showTab('muahang'); qsToast(refId ? ('Đơn ' + refId) : 'Mở tab Mua hàng') }
       return
     }
     if (/^de_xuat/.test(kind)) {
       const intent = refId ? { dxDetail: refId } : undefined
-      if (isAdmin) openAdmin(intent); else showTab('muahang', intent)
+      if (isAdmin) openAdmin(intent, 'yeucau'); else showTab('muahang', intent)
       return
     }
     if (/^delete_/.test(kind)) {
-      if (isAdmin) openAdmin({ highlightDrq: refId })
+      if (isAdmin) openAdmin({ highlightDrq: refId }, 'yeucau')
       else { showTab('sanpham'); qsToast('Yêu cầu xoá sản phẩm ' + (kind === 'delete_approved' ? 'đã được duyệt' : kind === 'delete_rejected' ? 'bị từ chối' : 'đang chờ duyệt')) }
       return
     }

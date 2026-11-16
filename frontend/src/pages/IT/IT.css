@@ -338,3 +338,11 @@ html[data-theme="dark"] .it-page{--bar-2:#7FA8F5;}
 /* Trang yêu cầu (kanban) — thông tin trên đầu */
 .it-meta-dot{display:inline-block; width:9px; height:9px; border-radius:50%;}
 .it-board-desc{margin:0; flex:1; line-height:1.5; white-space:pre-wrap;}
+/* Thanh tiêu đề Danh sách yêu cầu gọn 1 dòng: nút Tạo yêu cầu cùng hàng với ô tìm (MarkUp 2026-11-12 18:00).
+   Thiếu chỗ thì ô tìm co lại trước, rồi dải lọc trạng thái cuộn ngang; màn hẹp mới xuống dòng */
+.it-tl-head{flex-wrap:nowrap;}
+.it-tl-seg{min-width:0; flex:0 1 auto; overflow-x:auto; scrollbar-width:none;}
+.it-tl-seg::-webkit-scrollbar{display:none;}
+.it-tl-search{flex:0 1 240px; min-width:130px; width:auto;}
+.it-tl-create, .it-tl-hic, .it-tl-count, .it-tl-head h2{flex:none;}
+@media (max-width: 860px){ .it-tl-head{flex-wrap:wrap;} }

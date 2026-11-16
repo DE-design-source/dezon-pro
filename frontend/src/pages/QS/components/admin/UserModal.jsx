@@ -22,7 +22,9 @@ const SUB_KEYS = ['sp_edit', 'sp_duyet', 'da_duyet']
 /* Hộp Thêm / Sửa tài khoản (port admUserModal / admModalRole / admSubSync_ / admPermAll / admModalSave, PUB/admin.js:162-272).
    Props: user (null = tạo mới), isSuper, companies (S._admCt), defaultCt (công ty đang làm việc), onClose(), onSaved(msg).
    Như #admModal gốc: chỉ đóng bằng ✕ / Huỷ / bấm nền, không đóng bằng Esc để khỏi mất phần đã gõ. */
-export default function UserModal({ user, isSuper, companies, defaultCt, onClose, onSaved }) {
+/* superMode (mục Tài khoản siêu quản trị viên, MarkUp 2026-11-12 17:55): tạo / sửa tài khoản vai trò super - tài khoản can thiệp
+   hệ thống, không phải nhân viên cũng không phải admin công ty: không có lựa chọn vai trò, không có khối quyền */
+export default function UserModal({ user, isSuper, companies, defaultCt, onClose, onSaved, superMode = false }) {
   const isEdit = !!user
   const u = user || { role: 'staff', perms: [] }
   const perms0 = u.perms || []
@@ -34,7 +36,7 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   // mặc định = công ty đang làm việc; super chỉ đổi khi muốn tạo cho công ty khác
   const mac = u.congTyId || defaultCt || ''
   const [ct, setCt] = useState(mac)
-  const [role, setRole] = useState(u.role !== 'admin' ? 'staff' : 'admin')
+  const [role, setRole] = useState(superMode || u.role === 'super' ? 'super' : (u.role !== 'admin' ? 'staff' : 'admin'))
   const [perms, setPerms] = useState(() => GRANT_KEYS.filter(k => perms0.indexOf(k) >= 0))
   // Khoá đã lưu mà giao diện này không biết (bản mới hơn / cũ hơn thêm vào): giữ nguyên khi lưu, không âm thầm xoá
   const [extra] = useState(() => perms0.filter((k, i) => k && GRANT_KEYS.indexOf(k) < 0 && SUB_KEYS.indexOf(k) < 0 && perms0.indexOf(k) === i))
@@ -75,7 +77,7 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   function save() {
     // quyền = các tab được tích + mức quyền trong tab Danh sách SP (radio, có thể bỏ trống)
     let ps = []
-    if (role !== 'admin') {
+    if (role === 'staff') {
       ps = perms.concat(extra)
       if (lv && ps.indexOf('sanpham') >= 0) ps.push(lv)
       if (daDuyet) ps.push('da_duyet')
@@ -111,8 +113,8 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
         <div className="qsa-um" role="dialog" aria-modal="true">
           <div className="qsa-um-hd">
             <div>
-              <h3>{isEdit ? 'Sửa tài khoản' : 'Thêm tài khoản'}</h3>
-              <p>{isEdit ? 'Đổi họ tên, email, vai trò và quyền truy cập' : 'Tạo tài khoản mới cho công ty của bạn'}</p>
+              <h3>{role === 'super' ? (isEdit ? 'Sửa tài khoản siêu quản trị viên' : 'Thêm tài khoản siêu quản trị viên') : (isEdit ? 'Sửa tài khoản' : 'Thêm tài khoản')}</h3>
+              <p>{role === 'super' ? 'Tài khoản của nhà phát triển, can thiệp hệ thống' : isEdit ? 'Đổi họ tên, email, vai trò và quyền truy cập' : 'Tạo tài khoản mới cho công ty của bạn'}</p>
             </div>
             <span className="qsa-um-x" onClick={onClose}>✕</span>
           </div>
@@ -170,6 +172,14 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
             </div>
             <div className="qsa-sec">
               <div className="qsa-sec-h">Vai trò</div>
+              {role === 'super' ? (
+                <div className="qsa-seg">
+                  <label className="qsa-seg-i on">
+                    <input type="radio" name="qsa_role" value="super" checked readOnly />
+                    <span><b>Siêu quản trị viên</b><i>Tài khoản can thiệp hệ thống: cấp tài khoản công ty, đặt mặc định toàn hệ thống. Không phải nhân viên, cũng không phải admin công ty.</i></span>
+                  </label>
+                </div>
+              ) : (
               <div className="qsa-seg">
                 <label className={`qsa-seg-i${role === 'staff' ? ' on' : ''}`}>
                   <input type="radio" name="qsa_role" value="staff" checked={role === 'staff'} onChange={() => setRole('staff')} />
@@ -180,9 +190,10 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                   <span><b>Quản trị công ty</b><i>Toàn quyền trong công ty</i></span>
                 </label>
               </div>
+              )}
             </div>
-            {/* Ẩn khối quyền khi chọn Quản trị công ty (đã toàn quyền) */}
-            {role === 'admin' ? null : (
+            {/* Ẩn khối quyền khi chọn Quản trị công ty / siêu quản trị viên (đã toàn quyền) */}
+            {role !== 'staff' ? null : (
               <div className="qsa-sec">
                 <div className="qsa-sec-h">Quyền truy cập
                   <span className="qsa-sec-n">{perms.length}/{GRANT_KEYS.length}</span>

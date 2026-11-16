@@ -1401,3 +1401,5 @@ html[data-theme="dark"] .qs-po-status{background:#3A2E14; color:#F0B45A;}
 .qs-ai-input-area{margin:0 12px 12px; padding:10px 12px; border-radius:8px; background:var(--surface-alt); box-shadow:none;}
 .qs-ai-input-area textarea{font-size:var(--t-md);}
 .qs-ai-send{padding:6px 16px; border-radius:999px; font-size:var(--t-sm);}
+/* Dezbot cao bằng thẻ nội dung: mép trên / dưới = lề của .qs-scroll tab đang mở (--qs-pad-t / -b đặt ở QS.jsx; mặc định = .qs-scroll-dash 8 / 10), x zoom */
+.qs-ai-panel{top:calc((85.33px + var(--qs-pad-t, 8px)) * var(--qs-zoom, .75)); bottom:calc(var(--qs-pad-b, 10px) * var(--qs-zoom, .75));}

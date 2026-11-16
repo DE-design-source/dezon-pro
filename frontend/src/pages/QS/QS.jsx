@@ -146,7 +146,8 @@ function QsRoot() {
   return (
     <div
       className={`qs-page${aiOpen ? ' qs-ai-open' : ''}${aiResizing ? ' qs-ai-resizing' : ''}`}
-      style={{ '--ai-panel-width': `${aiWidth}px`, ...brand }}
+      /* lề trên / dưới của .qs-scroll theo tab (px trước zoom): Dezbot đặt đúng mép thẻ nội dung để cao bằng nhau (MarkUp 2026-11-12 18:04) */
+      style={{ '--ai-panel-width': `${aiWidth}px`, ...brand, ...(tab === 'boc' || tab === 'export' || tab === 'sanpham' ? { '--qs-pad-t': '12px', '--qs-pad-b': '12px' } : tab === 'dash' ? { '--qs-pad-t': '16px', '--qs-pad-b': '16px' } : null) }}
     >
       <div className="qs-topbar" ref={topRef}>
         {/* đầu trang giống các trang khác (vd. Tài chính): ô biểu tượng + tên trang | vạch | các tab */}

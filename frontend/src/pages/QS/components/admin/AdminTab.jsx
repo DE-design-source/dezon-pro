@@ -8,6 +8,8 @@ import { GRANT_TABS as PERM_TABS, refreshNotifCount, setCongTyLocal } from '../.
 import { qsToast, qsConfirm, qsAsk } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
 import UserModal from './UserModal'
+import AppointModal from './AppointModal'
+import * as hrApi from '../../../ChamCong/api'
 import CompanyCard from './CompanyCard'
 import PurDetail from './PurDetail'
 import DxDetail from './DxDetail'
@@ -23,7 +25,8 @@ import './admin.css'
    Tải lại TOÀN BỘ danh sách mỗi lần tab được mở (visibleSeq), như renderAdmin.
    Ý định điều hướng (từ thông báo): {purDetail: maDon} mở chi tiết đơn; {highlightDrq: id} làm nổi yêu cầu xoá;
    {dxDetail: ma} mở chi tiết phiếu đề xuất (M13.1). */
-export default function AdminTab() {
+/* view: 'admin' = mọi thẻ trừ yêu cầu và nhật ký; 'nhatky' = mục Nhật ký hoạt động;'yeucau' = mục Yêu cầu của Cài đặt (Yêu cầu xóa sản phẩm + Yêu cầu mua hàng + Đề xuất mua hàng) */
+export default function AdminTab({ view = 'admin' }) {
   const { visibleSeq, panelVisible, consumeIntent, reloadProducts, congTy } = useQsData()
   const { me, isAdmin, isSuper, viewAs } = useQsSession()
   const seq = visibleSeq('admin')
@@ -31,6 +34,23 @@ export default function AdminTab() {
   const [st, setSt] = useState({ phase: 'idle', err: '', d: null })
   const [reloadN, setReloadN] = useState(0)
   const [userDlg, setUserDlg] = useState(null)   // {user} | null
+  const [aptUser, setAptUser] = useState(null)   // tài khoản đang bổ nhiệm vào cơ cấu tổ chức (AppointModal) | null
+  /* Vị trí trong cơ cấu HR của từng tài khoản (cột Bổ nhiệm): {userId: {unit, position, head}}; công ty không có HR / không đọc được -> null (ẩn cột) */
+  const [hrPos, setHrPos] = useState(null)
+  useEffect(() => {
+    // hồ sơ HR theo công ty đang làm việc: super chưa "xem như" công ty nào -> không có cột / nút Bổ nhiệm
+    const ctNow = (congTy && congTy.id) || (me && me.congTyId) || ''
+    if (!vis || !isAdmin || !ctNow) { setHrPos(null); return undefined }
+    let off = false
+    hrApi.load().then(st => {
+      if (off) return
+      const un = {}; (st.units || []).forEach(u => { un[u.key] = u.name || u.label })
+      const m = {}
+      ;(st.employees || []).forEach(e => { if (e.userId) m[e.userId] = { unit: un[e.dept] || e.dept || '', position: e.position || '', head: !!(st.heads && String(st.heads[e.dept]) === String(e.id)) } })
+      setHrPos(m)
+    }, () => { if (!off) setHrPos(null) })
+    return () => { off = true }
+  }, [vis, isAdmin, reloadN, viewAs, congTy && congTy.id])   // eslint-disable-line react-hooks/exhaustive-deps
   const [purCode, setPurCode] = useState('')
   const [dxMa, setDxMa] = useState('')
   const pendingHl = useRef(null)
@@ -73,10 +93,14 @@ export default function AdminTab() {
     pendingHl.current = null
     const el = bodyRef.current.querySelector('[data-drq="' + CSS.escape(id) + '"]') || bodyRef.current.querySelector('[data-card="drq"]')
     if (!el) return undefined
-    el.scrollIntoView({ block: 'center' })
-    el.classList.add('qsa-flash')
-    const t = setTimeout(() => el.classList.remove('qsa-flash'), 1800)
-    return () => { clearTimeout(t); el.classList.remove('qsa-flash') }
+    window.dispatchEvent(new CustomEvent(QSA_EXPAND, { detail: 'drq' }))   // thẻ đang thu gọn thì mở ra trước
+    let t = 0
+    const t0 = setTimeout(() => {
+      el.scrollIntoView({ block: 'center' })
+      el.classList.add('qsa-flash')
+      t = setTimeout(() => el.classList.remove('qsa-flash'), 1800)
+    }, 30)
+    return () => { clearTimeout(t0); clearTimeout(t); el.classList.remove('qsa-flash') }
   }, [st])
 
   const reload = () => setReloadN(n => n + 1)
@@ -153,6 +177,23 @@ export default function AdminTab() {
     body = <div className="qsa-empty">Lỗi tải: {st.err}</div>
   } else if (st.phase !== 'ready' || !d) {
     body = <div className="qsa-empty">Đang tải…</div>
+  } else if (view === 'super') {
+    body = (
+      <UsersCard users={d.users.filter(u => u.role === 'super')} isSuper={isSuper} cts={d.cts} hrPos={null} hrCt="" onAppoint={setAptUser}
+        addLabel="Thêm tài khoản siêu quản trị viên"
+        onCreate={() => setUserDlg({ user: null, superMode: true })} onEdit={u => setUserDlg({ user: u, superMode: true })}
+        onResetPw={admResetPw} onToggle={admToggleActive} onDelete={admDelete} />
+    )
+  } else if (view === 'nhatky') {
+    body = <LogCard logs={d.logs} />
+  } else if (view === 'yeucau') {
+    body = (
+      <>
+        <ReqCard reqs={d.reqs} onResolve={drqResolve} />
+        <PurCard purs={d.purs} onOpen={setPurCode} onResolve={purResolve} />
+        <DxCard dxs={d.dxs} onOpen={setDxMa} onResolve={dxResolve} />
+      </>
+    )
   } else {
     body = (
       <>
@@ -161,13 +202,9 @@ export default function AdminTab() {
           <CompanyCard c={coEdit} onSaved={coSaved}
             note={isSuper ? 'Đang sửa công ty bạn đang xem. Màu và logo áp cho người dùng của công ty này khi họ tải lại trang.' : ''} />
         ) : null}
-        <UsersCard users={d.users} isSuper={isSuper} cts={d.cts}
+        <UsersCard users={d.users.filter(u => u.role !== 'super')} isSuper={isSuper} cts={d.cts} hrPos={hrPos} hrCt={(congTy && congTy.id) || (me && me.congTyId) || ''} onAppoint={setAptUser}
           onCreate={() => setUserDlg({ user: null })} onEdit={u => setUserDlg({ user: u })}
           onResetPw={admResetPw} onToggle={admToggleActive} onDelete={admDelete} />
-        <ReqCard reqs={d.reqs} onResolve={drqResolve} />
-        <PurCard purs={d.purs} onOpen={setPurCode} onResolve={purResolve} />
-        <DxCard dxs={d.dxs} onOpen={setDxMa} onResolve={dxResolve} />
-        <LogCard logs={d.logs} />
       </>
     )
   }
@@ -175,11 +212,24 @@ export default function AdminTab() {
   const defaultCt = (congTy && congTy.id) || (me && me.congTyId) || ''
   return (
     <div className="qsa-root" ref={bodyRef}>
-      <div className="qsa-hd"><h2>Quản trị — Tài khoản &amp; phân quyền</h2></div>
+      <div className="qsa-hd"><h2>{view === 'super' ? 'Tài khoản siêu quản trị viên' : view === 'nhatky' ? 'Nhật ký hoạt động' : view === 'yeucau' ? 'Yêu cầu — Xóa sản phẩm, mua hàng & đề xuất' :<>Quản trị — Tài khoản &amp; phân quyền</>}</h2>
+        {view === 'admin' ? <span className="qsa-hd-note">Admin toàn quyền · Nhân viên không mở được trang này.</span> : null}</div>
+      {view === 'super' ? (
+        /* Vai trò Siêu quản trị viên (MarkUp 2026-11-12 17:47, N17) */
+        <p className="qsa-super-note">
+          Tài khoản siêu quản trị viên là tài khoản của <b>nhà phát triển</b>: cấp tài khoản cho các công ty và can thiệp sâu vào hệ thống
+          (giao diện mặc định, tính năng mặc định...). Cài đặt do tài khoản siêu quản trị viên lưu bằng nút <b>Lưu làm mặc định toàn hệ thống</b>
+          (ở đầu các mục Giao diện, Hiển thị, Chung, Quyền riêng tư, Hiệu suất, Thông báo, Phím tắt, Lịch, Nhiệm vụ) được áp cho toàn hệ thống;
+          người dùng tự chỉnh thì giá trị riêng của họ được giữ.
+        </p>
+      ) : null}
       {body}
       {userDlg ? (
-        <UserModal user={userDlg.user} isSuper={isSuper} companies={d ? d.cts : []} defaultCt={defaultCt}
+        <UserModal user={userDlg.user} superMode={!!userDlg.superMode} isSuper={isSuper} companies={d ? d.cts : []} defaultCt={defaultCt}
           onClose={() => setUserDlg(null)} onSaved={msg => { qsToast(msg); setUserDlg(null); reload() }} />
+      ) : null}
+      {aptUser ? (
+        <AppointModal user={aptUser} onClose={() => setAptUser(null)} onSaved={msg => { qsToast(msg); setAptUser(null); reload() }} />
       ) : null}
       {purCode ? <PurDetail code={purCode} onClose={() => setPurCode('')} onResolve={purResolve} /> : null}
       {dxMa ? <DxDetail ma={dxMa} onClose={() => setDxMa('')} onResolve={dxResolve} /> : null}
@@ -215,14 +265,44 @@ function Stats({ d }) {
 }
 
 /* Thẻ .dbcard (dbCard_, PUB/nhap.js:456-459) */
-function Card({ title, icon, note, badge, hint, card, bodyCls = '', children }) {
+/* Nút thu gọn ở đầu mỗi thẻ (MarkUp 2026-11-12 17:07): nhớ theo thẻ trong localStorage; thân thẻ vẫn mount (ẩn bằng CSS)
+   để thông báo "làm nổi yêu cầu xoá" tìm được dòng, sự kiện QSA_EXPAND mở lại thẻ trước khi cuộn tới */
+const QSA_FOLD_LS = 'qsa-folded'
+const QSA_EXPAND = 'qsa-expand'
+function readFolded() { try { return JSON.parse(localStorage.getItem(QSA_FOLD_LS) || '{}') || {} } catch { return {} } }
+function Card({ title, icon, note, badge, hint, card, bodyCls = '', bare = false, children }) {
+  if (bare) {
+    return (
+      <div className="qsa-card bare" data-card={card}>
+        <div className={`qsa-card-b${bodyCls ? ' ' + bodyCls : ''}`}>{note ? <p className="qsa-note">{note}</p> : null}{children}</div>
+      </div>
+    )
+  }
+  return <FoldCard {...{ title, icon, note, badge, hint, card, bodyCls, children }} />
+}
+function FoldCard({ title, icon, note, badge, hint, card, bodyCls, children }) {
+  const [folded, setFolded] = useState(() => !!(card && readFolded()[card]))
+  const setF = v => {
+    setFolded(v)
+    if (!card) return
+    try { const m = readFolded(); if (v) m[card] = 1; else delete m[card]; localStorage.setItem(QSA_FOLD_LS, JSON.stringify(m)) } catch { /* bỏ qua */ }
+  }
+  useEffect(() => {
+    if (!card) return undefined
+    const on = e => { if (e.detail === card) setFolded(false) }
+    window.addEventListener(QSA_EXPAND, on)
+    return () => window.removeEventListener(QSA_EXPAND, on)
+  }, [card])
   return (
-    <div className="qsa-card" data-card={card}>
+    <div className={`qsa-card${folded ? ' folded' : ''}`} data-card={card}>
       <div className="qsa-card-h">
         <span className="qsa-card-ic"><QsIcon name={icon} size={18} /></span>
         <h3>{title}</h3>
         {hint ? <span className="qsa-hint">{hint}</span> : null}
         {badge ? <span className="qsa-pend">{badge} chờ duyệt</span> : null}
+        <button type="button" className="qsa-fold" title={folded ? 'Mở rộng' : 'Thu gọn'} aria-expanded={!folded} onClick={() => setF(!folded)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
       </div>
       <div className={`qsa-card-b${bodyCls ? ' ' + bodyCls : ''}`}>
         {note ? <p className="qsa-note">{note}</p> : null}
@@ -250,7 +330,7 @@ function RqItem({ cls, clickable, drq, icon, title, meta, badgeCls, badgeText, a
   )
 }
 
-function UsersCard({ users, isSuper, cts, onCreate, onEdit, onResetPw, onToggle, onDelete }) {
+function UsersCard({ users, isSuper, cts, hrPos, hrCt, onAppoint, addLabel = 'Thêm tài khoản', onCreate, onEdit, onResetPw, onToggle, onDelete }) {
   const lbl = {}
   PERM_TABS.forEach(t => { lbl[t[0]] = t[1] })
   const ctTen = id => { const c = (cts || []).filter(x => x.id === id)[0]; return c ? (c.ten || c.ma || id) : '(công ty đã xoá)' }
@@ -262,9 +342,10 @@ function UsersCard({ users, isSuper, cts, onCreate, onEdit, onResetPw, onToggle,
   }
   const noCt = users.filter(u => !u.congTyId).length
   return (
-    <Card title={'Tài khoản (' + users.length + ')'} icon="lock" note="Admin toàn quyền · Nhân viên không mở được trang này.">
+    /* không có đầu thẻ: số tài khoản ở thanh thống kê, ghi chú quyền ở cạnh tiêu đề trang (MarkUp 2026-11-12 17:13) */
+    <Card title="Tài khoản" icon="lock" card="users" bare>
       <div style={{ marginBottom: 12 }}>
-        <button type="button" className="qsa-btn blue sm" onClick={onCreate}><QsIcon name="plus" size={14} /> Thêm tài khoản</button>
+        <button type="button" className="qsa-btn blue sm" onClick={onCreate}><QsIcon name="plus" size={14} /> {addLabel}</button>
       </div>
       {isSuper && noCt ? (
         <div className="qsa-warn"><span className="qsa-warn-ic">!</span>
@@ -275,7 +356,7 @@ function UsersCard({ users, isSuper, cts, onCreate, onEdit, onResetPw, onToggle,
         <table className="qsa-tbl">
           <thead><tr>
             <th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Quyền truy cập</th>
-            {isSuper ? <th>Công ty</th> : null}<th>Trạng thái</th><th>Đăng nhập gần nhất</th><th />
+            {hrPos ? <th>Bổ nhiệm</th> : null}{isSuper ? <th>Công ty</th> : null}<th>Trạng thái</th><th>Đăng nhập gần nhất</th><th />
           </tr></thead>
           <tbody>
             {users.map(u => {
@@ -287,6 +368,13 @@ function UsersCard({ users, isSuper, cts, onCreate, onEdit, onResetPw, onToggle,
                   <td>{u.hoTen || ''}</td>
                   <td><span className={`qsa-role ${u.role === 'super' ? 'sup' : (u.role === 'admin' ? 'adm' : 'stf')}`}>{ROLE_LBL[u.role] || u.role}</span></td>
                   <td className="qsa-permcol">{permCell(u)}</td>
+                  {hrPos ? (
+                    <td className="qsa-aptcol">{String(u.congTyId || '') !== String(hrCt || '') ? <span className="qsa-muted" title="Chỉ bổ nhiệm được tài khoản của công ty đang làm việc">—</span> : hrPos[u.id]
+                      ? <button type="button" className="qsa-apt-cell" title="Đổi vị trí trong cơ cấu tổ chức" onClick={() => onAppoint(u)}>
+                          <b>{hrPos[u.id].unit || '—'}</b>{hrPos[u.id].head ? <span className="qsa-apt-head">Trưởng</span> : null}
+                          {hrPos[u.id].position ? <small>{hrPos[u.id].position}</small> : null}</button>
+                      : <span className="qsa-muted">Chưa bổ nhiệm</span>}</td>
+                  ) : null}
                   {isSuper ? (
                     <td>{u.congTyId ? ctTen(u.congTyId)
                       : <span className="qsa-st-lk" title="Tài khoản không thuộc công ty nào — không đăng nhập được. Bấm Sửa để gán công ty.">⚠ Chưa gán công ty</span>}</td>
@@ -295,6 +383,7 @@ function UsersCard({ users, isSuper, cts, onCreate, onEdit, onResetPw, onToggle,
                   <td className="qsa-muted">{u.lastLogin ? fmtDateTime_(u.lastLogin) : '—'}</td>
                   <td><div className="qsa-act">
                     <button type="button" className="qsa-btn ghost xs" onClick={() => onEdit(u)}>Sửa</button>
+                    {hrPos && u.role !== 'super' && String(u.congTyId || '') === String(hrCt || '') ? <button type="button" className="qsa-btn ghost xs" title="Bổ nhiệm vào phòng ban / cơ cấu tổ chức (HR)" onClick={() => onAppoint(u)}>Bổ nhiệm</button> : null}
                     <button type="button" className="qsa-btn ghost xs" onClick={() => onResetPw(u.id)}>Đặt MK</button>
                     <button type="button" className="qsa-btn ghost xs" onClick={() => onToggle(u.id, !u.active)}>{u.active ? 'Khóa' : 'Mở'}</button>
                     <button type="button" className="qsa-btn ghost xs danger" onClick={() => onDelete(u)}>Xóa</button>

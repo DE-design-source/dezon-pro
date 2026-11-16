@@ -74,7 +74,8 @@ const fmtD_ = s => (s ? s.split('-').reverse().join('/') : '…')
 /* Danh sách dự án (port dashProjSection_ / dashProjCards_, PUB/dash.js:196-212, 249): tìm theo tên dự án, khách hàng, SĐT.
    Props: groups = projectGroups(projects) (mỗi nhóm = 1 dự án, nhiều bản nháp), curMa = mã bản nháp đang mở,
    onCreate = nút "Tạo dự án" (mở trang nhập đủ trường như "Nhập dự án"; không truyền thì dùng hộp thoại ngắn),
-   onFilter({groups, label}) = danh sách dự án sau bộ lọc (nguồn, thời gian, ô tìm) + nhãn bộ lọc ('' = không lọc). */
+   onFilter({groups, label, tt, ttCount, setTt}) = danh sách dự án sau bộ lọc (nguồn, thời gian, trạng thái, ô tìm) + nhãn bộ lọc ('' = không lọc);
+   bộ lọc trạng thái (Tất cả / Đang báo giá / Đang thực hiện / Đã thực hiện) vẽ ở thẻ Biên lợi nhuận (DashSummary) - MarkUp 2026-11-12 16:43. */
 export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const [query, setQuery] = useState('')
   const [view, setViewSt] = useState(readView_)
@@ -87,8 +88,6 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
      Lựa chọn nhớ trong máy (qs_dash_tt, qs_dash_year) */
   const [tt, setTtSt] = useState(() => { try { const v = localStorage.getItem('qs_dash_tt') || ''; return TT_DU_AN.indexOf(v) >= 0 ? v : '' } catch (e) { return '' } })
   const setTt = v => { setTtSt(v); saveLs_('qs_dash_tt', v) }
-  const [year, setYearSt] = useState(() => { try { return localStorage.getItem('qs_dash_year') || '' } catch (e) { return '' } })
-  const setYear = v => { setYearSt(v); saveLs_('qs_dash_year', v) }
   const q = query.toLowerCase().trim()
   // Mã dự án đã gắn với khách hàng Kinh doanh; null = chưa tải được (ẩn bộ lọc nguồn)
   const [kdMa, setKdMa] = useState(null)
@@ -133,19 +132,20 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const nKd = kdMa ? found.filter(isKd).length : 0
   const shown0 = kdMa && src ? found.filter(g => (src === 'kd') === isKd(g)) : found
   const years = [...new Set(groups.map(groupYear_))].sort((a, b) => b.localeCompare(a))
-  const yr = years.indexOf(year) >= 0 ? year : ''
-  const inYear = shown0.filter(g => !yr || groupYear_(g) === yr)
+  // bỏ ô chọn Năm (MarkUp 16:43): lọc theo năm dùng bộ lọc thời gian (nút Năm / chọn kỳ); danh sách vẫn chia khối theo năm
+  const inYear = shown0
   const dem = v => inYear.filter(g => !v || groupStatus_(g) === v).length
   const shown = inYear.filter(g => !tt || groupStatus_(g) === tt)
   // khối theo năm, năm mới trước; dự án không có ngày tạo vào khối "Chưa rõ năm"
   const blocks = years.map(y => ({ y, ds: shown.filter(g => groupYear_(g) === y) })).filter(b => b.ds.length)
   const srcCnt = { '': found.length, kd: nKd, qs: found.length - nKd }
   /* Báo danh sách đang lọc lên Bảng điều khiển (cột trái cộng số theo bộ lọc); chỉ báo khi tập dự án / nhãn lọc đổi */
-  const fltLb = [kdMa && src ? (SRCS.find(x => x[0] === src) || SRCS[0])[1] : '', time.k ? timeLb : '', tt, yr ? 'Năm ' + yr : '', q ? '"' + query.trim() + '"' : ''].filter(Boolean).join(' · ')
-  const shownKey = shown.map(g => g.drafts.map(d => d.maDA).join(',')).join('|') + '#' + fltLb
+  const fltLb = [kdMa && src ? (SRCS.find(x => x[0] === src) || SRCS[0])[1] : '', time.k ? timeLb : '', tt, q ? '"' + query.trim() + '"' : ''].filter(Boolean).join(' · ')
+  const ttCount = Object.fromEntries([''].concat(TT_DU_AN).map(v => [v, dem(v)]))
+  const shownKey = shown.map(g => g.drafts.map(d => d.maDA).join(',')).join('|') + '#' + fltLb + '#' + JSON.stringify(ttCount)
   const shownRef = useRef(shown)
   shownRef.current = shown
-  useEffect(() => { if (onFilter) onFilter({ groups: shownRef.current, label: fltLb }) }, [shownKey])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (onFilter) onFilter({ groups: shownRef.current, label: fltLb, tt, ttCount, setTt }) }, [shownKey])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Số dòng + giá trị + nhà cung cấp của bản đang dùng (đọc thẳng dòng đang mở) hoặc bản mới nhất (projectStats, đếm 1 lần / phiên)
      - chỉ Dạng thanh cần */
@@ -251,21 +251,6 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
         </div>
         <button type="button" className="qs-dash-create" title="Tạo dự án" aria-label="Tạo dự án" onClick={() => (onCreate ? onCreate() : openProjDlg('create'))}><Icon name="plus" size={14} /><span className="lf">Tạo dự án</span></button>
       </div>
-      <div className="qs-dash-filter">
-        <div className="qs-dash-tt" role="radiogroup" aria-label="Phân loại dự án">
-          {[''].concat(TT_DU_AN).map(v => (
-            <button key={v || 'all'} type="button" role="radio" aria-checked={tt === v} className={'qs-dash-tt-b' + (tt === v ? ' on' : '')} onClick={() => setTt(v)}>
-              {v || 'Tất cả'} <span>{dem(v)}</span></button>
-          ))}
-        </div>
-        <span style={{ flex: 1 }} />
-        <label className="qs-dash-year">Năm
-          <select value={yr} onChange={e => setYear(e.target.value)}>
-            <option value="">Tất cả năm</option>
-            {years.filter(Boolean).map(y => <option key={y} value={y}>{y}</option>)}
-          </select></label>
-        <span className="qs-dash-tt-hint">Đổi trạng thái ở Thông tin dự án (ô Trạng thái của bản nháp)</span>
-      </div>
       <div className="qs-dash-list-body">
         {shown.length
           ? list
@@ -274,7 +259,7 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
               {q ? `Không tìm thấy dự án khớp "${q}"${time.k ? ' trong ' + timeLb.toLowerCase() : ''}.`
                 : time.k && groups.length ? `Không có dự án tạo trong ${timeLb.toLowerCase()}.`
                 : kdMa && src && groups.length ? `Không có dự án ${src === 'kd' ? 'từ Kinh doanh' : 'từ phòng QS'}.`
-                : (tt || yr) && groups.length ? 'Không có dự án nào thuộc loại / năm đang chọn.'
+                : tt && groups.length ? 'Không có dự án nào thuộc loại đang chọn.'
                 : <>Chưa có dự án. Bấm <b>Tạo dự án</b> để bắt đầu.</>}
             </div>
           )}

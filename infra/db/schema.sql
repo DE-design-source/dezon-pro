@@ -9216,6 +9216,54 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: system_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.system_settings (
+    setting_key text NOT NULL,
+    setting_value jsonb,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by text,
+    CONSTRAINT ck_system_settings_setting_key CHECK ((setting_key <> ''::text))
+);
+
+
+--
+-- Name: TABLE system_settings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.system_settings IS 'System-wide default settings saved by a super admin, readable by every signed-in user (not per company).';
+
+
+--
+-- Name: COLUMN system_settings.setting_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.system_settings.setting_key IS 'Section key: appearance, general or display.';
+
+
+--
+-- Name: COLUMN system_settings.setting_value; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.system_settings.setting_value IS 'JSON object of default values for the section; replaced as a whole on every save.';
+
+
+--
+-- Name: COLUMN system_settings.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.system_settings.updated_at IS 'Time of the last save.';
+
+
+--
+-- Name: COLUMN system_settings.updated_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.system_settings.updated_by IS 'Username of the last editor.';
+
+
+--
 -- Name: user_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -10508,6 +10556,14 @@ ALTER TABLE ONLY public.sales_lead_activities
 
 ALTER TABLE ONLY public.sales_leads
     ADD CONSTRAINT pk_sales_leads PRIMARY KEY (id);
+
+
+--
+-- Name: system_settings pk_system_settings; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.system_settings
+    ADD CONSTRAINT pk_system_settings PRIMARY KEY (setting_key);
 
 
 --

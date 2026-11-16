@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { STAGES, STAGE_LABEL, DEPT_LABEL } from '../../../data/kinhDoanhData'
 import { useKdMap, saveKdOptions } from './ShortlistSelect'
 import { fmtTy, stageAccent, lmInitials } from '../utils'
+import { mediaUrl } from '../../QS/api/files'
 
 /* Trang khách hàng riêng: hồ sơ, tiến trình pipeline, lịch sử chăm sóc & chi tiết từng lần tương tác */
 export const INTERACTION_TYPES = {
@@ -17,6 +18,25 @@ export const OUTCOMES = { good: ['Tích cực', 'var(--success)'], neutral: ['Đ
 
 const addDays = (iso, n) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 const fmtD = iso => (iso ? iso.split('-').reverse().join('/') : '')
+/* Bảng chi tiết bên phải (nút mở rộng ở Thông tin liên hệ, MarkUp 2026-11-16 16:32): nhớ đóng / mở theo trình duyệt */
+const DETAIL_LS = 'kd-cp-detail'
+const readDetail = () => { try { return localStorage.getItem(DETAIL_LS) === '1' } catch { return false } }
+/* Thu gọn từng mục của cột Chi tiết (MarkUp 2026-11-16 17:05): {tai-lieu|hinh|tep: 1}, nhớ theo trình duyệt */
+const FOLD_LS = 'kd-cp-dfold'
+const readFold = () => { try { return JSON.parse(localStorage.getItem(FOLD_LS) || '{}') || {} } catch { return {} } }
+function DSec({ id, title, fold, onFold, children }) {
+  const off = !!fold[id]
+  return (
+    <div className={'kd-cp-dsec' + (off ? ' folded' : '')}>
+      <span role="button" tabIndex={0} aria-expanded={!off} title={off ? 'Mở rộng' : 'Thu gọn'} onClick={() => onFold(id)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFold(id) } }}>
+        {title}<i className="kd-cp-dfold"><Ic d="m6 9 6 6 6-6" size={14} /></i>
+      </span>
+      {off ? null : children}
+    </div>
+  )
+}
+const FILE_IC = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6'
 
 /* Lịch sử mẫu — sinh theo giai đoạn hiện tại của khách hàng */
 export function seedInteractions(l) {
@@ -75,14 +95,14 @@ export function RatingStars({ id, small }) {
   const set = n => { const m = { ...map }; if (n === v) delete m[id]; else m[id] = n; saveKdOptions('rating', m) }
   const show = hov || v
   return (
-    <span className={'kd-cp-stars' + (small ? ' sm' : '')} onMouseLeave={() => setHov(0)} title={v ? 'Tiềm năng: ' + RATE_LABEL[v] + ' (bấm lại để bỏ)' : 'Đánh giá tiềm năng'}
+    <span className={'kd-cp-stars' + (small ? ' sm' : '')} onMouseLeave={() => setHov(0)} title={v ? 'Trạng thái giao tiếp: ' + RATE_LABEL[v] + ' (bấm lại để bỏ)' : 'Đánh giá trạng thái giao tiếp'}
       onClick={small ? e => e.stopPropagation() : undefined} draggable={small ? false : undefined} onDragStart={small ? e => { e.preventDefault(); e.stopPropagation() } : undefined}>
       {[1, 2, 3, 4, 5].map(n => (
         <button key={n} type="button" className={n <= show ? 'on' : ''} onMouseEnter={() => setHov(n)} onClick={() => set(n)} aria-label={n + ' sao'}>
           <svg width={small ? 13 : 16} height={small ? 13 : 16} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
         </button>
       ))}
-      {!small && <em>{show ? RATE_LABEL[show] : 'Chưa đánh giá'}</em>}
+      {/* chỉ hiện sao, không kèm chữ (MarkUp 2026-11-16 17:00); mức chữ xem ở chú thích khi rê chuột */}
     </span>
   )
 }
@@ -94,6 +114,14 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   const [f, setF] = useState(blank)
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [detail, setDetailRaw] = useState(readDetail)
+  const [fold, setFoldRaw] = useState(readFold)
+  const onFold = id => setFoldRaw(m => { const n = { ...m }; if (n[id]) delete n[id]; else n[id] = 1; try { localStorage.setItem(FOLD_LS, JSON.stringify(n)) } catch { /* bỏ qua */ } return n })
+  const setDetail = v => { setDetailRaw(v); try { localStorage.setItem(DETAIL_LS, v ? '1' : '0') } catch { /* bỏ qua */ } }
+  const geoMap = useKdMap('geo')
+  const projNameMap = useKdMap('projName')
+  const attachMap = useKdMap('attach')
+  const timelineMap = useKdMap('timeline')
   useEffect(() => { setAdding(false); setFilter('all') }, [l?.id])
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role=dialog]')) { if (adding) setAdding(false); else onBack() } }
@@ -103,6 +131,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   if (!l) return null
 
   const accent = stageAccent(l.stage)
+  const geo = geoMap[String(l.id)] || {}
+  const tinhThanh = [geo.kv, geo.tinh].filter(Boolean).join(' · ')
+  const projName = projNameMap[String(l.id)] || ''
+  const att = attachMap[String(l.id)] || {}
+  const imgs = att.img || [], docs = att.file || []
+  const tl = timelineMap[String(l.id)] || {}
   const list = interactions.filter(x => filter === 'all' || x.type === filter)
   const upcoming = interactions.filter(x => x.next).map(x => ({ date: x.next, note: x.nextNote || `Theo dõi sau: ${x.title}`, from: x })).sort((a, b) => a.date.localeCompare(b.date))
   const last = interactions[0]
@@ -116,11 +150,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   }
 
   return (
-    <div className="kd-cp">
+    <div className={'kd-cp' + (detail ? ' detail-open' : '')}>
       <div className="kd-cp-head">
         <button className="kd-cp-back" onClick={onBack} title="Quay lại (Esc)"><Ic d="M19 12H5M12 19l-7-7 7-7" />Khách hàng</button>
         <div className="kd-cp-title">
-          <h2>{l.name}</h2>
+          {/* tiêu đề = tên dự án (chưa có thì tên khách hàng); tên khách hàng ở Thông tin liên hệ (MarkUp 2026-11-16 16:42) */}
+          <h2 title={projName ? 'Dự án: ' + projName : l.name}>{projName || l.name}</h2>
           <div><span className="kd-cp-stage" style={{ background: accent ? accent.bg : 'var(--sales-tint)', color: accent ? accent.color : 'var(--sales)' }}>{STAGE_LABEL[l.stage]}</span><span>{l.type} · {fmtTy(l.value)} · {DEPT_LABEL[l.dept]}</span></div>
         </div>
         <span style={{ flex: 1 }} />
@@ -146,13 +181,19 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin" onClick={onEdit}>
                 <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
               </button>
+              <button type="button" className={'kd-cp-edit kd-cp-expand' + (detail ? ' on' : '')} aria-expanded={detail} onClick={() => setDetail(!detail)}
+                title={detail ? 'Đóng bảng chi tiết' : 'Mở bảng chi tiết bên phải (tài liệu, đính kèm, ghi chú)'}>
+                <Ic d={detail ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} size={15} />
+              </button>
             </h4>
             <dl>
+              <dt>Tên khách hàng</dt><dd>{l.name || '—'}</dd>
               <dt>Điện thoại</dt><dd>{l.phone || '—'}</dd>
               <dt>Email</dt><dd>{l.email || '—'}</dd>
+              <dt>Tỉnh thành</dt><dd>{tinhThanh || '—'}</dd>
               <dt>Địa chỉ</dt><dd>{l.address || '—'}</dd>
               <dt>Nguồn</dt><dd>{l.source || '—'}</dd>
-              <dt>Tiềm năng</dt><dd><RatingStars id={String(l.id)} /></dd>
+              <dt>Trạng thái giao tiếp</dt><dd><RatingStars id={String(l.id)} /></dd>
             </dl>
           </section>
           <section>
@@ -161,6 +202,8 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <dt>Loại dự án</dt><dd>{l.projectType || l.type}</dd>
               <dt>Quy mô</dt><dd>{l.scale || '—'}</dd>
               <dt>Giá trị ước tính</dt><dd className="kd-cp-money">{fmtTy(l.value)}</dd>
+              <dt>Khởi công</dt><dd>{tl.start ? fmtD(tl.start) : '—'}</dd>
+              <dt>Hoàn công</dt><dd>{tl.end ? fmtD(tl.end) : '—'}</dd>
               <dt>Ngày tạo</dt><dd>{fmtD(l.createdAt)}</dd>
             </dl>
             {l.categories?.length > 0 && <div className="kd-cp-tags">{l.categories.map(c => <span key={c}>{c}</span>)}</div>}
@@ -182,6 +225,34 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             <div className="kd-cp-mini">{Object.entries(INTERACTION_TYPES).filter(([k]) => counts[k]).map(([k, t]) => <span key={k} style={{ color: t.color }}><Ic d={t.icon} size={12} />{counts[k]}</span>)}</div>
           </section>
         </aside>
+
+        {/* Cột Chi tiết = cột thứ 2, cạnh cột thông tin (MarkUp 2026-11-16 16:49): mở / đóng bằng nút mở rộng */}
+        {detail && (
+          <aside className="kd-cp-detail" aria-label="Chi tiết khách hàng">
+            <div className="kd-cp-card">
+              <div className="kd-cp-detail-h"><h3>Chi tiết</h3>
+                <button type="button" className="kd-cp-edit" title="Đóng" onClick={() => setDetail(false)}><Ic d="M18 6 6 18M6 6l12 12" size={14} /></button>
+              </div>
+              <DSec id="tai-lieu" title="Tài liệu & ghi chú" fold={fold} onFold={onFold}>
+                {l.boqFile && <div className="kd-cp-file"><Ic d={FILE_IC} />{l.boqFile}</div>}
+                {l.concept && <p className="kd-cp-note"><b>Concept:</b> {l.concept}</p>}
+                {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
+                {!l.boqFile && !l.concept && !l.notes && <em className="kd-cp-dnone">Chưa có BOQ, concept hay ghi chú</em>}
+              </DSec>
+              <DSec id="hinh" title={'Hình đính kèm' + (imgs.length ? ' (' + imgs.length + ')' : '')} fold={fold} onFold={onFold}>
+                {imgs.length ? (
+                  <div className="kd-cp-imgs">{imgs.map((it, i) => <a key={i} href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><img src={mediaUrl(it.url)} alt={it.name} /></a>)}</div>
+                ) : <em className="kd-cp-dnone">Chưa có hình</em>}
+              </DSec>
+              <DSec id="tep" title={'Tệp đính kèm' + (docs.length ? ' (' + docs.length + ')' : '')} fold={fold} onFold={onFold}>
+                {docs.length ? docs.map((it, i) => (
+                  <a key={i} className="kd-cp-file" href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><Ic d={FILE_IC} /><span>{it.name}</span></a>
+                )) : <em className="kd-cp-dnone">Chưa có tệp</em>}
+              </DSec>
+              <button type="button" className="kd-cp-btn" onClick={onEdit} style={{ marginTop: 4 }}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={13} />Sửa / thêm tài liệu</button>
+            </div>
+          </aside>
+        )}
 
         <main className="kd-cp-main">
           {upcoming.length > 0 && (
@@ -250,14 +321,6 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             </ol>
           </div>
 
-          {(l.concept || l.notes || l.boqFile) && (
-            <div className="kd-cp-card">
-              <h3>Tài liệu & ghi chú</h3>
-              {l.boqFile && <div className="kd-cp-file"><Ic d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" />{l.boqFile}</div>}
-              {l.concept && <p className="kd-cp-note"><b>Concept:</b> {l.concept}</p>}
-              {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
-            </div>
-          )}
         </main>
       </div>
     </div>

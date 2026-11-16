@@ -8,6 +8,7 @@ import { useSyncExternalStore } from 'react'
 import { apiConfigured, readToken, writeToken, readViewAs, ping } from '../pages/QS/api/http'
 import * as qsApi from '../pages/QS/api/qsApi'
 import * as qsStore from '../pages/QS/state/store'
+import { loadSysDefaults } from './systemDefaultsService'
 
 let S = { auth: apiConfigured() ? 'checking' : 'unconfigured', me: null, congTy: null, error: '' }
 const subs = new Set()
@@ -56,6 +57,7 @@ function start() {
       if (!live()) return
       forgetOtherUser(u)
       set({ auth: 'ready', me: u, congTy: u.congTy || null, error: '' })
+      loadSysDefaults()   // mặc định toàn hệ thống của Siêu quản trị viên (N17)
     } catch (e) {
       if (!live()) return
       if (e && e.name === 'QsUnreachableError') set({ auth: 'unreachable', error: e.message })
@@ -95,6 +97,7 @@ export async function login(user, pw) {
   startSeq++
   forgetOtherUser(r.user)
   set({ auth: 'ready', me: r.user, congTy: r.congTy || null, error: '' })
+  loadSysDefaults()
   return r
 }
 /* Đăng xuất chung (Cài đặt > Tài khoản, menu tài khoản ở thanh trên, nút tài khoản của QS, thẻ thiếu quyền):

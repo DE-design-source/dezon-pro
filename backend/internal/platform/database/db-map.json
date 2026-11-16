@@ -639,6 +639,15 @@
    "nguoi_sua": "updated_by"
   }
  },
+ "cai_dat_he_thong": {
+  "table": "system_settings",
+  "columns": {
+   "khoa": "setting_key",
+   "gia_tri": "setting_value",
+   "cap_nhat": "updated_at",
+   "nguoi_sua": "updated_by"
+  }
+ },
  "kd_khach_hang": {
   "table": "sales_leads",
   "columns": {

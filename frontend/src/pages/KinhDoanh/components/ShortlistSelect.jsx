@@ -36,6 +36,13 @@ export function useKdMap(key) {
   const o = useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f) }, () => opts, () => opts)
   return o[key] && typeof o[key] === 'object' && !Array.isArray(o[key]) ? o[key] : {}
 }
+/* Ghi nhiều khoá trong 1 lần gửi (tránh 2 lần gửi cả kdOptions về sai thứ tự làm mất khoá) */
+export async function saveKdOptionsMany(patch) {
+  opts = { ...opts, ...patch }
+  Object.keys(patch).forEach(k => { dirty[k] = 1 })
+  emit()
+  try { await setProjData('__cty', 'kdOptions', opts) } catch (e) { alert('Không lưu được lên máy chủ: ' + ((e && e.message) || e)) }
+}
 export async function saveKdOptions(key, list) {
   opts = { ...opts, [key]: list }
   dirty[key] = 1

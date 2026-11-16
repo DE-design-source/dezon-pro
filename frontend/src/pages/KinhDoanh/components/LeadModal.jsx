@@ -12,6 +12,8 @@ import {
 } from '../../../data/kinhDoanhData'
 import { FONT_STACK, lmInitials } from '../utils'
 import ShortlistSelect, { useKdMap, useMkChannels } from './ShortlistSelect'
+import AttachBox from './AttachBox'
+import DatePicker from '../../../components/ui/DatePicker'
 
 /* ===================== Modal thêm / chỉnh sửa khách hàng tiềm năng (3 cấp độ) =====================
    Component được mount sẵn (ẩn bằng display) như bản HTML; trang cha đổi `key` mỗi lần mở
@@ -59,6 +61,9 @@ function initForm(lead, me) {
   }
 }
 
+/* Mức quy mô gợi ý (m2 sàn); gõ số tự do thì thẻ kanban tự thêm đơn vị m² */
+const LEAD_SCALES = ['Dưới 100 m²', '100 - 200 m²', '200 - 500 m²', '500 - 1.000 m²', '1.000 - 5.000 m²', 'Trên 5.000 m²']
+
 export default function LeadModal({ open, lead, me, onClose, onSave }) {
   const mkKenh = useMkChannels() // kênh quảng cáo của tab Marketing: gợi ý thêm cho Nguồn khách hàng
   const [form, setForm] = useState(() => initForm(lead, me))
@@ -72,6 +77,21 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
   const addAdmin = () => { const n = adminName.trim(); if (n && admins.indexOf(n) < 0) setAdmins(l => [...l, n]); setAdminName(''); setAdminOpen(false) }
   const [managerTouched, setManagerTouched] = useState(!!lead)
   /* Khu vực + Tỉnh / TP: máy chủ chưa có cột -> lưu chung công ty kdOptions.geo {mã lead: {kv, tinh}} (KinhDoanh.saveLead ghi) */
+  /* Tên dự án (MarkUp 2026-11-16 16:17): máy chủ chưa có cột -> kdOptions.projName {mã lead: tên} như geo */
+  const projNameMap = useKdMap('projName')
+  const [projName, setProjName] = useState(lead ? projNameMap[String(lead.id)] || '' : '')
+  const projNameKey = lead ? projNameMap[String(lead.id)] : null
+  useEffect(() => { if (projNameKey && !projName) setProjName(projNameKey) }, [projNameKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Hình / tệp đính kèm (MarkUp 2026-11-16 16:20): kdOptions.attach {mã lead: {img: [{name, url}], file: [...]}} */
+  const attachMap = useKdMap('attach')
+  const [attach, setAttach] = useState(() => { const a = lead ? attachMap[String(lead.id)] || {} : {}; return { img: a.img || [], file: a.file || [] } })
+  const attachKey = lead ? attachMap[String(lead.id)] : null
+  useEffect(() => { if (attachKey && !attach.img.length && !attach.file.length) setAttach({ img: attachKey.img || [], file: attachKey.file || [] }) }, [attachKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Thời gian dự án (MarkUp 2026-11-16 16:48): kdOptions.timeline {mã lead: {start, end}} (YYYY-MM-DD) như geo */
+  const timelineMap = useKdMap('timeline')
+  const [tl, setTl] = useState(() => { const t = lead ? timelineMap[String(lead.id)] || {} : {}; return { start: t.start || '', end: t.end || '' } })
+  const tlKey = lead ? timelineMap[String(lead.id)] : null
+  useEffect(() => { if (tlKey && !tl.start && !tl.end) setTl({ start: tlKey.start || '', end: tlKey.end || '' }) }, [tlKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const geoMap = useKdMap('geo')
   const geo0 = lead ? geoMap[String(lead.id)] || {} : {}
   const [geo, setGeo] = useState({ kv: geo0.kv || '', tinh: geo0.tinh || '' })
@@ -162,6 +182,9 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
     onSave({
       name,
       _geo: geo,
+      _projName: projName.trim(),
+      _attach: attach,
+      _timeline: tl,
       type: scale ? `${type} (${scale})` : type,
       value: (Number(digits_(form.value)) || 0) * (form.cur === 'VND' ? 1 : (Number(digits_(form.rate)) || (CURRENCIES.find(c => c[0] === form.cur) || [0, 1])[1])) / 1e9,   // quy ra tỷ VND
       stage: !lead && form.stage === 'tiep-can' && finalAssignees.some(a => a && a.role !== ADMIN_KD) ? 'giao-ns' : form.stage,   // tạo mới đã có nhân sự KD phụ trách -> vào thẳng giai đoạn "Nhân sự KD phụ trách"
@@ -219,6 +242,7 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
             <div className="kd-lf-grid" style={stepId === 'basic' ? undefined : { display: 'none' }}>
               <section className="kd-lf-sec">
                 <h4><i>1</i>Thông tin khách hàng</h4>
+                <div className="kd-field"><label>Tên dự án</label><input type="text" placeholder="VD: Nhà phố Anh Phú - Thủ Đức" value={projName} onChange={e => setProjName(e.target.value)} /></div>
                 <div style={grid2}>
                   <div className="kd-field"><label>Tên khách hàng *</label><input ref={nameRef} type="text" placeholder="VD: Anh Nguyễn Văn Phú" value={form.name} onChange={e => set('name', e.target.value)} /></div>
                   <div className="kd-field"><label>Số điện thoại *</label><input type="text" placeholder="09xx xxx xxx" value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
@@ -231,6 +255,8 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                 </div>
               </section>
 
+              {/* cột phải hàng 1: Địa điểm + Thời gian dự án xếp chồng, giữ bố cục 2 x 2 của các nhóm */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
               <section className="kd-lf-sec">
                 <h4><i>2</i>Địa điểm</h4>
                 <div style={grid2}>
@@ -248,6 +274,18 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                 </div>
                 <div className="kd-field"><label>Địa chỉ</label><input type="text" placeholder="Số nhà, đường, phường/xã, quận/huyện" value={form.address} onChange={e => set('address', e.target.value)} /></div>
               </section>
+              <section className="kd-lf-sec">
+                <h4><i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></i>Thời gian dự án</h4>
+                <div style={grid2}>
+                  <div className="kd-field"><label>Thời gian khởi công</label>
+                    <DatePicker value={tl.start} onChange={v => setTl(t => ({ ...t, start: v || '' }))} max={tl.end || undefined} clearable ariaLabel="Thời gian khởi công" />
+                  </div>
+                  <div className="kd-field"><label>Thời gian hoàn công</label>
+                    <DatePicker value={tl.end} onChange={v => setTl(t => ({ ...t, end: v || '' }))} min={tl.start || undefined} clearable ariaLabel="Thời gian hoàn công" />
+                  </div>
+                </div>
+              </section>
+              </div>
 
               <section className="kd-lf-sec">
                 <h4><i>3</i>Dự án</h4>
@@ -263,12 +301,18 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                     </select>
                   </div>
                 </div>
-                <div className="kd-field" style={{ position: 'relative' }}>
+                {/* Hạng mục quan tâm | Quy mô dự án (MarkUp 2026-11-16 16:21): quy mô chọn mức có sẵn hoặc gõ số m2 */}
+                <div style={grid2}>
+                <div className="kd-field" style={{ position: 'relative', minWidth: 0 }}>
                   <label>Hạng mục quan tâm</label>
                   <button type="button" onClick={toggleCatPopover} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', width: '100%', boxSizing: 'border-box' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.categories.length ? form.categories.join(', ') : 'Chọn hạng mục...'}</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
                   </button>
+                </div>
+                <div className="kd-field" style={{ minWidth: 0 }}><label>Quy mô dự án</label>
+                  <ShortlistSelect value={form.scale} free onChange={v => set('scale', v)} base={LEAD_SCALES} optKey="scale" placeholder="Chọn hoặc gõ số m² (VD: 120)" />
+                </div>
                 </div>
                 <div className="kd-field"><label>Giá trị ước tính</label>
                   <div className="kd-money">
@@ -364,7 +408,12 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                   <span>{boqFile ? '📎 ' + boqFile : BOQ_DEFAULT_LABEL}</span>
                 </div>
               </div>
-              <div className="kd-field"><label>Concept / Ý tưởng thiết kế</label><textarea rows={3} placeholder="Mô tả phong cách, ý tưởng thiết kế mong muốn của khách hàng..." value={form.concept} onChange={e => set('concept', e.target.value)} /></div>
+              {/* Concept | Hình đính kèm | Tệp đính kèm trên 1 hàng (MarkUp 2026-11-16 16:20) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>
+                <div className="kd-field"><label>Concept / Ý tưởng thiết kế</label><textarea rows={3} placeholder="Mô tả phong cách, ý tưởng thiết kế mong muốn của khách hàng..." value={form.concept} onChange={e => set('concept', e.target.value)} /></div>
+                <AttachBox kind="img" label="Hình đính kèm" items={attach.img} onChange={img => setAttach(a => ({ ...a, img }))} />
+                <AttachBox kind="file" label="Tệp đính kèm" items={attach.file} onChange={file => setAttach(a => ({ ...a, file }))} />
+              </div>
               <div className="kd-field"><label>Ghi chú nội bộ</label><textarea rows={2} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật..." value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
               <div className="kd-field">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>

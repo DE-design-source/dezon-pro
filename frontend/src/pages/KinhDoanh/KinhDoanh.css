@@ -667,3 +667,47 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-sl-tabs button:hover{color:var(--text);}
 .kd-sl-tabs button.on{background:var(--surface); color:var(--sales); box-shadow:0 1px 3px rgba(15,23,42,.12);}
 .kd-sl-tabs button.on em{background:var(--sales-tint, rgba(194,104,30,.15)); color:var(--sales);}
+/* Trang khách hàng: nút mở rộng + bảng chi tiết bên phải (MarkUp 2026-11-16 16:32) */
+.kd-cp-edit + .kd-cp-expand{margin-left:0;}   /* nút mở rộng đứng sau nút sửa (MarkUp 2026-11-16 16:44) */
+.kd-cp-expand.on{border-color:var(--sales); background:var(--sales-tint); color:var(--sales);}
+
+.kd-cp-detail{min-width:0;}
+.kd-cp-detail .kd-cp-card{display:flex; flex-direction:column; gap:14px;}
+.kd-cp-detail-h{display:flex; align-items:center; gap:8px;}
+.kd-cp-detail-h h3{margin:0; font-size:15px;}
+.kd-cp-dsec{display:flex; flex-direction:column; gap:6px; min-width:0;}
+.kd-cp-dsec > span{font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+.kd-cp-dsec > b{font-size:13.5px;}
+.kd-cp-dsec .kd-cp-file{margin-bottom:0; color:var(--text); text-decoration:none; min-width:0;}
+.kd-cp-dsec .kd-cp-file span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.kd-cp-dsec .kd-cp-file:hover{border-color:var(--sales);}
+.kd-cp-dnone{font-size:12.5px; font-style:normal; color:var(--text-muted);}
+.kd-cp-imgs{display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:6px;}
+.kd-cp-imgs a{display:block; aspect-ratio:1; border-radius:8px; overflow:hidden; border:1px solid var(--border);}
+.kd-cp-imgs img{width:100%; height:100%; object-fit:cover; display:block;}
+/* ghi chú giữ xuống dòng như lúc gõ */
+.kd-cp-note{white-space:pre-wrap; overflow-wrap:anywhere;}
+
+
+.kd-cp-detail .kd-cp-card > .kd-cp-btn{align-self:flex-start;}
+/* Cột Chi tiết dọc (cột thứ 2) khi mở: thông tin | chi tiết | lịch sử chăm sóc (MarkUp 2026-11-16 16:49) */
+.kd-cp.detail-open .kd-cp-body{grid-template-columns:400px 400px minmax(0, 1fr);}   /* cột thông tin = cột chi tiết (MarkUp 2026-11-16 16:56) */
+.kd-cp.detail-open .kd-cp-detail{position:sticky; top:0;}
+@media (max-width:1400px){ .kd-cp.detail-open .kd-cp-body{grid-template-columns:320px 320px minmax(0, 1fr);} }
+@media (max-width:1100px){ .kd-cp.detail-open .kd-cp-body{grid-template-columns:minmax(0, 1fr);} .kd-cp.detail-open .kd-cp-detail{position:static;} }
+/* Cột Chi tiết cao hết chiều cao các cột (kéo tới đáy như cột thông tin), không co theo nội dung - MarkUp 2026-11-16 16:58 */
+.kd-cp.detail-open .kd-cp-detail{position:static; align-self:stretch; display:flex; flex-direction:column;}
+.kd-cp.detail-open .kd-cp-detail > .kd-cp-card{flex:1; box-sizing:border-box;}
+/* Cột Chi tiết: vạch ngăn dưới tiêu đề và giữa các mục (MarkUp 2026-11-16 17:03) */
+.kd-cp-detail .kd-cp-detail-h{padding-bottom:12px; border-bottom:1px solid var(--border);}
+.kd-cp-detail .kd-cp-dsec + .kd-cp-dsec{padding-top:14px; border-top:1px solid var(--border);}
+.kd-cp-detail .kd-cp-dsec:last-of-type{padding-bottom:14px; border-bottom:1px solid var(--border);}
+/* vạch dưới tiêu đề từng mục của cột Chi tiết (MarkUp 2026-11-16 17:04) */
+.kd-cp-detail .kd-cp-dsec > span{padding-bottom:7px; margin-bottom:2px; border-bottom:1px solid var(--border);}
+/* Nút thu gọn ở tiêu đề từng mục của cột Chi tiết (MarkUp 2026-11-16 17:05) */
+.kd-cp-detail .kd-cp-dsec > span{display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
+.kd-cp-detail .kd-cp-dsec > span:hover{color:var(--text);}
+.kd-cp-dfold{margin-left:auto; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); font-style:normal; transition:transform .15s;}
+.kd-cp-detail .kd-cp-dsec > span:hover .kd-cp-dfold{border-color:var(--sales); color:var(--sales);}
+.kd-cp-dsec.folded .kd-cp-dfold{transform:rotate(-90deg);}
+.kd-cp-detail .kd-cp-dsec.folded > span{border-bottom:none; padding-bottom:0; margin-bottom:0;}
