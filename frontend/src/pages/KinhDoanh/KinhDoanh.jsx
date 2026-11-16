@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
 import {
@@ -16,6 +17,7 @@ import StaffRequestModal from './components/StaffRequestModal'
 import ConfirmDelete from './components/ConfirmDelete'
 import { useKdMap, saveKdOptions } from './components/ShortlistSelect'
 import CustomerPage from './components/CustomerPage'
+import KdNotifBell from './components/KdNotifBell'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
@@ -66,6 +68,21 @@ function KinhDoanhPage() {
   const scrollRef = useRef(null)
 
   useEffect(() => { kdApi.listLeads().then(setLeads, e => alert('Lỗi tải khách hàng: ' + e.message)) }, [])
+
+  /* Mở thẳng 1 khách hàng: /kinh-doanh?lead=<id> (bấm thông báo "được giao phụ trách" ở chuông QS / chuông trang này) */
+  const [params, setParams] = useSearchParams()
+  const leadParam = params.get('lead')
+  useEffect(() => {
+    if (!leadParam || !leads.length) return
+    if (leads.some(l => sameId(l.id, leadParam))) setDetail({ open: true, id: leads.find(l => sameId(l.id, leadParam)).id })
+    else alert('Không tìm thấy khách hàng (có thể đã bị xoá)')
+    setParams(p => { p.delete('lead'); return p }, { replace: true })
+  }, [leadParam, leads]) // eslint-disable-line react-hooks/exhaustive-deps
+  const openLeadById = id => {
+    const l = leads.find(x => sameId(x.id, id))
+    if (l) setDetail({ open: true, id: l.id })
+    else kdApi.listLeads().then(ls => { setLeads(ls); const m = ls.find(x => sameId(x.id, id)); if (m) setDetail({ open: true, id: m.id }); else alert('Không tìm thấy khách hàng (có thể đã bị xoá)') }, e => alert('Lỗi tải khách hàng: ' + e.message))
+  }
 
   /* Mở trang khách hàng -> tải lịch sử chăm sóc thật */
   useEffect(() => {
@@ -250,6 +267,7 @@ function KinhDoanhPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Thêm khách hàng tiềm năng
         </button>
+        <KdNotifBell onOpenLead={openLeadById} />
         <button title="Chuyển giao diện sáng/tối" onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           {theme === 'dark'
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>

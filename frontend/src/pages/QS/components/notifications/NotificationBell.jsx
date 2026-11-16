@@ -19,6 +19,7 @@ import './notifications.css'
      de_xuat*   : Admin -> tab Admin + chi tiết phiếu ({dxDetail}); người khác -> tab Mua hàng + chi tiết phiếu ({dxDetail},
                   đọc qua GET /my-proposals/:code - chỉ phiếu của chính mình) (M13.1)
      sp_edit*   : Danh sách SP tìm mã và mở sản phẩm ({spSearch, openFirst})
+     kd_*       : Kinh doanh (kd_assign = được giao phụ trách khách hàng, refId = id khách) -> /kinh-doanh?lead=<id>
      expiry_*   : nhắc gia hạn công ty (M17.3, chỉ bản Go; chỉ admin nhận) -> hiện lại dải nhắc gia hạn ở tab đang mở
                   (common/ExpiryBanner, sự kiện EXPIRY_SHOW_EVENT) - thẻ Thông tin công ty chưa có hạn dùng
    "Tab Admin" nay là mục Admin của trang Cài đặt (QsSettingsPanels): ghi ý định vào store rồi chuyển trang.
@@ -72,6 +73,7 @@ export default function NotificationBell() {
       return
     }
     if (/^sp_edit/.test(kind)) { showTab('sanpham', refId ? { spSearch: refId, openFirst: true } : undefined); return }
+    if (/^kd_/.test(kind)) { navigate(refId ? '/kinh-doanh?lead=' + encodeURIComponent(refId) : '/kinh-doanh'); return }
     if (/^expiry_/.test(kind)) {
       if (isAdmin) window.dispatchEvent(new Event(EXPIRY_SHOW_EVENT))
       else qsToast('Liên hệ quản trị hệ thống để gia hạn')

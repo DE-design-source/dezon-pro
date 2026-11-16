@@ -266,6 +266,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
 | `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); bảng route gốc `/mau-nhap-*.xlsx` (`RootRoutes`) đóng băng nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/sales/leads` | `kdListLeads` | `rpc.Login` | sales | Danh sách khách hàng Kinh doanh, kèm `quote` = tổng báo giá QS nếu đã gắn dự án |
+| `GET` | `/sales/staff` | `kdListStaff` | `rpc.Login` | sales | Tài khoản đang hoạt động của công ty để giao phụ trách (`{staff: [{username, name, department, role, sales}]}`); người được giao lưu kèm `username` trong `assignees` |
 | `POST` | `/sales/leads` | `kdCreateLead` | `rpc.Login` | sales | Thêm khách hàng (`createdAt` / `wonAt` yyyy-mm-dd tuỳ chọn, chỉ khi tạo: nạp dữ liệu mẫu) |
 | `PATCH` | `/sales/leads/:id` | `kdUpdateLead` | `rpc.Login` | sales | Sửa 1 phần (kéo-thả giai đoạn, bảng con, người phụ trách, form) |
 | `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |

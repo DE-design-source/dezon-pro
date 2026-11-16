@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-12 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-16 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -565,6 +565,7 @@
 - 2026-11-10: Tiến độ - bấm công việc "Mua hàng & cung ứng" mở "Phiếu thông tin mua hàng" ở khung phải (timeline vẫn hiện); phiếu chi tiết đơn mua hàng theo bộ trường Lark (From Today, Status, Pc/Sm/Pm Order, Mua hàng đặt hàng, Order Due Kế Toán tính lùi từ Start At Site / Lead Time / Bù trừ; ngày thực tế, PM / Thu mua / Kế toán / CHT/GS / PC, tệp đính kèm, Thanh toán), 3 chế độ xem Default / Columns / Groups - 🟡 chưa thử trên dữ liệu thật
 - Triển khai VPS dezon.tech 2026-11-10 (src_N 4fba0e8 = thanhv2 + feat/hr, `deploy.sh --no-pull`, giữ Caddyfile vuathau + thêm /gach-spec.js; sao lưu `qspro-20261110-161103.dump` trước migration 0040 - 0043); kiểm từ Internet: /healthz, /qs, /kinh-doanh, /marketing, /quan-ly-thiet-ke, /gach-spec.js trả 200; site vuathau vẫn chạy - giao diện chưa thử bằng tài khoản thật
 - 2026-11-10: Marketing ↔ Kinh doanh - "Nguồn khách hàng" có 2 chip (Marketing = kênh quảng cáo `mkAds.kenh` | Khác); "+ thêm kênh" ở bảng chi tiêu gợi ý từ Nguồn khách hàng; thẻ "Hiệu quả kênh: chi tiêu ↔ khách hàng tiềm năng" (chi tiêu, số lead, chi phí / lead, đã chốt, tỉ lệ chốt, giá trị cơ hội theo kỳ đang xem) - 🟡 chưa thử trên dữ liệu thật
+- 2026-11-16: Phiếu "Nhân sự KD phụ trách" chọn người từ tài khoản thật của công ty (`GET /api/v1/sales/staff`, người có quyền Kinh doanh xếp trước), lưu kèm `username` trong người phụ trách; người vừa được giao nhận thông báo (kind `kd_assign`, chuông mới ở trang Kinh doanh + chuông QS, bấm mở đúng khách `/kinh-doanh?lead=<id>`); Concept / Ghi chú nội bộ giữ xuống dòng khi hiển thị - 🟡 test Go + build ở local, đã thử ô chọn tài khoản trên trình duyệt, thông báo chưa thử trên trình duyệt, chưa deploy
 - Quyền tab mới `kinhdoanh`, `thietke`, `thicong` (admin cấp cho nhân viên; tính năng công ty), kiểm ở máy chủ; đăng nhập dùng chung token với QS
 - Test Go: quyền, kiểm dữ liệu vào, cách ly công ty trên PostgreSQL thật (`TestCachLyCongTyDB`, `TestDuAnTrienKhaiDB`); thử trên trình duyệt ở máy phát triển 2026-10-28
 - Triển khai VPS dezon.tech 2026-10-28 (`deploy.sh --no-pull`, sao lưu `qspro-20261028-105708.dump` trước migration 0015-0016); kiểm từ Internet: `/healthz`, `/kinh-doanh`, `/quan-ly-thiet-ke`, `/du-an` trả 200, API mới trả 401 khi chưa đăng nhập, dữ liệu cũ giữ nguyên (3 công ty, 32 dự án)

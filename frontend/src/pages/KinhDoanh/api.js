@@ -22,5 +22,7 @@ export const listLeads = () => request('GET', '/sales/leads').then(r => (r.leads
 export const createLead = d => request('POST', '/sales/leads', { body: toServer(d) }).then(fromServer)
 export const updateLead = (id, d) => request('PATCH', '/sales/leads/' + enc(id), { body: toServer(d) }).then(fromServer)
 export const deleteLead = id => request('DELETE', '/sales/leads/' + enc(id))
-export const listActivities = id => request('GET', '/sales/leads/' + enc(id) + '/activities')
+/* Tài khoản đang hoạt động của công ty để giao phụ trách: [{username, name, department, role, sales}] (sales = vào được Kinh doanh) */
+export const listStaff = () => request('GET', '/sales/staff').then(r => r.staff || [])
+export const listActivities =id => request('GET', '/sales/leads/' + enc(id) + '/activities')
 export const addActivity = (id, a) => request('POST', '/sales/leads/' + enc(id) + '/activities', { body: a })

@@ -5,11 +5,13 @@ package sales
 import (
 	"context"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"qspro-backend/internal/config"
 	"qspro-backend/internal/platform/database"
+	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/shared/actor"
 	"qspro-backend/internal/shared/contracts"
 	apperr "qspro-backend/internal/shared/errors"
@@ -52,6 +54,7 @@ type Deps struct {
 	Lines    contracts.LineReader
 	Projects contracts.ProjectReader
 	Delivery contracts.DeliveryFromLead
+	Notifier contracts.Notifier // báo người vừa được giao phụ trách khách hàng; nil = không báo
 	Repo     Repository
 }
 
@@ -63,6 +66,7 @@ type Service struct {
 	lines    contracts.LineReader
 	projects contracts.ProjectReader
 	delivery contracts.DeliveryFromLead
+	notifier contracts.Notifier
 	db       *database.DB
 	now      func() time.Time
 }
@@ -73,7 +77,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, db: d.DB, now: time.Now}
+	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, db: d.DB, now: time.Now}
 }
 
 // tx: ghi khách hàng + tạo dự án triển khai trong cùng 1 transaction. Repo giả trong test không có DB -> chạy thẳng.
@@ -316,6 +320,7 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 	if err != nil {
 		return nil, err
 	}
+	s.notifyAssigned(ctx, a, nil, out)
 	return leadOut(out, q), nil
 }
 
@@ -353,6 +358,7 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 	if out == nil {
 		return nil, apperr.NotFound("Không tìm thấy khách hàng")
 	}
+	s.notifyAssigned(ctx, a, old, out)
 	return leadOut(out, q), nil
 }
 
@@ -401,6 +407,132 @@ func (s *Service) ListActivities(ctx context.Context, a *actor.Actor, id float64
 		out[i] = activityOut(r)
 	}
 	return out, nil
+}
+
+// assigneeUsernames: tên đăng nhập trong phu_trach (người được chọn từ GET /sales/staff); dòng chỉ có tên thì bỏ qua.
+func assigneeUsernames(l *omap.Map) []string {
+	if l == nil {
+		return nil
+	}
+	arr, _ := l.Val("phu_trach").([]any)
+	out := []string{}
+	for _, x := range arr {
+		var u string
+		switch m := x.(type) {
+		case *omap.Map:
+			u = jsval.Str(m.Val("username"))
+		case map[string]any:
+			u = jsval.Str(m["username"])
+		}
+		if u = jsval.Trim(u); u != "" {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// notifyAssigned: sau khi lưu, báo (chuông thông báo, kind "kd_assign", refId = id khách) cho từng tài khoản VỪA được thêm
+// vào người phụ trách (có trong out, chưa có trong old); không báo cho chính người giao. Lỗi chỉ log, không làm hỏng lần lưu.
+func (s *Service) notifyAssigned(ctx context.Context, a *actor.Actor, old, out *omap.Map) {
+	if s.notifier == nil || out == nil {
+		return
+	}
+	had := map[string]bool{}
+	for _, u := range assigneeUsernames(old) {
+		had[u] = true
+	}
+	added := []string{}
+	for _, u := range assigneeUsernames(out) {
+		if !had[u] && (a == nil || u != a.U) {
+			had[u] = true
+			added = append(added, u)
+		}
+	}
+	if len(added) == 0 {
+		return
+	}
+	rows, err := s.repo.ListStaff(ctx)
+	if err != nil {
+		logger.Error("sales", "báo người phụ trách: đọc tài khoản lỗi:", err.Error())
+		return
+	}
+	ids := map[string]any{}
+	for _, r := range rows {
+		ids[jsval.Str(r.Val("username"))] = r.Val("id")
+	}
+	who := ""
+	if a != nil {
+		who = a.U
+		if s.users != nil && jsval.Truthy(a.UID) {
+			if u, err := s.users.GetByID(ctx, a.UID); err == nil && u != nil {
+				if n := jsval.Trim(jsval.Str(u.Val("ho_ten"))); n != "" {
+					who = n
+				}
+			}
+		}
+	}
+	ten := jsval.Str(out.Val("ten_khach"))
+	for _, u := range added {
+		id, ok := ids[u]
+		if !ok {
+			continue // tài khoản đã khoá / không thuộc công ty
+		}
+		body := "Khách hàng \"" + ten + "\""
+		if who != "" {
+			body = who + " giao bạn phụ trách khách hàng \"" + ten + "\""
+		}
+		s.notifier.Notify(ctx, id, "kd_assign", "Bạn được giao phụ trách khách hàng", body, jsval.Str(out.Val("id")))
+	}
+}
+
+// ListStaff: tài khoản của công ty để giao phụ trách khách hàng (phiếu "Nhân sự KD phụ trách").
+// sales = vào được Kinh doanh (admin, hoặc được cấp tab); người có quyền xếp trước, rồi theo tên.
+func (s *Service) ListStaff(ctx context.Context, a *actor.Actor) (any, error) {
+	if err := s.allow(ctx, a); err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.ListStaff(ctx)
+	if err != nil {
+		return nil, err
+	}
+	type st struct {
+		m     *omap.Map
+		sales bool
+		name  string
+	}
+	list := make([]st, 0, len(rows))
+	for _, r := range rows {
+		u := jsval.Str(r.Val("username"))
+		if u == "" {
+			continue
+		}
+		role := jsval.Str(r.Val("role"))
+		sales := role == "admin"
+		if !sales && s.userFmt != nil {
+			for _, p := range s.userFmt.PermsArr(r.Val("perms")) {
+				if p == Tab {
+					sales = true
+					break
+				}
+			}
+		}
+		name := jsval.Trim(jsval.Str(r.Val("ho_ten")))
+		if name == "" {
+			name = u
+		}
+		list = append(list, st{omap.Of("username", u, "name", name, "department", jsval.Str(r.Val("phong_ban")), "role", role, "sales", sales), sales, strings.ToLower(name)})
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		if list[i].sales != list[j].sales {
+			return list[i].sales
+		}
+		return list[i].name < list[j].name
+	})
+	out := make([]any, len(list))
+	for i, x := range list {
+		out[i] = x.m
+	}
+	return omap.Of("staff", out), nil
 }
 
 // AddActivity: ghi 1 lần chăm sóc. Người viết lấy từ body.by (tên hiển thị), thiếu thì tên đăng nhập.
@@ -518,7 +650,11 @@ func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
 		if arr, ok := b.Val("assignees").([]any); ok {
 			for _, x := range arr {
 				if m, ok := x.(*omap.Map); ok && str(m, "name") != "" && len(list) < 50 {
-					list = append(list, omap.Of("name", str(m, "name"), "role", str(m, "role")))
+					a := omap.Of("name", str(m, "name"), "role", str(m, "role"))
+					if u := str(m, "username"); u != "" {
+						a.Set("username", u) // tài khoản được giao (chọn từ GET /sales/staff); thiếu = chỉ có tên
+					}
+					list = append(list, a)
 				}
 			}
 		}

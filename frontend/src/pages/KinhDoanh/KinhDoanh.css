@@ -342,7 +342,8 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-cp-tl-next{color:var(--sales); font-weight:600;}
 .kd-cp-empty{padding:18px; text-align:center; font-size:13px; color:var(--text-muted);}
 .kd-cp-file{display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px; border:1px solid var(--border); font-size:12.5px; font-weight:600; margin-bottom:10px;}
-.kd-cp-note{margin:0 0 8px; font-size:13px; line-height:1.55;}
+.kd-cp-note{margin:0 0 8px; font-size:13px; line-height:1.55; white-space:pre-line; overflow-wrap:anywhere;}
+.kd-cp-note b{display:block; margin-bottom:2px;}
 @media (max-width:1000px){ .kd-cp-body{grid-template-columns:1fr;} .kd-cp-side{position:static;} }
 
 /* Lịch sử chăm sóc — dạng cây: đường dọc mảnh + nhánh bo góc └ nối vào từng mục */
@@ -571,6 +572,8 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-srq-chips{display:flex; flex-wrap:wrap; gap:6px;}
 .kd-srq-chips > span{display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 3px; border:1px solid var(--border); border-radius:99px; background:var(--surface-alt); font-size:12px; font-weight:600;}
 .kd-srq-chips > span.new{border-color:var(--sales); background:var(--sales-tint);}
+.kd-srq-chips > span em{font-style:normal; font-weight:500; color:var(--text-muted);}
+.kd-srq-err{margin-top:6px; font-size:12px; color:var(--danger);}
 .kd-srq-chips i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--sales); color:#fff; font-style:normal; font-size:9px; font-weight:800;}
 .kd-srq-chips em{font-style:normal; font-weight:500; color:var(--text-muted);}
 .kd-srq-chips button{width:16px; height:16px; padding:0; border:0; border-radius:50%; background:none; color:var(--text-muted); cursor:pointer;}
@@ -667,3 +670,22 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-sl-tabs button:hover{color:var(--text);}
 .kd-sl-tabs button.on{background:var(--surface); color:var(--sales); box-shadow:0 1px 3px rgba(15,23,42,.12);}
 .kd-sl-tabs button.on em{background:var(--sales-tint, rgba(194,104,30,.15)); color:var(--sales);}
+
+/* Chuông thông báo trang Kinh doanh (KdNotifBell): được giao phụ trách khách hàng + thông báo chung của tài khoản */
+.kd-nb{position:relative; flex:none;}
+.kd-nb-btn{position:relative; width:34px; height:34px; border-radius:9px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.kd-nb-btn:hover{color:var(--text);}
+.kd-nb-badge{position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; box-sizing:border-box; border-radius:99px; background:var(--danger); color:#fff; font-size:10.5px; font-weight:700; line-height:17px; text-align:center;}
+.kd-nb-dd{position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:340px; max-width:calc(100vw - 32px); background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.14); overflow:hidden;}
+.kd-nb-hd{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--border); font-size:14px;}
+.kd-nb-hd button{border:none; background:none; padding:0; font:inherit; font-size:12px; color:var(--sales); cursor:pointer;}
+.kd-nb-hd button:hover{text-decoration:underline;}
+.kd-nb-list{max-height:60vh; overflow:auto;}
+.kd-nb-empty{padding:24px 14px; text-align:center; color:var(--text-muted); font-size:13px;}
+.kd-nb-item{display:block; width:100%; text-align:left; padding:10px 14px; border:none; border-bottom:1px solid var(--border); background:none; font:inherit; color:var(--text); cursor:pointer;}
+.kd-nb-item:last-child{border-bottom:none;}
+.kd-nb-item:hover{background:var(--surface-alt);}
+.kd-nb-item.unread{background:var(--sales-tint);}
+.kd-nb-item b{display:block; font-size:13px;}
+.kd-nb-item span{display:block; margin-top:2px; font-size:12px; color:var(--text-muted);}
+.kd-nb-item i{display:block; margin-top:3px; font-size:11px; font-style:normal; color:var(--text-muted);}

@@ -140,7 +140,7 @@ func (s *Server) modules() []Module {
 	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: khách gửi tới phòng nào thì có dự án triển khai ở trang phòng đó (DeliveryFromLead)
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
-		Delivery: delivSvc})
+		Delivery: delivSvc, Notifier: notifSvc})
 	// Chat (tài khoản theo số điện thoại / email, hoặc gắn tài khoản Dezon Pro: POST /chat/auth/dezon đọc users qua Users / UserFmt). Gateway WebSocket một tiến trình (realtime.Hub)
 	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
 	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);

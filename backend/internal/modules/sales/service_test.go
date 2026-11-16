@@ -24,6 +24,7 @@ type fakeRepo struct {
 	tinhNang string
 	leads    map[float64]*omap.Map
 	acts     []*omap.Map
+	staff    []*omap.Map
 	nextID   float64
 }
 
@@ -72,6 +73,7 @@ func (f *fakeRepo) InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map
 	f.acts = append(f.acts, row)
 	return row, nil
 }
+func (f *fakeRepo) ListStaff(ctx context.Context) ([]*omap.Map, error) { return f.staff, nil }
 
 type fakeUsers struct{ perms string }
 
@@ -430,5 +432,146 @@ func TestCachLyCongTyDB(t *testing.T) {
 	lb2, _ := sb.repo.GetLead(ctxB, idB)
 	if lb2 == nil || jsval.Str(lb2.Val("ten_khach")) != "ZZ_kd_B" || len(lb2.Val("phu_trach").([]any)) != 1 {
 		t.Errorf("khách của B bị đổi: %v", lb2)
+	}
+}
+
+// Danh sách tài khoản để giao phụ trách: người vào được Kinh doanh (admin / được cấp tab) xếp trước, rồi theo tên;
+// thiếu họ tên thì dùng tên đăng nhập; không trả perms; nhân viên chưa cấp tab thì không đọc được.
+func TestListStaff(t *testing.T) {
+	f := newFake()
+	f.staff = []*omap.Map{
+		omap.Of("username", "tuannguyen", "ho_ten", "Tuấn Nguyễn", "phong_ban", "Kinh doanh", "role", "staff", "perms", "boc,kinhdoanh"),
+		omap.Of("username", "mai", "ho_ten", "sao mai", "phong_ban", "", "role", "staff", "perms", "boc"),
+		omap.Of("username", "lien", "ho_ten", "", "phong_ban", "Dự toán", "role", "admin", "perms", ""),
+		omap.Of("username", "", "ho_ten", "rỗng", "role", "staff"),
+	}
+	ctx, a := ctxAs("user", "ct-1")
+	r, err := newSvc(f, "kinhdoanh").ListStaff(ctx, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, x := range r.(*omap.Map).Val("staff").([]any) {
+		m := x.(*omap.Map)
+		if m.Has("perms") {
+			t.Errorf("không được trả perms: %v", m)
+		}
+		got = append(got, jsval.Str(m.Val("username"))+"|"+jsval.Str(m.Val("name"))+"|"+jsval.Str(m.Val("sales")))
+	}
+	want := []string{"lien|lien|true", "tuannguyen|Tuấn Nguyễn|true", "mai|sao mai|false"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("staff = %v, mong %v", got, want)
+	}
+	if _, err := newSvc(f, "boc").ListStaff(ctx, a); status(err) != 403 {
+		t.Errorf("nhân viên chưa cấp tab: %v, mong 403", err)
+	}
+}
+
+// Người phụ trách giữ tên đăng nhập khi chọn từ danh sách tài khoản; gõ tay (không có username) thì chỉ có tên.
+func TestAssigneeUsername(t *testing.T) {
+	f := newFake()
+	ctx, a := ctxAs("admin", "ct-1")
+	s := newSvc(f, "")
+	body := omap.Of("name", "Khách A", "assignees", []any{
+		omap.Of("name", "Tuấn Nguyễn", "role", "PM-KD", "username", "tuannguyen", "x", "bỏ"),
+		omap.Of("name", "Người ngoài", "role", ""),
+	})
+	if _, err := s.CreateLead(ctx, a, body); err != nil {
+		t.Fatal(err)
+	}
+	pt := f.leads[1].Val("phu_trach").([]any)
+	if u := pt[0].(*omap.Map); jsval.Str(u.Val("username")) != "tuannguyen" || u.Has("x") {
+		t.Errorf("assignee 0 = %v", u)
+	}
+	if u := pt[1].(*omap.Map); u.Has("username") {
+		t.Errorf("assignee 1 không được có username: %v", u)
+	}
+}
+
+// Truy vấn của GET /sales/staff trên Postgres thật: mỗi công ty chỉ thấy tài khoản đang hoạt động của chính mình (users thuộc TenantTables).
+func TestListStaffDB(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("chưa đặt TEST_DATABASE_URL")
+	}
+	if !regexp.MustCompile(`/qspro_gotest(\?|$)`).MatchString(url) {
+		t.Fatal("TEST_DATABASE_URL phải trỏ tới database thử qspro_gotest")
+	}
+	db := database.New(database.Config{URL: url})
+	t.Cleanup(db.Close)
+	bg := context.Background()
+	cts, err := db.Select(bg, "cong_ty", database.SelectOpt{Select: "id", Limit: 2, NoScope: true})
+	if err != nil || len(cts) < 2 {
+		t.Fatalf("database thử cần ít nhất 2 công ty: %v", err)
+	}
+	for _, c := range cts {
+		ct := c.Val("id")
+		ctx := tenant.With(bg, tenant.Ctx{Role: "admin", CongTyID: ct})
+		rows, err := newPgRepo(db).ListStaff(ctx) // gọi thẳng repo: công ty thử có thể chưa bật tính năng Kinh doanh
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := db.Select(bg, "users", database.SelectOpt{Select: "username", Filter: database.Eq("cong_ty_id", ct) + "&" + database.Eq("active", true), NoScope: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != len(want) {
+			t.Errorf("công ty %v: %d tài khoản, mong %d", ct, len(rows), len(want))
+		}
+		for _, r := range rows {
+			if r.Has("cong_ty_id") || !r.Has("ho_ten") || !r.Has("perms") {
+				t.Errorf("cột trả về sai: %v", r)
+			}
+		}
+	}
+}
+
+type fakeNotifier struct{ got []string }
+
+func (n *fakeNotifier) Notify(ctx context.Context, userID any, kind, title, body string, refID any) {
+	n.got = append(n.got, jsval.Str(userID)+"|"+kind+"|"+body+"|"+jsval.Str(refID))
+}
+
+// Giao người phụ trách: chỉ người VỪA được thêm (có username, tài khoản thuộc công ty) nhận thông báo; không báo người giao,
+// không báo lại người đã có, người gõ tay (không username) và tài khoản không có trong công ty thì bỏ qua.
+func TestNotifyAssigned(t *testing.T) {
+	f := newFake()
+	f.staff = []*omap.Map{
+		omap.Of("id", 7.0, "username", "tuannguyen", "ho_ten", "Tuấn Nguyễn", "role", "staff", "perms", "kinhdoanh"),
+		omap.Of("id", 8.0, "username", "mai", "ho_ten", "sao mai", "role", "staff", "perms", ""),
+		omap.Of("id", 1.0, "username", "an", "ho_ten", "An", "role", "admin", "perms", ""),
+	}
+	n := &fakeNotifier{}
+	s := newSvc(f, "")
+	s.notifier = n
+	ctx, a := ctxAs("admin", "ct-1")
+	as := func(xs ...*omap.Map) []any {
+		out := []any{}
+		for _, x := range xs {
+			out = append(out, x)
+		}
+		return out
+	}
+	tuan := omap.Of("name", "Tuấn Nguyễn", "role", "PM-KD", "username", "tuannguyen")
+	if _, err := s.CreateLead(ctx, a, omap.Of("name", "Khách A", "assignees", as(tuan,
+		omap.Of("name", "An", "username", "an"), omap.Of("name", "Gõ tay"), omap.Of("name", "Người lạ", "username", "nguoila")))); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{`7|kd_assign|an giao bạn phụ trách khách hàng "Khách A"|1`}; strings.Join(n.got, ",") != strings.Join(want, ",") {
+		t.Errorf("tạo: %v, mong %v", n.got, want)
+	}
+	n.got = nil
+	if _, err := s.UpdateLead(ctx, a, 1, omap.Of("assignees", as(tuan, omap.Of("name", "sao mai", "username", "mai")))); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{`8|kd_assign|an giao bạn phụ trách khách hàng "Khách A"|1`}; strings.Join(n.got, ",") != strings.Join(want, ",") {
+		t.Errorf("sửa: %v, mong %v", n.got, want)
+	}
+	n.got = nil
+	if _, err := s.UpdateLead(ctx, a, 1, omap.Of("stage", "tu-van")); err != nil {
+		t.Fatal(err)
+	}
+	if len(n.got) != 0 {
+		t.Errorf("không đổi người phụ trách mà vẫn báo: %v", n.got)
 	}
 }
