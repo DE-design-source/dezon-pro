@@ -40,6 +40,7 @@
 .dp-months button{height:52px; border-radius:12px; font-size:15px !important; font-weight:600;}
 .dp-months button:hover{background:var(--dp-tint);}
 .dp-months button.on{background:var(--dp-accent) !important; color:#fff !important;}
+.dp-months button.dp-cur:not(.on){color:var(--dp-accent) !important;}   /* năm hiện tại trong bảng năm */
 
 .dp-foot{display:flex; justify-content:space-between; margin-top:8px; padding:8px 4px 0; border-top:1px solid color-mix(in srgb, var(--border, #D1D5DB) 70%, transparent);}
 .dp-foot button{padding:6px 8px !important; border-radius:8px; color:var(--dp-accent) !important; font-size:14px !important; font-weight:600;}
