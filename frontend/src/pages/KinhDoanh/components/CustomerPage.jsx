@@ -3,6 +3,7 @@ import { STAGES, STAGE_LABEL, DEPT_LABEL } from '../../../data/kinhDoanhData'
 import { useKdMap, saveKdOptions } from './ShortlistSelect'
 import { fmtTy, stageAccent, lmInitials } from '../utils'
 import { mediaUrl } from '../../QS/api/files'
+import { MonthCalendar, TimeWheel } from './IosWheel'
 
 /* Trang khách hàng riêng: hồ sơ, tiến trình pipeline, lịch sử chăm sóc & chi tiết từng lần tương tác */
 export const INTERACTION_TYPES = {
@@ -33,6 +34,94 @@ function DSec({ id, title, fold, onFold, children }) {
         {title}<i className="kd-cp-dfold"><Ic d="m6 9 6 6 6-6" size={14} /></i>
       </span>
       {off ? null : children}
+    </div>
+  )
+}
+/* Đặt lịch hẹn với khách (MarkUp 2026-11-16 17:20): kdOptions.appt {mã lead: [{id, date, time, place, content, by}]},
+   hiện trong "Lịch chăm sóc sắp tới" cùng các mốc hẹn tiếp của tương tác */
+/* Thành viên của 1 lịch hẹn (MarkUp 2026-11-16 17:28): vòng tròn chữ tắt + nút "+" mở ô thêm người
+   (gợi ý: người phụ trách / quản lý / người tạo khách hàng, hoặc gõ tên khác). Bấm vòng tròn = bỏ người đó. */
+function ApptMembers({ list, people, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const off = e => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', off)
+    return () => document.removeEventListener('mousedown', off)
+  }, [open])
+  const add = n => { const t = String(n || '').trim(); if (t && list.indexOf(t) < 0) onChange(list.concat([t])); setQ('') }
+  const goi = people.filter(p => list.indexOf(p) < 0 && (!q.trim() || p.toLowerCase().indexOf(q.trim().toLowerCase()) >= 0))
+  return (
+    <span className="kd-cp-up-mem" ref={box}>
+      {list.map(n => (
+        <button key={n} type="button" className="kd-cp-av sm" title={n + ' - bấm để bỏ khỏi lịch hẹn'}
+          onClick={() => { if (window.confirm('Bỏ ' + n + ' khỏi lịch hẹn?')) onChange(list.filter(x => x !== n)) }}>{lmInitials(n)}</button>
+      ))}
+      <button type="button" className="kd-cp-up-add" title="Thêm thành viên" aria-expanded={open} onClick={() => setOpen(o => !o)}>+</button>
+      {open && (
+        <div className="kd-cp-up-pop">
+          <input autoFocus value={q} placeholder="Gõ tên rồi Enter…" onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(q) } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false) } }} />
+          {goi.map(p => <button key={p} type="button" onClick={() => add(p)}><span className="kd-cp-av sm">{lmInitials(p)}</span>{p}</button>)}
+          {!goi.length && !q.trim() && <em>Gõ tên người tham gia</em>}
+          {q.trim() && people.indexOf(q.trim()) < 0 && <button type="button" onClick={() => add(q)}>+ Thêm "{q.trim()}"</button>}
+        </div>
+      )}
+    </span>
+  )
+}
+/* init: lịch hẹn đang sửa (null = đặt mới) */
+function ApptModal({ onClose, onSave, init }) {
+  const [a, setA] = useState(() => (init ? { date: init.date, time: init.time || '09:00', place: init.place || '', content: init.content || '' }
+    : { date: new Date().toISOString().slice(0, 10), time: '09:00', place: '', content: '' }))
+  const [open, setOpen] = useState('')   // bánh xe đang mở: 'date' | 'time' | ''
+  const ok = a.date && (a.place.trim() || a.content.trim())
+  useEffect(() => {
+    const k = e => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }
+    document.addEventListener('keydown', k)
+    return () => document.removeEventListener('keydown', k)
+  }, [onClose])
+  const [yy, mm, dd] = a.date.split('-').map(Number)
+  const save = () => { if (ok) onSave({ ...(init || {}), id: init ? init.id : 'a' + Date.now(), date: a.date, time: a.time, place: a.place.trim(), content: a.content.trim() }) }
+  const toggle = k => setOpen(o => (o === k ? '' : k))
+  /* kiểu iOS: thanh đầu Hủy | tiêu đề | Lưu; các dòng gom trong nhóm bo góc; bấm Ngày / Giờ = xổ bánh xe ngay dưới dòng */
+  return (
+    <div className="kd-appt-ov" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="ios-sheet" role="dialog" aria-modal="true" aria-label={init ? 'Sửa lịch hẹn' : 'Đặt lịch hẹn'}>
+        <div className="ios-nav">
+          <button type="button" className="ios-link" onClick={onClose}>Hủy</button>
+          <b>{init ? 'Sửa lịch hẹn' : 'Đặt lịch hẹn'}</b>
+          <button type="button" className="ios-link strong" disabled={!ok} onClick={save} title={ok ? '' : 'Nhập địa điểm hoặc nội dung'}>Lưu</button>
+        </div>
+        <div className="ios-body">
+          <div className="ios-group">
+            <div className="ios-row" onClick={() => toggle('date')}>
+              <span className="ios-ic red"><Ic d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" size={14} /></span>
+              <span className="ios-lbl">Ngày</span>
+              <button type="button" className={'ios-pill' + (open === 'date' ? ' on' : '')}>{dd} thg {mm}, {yy}</button>
+            </div>
+            {open === 'date' && <div className="ios-wheel-box"><MonthCalendar value={a.date} onChange={v => setA(x => ({ ...x, date: v }))} /></div>}
+            <div className="ios-row" onClick={() => toggle('time')}>
+              <span className="ios-ic blue"><Ic d="M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" size={14} /></span>
+              <span className="ios-lbl">Giờ</span>
+              <button type="button" className={'ios-pill' + (open === 'time' ? ' on' : '')}>{a.time}</button>
+            </div>
+            {open === 'time' && <div className="ios-wheel-box"><TimeWheel value={a.time} onChange={v => setA(x => ({ ...x, time: v }))} /></div>}
+          </div>
+          <div className="ios-group">
+            <label className="ios-row">
+              <span className="ios-ic green"><Ic d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" size={14} /></span>
+              <input className="ios-in" value={a.place} placeholder="Địa điểm" onFocus={() => setOpen('')} onChange={e => setA({ ...a, place: e.target.value })} />
+            </label>
+            <label className="ios-row top">
+              <span className="ios-ic gray"><Ic d="M4 6h16M4 12h16M4 18h10" size={14} /></span>
+              <textarea className="ios-in" rows={3} value={a.content} placeholder="Nội dung (mục đích buổi hẹn, cần chuẩn bị gì…)" onFocus={() => setOpen('')} onChange={e => setA({ ...a, content: e.target.value })} />
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -121,8 +210,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')
   const attachMap = useKdMap('attach')
+  const apptMap = useKdMap('appt')
+  const [apptOpen, setApptOpen] = useState(false)   // false | true (đặt mới) | {lịch hẹn đang sửa}
+  const [upEdit, setUpEdit] = useState(false)       // chế độ sửa của khung Lịch chăm sóc sắp tới (MarkUp 2026-11-16 17:31)
   const timelineMap = useKdMap('timeline')
-  useEffect(() => { setAdding(false); setFilter('all') }, [l?.id])
+  // đổi khách khi trang đang mở (bấm thông báo ở chuông): bỏ form / chế độ sửa / hộp lịch hẹn của khách cũ
+  useEffect(() => { setAdding(false); setFilter('all'); setUpEdit(false); setApptOpen(false) }, [l?.id])
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role=dialog]')) { if (adding) setAdding(false); else onBack() } }
     document.addEventListener('keydown', onKey)
@@ -138,7 +231,23 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   const imgs = att.img || [], docs = att.file || []
   const tl = timelineMap[String(l.id)] || {}
   const list = interactions.filter(x => filter === 'all' || x.type === filter)
-  const upcoming = interactions.filter(x => x.next).map(x => ({ date: x.next, note: x.nextNote || `Theo dõi sau: ${x.title}`, from: x })).sort((a, b) => a.date.localeCompare(b.date))
+  const appts = Array.isArray(apptMap[String(l.id)]) ? apptMap[String(l.id)] : []
+  const apptNote = a => [a.time, a.place, a.content].filter(Boolean).join(' · ')
+  const upcoming = interactions.filter(x => x.next).map(x => ({ date: x.next, note: x.nextNote || `Theo dõi sau: ${x.title}`, from: x }))
+    .concat(appts.map(a => ({ date: a.date, sort: a.date + ' ' + (a.time || ''), note: apptNote(a), appt: a })))
+    .sort((a, b) => (a.sort || a.date).localeCompare(b.sort || b.date))
+  const saveAppt = a => {
+    const list = appts.some(x => x.id === a.id) ? appts.map(x => (x.id === a.id ? a : x)) : appts.concat([{ ...a, by: me || '' }])
+    saveKdOptions('appt', { ...apptMap, [String(l.id)]: list }); setApptOpen(false)
+  }
+  const people = [...new Set([me, l.manager, l.creator, ...(l.assignees || []).map(x => x && x.name)].map(x => String(x || '').trim()).filter(Boolean))]
+  const setApptMembers = (id, members) => saveKdOptions('appt', { ...apptMap, [String(l.id)]: appts.map(x => (x.id === id ? { ...x, members } : x)) })
+  const delAppt = id => {
+    if (!window.confirm('Xoá lịch hẹn này?')) return
+    const left = appts.filter(x => x.id !== id); const m = { ...apptMap }
+    if (left.length) m[String(l.id)] = left; else delete m[String(l.id)]
+    saveKdOptions('appt', m)
+  }
   const last = interactions[0]
   const flow = STAGES.filter(s => s !== 'khong-tham-gia' && s !== 'truot-thau' && s !== 'spam')
   const cur = flow.indexOf(l.stage)
@@ -257,9 +366,22 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
         <main className="kd-cp-main">
           {upcoming.length > 0 && (
             <div className="kd-cp-card kd-cp-upcoming">
-              <h3>Lịch chăm sóc sắp tới</h3>
+              <div className="kd-cp-up-h"><h3>Lịch chăm sóc sắp tới</h3>
+                {/* nút sửa: bật chế độ sửa -> mỗi lịch hẹn có nút bút (mở hộp sửa) và nút xoá */}
+                {appts.length > 0 && (
+                  <button type="button" className={'kd-cp-edit' + (upEdit ? ' on' : '')} aria-pressed={upEdit}
+                    title={upEdit ? 'Xong' : 'Sửa lịch hẹn'} onClick={() => setUpEdit(v => !v)}>
+                    <Ic d={upEdit ? 'M20 6 9 17l-5-5' : 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'} size={14} />
+                  </button>
+                )}
+              </div>
               {upcoming.map((u, i) => (
-                <div key={i} className="kd-cp-up"><span className="kd-cp-up-date">{fmtD(u.date)}</span><span>{u.note}</span></div>
+                <div key={i} className={'kd-cp-up' + (u.appt ? ' appt' : '')}><span className="kd-cp-up-date">{fmtD(u.date)}</span>
+                  {u.appt && <span className="kd-cp-up-tag">Lịch hẹn</span>}<span>{u.note}</span>
+                  {u.appt && <ApptMembers list={u.appt.members || []} people={people} onChange={m => setApptMembers(u.appt.id, m)} />}
+                  {u.appt && upEdit && <button type="button" className="kd-cp-up-x ed" title="Sửa lịch hẹn" onClick={() => setApptOpen(u.appt)}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={13} /></button>}
+                  {u.appt && upEdit && <button type="button" className="kd-cp-up-x" title="Xoá lịch hẹn" onClick={() => delAppt(u.appt.id)}>×</button>}
+                </div>
               ))}
             </div>
           )}
@@ -290,6 +412,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             <div className="kd-cp-tl-head">
               <h3>Lịch sử chăm sóc</h3>
               <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác</button>
+              <button className="kd-cp-btn" onClick={() => setApptOpen(true)} title="Hẹn gặp khách: thời gian, địa điểm, nội dung"><Ic d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" size={14} />Đặt lịch hẹn</button>
               <span style={{ flex: 1 }} />
               <div className="kd-cp-filter">
                 <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tất cả ({interactions.length})</button>
@@ -322,6 +445,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           </div>
 
         </main>
+        {apptOpen && <ApptModal key={apptOpen === true ? 'new' : apptOpen.id} init={apptOpen === true ? null : apptOpen} onClose={() => setApptOpen(false)} onSave={saveAppt} />}
       </div>
     </div>
   )

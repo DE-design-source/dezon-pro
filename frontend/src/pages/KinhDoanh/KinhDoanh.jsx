@@ -330,6 +330,7 @@ function KinhDoanhPage() {
             leads={filteredLeads} dept={dept} onDeptChange={setDept} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter}
             scrollRef={scrollRef} onMove={moveLead} onDelete={deleteLead}
             onOpenDetail={id => setDetail({ open: true, id })}
+            onEdit={id => openLeadModal(id)}
             onAddAssignee={addAssignee} onRemoveAssignee={removeAssignee}
           />
         </div>

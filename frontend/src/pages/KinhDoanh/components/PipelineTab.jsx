@@ -7,7 +7,8 @@ import { useKdMap } from './ShortlistSelect'
    không tích mức nào = tất cả */
 const STAR_FLT = [5, 4, 3, 2, 1, 0]
 const StarIc = ({ on }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: on ? '#F5A524' : 'var(--border)' }}><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
-function StarFilter({ value, onChange, count }) {
+/* sortOn / onSort: nút ưu tiên sắp xếp 5 sao trước -> 1 sao -> chưa đánh giá (MarkUp 2026-11-16 17:44) */
+function StarFilter({ value, onChange, count, sortOn, onSort }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
   useEffect(() => {
@@ -33,6 +34,12 @@ function StarFilter({ value, onChange, count }) {
               <i>{count(n)}</i>
             </label>
           ))}
+          <button type="button" className={'kd-pl-ssort' + (sortOn ? ' on' : '')} aria-pressed={!!sortOn} onClick={() => onSort(!sortOn)}
+            title="Xếp khách trong mỗi cột theo số sao: 5 sao trước, chưa đánh giá cuối">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h13M3 12h9M3 18h5M18 4v16M15 17l3 3 3-3" /></svg>
+            <span>Ưu tiên 5 sao trước → 1 sao</span>
+            <i className="sw" aria-hidden="true" />
+          </button>
           <div className="ft">
             <button type="button" onClick={() => onChange([])} disabled={!value.length}>Bỏ lọc</button>
             <button type="button" className="pri" onClick={() => setOpen(false)}>Xong</button>
@@ -42,24 +49,91 @@ function StarFilter({ value, onChange, count }) {
     </div>
   )
 }
+/* Bộ lọc chọn nhiều (Nguồn, Nhân sự phụ trách - MarkUp 2026-11-16 17:42): cùng kiểu nút + hộp tích của bộ lọc sao, có ô tìm.
+   options [{v, label, n}]; value [] = tất cả */
+const NONE = '__none__'
+function MultiFilter({ icon, allLabel, options, value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const out = e => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', out)
+    return () => document.removeEventListener('mousedown', out)
+  }, [open])
+  const toggle = v => onChange(value.indexOf(v) >= 0 ? value.filter(x => x !== v) : [...value, v])
+  const lbl = v => (options.find(o => o.v === v) || { label: v }).label
+  const label = !value.length ? allLabel : value.map(lbl).join(', ')
+  const t = q.trim().toLowerCase()
+  const shown = options.filter(o => !t || o.label.toLowerCase().indexOf(t) >= 0)
+  return (
+    <div className="kd-pl-sdd" ref={box}>
+      <button type="button" className={'kd-pl-sbtn' + (value.length ? ' on' : '')} onClick={() => { setOpen(o => !o); setQ('') }} aria-expanded={open} title={label}>
+        {icon}<span>{label}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && (
+        <div className="kd-pl-spop">
+          {options.length > 6 && <input className="q" autoFocus value={q} placeholder="Gõ để tìm…" onChange={e => setQ(e.target.value)} />}
+          <div className="ls">
+            {shown.length ? shown.map(o => (
+              <label key={o.v} className={value.indexOf(o.v) >= 0 ? 'on' : ''}>
+                <input type="checkbox" checked={value.indexOf(o.v) >= 0} onChange={() => toggle(o.v)} />
+                <span className="st nm">{o.v === NONE ? <em>{o.label}</em> : o.label}</span>
+                <i>{o.n}</i>
+              </label>
+            )) : <p className="none">Không thấy "{q}"</p>}
+          </div>
+          <div className="ft">
+            <button type="button" onClick={() => onChange([])} disabled={!value.length}>Bỏ lọc</button>
+            <button type="button" className="pri" onClick={() => setOpen(false)}>Xong</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+const ADMIN_KD = 'Admin Kinh doanh'
+const srcKey = l => String(l.source || '').trim() || NONE
+const staffOf = l => [...new Set((l.assignees || []).filter(a => a && a.name && a.role !== ADMIN_KD).map(a => String(a.name).trim()).filter(Boolean))]
+function optsOf(list, keysOf, noneLabel) {
+  const m = new Map()
+  list.forEach(l => { const ks = keysOf(l); (ks.length ? ks : [NONE]).forEach(k => m.set(k, (m.get(k) || 0) + 1)) })
+  return [...m.entries()].map(([v, n]) => ({ v, n, label: v === NONE ? noneLabel : v }))
+    .sort((a, b) => (a.v === NONE) - (b.v === NONE) || b.n - a.n || a.label.localeCompare(b.label, 'vi'))
+}
 import { DeptFilter, TimeFilter } from './Filters'
 import LeadCard from './LeadCard'
 
 /* ===================== Tab Pipeline khách hàng (Kanban + Danh sách) ===================== */
 
-const LIST_COLS = '1.4fr 1.2fr 1fr 0.9fr 1.2fr 1fr'
+/* STT | Lead | Nguồn | Loại dự án | Phòng ban | Giá trị | Giai đoạn | Chuyển tới | Sửa (MarkUp 2026-11-16 17:34, 17:37) */
+const LIST_COLS = '36px 1.4fr 1fr 1.2fr 1fr 0.9fr 1.2fr 1fr 34px'
 const viewBtnStyle = active => ({
   border: 'none', cursor: 'pointer', padding: '7px 13px', fontSize: 12.5, fontWeight: 600,
   background: active ? 'var(--sales-tint)' : 'none', color: active ? 'var(--sales)' : 'var(--text-muted)', fontFamily: 'inherit',
 })
 
-export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onAddAssignee, onRemoveAssignee }) {
+export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onEdit, onAddAssignee, onRemoveAssignee }) {
   const [view, setView] = useState('kanban')
   const rating = useKdMap('rating')
   const [star, setStar] = useState([])   // các mức sao đang lọc ([] = tất cả)
+  const [starSort, setStarSortRaw] = useState(() => { try { return localStorage.getItem('kd-star-sort') === '1' } catch { return false } })
+  const setStarSort = v => { setStarSortRaw(v); try { localStorage.setItem('kd-star-sort', v ? '1' : '0') } catch { /* bỏ qua */ } }
   const rateOf = l => Number(rating[String(l.id)]) || 0
-  const leads = !star.length ? leadsAll : leadsAll.filter(l => star.indexOf(rateOf(l)) >= 0)
-  const starCnt = n => leadsAll.filter(l => rateOf(l) === n).length
+  const [srcF, setSrcF] = useState([])     // nguồn đang lọc
+  const [staffF, setStaffF] = useState([]) // nhân sự phụ trách đang lọc
+  const okSrc = l => !srcF.length || srcF.indexOf(srcKey(l)) >= 0
+  const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
+  const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0
+  const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l))
+  /* ưu tiên sao: 5 -> 1 -> chưa đánh giá; cùng số sao giữ thứ tự cũ (sort ổn định) */
+  const leads = starSort ? leads0.slice().sort((a, b) => (rateOf(b) || -1) - (rateOf(a) || -1)) : leads0
+  /* số đếm của từng bộ lọc tính trên các bộ lọc còn lại */
+  const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && rateOf(l) === n).length
+  const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
+  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l)), staffOf, 'Chưa có người phụ trách')
   const [draggingId, setDraggingId] = useState(null)
   const [hoverStage, setHoverStage] = useState(null)
   const [memberOpenFor, setMemberOpenFor] = useState(null)
@@ -164,7 +238,11 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
       <div className="kd-pl-bar">
         <DeptFilter dept={dept} onChange={onDeptChange} />
         <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} />
-        <StarFilter value={star} onChange={setStar} count={starCnt} />
+        <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} />
+        <MultiFilter allLabel="Tất cả nguồn" options={srcOpts} value={srcF} onChange={setSrcF}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></svg>} />
+        <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
         <span style={{ flex: 1 }} />
         <div className="kd-pl-view" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
           <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>
@@ -237,23 +315,33 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
       {/* ---- Danh sách ---- */}
       <div style={{ display: view === 'list' ? 'block' : 'none', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '6px 20px 8px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: LIST_COLS, gap: 10, padding: '12px 4px', fontSize: 10.5, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-          <span>Lead khách hàng</span><span>Loại dự án</span><span>Phòng ban</span><span>Giá trị</span><span>Giai đoạn</span><span>Chuyển tới</span>
+          <span style={{ textAlign: 'right' }}>STT</span><span>Lead khách hàng</span><span>Nguồn</span><span>Loại dự án</span><span>Phòng ban</span><span>Giá trị</span><span>Giai đoạn</span><span>Chuyển tới</span><span />
         </div>
         {leads.map((l, i) => {
           const a = stageAccent(l.stage)
           return (
-            <div key={l.id} style={{ display: 'grid', gridTemplateColumns: LIST_COLS, gap: 10, alignItems: 'center', padding: '11px 4px', ...(i < leads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
+            /* bấm dòng = mở trang chi tiết khách hàng; ô chọn giai đoạn và nút sửa không mở */
+            <div key={l.id} className="kd-list-row" role="button" tabIndex={0} title="Xem chi tiết khách hàng"
+              onClick={() => onOpenDetail && onOpenDetail(l.id)}
+              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpenDetail && onOpenDetail(l.id) } }}
+              style={{ display: 'grid', gridTemplateColumns: LIST_COLS, gap: 10, alignItems: 'center', padding: '11px 4px', cursor: 'pointer', ...(i < leads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>{i + 1}</span>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{l.name}</span>
+              <span title={l.source || ''} style={{ fontSize: 12.5, color: l.source ? 'var(--text)' : 'var(--text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.source || '—'}</span>
               <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{l.type}</span>
               <span style={{ padding: '3px 9px', borderRadius: 999, background: DEPT_TINT[l.dept], color: DEPT_COLOR[l.dept], fontSize: 10.5, fontWeight: 600, justifySelf: 'start' }}>{DEPT_SHORT[l.dept]}</span>
               <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>
               <span style={{ padding: '3px 9px', borderRadius: 999, background: a ? a.bg : 'var(--sales-tint)', color: a ? a.color : 'var(--sales)', fontSize: 11, fontWeight: 600, justifySelf: 'start' }}>{STAGE_LABEL[l.stage]}</span>
               <select
-                value={l.stage} onChange={e => onMove(l.id, e.target.value)}
+                value={l.stage} onChange={e => onMove(l.id, e.target.value)} onClick={e => e.stopPropagation()}
                 style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', fontSize: 11, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }}
               >
                 {STAGES.map(s => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
               </select>
+              <button type="button" className="kd-list-edit" title="Sửa thông tin khách hàng" aria-label={'Sửa ' + l.name}
+                onClick={e => { e.stopPropagation(); onEdit && onEdit(l.id) }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+              </button>
             </div>
           )
         })}
