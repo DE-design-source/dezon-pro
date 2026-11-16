@@ -111,15 +111,20 @@ function KinhDoanhPage() {
   const timelineMap = useKdMap('timeline')   // Thời gian khởi công / hoàn công (MarkUp 2026-11-16 16:48)
   /* Kéo thẻ vào "Nhân sự KD phụ trách": hiện phiếu yêu cầu nhân sự trước, xác nhận mới chuyển giai đoạn */
   const [staffReq, setStaffReq] = useState({ open: false, leadId: null, seq: 0 })
-  function confirmStaffReq(newAssignees, note) {
+  /* final = {list: người phụ trách sau khi giao / gỡ, removed: người bị gỡ} (StaffRequestModal) */
+  function confirmStaffReq(newAssignees, note, final) {
     const lead = leads.find(l => sameId(l.id, staffReq.leadId))
     setStaffReq(r => ({ ...r, open: false }))
     if (!lead) return
-    patchLead(lead.id, { stage: 'giao-ns', ...(newAssignees.length ? { assignees: [...(lead.assignees || []), ...newAssignees] } : null) })
+    const removed = (final && final.removed) || []
+    const changed = newAssignees.length > 0 || removed.length > 0
+    const list = final && final.list ? final.list : [...(lead.assignees || []), ...newAssignees]
+    patchLead(lead.id, { stage: 'giao-ns', ...(changed ? { assignees: list } : null) })
     const ten = newAssignees.map(a => a.name).join(', ')
-    if (note || ten) {
+    const go = removed.map(a => a.name).join(', ')
+    if (note || ten || go) {
       const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-      addInteraction(lead, { type: 'note', date: iso, by: meName, title: 'Yêu cầu nhân sự KD phụ trách', content: [ten ? 'Giao: ' + ten : '', note].filter(Boolean).join('\n'), outcome: 'good', next: '', nextNote: '' })
+      addInteraction(lead, { type: 'note', date: iso, by: meName, title: 'Yêu cầu nhân sự KD phụ trách', content: [ten ? 'Giao: ' + ten : '', go ? 'Gỡ: ' + go : '', note].filter(Boolean).join('\n'), outcome: 'good', next: '', nextNote: '' })
     }
   }
   function moveLead(id, newStage) {
