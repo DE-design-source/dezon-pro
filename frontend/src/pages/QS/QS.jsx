@@ -27,7 +27,6 @@ import { QsDataProvider } from './state/QsData'
 import { useQsStore, showTab, retryBoot } from './state/store'
 import { useQsSession } from './session/QsSession'
 import { API_BASE, apiConfigured, reportClientError } from './api/http'
-import { logoUrl } from './api/files'
 import DevSheetProbe from './state/DevSheetProbe'
 import { useFitLevel } from './components/common/useFitLevel'
 
@@ -64,7 +63,6 @@ const PANEL_LAYOUT = {
   import: { flexDirection: 'column', gap: 10 },
 }
 
-let splashShown = false   // màn chờ chỉ hiện ở lần nạp đầu của trang, không hiện lại khi quay lại /qs
 
 export default function QS() {
   return (
@@ -87,7 +85,6 @@ function QsRoot() {
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
-  const [splashGone, setSplashGone] = useState(splashShown)
   /* Thanh đầu trang thiếu chỗ (cửa sổ hẹp / phóng to) thì gọn dần: 1 = nút bên phải chỉ còn biểu tượng, 2 = tab chỉ còn biểu tượng */
   const topRef = useRef(null)
   useFitLevel(topRef, 2, '.qs-tabs-row')
@@ -104,7 +101,6 @@ function QsRoot() {
   useEffect(() => { if (SETTINGS_TABS[tab]) showTab(session.firstAllowedTab() || 'dash') }, [tab, me])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const loading = configured && (auth === 'init' || auth === 'checking' || (ready && (boot === 'idle' || boot === 'loading')))
-  const showSplash = configured && !splashGone
   /* Màu chính công ty (PUB/app.js:2512 đặt --blue); màu nhấn của QS clone là --dash-accent nên đặt cả biến này, chỉ trong .qs-page */
   const mau = session.congTy && session.congTy.mauChinh
   const brand = mau ? { '--primary': mau, '--blue': mau, '--dash-accent': mau } : null
@@ -120,6 +116,8 @@ function QsRoot() {
   else if (auth === 'unreachable' || (ready && boot === 'error' && bootErrorKind === 'unreachable'))
     body = <StatusView kind="unreachable" apiUrl={API_BASE} onRetry={() => (auth === 'unreachable' ? session.retry() : retryBoot())} />
   else if (ready && boot === 'error') body = <StatusView kind="error" message={bootError} onRetry={() => retryBoot()} />
+  /* Đang xác thực / tải dữ liệu: 1 dòng "Đang tải…" trong vùng nội dung (bỏ màn chờ phủ kín kiểu intro, 2026-11-16) */
+  else if (loading) body = <StatusView kind="loading" message={bootStep || 'Đang tải…'} />
   else if (me) {
     body = (
       <>
@@ -193,10 +191,6 @@ function QsRoot() {
       />
 
       {/* Đăng nhập: màn chung của ứng dụng (components/layout/AppGate.jsx), QS không còn thẻ đăng nhập riêng */}
-      {showSplash && (
-        <StatusView kind="splash" message={bootStep || 'Đang khởi động…'} done={!loading} logoSrc={logoUrl()}
-          onHidden={() => { splashShown = true; setSplashGone(true) }} />
-      )}
     </div>
   )
 }
