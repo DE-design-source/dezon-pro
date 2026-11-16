@@ -103,6 +103,16 @@ function optsOf(list, keysOf, noneLabel) {
   return [...m.entries()].map(([v, n]) => ({ v, n, label: v === NONE ? noneLabel : v }))
     .sort((a, b) => (a.v === NONE) - (b.v === NONE) || b.n - a.n || a.label.localeCompare(b.label, 'vi'))
 }
+/* Bộ lọc Giai đoạn / Giá trị (MarkUp 2026-11-16 18:01). Giá trị lead tính bằng tỷ (l.value) */
+const VAL_BANDS = [
+  ['0', 'Chưa có giá trị', v => !(v > 0)],
+  ['lt1', 'Dưới 1 tỷ', v => v > 0 && v < 1],
+  ['1-3', '1 - 3 tỷ', v => v >= 1 && v < 3],
+  ['3-5', '3 - 5 tỷ', v => v >= 3 && v < 5],
+  ['5-10', '5 - 10 tỷ', v => v >= 5 && v < 10],
+  ['gt10', 'Từ 10 tỷ', v => v >= 10],
+]
+const bandOf = l => { const v = Number(l.value) || 0; const b = VAL_BANDS.find(x => x[2](v)); return b ? b[0] : '0' }
 import { DeptFilter, TimeFilter } from './Filters'
 import LeadCard from './LeadCard'
 
@@ -127,13 +137,21 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
   const okSrc = l => !srcF.length || srcF.indexOf(srcKey(l)) >= 0
   const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
   const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0
-  const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l))
+  const [stageF, setStageF] = useState([])
+  const [valF, setValF] = useState([])
+  const okStage = l => !stageF.length || stageF.indexOf(l.stage) >= 0
+  const okVal = l => !valF.length || valF.indexOf(bandOf(l)) >= 0
+  const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l))
   /* ưu tiên sao: 5 -> 1 -> chưa đánh giá; cùng số sao giữ thứ tự cũ (sort ổn định) */
   const leads = starSort ? leads0.slice().sort((a, b) => (rateOf(b) || -1) - (rateOf(a) || -1)) : leads0
   /* số đếm của từng bộ lọc tính trên các bộ lọc còn lại */
-  const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && rateOf(l) === n).length
-  const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
-  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l)), staffOf, 'Chưa có người phụ trách')
+  const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && rateOf(l) === n).length
+  const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l) && okStage(l) && okVal(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
+  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStage(l) && okVal(l)), staffOf, 'Chưa có người phụ trách')
+  const forStage = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okVal(l))
+  const stageOpts = STAGES.map(st => ({ v: st, label: STAGE_LABEL[st], n: forStage.filter(l => l.stage === st).length }))
+  const forVal = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l))
+  const valOpts = VAL_BANDS.map(([v, label]) => ({ v, label, n: forVal.filter(l => bandOf(l) === v).length }))
   const [draggingId, setDraggingId] = useState(null)
   const [hoverStage, setHoverStage] = useState(null)
   const [memberOpenFor, setMemberOpenFor] = useState(null)
@@ -147,14 +165,19 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
     if (!k) return undefined
     const upd = () => {
       const max = k.scrollWidth - k.clientWidth
-      setHs({ ratio: k.scrollWidth ? Math.min(1, k.clientWidth / k.scrollWidth) : 1, pos: max > 0 ? k.scrollLeft / max : 0 })
+      const ratio = k.scrollWidth ? Math.min(1, k.clientWidth / k.scrollWidth) : 1
+      const pos = max > 0 ? k.scrollLeft / max : 0
+      // chỉ đổi state khi số đo thật sự đổi: object mới mỗi lần sẽ vẽ lại vô hạn
+      setHs(h => (h.ratio === ratio && h.pos === pos ? h : { ratio, pos }))
     }
     upd()
     k.addEventListener('scroll', upd)
     const ro = new ResizeObserver(upd)
     ro.observe(k)
     return () => { k.removeEventListener('scroll', upd); ro.disconnect() }
-  }, [view, leads])
+    /* leads.length (không phải leads): danh sách lọc là mảng mới mỗi lần vẽ -> effect chạy lại mỗi lần vẽ -> setHs -> vẽ lại
+       -> vòng lặp vô hạn, React bận nên đổi trang (đường dẫn đã đổi) không vẽ được trang mới */
+  }, [view, leads.length])
   const stepScroll = dir => { const k = kanbanRef.current; if (k) k.scrollBy({ left: dir * Math.max(240, k.clientWidth * 0.6), behavior: 'smooth' }) }
   // Kéo thumb: di chuyển theo tỉ lệ độ rộng nội dung / độ rộng thanh
   function dragThumb(e) {
@@ -237,12 +260,16 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
       {/* 1 module xanh đậm (như băng dự án QS): phòng ban · thời gian | Kanban / Danh sách */}
       <div className="kd-pl-bar">
         <DeptFilter dept={dept} onChange={onDeptChange} />
-        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} />
+        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill />
         <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} />
         <MultiFilter allLabel="Tất cả nguồn" options={srcOpts} value={srcF} onChange={setSrcF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></svg>} />
         <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
+        <MultiFilter allLabel="Tất cả giai đoạn" options={stageOpts} value={stageF} onChange={setStageF}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>} />
+        <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
         <span style={{ flex: 1 }} />
         <div className="kd-pl-view" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
           <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>

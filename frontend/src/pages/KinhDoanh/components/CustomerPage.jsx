@@ -305,7 +305,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             </dl>
           </section>
           <section>
-            <h4>Dự án quan tâm</h4>
+            <h4>Dự án quan tâm
+              {/* nút sửa ở mọi khung thông tin (MarkUp 2026-11-16 18:08) */}
+              <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa dự án quan tâm" onClick={onEdit}>
+                <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
+              </button>
+            </h4>
             <dl>
               <dt>Loại dự án</dt><dd>{l.projectType || l.type}</dd>
               <dt>Quy mô</dt><dd>{l.scale || '—'}</dd>
@@ -317,7 +322,12 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             {l.categories?.length > 0 && <div className="kd-cp-tags">{l.categories.map(c => <span key={c}>{c}</span>)}</div>}
           </section>
           <section>
-            <h4>Phụ trách</h4>
+            <h4>Phụ trách
+              {/* nút sửa ở mọi khung thông tin (MarkUp 2026-11-16 18:08) */}
+              <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa phụ trách" onClick={onEdit}>
+                <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
+              </button>
+            </h4>
             <div className="kd-cp-people">
               {[['Phòng', DEPT_LABEL[l.dept]], ['Khởi tạo', l.creator], ['Quản lý', l.manager], ...(l.assignees || []).map(a => [a.role || 'Phụ trách', a.name])].filter(x => x[1]).map(([r, n], i) => (
                 <div key={i}><span className="kd-cp-av sm">{lmInitials(n)}</span><span><b>{n}</b><em>{r}</em></span></div>
