@@ -141,20 +141,25 @@ export default function PipelineTab({ leads: leadsAll, dept, onDeptChange, timeF
   const trackRef = useRef(null)
   const [hs, setHs] = useState({ ratio: 1, pos: 0 }) // thanh cuộn ngang: tỉ lệ phần nhìn thấy & vị trí (0–1)
 
-  /* Thanh kéo ngang luôn hiện ở đáy màn hình (sticky) — đồng bộ với vị trí cuộn của kanban */
+  /* Thanh kéo ngang luôn hiện ở đáy màn hình (sticky) — đồng bộ với vị trí cuộn của kanban.
+     leads là mảng lọc tạo lại mỗi lần render: phụ thuộc theo danh sách id (leadsKey) và chỉ setHs khi số đổi,
+     nếu không effect chạy lại -> setHs object mới -> render -> lặp vô hạn (treo trang, bấm sang trang khác không được) */
+  const leadsKey = leads.map(l => l.id).join(',')
   useEffect(() => {
     const k = kanbanRef.current
     if (!k) return undefined
     const upd = () => {
       const max = k.scrollWidth - k.clientWidth
-      setHs({ ratio: k.scrollWidth ? Math.min(1, k.clientWidth / k.scrollWidth) : 1, pos: max > 0 ? k.scrollLeft / max : 0 })
+      const ratio = k.scrollWidth ? Math.min(1, k.clientWidth / k.scrollWidth) : 1
+      const pos = max > 0 ? k.scrollLeft / max : 0
+      setHs(h => (h.ratio === ratio && h.pos === pos ? h : { ratio, pos }))
     }
     upd()
     k.addEventListener('scroll', upd)
     const ro = new ResizeObserver(upd)
     ro.observe(k)
     return () => { k.removeEventListener('scroll', upd); ro.disconnect() }
-  }, [view, leads])
+  }, [view, leadsKey])
   const stepScroll = dir => { const k = kanbanRef.current; if (k) k.scrollBy({ left: dir * Math.max(240, k.clientWidth * 0.6), behavior: 'smooth' }) }
   // Kéo thumb: di chuyển theo tỉ lệ độ rộng nội dung / độ rộng thanh
   function dragThumb(e) {
