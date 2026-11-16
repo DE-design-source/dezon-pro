@@ -22,6 +22,16 @@ import DisplayTab from './components/DisplayTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import { QsDataProvider } from '../QS/state/QsData'
 import QsSettingsPanels, { useQsSettingsTabs } from '../QS/QsSettingsPanels'
+import SysDefaultBar from './components/SysDefaultBar'
+import { sysSection, useSysDefaults } from '../../services/systemDefaultsService'
+import { useNavHidden } from '../../hooks/useNavHidden'
+
+/* Mục Cài đặt -> nhóm mặc định hệ thống (N17) mà Siêu quản trị viên lưu được; mục khác (Tài khoản, Bảo mật...) là dữ liệu riêng */
+const SYS_SEC = {
+  appearance: 'appearance', display: 'display',
+  general: 'general', privacy: 'general', efficiency: 'general', notify: 'general', shortcuts: 'general', calendar: 'general', tasks: 'general',
+}
+const GENERAL_PERSONAL = ['blocklist']   // danh sách chặn là của riêng từng người, không làm mặc định
 
 const tabIcon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
@@ -44,9 +54,18 @@ const TABS = [
 ]
 
 /* Mục của QS Pro (Công ty / Admin, chuyển từ thanh tab của /qs): chỉ hiện với tài khoản QS có quyền */
+/* Đầu mục lớn của menu (QS Pro, Siêu quản trị viên): to + đậm + vạch ngăn phía trên (MarkUp 2026-11-12 17:37) */
+const NAV_GROUP_H = { margin: '14px 0 6px', padding: '14px 14px 0', borderTop: '1px solid var(--border)', fontSize: 13.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text)' }
+
+/* Mục của nhóm Siêu quản trị viên (chỉ tài khoản super thấy) */
+const SUPER_KEYS = ['qs-congty', 'qs-sieu']
+
 const QS_ICONS = {
   'qs-congty': <svg {...tabIcon}><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" /></svg>,
   'qs-admin': <svg {...tabIcon}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></svg>,
+  'qs-sieu': <svg {...tabIcon}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m17 8 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" /></svg>,
+  'qs-nhatky': <svg {...tabIcon}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></svg>,
+  'qs-yeucau':<svg {...tabIcon}><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></svg>,
 }
 
 export default function CaiDat() {
@@ -70,7 +89,18 @@ function CaiDatRoot() {
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
   const [aiResizing, setAiResizing] = useState(false)
   const [saved, setSaved] = useLocalStorage('siteflow-settings', {})
-  const settings = { s: { ...SETTINGS_DEFAULTS, ...saved }, update: patch => setSaved(prev => ({ ...prev, ...patch })) }
+  /* Hiệu lực = mặc định gốc < mặc định hệ thống (Siêu quản trị viên) < người dùng tự chỉnh ("siteflow-settings" chỉ chứa phần tự chỉnh) */
+  const sysGen = sysSection('general', useSysDefaults()) || {}
+  const settings = { s: { ...SETTINGS_DEFAULTS, ...sysGen, ...saved }, update: patch => setSaved(prev => ({ ...prev, ...patch })) }
+  const { appearanceSnapshot } = useTheme()
+  const navHidden = useNavHidden()
+  const sysValue = sec => {
+    if (sec === 'appearance') return appearanceSnapshot()
+    if (sec === 'display') return { hidden: navHidden }
+    const g = {}
+    Object.keys(SETTINGS_DEFAULTS).forEach(k => { if (!GENERAL_PERSONAL.includes(k)) g[k] = settings.s[k] })
+    return g
+  }
 
   return (
     <div
@@ -102,10 +132,27 @@ function CaiDatRoot() {
               {t.label}
             </button>
           ))}
-          {qsTabs.length > 0 && (
-            <div style={{ margin: '14px 14px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>QS Pro</div>
+          {/* Admin dời lên cuối danh sách chung, ngay dưới Hiển thị (MarkUp 2026-11-12 17:11); các mục QS còn lại dưới nhãn QS Pro */}
+          {qsTabs.filter(t => t.key === 'qs-admin').map(t => (
+            <button key={t.key} className={`cd-settings-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
+              {QS_ICONS[t.key]}
+              {t.label}
+            </button>
+          ))}
+          {qsTabs.some(t => t.key !== 'qs-admin' && !SUPER_KEYS.includes(t.key)) && (
+            <div style={NAV_GROUP_H}>QS Pro</div>
           )}
-          {qsTabs.map(t => (
+          {qsTabs.filter(t => t.key !== 'qs-admin' && !SUPER_KEYS.includes(t.key)).map(t => (
+            <button key={t.key} className={`cd-settings-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
+              {QS_ICONS[t.key]}
+              {t.label}
+            </button>
+          ))}
+          {/* Đầu mục lớn Siêu quản trị viên (MarkUp 2026-11-12 17:36 / 17:39): mục Công ty (chỉ tài khoản super thấy) */}
+          {qsTabs.some(t => SUPER_KEYS.includes(t.key)) && (
+            <div style={NAV_GROUP_H}>Siêu quản trị viên</div>
+          )}
+          {qsTabs.filter(t => SUPER_KEYS.includes(t.key)).map(t => (
             <button key={t.key} className={`cd-settings-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
               {QS_ICONS[t.key]}
               {t.label}
@@ -119,6 +166,7 @@ function CaiDatRoot() {
           <SettingsContext.Provider value={settings}>
             {TABS.map(({ key, Panel }) => (
               <div key={key} className="cd-settings-panel" style={{ ...panelStyle, display: activeTab === key ? 'flex' : 'none' }}>
+                {SYS_SEC[key] ? <SysDefaultBar section={SYS_SEC[key]} getValue={() => sysValue(SYS_SEC[key])} /> : null}
                 <Panel />
               </div>
             ))}

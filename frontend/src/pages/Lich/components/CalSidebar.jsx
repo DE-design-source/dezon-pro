@@ -85,7 +85,7 @@ export default function CalSidebar({ checkedMap, onToggleDot, colleagues, onAddC
       {/* Tab Lịch: danh sách lịch ở trên, lịch nhỏ dưới đáy (như macOS) */}
       <div className={`lc-cal-sidebar-pane${tab === 'lich' ? ' active' : ''}`} style={{ gap: 14 }}>
         {/* 1 module: ô tìm (thêm đồng nghiệp / bật lịch nhóm) + Đang quản lý + Đang theo dõi, danh sách cuộn trong khung thấp */}
-        <div className="lc-side-card lc-cal-lists">
+        <div className="lc-side-card lc-cal-lists grow">
           <div className="lc-cal-find" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setFindOpen(false) }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <input value={q} placeholder="Thêm người hoặc lịch nhóm..." onFocus={() => setFindOpen(true)} onChange={e => { setQ(e.target.value); setFindOpen(true) }}

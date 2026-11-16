@@ -105,7 +105,9 @@ html[data-theme="dark"][data-accent="teal"] .lc-page{--primary:#3FC2B6; --primar
 .lc-cal-find-pop button em{font-style:normal; font-size:10.5px; color:var(--text-muted); flex:none;}
 .lc-cal-find-none{padding:8px; font-size:12px; color:var(--text-muted);}
 .lc-cal-find-note{padding:6px 8px 4px; border-top:1px solid var(--border); margin-top:2px; font-size:10.5px; color:var(--text-muted);}
-/* Lịch nhỏ mở rộng: chiếm hết phần cao còn lại của sidebar, ô ngày to theo */
+/* Danh sách lịch hiện đủ mọi lịch (chỉ co + cuộn trong khi sidebar thấp); lịch nhỏ lấp phần còn lại tới đáy (MarkUp 2026-11-12 16:57) */
+.lc-cal-sidebar-pane > .lc-cal-lists.grow{flex:0 1 auto; min-height:160px;}
+.lc-cal-lists.grow .lc-cal-lists-body{flex:0 1 auto; min-height:0; max-height:none;}
 .lc-cal-sidebar-pane > .lc-mini-cal.grow{flex:1 0 auto; min-height:250px; display:flex; flex-direction:column;}
 .lc-mini-cal.grow .lc-mini-cal-h{font-size:13px; margin-bottom:8px;}
 .lc-mini-cal.grow .lc-mini-cal-grid:last-child{flex:1; grid-auto-rows:minmax(30px, 1fr); align-items:center;}

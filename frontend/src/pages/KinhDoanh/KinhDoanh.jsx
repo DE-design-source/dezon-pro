@@ -14,7 +14,7 @@ import TasksTab from './components/TasksTab'
 import LeadModal from './components/LeadModal'
 import StaffRequestModal from './components/StaffRequestModal'
 import ConfirmDelete from './components/ConfirmDelete'
-import { useKdMap, saveKdOptions } from './components/ShortlistSelect'
+import { useKdMap, saveKdOptionsMany } from './components/ShortlistSelect'
 import CustomerPage from './components/CustomerPage'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
@@ -89,6 +89,9 @@ function KinhDoanhPage() {
 
   /* ---------- Chuyển giai đoạn (moveLead) ---------- */
   const geoMap = useKdMap('geo')
+  const projNameMap = useKdMap('projName')   // Tên dự án (MarkUp 2026-11-16 16:17)
+  const attachMap = useKdMap('attach')       // Hình / tệp đính kèm (MarkUp 2026-11-16 16:20)
+  const timelineMap = useKdMap('timeline')   // Thời gian khởi công / hoàn công (MarkUp 2026-11-16 16:48)
   /* Kéo thẻ vào "Nhân sự KD phụ trách": hiện phiếu yêu cầu nhân sự trước, xác nhận mới chuyển giai đoạn */
   const [staffReq, setStaffReq] = useState({ open: false, leadId: null, seq: 0 })
   function confirmStaffReq(newAssignees, note) {
@@ -133,15 +136,38 @@ function KinhDoanhPage() {
   const openLeadModal = id => { setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 })); if (scrollRef.current) scrollRef.current.scrollTop = 0 }
   const closeLeadModal = () => setLeadModal(m => ({ ...m, open: false }))
   async function saveLead(input) {
-    const { _geo: geo, ...data } = input   // Khu vực / Tỉnh-TP: lưu riêng kdOptions.geo (máy chủ chưa có cột)
+    const { _geo: geo, _projName: projName, _attach: attach, _timeline: timeline, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
+      const patch = {}
       if (geo) {
         const m = { ...geoMap }
         if (geo.kv || geo.tinh) m[String(saved.id)] = geo; else delete m[String(saved.id)]
-        saveKdOptions('geo', m)
+        patch.geo = m
       }
+      if (projName !== undefined && (projName || projNameMap[String(saved.id)])) {
+        const m = { ...projNameMap }
+        if (projName) m[String(saved.id)] = projName; else delete m[String(saved.id)]
+        patch.projName = m
+      }
+      if (attach) {
+        const has = (attach.img && attach.img.length) || (attach.file && attach.file.length)
+        if (has || attachMap[String(saved.id)]) {
+          const m = { ...attachMap }
+          if (has) m[String(saved.id)] = { img: attach.img || [], file: attach.file || [] }; else delete m[String(saved.id)]
+          patch.attach = m
+        }
+      }
+      if (timeline) {
+        const has = timeline.start || timeline.end
+        if (has || timelineMap[String(saved.id)]) {
+          const m = { ...timelineMap }
+          if (has) m[String(saved.id)] = { start: timeline.start || '', end: timeline.end || '' }; else delete m[String(saved.id)]
+          patch.timeline = m
+        }
+      }
+      if (Object.keys(patch).length) saveKdOptionsMany(patch)
       setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [...prev, saved]))
       closeLeadModal()
     } catch (e) {

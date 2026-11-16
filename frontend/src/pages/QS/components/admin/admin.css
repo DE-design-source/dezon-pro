@@ -218,3 +218,45 @@ html[data-theme="dark"] .qsa-permchip{color:#a5b4fc;}
   .qsa-grid2, .qsa-seg, .qsa-perms{grid-template-columns:1fr;}
   .qsa-rq{flex-wrap:wrap;}
 }
+/* Bổ nhiệm vào cơ cấu tổ chức (AppointModal + cột Bổ nhiệm của bảng tài khoản) - MarkUp 2026-11-12 16:53 */
+.qsa-aptcol{min-width:150px;}
+.qsa-apt-cell{display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; max-width:220px; padding:4px 6px; margin:-4px -6px; border:1px solid transparent; border-radius:8px; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.qsa-apt-cell:hover{border-color:var(--border); background:var(--dash-soft);}
+.qsa-apt-cell b{font-weight:600;}
+.qsa-apt-cell small{flex:1 0 100%; font-size:11.5px; color:var(--text-muted);}
+.qsa-apt-head{padding:0 6px; border-radius:6px; background:var(--dash-accent-tint, #E8EEF5); color:var(--dash-accent, #13406E); font-size:10.5px; font-weight:700;}
+.qsa-apt{width:min(680px, 94vw);}
+.qsa-apt-emp{padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--dash-soft);}
+.qsa-apt-mode{display:flex; flex-direction:column; gap:6px; margin-bottom:10px;}
+.qsa-apt .qsa-um-ft{justify-content:flex-start; align-items:center;}
+/* Nút thu gọn thẻ (MarkUp 2026-11-12 17:07) */
+.qsa-fold{margin-left:auto; flex:none; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-muted); cursor:pointer;}
+.qsa-fold:hover{color:var(--text); border-color:var(--text-muted);}
+.qsa-fold svg{transition:transform .15s ease;}
+.qsa-card.folded .qsa-fold svg{transform:rotate(-90deg);}
+.qsa-card.folded > .qsa-card-h{border-bottom:none;}
+.qsa-card.folded > .qsa-card-b{display:none;}
+/* Ô thống kê gom thành 1 thanh như đầu thẻ (.qsa-card-h) - MarkUp 2026-11-12 17:12 */
+.qsa-stats{display:flex; flex-wrap:wrap; align-items:center; gap:6px 0; padding:8px 16px; border:1px solid var(--border); border-radius:14px; background:var(--dash-soft); margin:0;}
+.qsa-stat, .qsa-stat.warn{gap:8px; padding:0 18px 0 0; margin-right:18px; border:none; border-right:1px solid var(--border); border-radius:0; background:none;}
+.qsa-stat:last-child{border-right:none; margin-right:0; padding-right:0;}
+.qsa-stat-ic{width:32px; height:32px; border-radius:9px;}
+.qsa-stat > div{display:flex; align-items:baseline; gap:6px;}
+.qsa-stat-v{font-size:16px;}
+.qsa-stat-l{margin-top:0; font-size:12.5px; white-space:nowrap;}
+.qsa-stat.warn .qsa-stat-v{color:var(--finance);}
+html[data-theme="dark"] .qsa-stat.warn{background:none;}
+/* Thẻ Tài khoản không đầu thẻ, ghi chú quyền cạnh tiêu đề trang (MarkUp 2026-11-12 17:13) */
+.qsa-hd-note{font-size:12.5px; color:var(--text-muted);}
+.qsa-card.bare > .qsa-card-b{padding-top:14px;}
+/* Thanh kéo của bảng chỉ hiện khi rê chuột vào bảng (giữ chỗ sẵn nên không xô lệch bảng) */
+.qsa-tblwrap{scrollbar-color:transparent transparent;}
+.qsa-tblwrap:hover, .qsa-tblwrap:focus-within{scrollbar-color:#b9c0cc transparent;}
+html[data-theme="dark"] .qsa-tblwrap:hover, html[data-theme="dark"] .qsa-tblwrap:focus-within{scrollbar-color:#5a6270 transparent;}
+/* Bảng tài khoản dài: tự cuộn dọc trong khung cao vừa màn hình để thanh kéo ngang luôn thấy được, tiêu đề cột dính đầu
+   (MarkUp 2026-11-12 17:24). Nội dung nằm trong .qs-scroll bị zoom -> chia cho --qs-zoom để ra đúng chiều cao màn hình */
+.qsa-card[data-card="users"] .qsa-tblwrap{max-height:calc((100vh - 170px) / var(--qs-zoom, .75));}
+.qsa-card[data-card="users"] .qsa-tbl thead th{position:sticky; top:0; z-index:2;}
+/* Mô tả vai trò ở mục Tài khoản siêu quản trị viên (N17) */
+.qsa-super-note{margin:0 0 12px; padding:10px 14px; border:1px solid var(--border); border-left:3px solid var(--dash-accent, var(--primary)); border-radius:10px; background:var(--surface); font-size:12.5px; line-height:1.55; color:var(--text-muted);}
+.qsa-super-note b{color:var(--text);}

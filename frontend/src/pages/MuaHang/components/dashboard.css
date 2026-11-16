@@ -306,3 +306,6 @@ html[data-theme="dark"] .mh-st.g-xong{background:#14301F; color:#4ADE80;}
 .mh-scroll-dash .mh-kv dt{font-size:11px;}
 .mh-scroll-dash .mh-kv dd, .mh-scroll-dash .mh-item, .mh-scroll-dash .mh-dash-empty{font-size:13px;}
 .mh-scroll-dash .mh-items-more{font-size:11px;}
+/* Nút tải lại ở đầu thẻ Giá trị mua hàng (nền trắng), cạnh "Tất cả nguồn" - MarkUp 2026-11-12 18:01 */
+.mh-dash-reload.sm{width:26px; height:26px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted);}
+.mh-dash-reload.sm:hover{background:var(--surface-alt); color:var(--text);}

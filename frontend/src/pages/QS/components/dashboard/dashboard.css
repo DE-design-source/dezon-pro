@@ -580,3 +580,21 @@ button.qs-dash-draft-info:hover{border-color:var(--dash-accent-border); backgrou
 .qs-dash-list-head[data-fit="5"] .qs-dash-tquick .lf, .qs-dash-list-head[data-fit="5"] .qs-dash-dens .lf{display:none;}
 .qs-dash-list-head[data-fit="5"] .qs-dash-tquick .ls, .qs-dash-list-head[data-fit="5"] .qs-dash-dens .ls{display:inline;}
 .qs-dash-list-head[data-fit="5"] .qs-dash-search{flex-basis:90px; min-width:90px;}
+/* Nút Bộ lọc tròn ở đầu thẻ Biên lợi nhuận + khung Bộ lọc mở bên phải cột (chỗ của khung Giá trị theo nhóm) - MarkUp 2026-11-12 16:45 */
+.qs-sm-hf .qs-sm-fbtn{position:relative; margin-left:auto;}
+.qs-sm-fbtn.act{border-color:var(--dash-accent); background:var(--dash-accent-tint);}
+.qs-sm-fbtn em{position:absolute; top:-5px; right:-5px; min-width:15px; height:15px; padding:0 3px; border-radius:8px; border:2px solid var(--surface); background:var(--dash-accent); color:#fff; font-style:normal; font-size:9px; font-weight:700; line-height:11px; text-align:center;}
+.qs-sm-fpanel{display:flex; flex-direction:column;}
+.qs-sm-fsec{flex:1 1 auto; min-height:0; overflow:auto; padding:14px 18px;}
+.qs-sm-fhd{margin-bottom:8px; font-size:var(--t-xs, 11.5px); font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+.qs-sm-flist{display:flex; flex-direction:column; gap:4px;}
+.qs-sm-fit{display:flex; align-items:center; gap:10px; min-height:40px; padding:0 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer;}
+.qs-sm-fit:hover{border-color:var(--dash-accent-border); background:var(--dash-soft);}
+.qs-sm-fit i{width:16px; height:16px; flex:none; border-radius:50%; border:2px solid var(--border); box-sizing:border-box;}
+.qs-sm-fit span{flex:1; min-width:0;}
+.qs-sm-fit b{flex:none; min-width:26px; padding:1px 8px; border-radius:999px; background:var(--surface-alt); color:var(--text-muted); font-size:11.5px; font-weight:700; text-align:center;}
+.qs-sm-fit.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); color:var(--dash-accent); font-weight:600;}
+.qs-sm-fit.on i{border:5px solid var(--dash-accent);}
+.qs-sm-fit.on b{background:var(--dash-accent); color:#fff;}
+.qs-sm-fnote{margin:12px 0 0; font-size:var(--t-xs, 11.5px); line-height:1.5; color:var(--text-muted);}
+.qs-sm-fft{flex:none; display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border);}

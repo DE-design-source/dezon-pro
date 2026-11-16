@@ -17,6 +17,11 @@ import { reportClientError } from './api/http'
 export const QS_SETTINGS = [
   { key: 'qs-congty', tab: 'congty', label: 'Công ty' },
   { key: 'qs-admin', tab: 'admin', label: 'Admin' },
+  /* Yêu cầu xoá sản phẩm + mua hàng tách khỏi Admin (MarkUp 2026-11-12): cùng tab 'admin' của store, AdminTab view='yeucau' */
+  { key: 'qs-yeucau', tab: 'admin', view: 'yeucau', label: 'Yêu cầu' },
+  { key: 'qs-nhatky', tab: 'admin', view: 'nhatky', label: 'Nhật ký hoạt động' },
+  /* Tài khoản super tách khỏi bảng của Admin (MarkUp 2026-11-12 17:43); chỉ super thấy */
+  { key: 'qs-sieu', tab: 'admin', view: 'super', label: 'Tài khoản siêu quản trị viên', superOnly: true },
 ]
 
 /* Đường dẫn mở thẳng 1 mục (vd. chuông thông báo của /qs mở chi tiết đơn ở Admin) */
@@ -24,8 +29,8 @@ export const qsSettingsPath = tab => '/cai-dat?tab=qs-' + tab
 
 /* Các mục QS tài khoản đang đăng nhập được thấy (Công ty: super; Admin: admin / super) */
 export function useQsSettingsTabs() {
-  const { me, canTab } = useQsSession()
-  return me ? QS_SETTINGS.filter(t => canTab(t.tab)) : []
+  const { me, canTab, isSuper } = useQsSession()
+  return me ? QS_SETTINGS.filter(t => canTab(t.tab) && (!t.superOnly || isSuper)) : []
 }
 
 const PANEL_STYLE = { flexDirection: 'column', gap: 10 }
@@ -37,7 +42,7 @@ export default function QsSettingsPanels({ active }) {
   const cur = QS_SETTINGS.find(t => t.key === active)
   const tab = cur ? cur.tab : ''
   const me = session.me
-  const allowed = !!me && !!tab && session.canTab(tab)
+  const allowed = !!me && !!tab && session.canTab(tab) && !(cur.superOnly && !session.isSuper)
 
   useEffect(() => {
     if (!allowed) return undefined
@@ -53,7 +58,7 @@ export default function QsSettingsPanels({ active }) {
   const guard = (key, el) => (
     <ErrorBoundary resetKey={key + '|' + (visSeq[key] || 0)} onError={e => reportClientError(e && e.message, 'render ' + key, key)}>{el}</ErrorBoundary>
   )
-  const panel = key => ({ display: tab === key ? 'flex' : 'none', ...PANEL_STYLE })
+  const panel = key => ({ display: tab === key && allowed ? 'flex' : 'none', ...PANEL_STYLE })
 
   let note = null
   if (cur && !allowed) {
@@ -68,7 +73,7 @@ export default function QsSettingsPanels({ active }) {
       <div className="qs-scroll qs-scroll-dash">
         {note && <div className="qsc-state">{note}</div>}
         {me && session.canTab('congty') && <div style={panel('congty')}>{guard('congty', <CongTyTab />)}</div>}
-        {me && session.canTab('admin') && <div style={panel('admin')}>{guard('admin', <AdminTab />)}</div>}
+        {me && session.canTab('admin') && <div style={panel('admin')}>{guard('admin', <AdminTab view={(cur && cur.view) || 'admin'} />)}</div>}
       </div>
       <ModalHost />
     </div>

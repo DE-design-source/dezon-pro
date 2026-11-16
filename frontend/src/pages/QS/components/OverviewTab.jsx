@@ -130,7 +130,7 @@ export default function OverviewTab() {
           onPointerDown={splitDown} onPointerMove={splitMove} onPointerUp={splitUp} onPointerCancel={splitUp}
           onDoubleClick={() => saveSide(SIDE_DEF)} />
         <div className="qs-dash-side">
-          <DashSummary A={A} nDa={nDa} label={flt ? flt.label : ''} />
+          <DashSummary A={A} nDa={nDa} label={flt ? flt.label : ''} tt={flt ? flt.tt : ''} ttCount={flt ? flt.ttCount : null} onTt={flt ? flt.setTt : null} />
           <QuickActions />
         </div>
         <ProjectList groups={groups} curMa={has ? cur.maDA : ''} onCreate={() => toCreate(true)} onFilter={setFlt} />

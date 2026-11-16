@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { money } from '../../lib/format.js'
+import { TT_DU_AN } from '../../lib/dashModel.js'
 
 /* Cột trái Bảng điều khiển: 2 thẻ cộng theo bộ lọc của Danh sách dự án (kiểu thẻ "Gross margin" + "Last 12 weeks").
    A = số đã cộng {n, von, ban, total, ln, bien, vats, groups:[{key, name, value}], done, fail, ready}; nDa = số dự án; label = nhãn bộ lọc.
@@ -19,7 +20,7 @@ const GRP_LS = 'qs_dash_grp'
 const loadPick_ = () => { try { const v = JSON.parse(localStorage.getItem(GRP_LS) || 'null'); return Array.isArray(v) ? v.map(String) : null } catch (e) { return null } }
 const savePick_ = v => { try { if (v) localStorage.setItem(GRP_LS, JSON.stringify(v)); else localStorage.removeItem(GRP_LS) } catch (e) { /* bỏ qua */ } }
 
-export default function DashSummary({ A, nDa, label }) {
+export default function DashSummary({ A, nDa, label, tt = '', ttCount = null, onTt = null }) {
   const ok = A.ready
   const neg = ok && A.ln < 0
   const vat = A.vats.size === 1 ? 'gồm VAT ' + [...A.vats][0] + '%' : 'gồm VAT'
@@ -47,6 +48,20 @@ export default function DashSummary({ A, nDa, label }) {
     setPick(cur)
   }
   const panelRef = useRef(null)
+  /* Khung "Bộ lọc" (nút tròn ở đầu thẻ Biên lợi nhuận): mở bên phải cột như khung Giá trị theo nhóm, chọn trạng thái dự án.
+     Mở khung này thì đóng khung nhóm và ngược lại (cùng 1 chỗ) - MarkUp 2026-11-12 16:45 */
+  const [fOpen, setFOpen] = useState(false)
+  const fRef = useRef(null)
+  useEffect(() => { if (open) setFOpen(false) }, [open])
+  useEffect(() => { if (fOpen) setOpen(false) }, [fOpen])
+  useEffect(() => {
+    if (!fOpen) return undefined
+    const esc = e => { if (e.key === 'Escape') setFOpen(false) }
+    const main = fRef.current && fRef.current.closest('.qs-dash-main')
+    if (main) main.classList.add('has-grp-panel')
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('keydown', esc); if (main) main.classList.remove('has-grp-panel') }
+  }, [fOpen])
   useEffect(() => {
     const el = grpRef.current
     if (!el || typeof ResizeObserver === 'undefined') return undefined
@@ -107,7 +122,14 @@ export default function DashSummary({ A, nDa, label }) {
   return (
     <>
       <section className="qs-card qs-sm" aria-label="Biên lợi nhuận theo bộ lọc">
-        <div className="qs-sm-h"><h3>Biên lợi nhuận</h3>{scope}</div>
+        <div className="qs-sm-h qs-sm-hf"><h3>Biên lợi nhuận</h3>
+          {onTt && ttCount && (
+            <button type="button" className={'qs-sm-more qs-sm-fbtn' + (fOpen ? ' on' : '') + (tt ? ' act' : '')} aria-expanded={fOpen}
+              title={fOpen ? 'Đóng bộ lọc' : 'Bộ lọc' + (tt ? ': ' + tt : ' - chọn trạng thái dự án')} aria-label="Bộ lọc" onClick={() => setFOpen(o => !o)}>
+              <Icon name="filter" size={13} />{tt && !fOpen && <em>1</em>}
+            </button>
+          )}
+          {scope}</div>
         {!ok && <div className="qs-sum-load"><i style={{ width: (nDa ? (A.done + A.fail) / nDa * 100 : 100) + '%' }} />Đang tính {A.done + A.fail}/{nDa} dự án…</div>}
         {ok && A.fail > 0 && <div className="qs-sum-warn"><Icon name="alert" size={13} />{A.fail} dự án chưa tải được, chưa cộng vào tổng</div>}
 
@@ -154,6 +176,28 @@ export default function DashSummary({ A, nDa, label }) {
           {ok && shown.map(g => row(g))}
         </div>
       </section>
+      {fOpen && onTt && ttCount && (
+        <aside className="qs-card qs-sm qs-sm-panel qs-sm-fpanel" ref={fRef} aria-label="Bộ lọc dự án">
+          <div className="qs-sm-h"><h3>Bộ lọc</h3><span className="qs-sm-sub">{nDa} dự án</span>
+            <button type="button" className="qsc-x" title="Đóng (Esc)" onClick={() => setFOpen(false)}>✕</button>
+          </div>
+          <div className="qs-sm-fsec">
+            <div className="qs-sm-fhd">Trạng thái dự án</div>
+            <div className="qs-sm-flist" role="radiogroup" aria-label="Trạng thái dự án">
+              {[''].concat(TT_DU_AN).map(v => (
+                <button key={v || 'all'} type="button" role="radio" aria-checked={tt === v} className={'qs-sm-fit' + (tt === v ? ' on' : '')} onClick={() => onTt(v)}>
+                  <i aria-hidden="true" /><span>{v || 'Tất cả'}</span><b>{ttCount[v] || 0}</b>
+                </button>
+              ))}
+            </div>
+            <p className="qs-sm-fnote">Đổi trạng thái của dự án ở Thông tin dự án (ô Trạng thái của bản nháp). Nguồn, thời gian và ô tìm nằm trên thanh Danh sách dự án.</p>
+          </div>
+          <div className="qs-sm-fft">
+            <button type="button" className="qs-modal-btn" disabled={!tt} onClick={() => onTt('')}>Bỏ lọc</button>
+            <button type="button" className="qs-modal-btn primary" onClick={() => setFOpen(false)}>Xong</button>
+          </div>
+        </aside>
+      )}
       {open && (
         <aside className="qs-card qs-sm qs-sm-panel" ref={panelRef} aria-label="Giá trị theo nhóm - đầy đủ">
           <div className="qs-sm-h"><h3>{editing ? 'Chọn ngành hàng hiện' : 'Giá trị theo nhóm'}</h3><span className="qs-sm-sub">{editing ? shownKeys.length + '/' + GRP_MAX : A.groups.length + ' nhóm'}</span>

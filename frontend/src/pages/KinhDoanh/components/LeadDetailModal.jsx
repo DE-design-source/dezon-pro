@@ -1,5 +1,7 @@
 import { STAGE_LABEL, DEPT_LABEL, HANDOFF_CONFIG } from '../../../data/kinhDoanhData'
 import { FONT_STACK, fmtTy, stageAccent, lmInitials } from '../utils'
+import { useKdMap } from './ShortlistSelect'
+import { mediaUrl } from '../../QS/api/files'
 
 /* ===================== Modal: Chi tiết lead (đầy đủ thông tin đã nhập từ modal +Thêm) ===================== */
 
@@ -38,7 +40,10 @@ function Body({ l }) {
   const h = l.handoff
   const hasAssignees = l.assignees && l.assignees.length
   const hasCategories = l.categories && l.categories.length
-  const empty = !l.phone && !l.email && !l.source && !l.address && !l.scale && !hasCategories && !hasAssignees && !l.boqFile && !l.concept && !l.notes
+  const projName = useKdMap('projName')[String(l.id)] || ''   // Tên dự án (kdOptions.projName)
+  const att = useKdMap('attach')[String(l.id)] || {}   // Hình / tệp đính kèm (kdOptions.attach)
+  const imgs = att.img || [], docs = att.file || []
+  const empty = !imgs.length && !docs.length && !projName && !l.phone && !l.email && !l.source && !l.address && !l.scale && !hasCategories && !hasAssignees && !l.boqFile && !l.concept && !l.notes
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
@@ -60,6 +65,7 @@ function Body({ l }) {
         </OwnerRow>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {projName ? <div style={{ gridColumn: '1 / -1' }}><LdRow label="Tên dự án" value={projName} /></div> : null}
         <LdRow label="Số điện thoại" value={l.phone} />
         <LdRow label="Email" value={l.email} />
         <LdRow label="Nguồn khách hàng" value={l.source} />
@@ -98,6 +104,23 @@ function Body({ l }) {
         <div>
           <div style={capLabel(6)}>Concept / Ý tưởng thiết kế</div>
           <div style={noteBox}>{l.concept}</div>
+        </div>
+      ) : null}
+      {imgs.length || docs.length ? (
+        <div>
+          <div style={capLabel(6)}>Đính kèm</div>
+          {imgs.length ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: docs.length ? 8 : 0 }}>
+              {imgs.map((it, i) => (
+                <a key={i} href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name} style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', display: 'block' }}>
+                  <img src={mediaUrl(it.url)} alt={it.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </a>
+              ))}
+            </div>
+          ) : null}
+          {docs.map((it, i) => (
+            <div key={i} style={{ fontSize: 12.5, marginTop: 2 }}>📎 <a href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>{it.name}</a></div>
+          ))}
         </div>
       ) : null}
       {l.notes ? (
