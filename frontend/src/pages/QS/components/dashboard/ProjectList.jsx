@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { listLeads } from '../../../KinhDoanh/api'
 import { useQs } from '../../state/QsData'
+import { useQsStore } from '../../state/store'
+import { canTab } from '../../../../services/workSession'
 import { dashSearch_, TT_DU_AN, groupStatus_, groupYear_ } from '../../lib/dashModel.js'
 import { openProjDlg } from '../project/projectActions'
 import { usePhuTrach, setPhuTrach, ptRoles_ } from './ptStore'
@@ -92,11 +94,16 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const [kdMa, setKdMa] = useState(null)
   /* Nhân sự phụ trách từng dự án (ptStore, dùng chung với hộp Thông tin dự án): quản trị giao / bỏ ở cột Phụ trách, người khác chỉ xem */
   const { map: ptMap, users: ptUsers, canEdit: canEditPt } = usePhuTrach()
+  // Không có quyền Kinh doanh thì không gọi /sales/leads (server trả 403, hiện lỗi đỏ ở console)
+  const me = useQsStore(s => s.me)
+  const congTy = useQsStore(s => s.congTy)
+  const kdOk = canTab('kinhdoanh', me, congTy)
   useEffect(() => {
     let off = false
+    if (!kdOk) { setKdMa(null); return undefined }
     listLeads().then(ls => { if (!off) setKdMa(new Set(ls.map(l => l.maDA).filter(Boolean))) }, () => { if (!off) setKdMa(null) })
     return () => { off = true }
-  }, [groups.length])
+  }, [groups.length, kdOk])
   const [src, setSrcSt] = useState(readSrc_)
   const setSrc = v => { setSrcSt(v); saveLs_(SRC_LS, v) }
   const isKd = g => g.drafts.some(d => kdMa.has(d.maDA))

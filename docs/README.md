@@ -2,6 +2,12 @@
 
 Mục lục mọi tài liệu trong `docs/`. Cập nhật file này mỗi khi thêm hoặc đổi tên tài liệu.
 
+## 02-ky-thuat / kien-truc
+
+| Tài liệu | Nội dung | Loại |
+|---|---|---|
+| [kien-truc-he-thong.md](02-ky-thuat/kien-truc/kien-truc-he-thong.md) | Ảnh chụp kiến trúc hiện tại: khối hệ thống, tầng backend, 18 module, trang gọi server, dữ liệu, triển khai, điểm đáng chú ý. Sinh bằng lệnh `/architecture`, chạy lại để cập nhật | **Hiện hành** |
+
 ## 02-ky-thuat / database
 
 Bộ tài liệu audit và tái thiết kế database (2026-10-12). Refactor **đã triển khai trên database local `qspro_en2`**; 2026-10-24 đã nạp `qspro_en2` lên PostgreSQL của VPS CloudFly (backend Go, https://dezon.tech - xem roadmap N2). Đọc hai tài liệu đầu bảng trước.
@@ -55,3 +61,9 @@ Yêu cầu ghi `docs/database/<TÊN>.md`; quy tắc của repo (`.claude/rules/d
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
 | [trien-khai-vps-cloudfly.md](04-van-hanh/trien-khai-vps-cloudfly.md) | Đưa backend Go + giao diện React + PostgreSQL lên VPS (Docker Compose + Caddy HTTPS): từng bước từ trỏ tên miền, chuyển dữ liệu, sao lưu / khôi phục, vận hành, xử lý sự cố | **Hiện hành** |
+
+## 06-design / kien-truc
+
+| Tài liệu | Nội dung | Loại |
+|---|---|---|
+| [index.html](06-design/kien-truc/index.html) | 5 sơ đồ kiến trúc HTML/SVG (tổng quan, tầng backend, bản đồ module, frontend gọi backend, triển khai), mở bằng trình duyệt. Sinh bằng lệnh `/architecture` | **Hiện hành** |
