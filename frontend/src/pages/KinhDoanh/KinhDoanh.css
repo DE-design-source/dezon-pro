@@ -827,3 +827,8 @@ html[data-theme="dark"] .ios-cal-g .dow{color:rgba(235,235,245,.3);}
 .kd-pl-trange{display:flex; align-items:center; gap:6px; padding:6px 8px 2px;}
 .kd-pl-trange input{flex:1; min-width:0; padding:5px 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:12px;}
 .kd-pl-trange span{color:var(--text-muted); font-size:12px;}
+/* Khung Phụ trách dời sang cột Chi tiết khi mở (MarkUp 2026-11-16 18:46): thẻ Chi tiết cao theo nội dung, Phụ trách kéo tới đáy */
+.kd-cp.detail-open .kd-cp-detail > .kd-cp-card{flex:1;}   /* Phụ trách ở trên, thẻ Chi tiết kéo tới đáy (MarkUp 2026-11-16 18:48) */
+.kd-cp.detail-open .kd-cp-detail > .kd-cp-pt{flex:none;}
+.kd-cp-detail-h .kd-cp-edit + .kd-cp-edit{margin-left:0;}   /* nút sửa + nút đóng sát nhau ở góc phải (MarkUp 2026-11-16 19:27) */
+.kd-cp-side h4 .kd-cp-edit + .kd-cp-edit{margin-left:0;}

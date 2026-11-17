@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BugChip } from '../../../components/ui/BugReport'
+import { CaptureChips } from '../../../components/ui/CaptureTools'
 import { AI_KB, AI_TOPIC_PROMPTS, AI_SUGGESTS } from '../../../data/kinhDoanhData'
 
 /* ===================== Dezbot — trợ lý ảo ===================== */
@@ -133,6 +134,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                   </div>
                 ))}
                 <div className="kd-ai-topic-chip"><BugChip className="kd-ai-chip" onBefore={onClose} /></div>
+                <CaptureChips className="kd-ai-chip" wrap="kd-ai-topic-chip" onBefore={onClose} />
               </div>
             </div>
           )}

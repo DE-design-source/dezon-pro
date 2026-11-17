@@ -139,7 +139,15 @@ type Service struct {
 	pushDrops   int64                  // thông báo bị bỏ vì hàng đợi đầy, chưa ghi log
 	pushDropLog time.Time              // lần ghi log "hàng đợi push đầy" gần nhất
 	pushRetry   []time.Duration        // chờ trước mỗi lần thử lại (test rút ngắn)
-	shutOnce    sync.Once
+
+	// worker tin hẹn giờ (service_scheduled.go): chỉ chạy khi StartScheduler được gọi
+	schedMu      sync.Mutex
+	schedStarted bool
+	schedStopped bool
+	schedQuit    chan struct{}
+	schedWG      sync.WaitGroup
+
+	shutOnce sync.Once
 }
 
 // *Service là Backend của WebSocket gateway.
@@ -198,6 +206,7 @@ func New(d Deps) *Service {
 		pushQuit:  make(chan struct{}),
 		pushLast:  map[[2]int64]time.Time{},
 		pushRetry: []time.Duration{time.Second, 5 * time.Second},
+		schedQuit: make(chan struct{}),
 	}
 	if s.sms == nil {
 		s.sms = logSender{}
@@ -261,10 +270,21 @@ func (s *Service) gateway() Gateway {
 	return s.gw
 }
 
-// Shutdown (sau khi HTTP đã dừng nhận request): đóng gateway - kết nối (nếu routes chưa Drain trước) rồi bộ chạy phân
-// phối, chạy nốt tin đang xếp hàng (kể cả việc xếp push) - rồi mới dừng worker push. Gọi nhiều lần cũng được.
+// Shutdown (sau khi HTTP đã dừng nhận request): dừng worker tin hẹn giờ (tin đang gửi dở rollback, giữ pending), đóng
+// gateway - kết nối (nếu routes chưa Drain trước) rồi bộ chạy phân phối, chạy nốt tin đang xếp hàng (kể cả việc xếp push) -
+// rồi mới dừng worker push. Gọi nhiều lần cũng được.
 func (s *Service) Shutdown(ctx context.Context) {
 	s.shutOnce.Do(func() {
+		s.schedMu.Lock()
+		s.schedStopped = true
+		s.schedMu.Unlock()
+		close(s.schedQuit)
+		sched := make(chan struct{})
+		go func() { s.schedWG.Wait(); close(sched) }()
+		select {
+		case <-sched:
+		case <-ctx.Done():
+		}
 		if g := s.gateway(); g != nil {
 			g.Shutdown(ctx)
 		}

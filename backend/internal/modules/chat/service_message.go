@@ -342,10 +342,15 @@ func isFK(err error, constraint string) bool {
 
 // SendMessage lưu tin (chống trùng theo client_msg_id) rồi phân phối bất đồng bộ; trả data của ack.
 func (s *Service) SendMessage(ctx context.Context, uid int64, in SendInput) (*SendAck, error) {
+	return s.sendMessage(ctx, uid, in, true)
+}
+
+// sendMessage: SendMessage; limited = false bỏ qua giới hạn gửi tương tác (worker tin hẹn giờ, service_scheduled.go).
+func (s *Service) sendMessage(ctx context.Context, uid int64, in SendInput, limited bool) (*SendAck, error) {
 	if err := validateSend(&in); err != nil {
 		return nil, err
 	}
-	if !s.sendLimit.allow(uid) {
+	if limited && !s.sendLimit.allow(uid) {
 		return nil, errSendRateLimit
 	}
 	var ack *SendAck
@@ -461,7 +466,7 @@ type msgGate struct {
 // msgGateTx (trong transaction gửi tin / chuyển tiếp): khoá dòng hội thoại tới hết transaction (thứ tự seq); người gửi phải
 // là thành viên đang hoạt động (dòng chỉ đọc của nhóm đã giải tán -> 410; đã rời / bị xoá trước đó hoặc đã gỡ nhóm khỏi
 // danh sách -> 403 như REST); đã có tin cùng client_msg_id -> trả ack trùng (không kiểm tiếp); nhóm bật admins_only_send
-// mà là member -> 403; chat 1-1 đang chặn (một trong hai bên) -> BLOCKED.
+// mà là member -> 403; chat 1-1 đang chặn (một trong hai bên) -> BLOCKED. clientID "" = không kiểm tin trùng.
 func msgGateTx(ctx context.Context, tx pgx.Tx, uid, convID int64, clientID string) (*msgGate, *SendAck, error) {
 	g := &msgGate{}
 	var active, readonly bool
@@ -486,9 +491,11 @@ func msgGateTx(ctx context.Context, tx pgx.Tx, uid, convID int64, clientID strin
 	if !active {
 		return nil, nil, errNotMember
 	}
-	ack, err := findSent(ctx, tx, convID, uid, clientID)
-	if err != nil || ack != nil {
-		return nil, ack, err
+	if clientID != "" { // "" = chỉ kiểm cổng (tạo / sửa tin hẹn giờ), không có tin để chống trùng
+		ack, err := findSent(ctx, tx, convID, uid, clientID)
+		if err != nil || ack != nil {
+			return nil, ack, err
+		}
 	}
 	if g.conv.typ == "group" && !canDo(g.role, g.st, ActSend) {
 		return nil, nil, errForbidden("Chỉ trưởng / phó nhóm được gửi tin trong nhóm này")

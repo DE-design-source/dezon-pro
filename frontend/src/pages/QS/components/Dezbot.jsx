@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AI_KB, AI_TOPIC_LABELS, AI_SUGGESTIONS, matchTopic } from '../../../data/qsData'
 import { openBugReport } from '../../../components/ui/BugReport'
+import { openCapture } from '../../../components/ui/CaptureTools'
 
 const MIN_W = 320
 const MAX_W = 720
@@ -34,6 +35,10 @@ const TOPICS = [
   { key: 'tinnhan', label: 'Tin nhắn', icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
   /* Báo lỗi: mở hộp chụp màn hình + gửi phòng IT (không hỏi trợ lý) */
   { key: 'baoloi', label: 'Báo lỗi', icon: '<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9M6.5 13H3M21 13h-3.5"/>', bug: true },
+  /* Chụp hình / Ảnh -> chữ / Quay màn hình (CaptureTools, MarkUp 2026-11-16 18:51) */
+  { key: 'chuphinh', label: 'Chụp hình', icon: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>', cap: 'shot' },
+  { key: 'anhchu', label: 'Ảnh → chữ', icon: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 8h8M12 8v8"/>', cap: 'ocr' },
+  { key: 'quaymh', label: 'Quay màn hình', icon: '<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m22 8-6 4 6 4z"/>', cap: 'rec' },
 ]
 
 export default function Dezbot({ open, onToggle, onClose, onResize, onResizingChange }) {
@@ -48,6 +53,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
 
   /* đóng Dezbot trước khi chụp để khung trợ lý không che màn hình cần báo lỗi */
   function openBug() { onClose(); setTimeout(() => openBugReport('QS'), 280) }
+  function openCap(m) { onClose(); setTimeout(() => openCapture(m), 280) }
 
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
@@ -128,7 +134,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
               <div className="qs-ai-topic-grid">
                 {TOPICS.map(t => (
                   <div key={t.key} className={`qs-ai-topic-chip${t.wide ? ' wide' : ''}`}>
-                    <button className={`qs-ai-chip${t.bug ? ' qs-ai-bug' : ''}`} onClick={() => (t.bug ? openBug() : sendMessage(AI_TOPIC_LABELS[t.key] || t.label))}><Svg html={t.icon} />{t.label}</button>
+                    <button className={`qs-ai-chip${t.bug ? ' qs-ai-bug' : ''}`} onClick={() => (t.bug ? openBug() : t.cap ? openCap(t.cap) : sendMessage(AI_TOPIC_LABELS[t.key] || t.label))}><Svg html={t.icon} />{t.label}</button>
                   </div>
                 ))}
               </div>

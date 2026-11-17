@@ -55,6 +55,7 @@ type Server struct {
 
 	reports   contracts.ReportRunner   // module reports, cho job nền
 	expiry    contracts.ExpiryReminder // module companies: nhắc gia hạn trong ứng dụng (M17.3), cho job nền
+	chatSched func()                   // module chat: bật worker gửi tin hẹn giờ (dừng trong chat Shutdown)
 	swaggerOn bool                     // /api-docs có bật không
 
 	routesOnce sync.Once
@@ -283,6 +284,14 @@ func (s *Server) Reports() contracts.ReportRunner { return s.reports }
 
 // Expiry trả phần nhắc gia hạn của module companies (job nền dùng, M17.3).
 func (s *Server) Expiry() contracts.ExpiryReminder { return s.expiry }
+
+// StartChatScheduler bật worker gửi tin hẹn giờ của chat (cmd/api gọi; test dựng server không gọi nên không có goroutine nền).
+// Worker dừng khi server tắt (chat Shutdown đã đăng ký OnShutdown).
+func (s *Server) StartChatScheduler() {
+	if s.chatSched != nil {
+		s.chatSched()
+	}
+}
 
 // SwaggerOn: tài liệu API /api-docs có bật không.
 func (s *Server) SwaggerOn() bool { return s.swaggerOn }

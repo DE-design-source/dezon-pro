@@ -147,7 +147,7 @@ func TestRegisterRPCMatchesRoutes(t *testing.T) {
 		have[rt.Method+" "+rt.Path] = true
 	}
 	gs := reg.GoRoutes()
-	if len(gs) != 68 {
+	if len(gs) != 72 {
 		t.Errorf("số route chat: %d", len(gs))
 	}
 	for _, g := range gs {

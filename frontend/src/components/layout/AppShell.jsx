@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import PageGuard from './PageGuard'
 import useHeaderTabsFit from '../../hooks/useHeaderTabsFit'
 import { BugReportHost } from '../ui/BugReport'
+import { CaptureHost } from '../ui/CaptureTools'
 
 export default function AppShell() {
   useHeaderTabsFit()
@@ -13,6 +14,7 @@ export default function AppShell() {
         <PageGuard inline><Outlet /></PageGuard>
       </div>
       <BugReportHost />
+      <CaptureHost />
 
     </div>
   )

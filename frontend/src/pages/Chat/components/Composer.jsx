@@ -34,7 +34,10 @@ function mentionsOfMessage(m) {
 
 const sameMentions = (a, b) => a.length === b.length && a.every((x, i) => x.user_id === b[i].user_id && x.offset === b[i].offset && x.length === b[i].length)
 
-export default function Composer({ initialText = '', onSend, onDraft, onTyping, onBlur, disabled, placeholder, onSendFiles, onSendVoice, mediaCfg, incomingFiles, mentionMembers, canMentionAll, reply, onCancelReply, editing, onSubmitEdit, onCancelEdit }) {
+import { SchedulePicker } from './Scheduled'
+
+/* onSchedule(text đã trim, mentions, sendAtIso) -> Promise: nút hẹn giờ gửi cạnh nút Gửi (MarkUp 2026-11-16 18:57) */
+export default function Composer({ initialText = '', onSend, onSchedule, scheduleNote, onDraft, onTyping, onBlur, disabled, placeholder, onSendFiles, onSendVoice, mediaCfg, incomingFiles, mentionMembers, canMentionAll, reply, onCancelReply, editing, onSubmitEdit, onCancelEdit }) {
   const [text, setText] = useState(initialText)
   /* Đoạn @nhắc tên đã chèn: {user_id, offset, length, name} theo vị trí trong chuỗi chưa trim */
   const [mentions, setMentions] = useState([])
@@ -237,6 +240,13 @@ export default function Composer({ initialText = '', onSend, onDraft, onTyping, 
     resetText()
   }
 
+  async function schedule(iso) {
+    const t = text.trim()
+    const ms = mentionOn ? finalizeMentions(text, mentions) : []
+    await onSchedule(t, ms, iso)
+    resetText()
+  }
+
   function onPaste(e) {
     if (!mediaOn || editing) return
     const list = Array.from((e.clipboardData && e.clipboardData.files) || [])
@@ -347,6 +357,7 @@ export default function Composer({ initialText = '', onSend, onDraft, onTyping, 
           onPaste={onPaste}
           onKeyDown={onKey}
         />
+        {onSchedule && !editing && <SchedulePicker disabled={disabled || over || !!files.length || !text.trim()} onPick={schedule} note={scheduleNote} />}
         {showMic ? (
           <button className="ch-send-btn" title="Ghi tin nhắn thoại" disabled={disabled} onClick={() => { setNote(''); setRecording(true) }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5" /></svg>

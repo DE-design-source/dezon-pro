@@ -31,6 +31,8 @@ func main() {
 	// ═══ JOB NỀN: báo cáo nhập SP tự động + nhắc gia hạn công ty trong ứng dụng (M17.3); REPORT_JOB=0 thì không bật ═══
 	worker := jobs.Start(ctx, jobs.Deps{Reports: srv.Reports(), Expiry: srv.Expiry(), Cfg: cfg})
 	srv.OnShutdown(worker.Stop)
+	// worker gửi tin hẹn giờ của chat (mỗi 15 giây; không phụ thuộc REPORT_JOB), dừng trong chat Shutdown khi server tắt
+	srv.StartChatScheduler()
 
 	if err := srv.Run(ctx); err != nil {
 		logger.Error("server", err.Error())

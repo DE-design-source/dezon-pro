@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BugChip } from '../../../components/ui/BugReport'
+import { CaptureChips } from '../../../components/ui/CaptureTools'
 import { AI_KB, AI_TOPIC_LABELS, AI_SUGGESTIONS, matchTopic } from '../../../data/chamCongData'
 
 const MIN_W = 320
@@ -122,6 +123,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
                   </div>
                 ))}
                 <div className="cc-ai-topic-chip"><BugChip className="cc-ai-chip" onBefore={onClose} /></div>
+                <CaptureChips className="cc-ai-chip" wrap="cc-ai-topic-chip" onBefore={onClose} />
               </div>
             </div>
           ) : (

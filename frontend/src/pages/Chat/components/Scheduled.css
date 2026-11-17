@@ -1,0 +1,58 @@
+/* Hẹn giờ gửi tin (Scheduled.jsx) */
+.ch-sch{position:relative; flex:none;}
+.ch-sch-btn{width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer;}
+.ch-sch-btn:hover:not(:disabled){border-color:var(--primary); color:var(--primary);}
+.ch-sch-btn:disabled{opacity:.45; cursor:default;}
+.ch-sch-pop{position:absolute; right:0; bottom:calc(100% + 8px); z-index:60; width:270px; display:flex; flex-direction:column; gap:2px; padding:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 14px 34px rgba(15,23,42,.18);}
+.ch-sch-h{padding:2px 6px 6px; font-size:13px;}
+.ch-sch-opt{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border:none; border-radius:8px; background:none; color:var(--text); font:inherit; font-size:12.5px; cursor:pointer; text-align:left;}
+.ch-sch-opt:hover:not(:disabled){background:var(--surface-alt);}
+.ch-sch-opt em{font-style:normal; font-size:11.5px; color:var(--text-muted);}
+.ch-sch-custom{display:flex; gap:6px; padding:6px 4px 2px; margin-top:4px; border-top:1px solid var(--border);}
+.ch-sch-custom input{flex:1; min-width:0; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:12px;}
+.ch-sch-go{height:32px; padding:0 12px; border:none; border-radius:8px; background:var(--primary); color:#fff; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;}
+.ch-sch-go:disabled{opacity:.45; cursor:default;}
+.ch-sch-err{padding:4px 6px; font-size:12px; color:var(--danger);}
+.ch-sch-note{padding:4px 6px 2px; font-size:11px; color:var(--text-muted);}
+/* thanh tin đã hẹn giờ (trên khung soạn) */
+.ch-schbar{margin:0 12px 6px; border:1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius:10px; background:var(--primary-tint); overflow:hidden;}
+.ch-schbar-h{display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px; border:none; background:none; color:var(--primary); font:inherit; font-size:12.5px; text-align:left; cursor:pointer;}
+.ch-schbar-h span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);}
+.ch-schbar-h i{font-style:normal; color:var(--text-muted);}
+.ch-schbar-list{max-height:220px; overflow-y:auto; border-top:1px solid var(--border); background:var(--surface);}
+.ch-schbar-it{display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px;}
+.ch-schbar-it:last-of-type{border-bottom:none;}
+.ch-schbar-txt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+.ch-schbar-txt em{font-style:normal; font-size:11.5px; font-weight:700; color:var(--primary);}
+.ch-schbar-txt span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-schbar-act, .ch-schbar-edit{display:flex; align-items:center; gap:6px; flex:none;}
+.ch-schbar-act button, .ch-schbar-edit button{height:28px; padding:0 10px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; cursor:pointer;}
+.ch-schbar-act button.x:hover{border-color:var(--danger); color:var(--danger);}
+.ch-schbar-edit input{padding:4px 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:12px;}
+/* Chọn ngày giờ kiểu macOS (MacDateTime.jsx) */
+.mdt{position:relative; display:inline-flex; align-items:center; gap:6px; font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', inherit; font-size:13px;}
+.mdt-date, .mdt-time{height:26px; display:inline-flex; align-items:center; padding:0 8px; border:.5px solid rgba(0,0,0,.18); border-radius:6px; background:var(--surface); color:var(--text); box-shadow:0 .5px 1px rgba(0,0,0,.08) inset; font:inherit; font-variant-numeric:tabular-nums; cursor:pointer;}
+.mdt-date.on, .mdt-time:focus-within, .mdt-time:focus{outline:3px solid color-mix(in srgb, #007AFF 45%, transparent); outline-offset:0;}
+.mdt-time{gap:1px; padding:0 4px; cursor:text;}
+.mdt-seg{padding:1px 3px; border-radius:4px;}
+.mdt-time:focus .mdt-seg.on{background:#007AFF; color:#fff;}
+.mdt-step{display:inline-flex; flex-direction:column; margin-left:-4px;}
+.mdt-step button{width:15px; height:12px; padding:0; border:.5px solid rgba(0,0,0,.18); background:var(--surface); color:var(--text-muted); font-size:6.5px; line-height:1; cursor:pointer;}
+.mdt-step button:first-child{border-radius:5px 5px 0 0; border-bottom:none;}
+.mdt-step button:last-child{border-radius:0 0 5px 5px;}
+.mdt-step button:active{background:#007AFF; color:#fff;}
+.mdt-pop{position:fixed; z-index:4000; width:232px; padding:10px 10px 8px; border:.5px solid rgba(0,0,0,.2); border-radius:10px; background:color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter:blur(20px); box-shadow:0 10px 30px rgba(0,0,0,.2);}
+.mdt-pop-h{display:flex; align-items:center; justify-content:space-between; padding:0 2px 6px;}
+.mdt-pop-h b{font-size:13px;}
+.mdt-pop-h span{display:flex; gap:2px;}
+.mdt-pop-h button{width:20px; height:20px; border:none; border-radius:5px; background:none; color:var(--text-muted); font-size:15px; line-height:1; cursor:pointer;}
+.mdt-pop-h button.dot{font-size:8px;}
+.mdt-pop-h button:hover{background:var(--surface-alt); color:var(--text);}
+.mdt-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:1px; justify-items:center;}
+.mdt-grid .dow{font-size:10.5px; font-weight:600; color:var(--text-muted); padding-bottom:3px;}
+.mdt-grid .day{width:26px; height:26px; border:none; border-radius:50%; background:none; color:var(--text); font:inherit; font-size:12.5px; cursor:pointer; font-variant-numeric:tabular-nums;}
+.mdt-grid .day:hover:not(:disabled){background:var(--surface-alt);}
+.mdt-grid .day:disabled{color:var(--text-muted); opacity:.4; cursor:default;}
+.mdt-grid .day.today{color:#007AFF; font-weight:700;}
+.mdt-grid .day.on{background:#007AFF; color:#fff; font-weight:600;}
+html[data-theme="dark"] .mdt-date, html[data-theme="dark"] .mdt-time, html[data-theme="dark"] .mdt-step button{border-color:rgba(255,255,255,.2);}
