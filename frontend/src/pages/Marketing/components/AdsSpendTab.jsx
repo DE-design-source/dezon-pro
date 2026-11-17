@@ -421,7 +421,7 @@ export default function AdsSpendTab({ visible }) {
     if (tu > den) return 0
     return Math.round((Date.parse(den + 'T00:00:00Z') - Date.parse(tu + 'T00:00:00Z')) / 864e5) + 1
   })()
-  const theoThang = R.ky === 'thang' || R.ky === 'truoc' || /^Tháng /.test(R.nhan || '')
+  const theoThang = R.ky === 'thang' || /^Tháng /.test(R.nhan || '')
   const soLe = n => (Number.isInteger(n) ? fmt(n) : n.toFixed(1).replace('.', ','))
   const ghiNgay = soNgayKy ? ' · TB ' + soNgayKy + ' ngày' : ''
 

@@ -13,7 +13,7 @@ import DatePicker from '../../../components/ui/DatePicker'
    (MarkUp 2026-11-16 16:40) - chỉ lọc ở đây, không đổi lựa chọn của "Chi theo kênh" */
 const WON = ['chot-hd', 'bao-gia-thi-cong', 'thiet-ke', 'thi-cong']
 const VIEWS = [['tong', 'Tổng quan'], ['bieudo', 'Biểu đồ'], ['page', 'Từng page']]
-const KY = [['homnay', 'Hôm nay'], ['thang', 'Tháng này'], ['truoc', 'Tháng trước'], ['7n', '7 ngày'], ['30n', '30 ngày'], ['tuy', 'Tuỳ chọn'], ['tat', 'Mọi lúc']]
+const KY = [['homnay', 'Hôm nay'], ['thang', 'Tháng này'], ['tuy', 'Tuỳ chọn'], ['tat', 'Mọi lúc']]   // bỏ Tháng trước / 7 ngày / 30 ngày (MarkUp 2026-11-17)
 const vnd = n => (Math.round(Number(n) || 0)).toLocaleString('vi-VN')
 const gon = n => {
   n = Number(n) || 0
@@ -33,9 +33,6 @@ function range(ky, tuy) {
   const today = iso(now)
   if (ky === 'homnay') return { tu: today, den: today, nhan: 'Hôm nay ' + dm(today) + '/' + today.slice(0, 4) }
   if (ky === 'thang') return { tu: iso(new Date(now.getFullYear(), now.getMonth(), 1)), den: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)), nhan: 'Tháng ' + (now.getMonth() + 1) + '/' + now.getFullYear() }
-  if (ky === 'truoc') { const a = new Date(now.getFullYear(), now.getMonth() - 1, 1); return { tu: iso(a), den: iso(new Date(a.getFullYear(), a.getMonth() + 1, 0)), nhan: 'Tháng ' + (a.getMonth() + 1) + '/' + a.getFullYear() } }
-  if (ky === '7n') return { tu: addD(today, -6), den: today, nhan: '7 ngày qua' }
-  if (ky === '30n') return { tu: addD(today, -29), den: today, nhan: '30 ngày qua' }
   if (ky === 'tuy') return tuy.tu && tuy.den && tuy.tu <= tuy.den ? { tu: tuy.tu, den: tuy.den, nhan: dm(tuy.tu) + ' – ' + dm(tuy.den) + '/' + tuy.den.slice(0, 4) } : { tu: null, den: null, nhan: 'Chọn khoảng ngày', chua: true }
   return { tu: null, den: null, nhan: 'Mọi lúc' }
 }
