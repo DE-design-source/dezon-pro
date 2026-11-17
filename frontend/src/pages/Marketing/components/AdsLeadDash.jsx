@@ -13,7 +13,7 @@ import DatePicker from '../../../components/ui/DatePicker'
    (MarkUp 2026-11-16 16:40) - chỉ lọc ở đây, không đổi lựa chọn của "Chi theo kênh" */
 const WON = ['chot-hd', 'bao-gia-thi-cong', 'thiet-ke', 'thi-cong']
 const VIEWS = [['tong', 'Tổng quan'], ['bieudo', 'Biểu đồ'], ['page', 'Từng page']]
-const KY = [['homnay', 'Hôm nay'], ['thang', 'Tháng này'], ['tuy', 'Tuỳ chọn'], ['tat', 'Mọi lúc']]   // bỏ Tháng trước / 7 ngày / 30 ngày (MarkUp 2026-11-17)
+const KY = [['homnay', 'Hôm nay'], ['thang', 'Tháng này'], ['tuy', 'Tuỳ chọn']]   // bỏ Tháng trước / 7 ngày / 30 ngày / Mọi lúc (MarkUp 2026-11-17)
 const vnd = n => (Math.round(Number(n) || 0)).toLocaleString('vi-VN')
 const gon = n => {
   n = Number(n) || 0
