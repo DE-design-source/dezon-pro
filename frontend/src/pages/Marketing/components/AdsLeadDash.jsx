@@ -151,7 +151,7 @@ export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Pick
         <div className="mk-ld-seg" role="tablist" aria-label="Chế độ xem">
           {VIEWS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}
         </div>
-        {/* bộ lọc kênh: Chọn kênh + combo đã lưu + Lưu combo (giống "Chi theo kênh") */}
+        {/* bộ lọc kênh: Chọn kênh + combo đã lưu + Lưu combo */}
         {Picker && (
           <div className="mk-ld-kloc">
             <Picker ds={kenhAll} chon={kenh} onChange={datChon} />
@@ -165,7 +165,7 @@ export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Pick
                 </span>
               )
             })}
-            {onSaveCombo && <button type="button" className="mk-ads-cbmoi" onClick={() => onSaveCombo(kenh)} title="Lưu các kênh đang chọn thành 1 combo (dùng chung với Chi theo kênh)">+ Lưu combo</button>}
+            {onSaveCombo && <button type="button" className="mk-ads-cbmoi" onClick={() => onSaveCombo(kenh)} title="Lưu các kênh đang chọn thành 1 combo (phím tắt) - vd Nhà thầu = HM Cons + Dezon">+ Lưu combo</button>}
           </div>
         )}
         <div className="mk-ld-ky">

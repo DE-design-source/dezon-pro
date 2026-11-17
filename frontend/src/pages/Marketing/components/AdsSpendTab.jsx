@@ -8,7 +8,7 @@ import { useKdOptions } from '../../KinhDoanh/components/ShortlistSelect'
 import AdsLeadDash from './AdsLeadDash'
 
 /* Tab "Chi tiêu quảng cáo": chi tiêu hằng ngày theo kênh (Facebook, Google Ads...). Gồm: ô số tổng · BẢNG NHẬP (ngày x kênh, gõ thẳng) ·
-   chi theo ngày · chi theo kênh; nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
+   hiệu quả kênh (AdsLeadDash); nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
    1.832434e+06). Lưu: trình duyệt (localStorage mk_ads_spend), đã đăng nhập thì lưu chung công ty trên máy chủ (dữ liệu công ty 'mkAds').
    phuTrach = {kênh: [tên đăng nhập, ...]} (1 kênh nhiều người cùng xử lý; bản cũ lưu 1 chuỗi vẫn đọc được): quản trị thấy / giao mọi kênh,
    nhân sự chỉ thấy và nhập kênh mình có tên. */
@@ -180,7 +180,6 @@ export default function AdsSpendTab({ visible }) {
   const [thang, setThangS] = useState(thangNay)  // tháng của kỳ 'thang'
   const [tuy, setTuy] = useState({ tu: '', den: '' })
   const setThang = k => { setKy('thang'); setThangS(k) }
-  const [tat, setTat] = useState({})            // kênh tắt khỏi tổng {tên: 1}
   const [loi, setLoi] = useState('')
   /* nút + thêm kênh: căn đúng giữa cột trống cuối bảng (đo vị trí ô th.them so với khung, đo lại khi đổi cỡ / cuộn ngang) */
   const boxRef = useRef(null)
@@ -322,9 +321,8 @@ export default function AdsSpendTab({ visible }) {
     const v = ngay[k].v.slice(); v[i] = n; ngay[k] = { d, v }
     setData({ ...data, ngay: ngay.filter(x => x.v.some(y => y != null)) })
   }
-  /* combo (phím tắt) chọn kênh: data.combo = [{ten, kenh: [tên kênh]}], lưu chung; bấm chip = chỉ chọn đúng các kênh của combo */
+  /* combo (phím tắt) chọn kênh của báo cáo Hiệu quả kênh (AdsLeadDash): data.combo = [{ten, kenh: [tên kênh]}], lưu chung */
   const combo = Array.isArray(data.combo) ? data.combo : []
-  const datChon = ks => { const m = {}; kenhThay.forEach(i => { const k = data.kenh[i]; if (ks.indexOf(k) < 0) m[k] = 1 }); setTat(m) }
   function luuCombo(chonKs) {
     if (!chonKs.length) { setLoi('Chọn ít nhất 1 kênh rồi mới lưu combo'); return }
     const ten = (window.prompt('Tên combo (vd: Nhà thầu) cho ' + chonKs.length + ' kênh: ' + chonKs.join(', ')) || '').trim().slice(0, 40)
@@ -376,23 +374,20 @@ export default function AdsSpendTab({ visible }) {
     : kyNgay.length ? nhanNgay(kyNgay[0]) + ' – ' + nhanNgay(kyNgay[kyNgay.length - 1]) + '/' + kyNgay[kyNgay.length - 1].slice(0, 4) : ''
   const kyKhoa = ky + '|' + thang + '|' + tuy.tu + '|' + tuy.den + '|' + homNay
   const v = useMemo(() => {
-    const ki = kenhThay.filter(i => !tat[data.kenh[i]])
+    const ki = kenhThay
     const by = {}; data.ngay.forEach(x => { by[x.d] = x.v })
     // tháng đang chọn: đủ mọi ngày của tháng (cả ngày chưa nhập); Mọi tháng: chỉ ngày đã có số
     const ds = kyNgay
     const ngay = ds.map(d => { const vv = by[d] || data.kenh.map(() => null); return { d, v: vv, tong: ki.reduce((a, i) => a + (Number(vv[i]) || 0), 0) } })
-    const theoKenh = kenhThay.map(i => ({ k: data.kenh[i], i, tong: ngay.reduce((a, x) => a + (Number(x.v[i]) || 0), 0), on: !tat[data.kenh[i]] }))
+    const theoKenh = kenhThay.map(i => ({ k: data.kenh[i], i, tong: ngay.reduce((a, x) => a + (Number(x.v[i]) || 0), 0) }))
     const tkI = {}; theoKenh.forEach(x => { tkI[x.i] = x.tong })
     const tong = ngay.reduce((a, x) => a + x.tong, 0)
     const coChi = ngay.filter(x => x.tong > 0)
     const max = ngay.reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, d: '' })
-    const kMax = theoKenh.filter(x => x.on).reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, k: '' })
+    const kMax = theoKenh.reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, k: '' })
     return { ki, tkI, ngay, theoKenh, tong, tb: coChi.length ? tong / coChi.length : 0, soNgay: coChi.length, max, kMax }
-  }, [data, kyKhoa, tat, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, kyKhoa, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tongKenhMax = Math.max(1, ...v.theoKenh.map(x => x.tong))
-  /* combo đang áp dụng (lựa chọn hiện tại trùng đúng 1 combo): danh sách chỉ hiện các kênh của combo, kênh khác ẩn */
-  const comboDang = (Array.isArray(data.combo) ? data.combo : []).find(c => { const co = c.kenh.filter(k => v.theoKenh.some(x => x.k === k)); return co.length && co.length === v.ki.length && co.every(k => v.theoKenh.some(x => x.k === k && x.on)) })
   const dongBang = v.ngay.slice().reverse()     // bảng: mới nhất ở trên như file gốc
 
   return (
@@ -604,47 +599,6 @@ export default function AdsSpendTab({ visible }) {
         onSaveCombo={luuCombo}
         onDelCombo={boCombo}
       />}
-
-      {/* chi theo kênh: bấm để bật / tắt kênh khỏi tổng (ô số, biểu đồ) */}
-      <div className="mk-ads-card">
-        {/* check list: đánh dấu các kênh (page) muốn xem -> tổng của riêng các kênh đó (ô số + biểu đồ cũng tính theo lựa chọn) */}
-        <div className="mk-ads-h mk-ads-hloc"><span className="mk-ads-h1"><b>Chi theo kênh</b>
-          <KenhPicker ds={v.theoKenh.map(x => x.k)} chon={v.theoKenh.filter(x => x.on).map(x => x.k)} onChange={datChon} />
-          {/* combo (phím tắt): mỗi combo đã lưu = 1 nút nhấn ngay cạnh Chọn kênh; bấm = chỉ chọn các kênh của combo */}
-          {combo.map(c => {
-            const co = c.kenh.filter(k => v.theoKenh.some(x => x.k === k))
-            const dang = co.length && co.length === v.ki.length && co.every(k => v.theoKenh.some(x => x.k === k && x.on))
-            return (
-              <span key={c.ten} className={'mk-ads-cb' + (dang ? ' on' : '')} title={c.ten + ': ' + c.kenh.join(' + ')}>
-                <button type="button" onClick={() => datChon(co)}>{c.ten}<i>{co.length}</i></button>
-                <button type="button" className="x" title={'Xoá combo ' + c.ten} onClick={() => boCombo(c.ten)}>×</button>
-              </span>
-            )
-          })}
-          <button type="button" className="mk-ads-cbmoi" onClick={() => luuCombo(v.theoKenh.filter(x => x.on).map(x => x.k))} title="Lưu các kênh đang chọn thành 1 combo (phím tắt) - vd Nhà thầu = HM Cons + Dezon">+ Lưu combo</button></span>
-          <div className="mk-ads-chon">
-            <span>Đã chọn <b>{v.ki.length}/{v.theoKenh.length}</b> kênh · Tổng <b className="t">{fmt(v.tong)} đ</b></span>
-            <button type="button" onClick={() => setTat({})} disabled={v.ki.length === v.theoKenh.length}>Chọn hết</button>
-            <button type="button" onClick={() => { const m = {}; v.theoKenh.forEach(x => { m[x.k] = 1 }); setTat(m) }} disabled={!v.ki.length}>Bỏ hết</button>
-          </div>
-        </div>
-        <div className="mk-ads-kenh">
-          {comboDang && (
-            <div className="mk-ads-cbdang">Đang xem combo <b>{comboDang.ten}</b> · các kênh khác đã ẩn
-              <button type="button" onClick={() => setTat({})}>Hiện tất cả kênh</button></div>
-          )}
-          {v.theoKenh.filter(x => !comboDang || x.on).sort((a, b) => b.tong - a.tong).map(x => (
-            <button type="button" key={x.k} className={'mk-ads-krow' + (x.on ? '' : ' off')} onClick={() => setTat(t => { const m = { ...t }; if (m[x.k]) delete m[x.k]; else m[x.k] = 1; return m })}
-              title={x.on ? 'Bỏ chọn kênh này (không tính vào tổng)' : 'Chọn kênh này để tính vào tổng'}>
-              <span className="nm"><i className={'ck' + (x.on ? ' on' : '')} aria-hidden="true" />{x.k}</span>
-              <span className="tr"><i style={{ width: (x.tong / tongKenhMax * 100) + '%' }} /></span>
-              <b>{x.tong ? fmt(x.tong) + ' đ' : '—'}</b>
-              <em>{x.on && v.tong ? Math.round(x.tong / v.tong * 100) + '%' : x.on ? '0%' : 'không chọn'}</em>
-            </button>
-          ))}
-        </div>
-      </div>
-
       </>}
     </div>
   )
