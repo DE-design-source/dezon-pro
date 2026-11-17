@@ -4,6 +4,7 @@ import { useKdMap, saveKdOptions } from './ShortlistSelect'
 import { fmtTy, stageAccent, lmInitials } from '../utils'
 import { mediaUrl } from '../../QS/api/files'
 import { MonthCalendar, TimeWheel } from './IosWheel'
+import DatePicker from '../../../components/ui/DatePicker'
 
 /* Trang khách hàng riêng: hồ sơ, tiến trình pipeline, lịch sử chăm sóc & chi tiết từng lần tương tác */
 export const INTERACTION_TYPES = {
@@ -19,6 +20,7 @@ export const OUTCOMES = { good: ['Tích cực', 'var(--success)'], neutral: ['Đ
 
 const addDays = (iso, n) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 const fmtD = iso => (iso ? iso.split('-').reverse().join('/') : '')
+const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
 /* Bảng chi tiết bên phải (nút mở rộng ở Thông tin liên hệ, MarkUp 2026-11-16 16:32): nhớ đóng / mở theo trình duyệt */
 const DETAIL_LS = 'kd-cp-detail'
 const readDetail = () => { try { return localStorage.getItem(DETAIL_LS) === '1' } catch { return false } }
@@ -198,7 +200,8 @@ export function RatingStars({ id, small }) {
 
 const Ic = ({ d, size = 15 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 
-export default function CustomerPage({ lead: l, interactions, onAddInteraction, onBack, onEdit, onMove, me }) {
+export default function CustomerPage({ lead: l, interactions, onAddInteraction, onBack, onEdit, onMove, onSetCreated, me }) {
+  const [suaNgay, setSuaNgay] = useState(false)   // đang sửa Ngày tạo
   const blank = () => ({ type: 'call', date: new Date().toISOString().slice(0, 10), title: '', content: '', outcome: 'good', next: '', nextNote: '' })
   const [f, setF] = useState(blank)
   const [adding, setAdding] = useState(false)
@@ -335,7 +338,24 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <dt>Giá trị ước tính</dt><dd className="kd-cp-money">{fmtTy(l.value)}</dd>
               <dt>Khởi công</dt><dd>{tl.start ? fmtD(tl.start) : '—'}</dd>
               <dt>Hoàn công</dt><dd>{tl.end ? fmtD(tl.end) : '—'}</dd>
-              <dt>Ngày tạo</dt><dd>{fmtD(l.createdAt)}</dd>
+              <dt>Ngày tạo</dt>
+              <dd className="kd-cp-ngay">
+                {suaNgay && onSetCreated ? (
+                  <>
+                    <DatePicker value={l.createdAt || ''} max={todayIso()} ariaLabel="Ngày tạo" onChange={d => { if (d) onSetCreated(d); setSuaNgay(false) }} />
+                    <button type="button" className="kd-cp-ngay-x" title="Huỷ" aria-label="Huỷ sửa ngày tạo" onClick={() => setSuaNgay(false)}>×</button>
+                  </>
+                ) : (
+                  <>
+                    {fmtD(l.createdAt)}
+                    {onSetCreated && (
+                      <button type="button" className="kd-cp-ngay-btn" title="Sửa ngày tạo" aria-label="Sửa ngày tạo" onClick={() => setSuaNgay(true)}>
+                        <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={12} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </dd>
             </dl>
             {l.categories?.length > 0 && <div className="kd-cp-tags">{l.categories.map(c => <span key={c}>{c}</span>)}</div>}
           </section>

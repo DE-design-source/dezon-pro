@@ -21,6 +21,8 @@ export function toServer(d) {
 export const listLeads = () => request('GET', '/sales/leads').then(r => (r.leads || []).map(fromServer))
 export const createLead = d => request('POST', '/sales/leads', { body: toServer(d) }).then(fromServer)
 export const updateLead = (id, d) => request('PATCH', '/sales/leads/' + enc(id), { body: toServer(d) }).then(fromServer)
+// sửa ngày tạo (yyyy-mm-dd) - toServer bỏ createdAt nên gửi riêng
+export const setLeadCreatedAt = (id, day) => request('PATCH', '/sales/leads/' + enc(id), { body: { createdAt: day } }).then(fromServer)
 export const deleteLead = id => request('DELETE', '/sales/leads/' + enc(id))
 /* Tài khoản đang hoạt động của công ty để giao phụ trách: [{username, name, department, role, sales}] (sales = vào được Kinh doanh) */
 export const listStaff = () => request('GET', '/sales/staff').then(r => r.staff || [])

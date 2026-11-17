@@ -6,9 +6,10 @@ import * as qsApi from '../../QS/api/qsApi'
 import { LEAD_SOURCES } from '../../../data/kinhDoanhData'
 import { useKdOptions } from '../../KinhDoanh/components/ShortlistSelect'
 import AdsLeadDash from './AdsLeadDash'
+import { listLeads } from '../../KinhDoanh/api'
 
 /* Tab "Chi tiêu quảng cáo": chi tiêu hằng ngày theo kênh (Facebook, Google Ads...). Gồm: ô số tổng · BẢNG NHẬP (ngày x kênh, gõ thẳng) ·
-   chi theo ngày · chi theo kênh; nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
+   hiệu quả kênh (AdsLeadDash); nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
    1.832434e+06). Lưu: trình duyệt (localStorage mk_ads_spend), đã đăng nhập thì lưu chung công ty trên máy chủ (dữ liệu công ty 'mkAds').
    phuTrach = {kênh: [tên đăng nhập, ...]} (1 kênh nhiều người cùng xử lý; bản cũ lưu 1 chuỗi vẫn đọc được): quản trị thấy / giao mọi kênh,
    nhân sự chỉ thấy và nhập kênh mình có tên. */
@@ -23,69 +24,6 @@ const khongDau = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/
 /* Nút "+" phụ trách: hộp nổi có ô gõ để tìm + danh sách đánh dấu (chọn / bỏ nhiều người, ghi ngay); bấm ra ngoài hoặc Esc để đóng.
    Hộp vẽ ra thẳng .mk-page (portal - giữ biến màu của trang) + position:fixed theo vị trí nút: ô tiêu đề sticky của bảng tạo lớp xếp chồng riêng,
    vẽ trong ô thì dòng Tổng (sticky) đè lên hộp */
-/* Biểu đồ "Lũy kế chi tiêu": đường cộng dồn chi tiêu theo ngày của kỳ đang xem (màu Marketing) so với kỳ trước cùng độ dài
-   (xám, nét đứt) - thấy ngay đang tiêu nhanh / chậm hơn kỳ trước. cur / prev = mảng lũy kế theo thứ tự ngày (null = ngày chưa tới).
-   Rê chuột: đường dóng + giá trị 2 kỳ tại ngày đó. Vẽ đúng bề rộng thật của khung (không kéo giãn chữ) */
-function LuyKeChart({ ngay, cur, prev, nhanPrev }) {
-  const ref = useRef(null)
-  const [w, setW] = useState(480)
-  const [hv, setHv] = useState(-1)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => { const x = Math.round(el.clientWidth - 36); if (x > 0) setW(x) })
-    ro.observe(el); return () => ro.disconnect()
-  }, [])
-  const W = Math.max(280, w); const H = 240; const padL = 50; const padB = 26; const padT = 14; const padR = 10
-  const n = Math.max(ngay.length, prev.length, 1)
-  const yMax = Math.max(1e6, ...cur.filter(x => x != null), ...prev)
-  const buoc = Math.pow(10, Math.floor(Math.log10(Math.max(1, yMax / 3))))
-  const tick = Math.max(1, Math.ceil(yMax / 3 / buoc) * buoc)
-  const top = tick * 3
-  const x = i => padL + (n <= 1 ? 0 : i * (W - padL - padR) / (n - 1))
-  const y = v => padT + (H - padT - padB) * (1 - v / top)
-  const duong = ds => { let d = ''; ds.forEach((v, i) => { if (v == null) return; d += (d ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) }); return d }
-  const cuoi = (() => { for (let i = cur.length - 1; i >= 0; i--) if (cur[i] != null) return i; return -1 })()
-  const buocNhan = Math.ceil(n / Math.max(3, Math.floor(W / 80)))
-  const onMove = e => {
-    const r = e.currentTarget.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width * W
-    setHv(Math.max(0, Math.min(n - 1, Math.round((px - padL) / ((W - padL - padR) / Math.max(1, n - 1))))))
-  }
-  const ci = hv >= 0 ? cur[hv] : null; const pi = hv >= 0 ? prev[hv] : null
-  return (
-    <div className="mk-ads-chart" ref={ref} onMouseLeave={() => setHv(-1)}>
-      <svg viewBox={'0 0 ' + W + ' ' + H} width={W} height={H} role="img" aria-label="Biểu đồ lũy kế chi tiêu kỳ này so với kỳ trước" onMouseMove={onMove}>
-        {[0, 1, 2, 3].map(t => (
-          <g key={t}>
-            <line x1={padL} x2={W - padR} y1={y(tick * t)} y2={y(tick * t)} className="grid" />
-            <text x={padL - 6} y={y(tick * t) + 3} textAnchor="end" className="ax">{fmtM(tick * t)}</text>
-          </g>
-        ))}
-        {ngay.map((d, i) => (i % buocNhan === 0 ? <text key={d} x={x(i)} y={H - 7} textAnchor="middle" className="ax">{nhanNgay(d)}</text> : null))}
-        <line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} className="base" />
-        {prev.length > 0 && <path d={duong(prev)} className="lk-prev" />}
-        {cuoi >= 0 && <path d={duong(cur) + 'L' + x(cuoi).toFixed(1) + ',' + y(0) + 'L' + x(0).toFixed(1) + ',' + y(0) + 'Z'} className="lk-area" />}
-        <path d={duong(cur)} className="lk-cur" />
-        {cuoi >= 0 && <circle cx={x(cuoi)} cy={y(cur[cuoi])} r="4.5" className="lk-dot" />}
-        {hv >= 0 && (
-          <g>
-            <line x1={x(hv)} x2={x(hv)} y1={padT} y2={y(0)} className="lk-hair" />
-            {ci != null && <circle cx={x(hv)} cy={y(ci)} r="4" className="lk-dot" />}
-            {pi != null && <circle cx={x(hv)} cy={y(pi)} r="4" className="lk-dotp" />}
-          </g>
-        )}
-      </svg>
-      {hv >= 0 && (
-        <div className="mk-ads-tip" style={{ left: (x(hv) / W * 100) + '%' }}>
-          <b>Ngày thứ {hv + 1}{ngay[hv] ? ' · ' + nhanNgay(ngay[hv]) : ''}</b>
-          <span><i><em className="lk-sw cur" />Kỳ này</i>{ci != null ? fmt(ci) + ' đ' : '—'}</span>
-          {prev.length > 0 && <span><i><em className="lk-sw prev" />{nhanPrev}</i>{pi != null ? fmt(pi) + ' đ' : '—'}</span>}
-        </div>
-      )}
-    </div>
-  )
-}
 /* Shortlist chọn kênh: nút "Chọn kênh (n/N)" mở hộp có ô gõ tìm + danh sách đánh dấu (chọn / bỏ nhiều kênh); hộp vẽ ra .mk-page */
 function KenhPicker({ ds, chon, onChange }) {
   const [mo, setMo] = useState(null)
@@ -174,7 +112,6 @@ function PtPicker({ ds, users, onChange }) {
 }
 const LS = 'mk_ads_spend'
 const fmt = n => Math.round(Number(n) || 0).toLocaleString('vi-VN')
-const fmtM = n => { n = Number(n) || 0; if (!n) return '0'; if (n < 1e6) return Math.round(n / 1000) + 'k'; const v = n / 1e6; return (v >= 10 ? v.toFixed(0) : v.toFixed(1)).replace('.', ',') + 'tr' }
 
 function napLs() { try { const v = JSON.parse(localStorage.getItem(LS) || 'null'); return v && Array.isArray(v.kenh) && Array.isArray(v.ngay) ? v : null } catch (e) { return null } }
 function luuLs(v) { try { if (v) localStorage.setItem(LS, JSON.stringify(v)); else localStorage.removeItem(LS) } catch (e) { /* bỏ qua */ } }
@@ -244,10 +181,7 @@ export default function AdsSpendTab({ visible }) {
   const [thang, setThangS] = useState(thangNay)  // tháng của kỳ 'thang'
   const [tuy, setTuy] = useState({ tu: '', den: '' })
   const setThang = k => { setKy('thang'); setThangS(k) }
-  const [tat, setTat] = useState({})            // kênh tắt khỏi tổng {tên: 1}
   const [loi, setLoi] = useState('')
-  const [hover, setHover] = useState(-1)
-  const chartRef = useRef(null)
   /* nút + thêm kênh: căn đúng giữa cột trống cuối bảng (đo vị trí ô th.them so với khung, đo lại khi đổi cỡ / cuộn ngang) */
   const boxRef = useRef(null)
   const [themX, setThemX] = useState(null)
@@ -280,14 +214,6 @@ export default function AdsSpendTab({ visible }) {
     const raf = requestAnimationFrame(do_)   // đo lại sau khi trình duyệt dàn xong (font / CSS vừa nạp)
     return () => { if (ro) ro.disconnect(); if (wrap) wrap.removeEventListener('scroll', do_); window.removeEventListener('resize', do_); cancelAnimationFrame(raf) }
   })
-  const [chartW, setChartW] = useState(1000)
-  useEffect(() => {
-    const el = chartRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => { const w = Math.round(el.clientWidth - 36); if (w > 0) setChartW(w) })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
   const fileRef = useRef(null)
   /* phiên đăng nhập: quản trị (admin / super, hoặc chưa đăng nhập = dữ liệu chỉ ở máy này) thấy mọi kênh + giao kênh;
      nhân sự chỉ thấy kênh có phuTrach[kênh] = tên đăng nhập của mình */
@@ -396,9 +322,8 @@ export default function AdsSpendTab({ visible }) {
     const v = ngay[k].v.slice(); v[i] = n; ngay[k] = { d, v }
     setData({ ...data, ngay: ngay.filter(x => x.v.some(y => y != null)) })
   }
-  /* combo (phím tắt) chọn kênh: data.combo = [{ten, kenh: [tên kênh]}], lưu chung; bấm chip = chỉ chọn đúng các kênh của combo */
+  /* combo (phím tắt) chọn kênh của báo cáo Hiệu quả kênh (AdsLeadDash): data.combo = [{ten, kenh: [tên kênh]}], lưu chung */
   const combo = Array.isArray(data.combo) ? data.combo : []
-  const datChon = ks => { const m = {}; kenhThay.forEach(i => { const k = data.kenh[i]; if (ks.indexOf(k) < 0) m[k] = 1 }); setTat(m) }
   function luuCombo(chonKs) {
     if (!chonKs.length) { setLoi('Chọn ít nhất 1 kênh rồi mới lưu combo'); return }
     const ten = (window.prompt('Tên combo (vd: Nhà thầu) cho ' + chonKs.length + ' kênh: ' + chonKs.join(', ')) || '').trim().slice(0, 40)
@@ -423,6 +348,14 @@ export default function AdsSpendTab({ visible }) {
     setThemMo(false); setThemQ('')
     if (data.kenh.indexOf(ten) >= 0) { setLoi('Kênh "' + ten + '" đã có'); return }
     setData({ ...data, kenh: data.kenh.concat([ten]), ngay: data.ngay.map(x => ({ d: x.d, v: x.v.concat([null]) })) })
+  }
+  /* kéo thả đổi chỗ cột kênh (MarkUp 2026-11-17): đổi thứ tự data.kenh + số từng ngày theo cùng thứ tự; lưu chung */
+  const [keo, setKeo] = useState({ tu: -1, toi: -1 })
+  function doiChoKenh(tu, den) {
+    if (tu < 0 || den < 0 || tu === den) return
+    const ord = data.kenh.map((k, i) => i)
+    ord.splice(den, 0, ord.splice(tu, 1)[0])
+    setData({ ...data, kenh: ord.map(i => data.kenh[i]), ngay: data.ngay.map(x => ({ d: x.d, v: ord.map(i => (x.v[i] == null ? null : x.v[i])) })) })
   }
   function doiTenKenh(i) {
     const ten = (window.prompt('Đổi tên kênh', data.kenh[i]) || '').trim()
@@ -450,53 +383,62 @@ export default function AdsSpendTab({ visible }) {
     : kyNgay.length ? nhanNgay(kyNgay[0]) + ' – ' + nhanNgay(kyNgay[kyNgay.length - 1]) + '/' + kyNgay[kyNgay.length - 1].slice(0, 4) : ''
   const kyKhoa = ky + '|' + thang + '|' + tuy.tu + '|' + tuy.den + '|' + homNay
   const v = useMemo(() => {
-    const ki = kenhThay.filter(i => !tat[data.kenh[i]])
+    const ki = kenhThay
     const by = {}; data.ngay.forEach(x => { by[x.d] = x.v })
     // tháng đang chọn: đủ mọi ngày của tháng (cả ngày chưa nhập); Mọi tháng: chỉ ngày đã có số
     const ds = kyNgay
     const ngay = ds.map(d => { const vv = by[d] || data.kenh.map(() => null); return { d, v: vv, tong: ki.reduce((a, i) => a + (Number(vv[i]) || 0), 0) } })
-    const theoKenh = kenhThay.map(i => ({ k: data.kenh[i], i, tong: ngay.reduce((a, x) => a + (Number(x.v[i]) || 0), 0), on: !tat[data.kenh[i]] }))
+    const theoKenh = kenhThay.map(i => ({ k: data.kenh[i], i, tong: ngay.reduce((a, x) => a + (Number(x.v[i]) || 0), 0) }))
     const tkI = {}; theoKenh.forEach(x => { tkI[x.i] = x.tong })
     const tong = ngay.reduce((a, x) => a + x.tong, 0)
     const coChi = ngay.filter(x => x.tong > 0)
     const max = ngay.reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, d: '' })
-    const kMax = theoKenh.filter(x => x.on).reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, k: '' })
+    const kMax = theoKenh.reduce((m, x) => (x.tong > m.tong ? x : m), { tong: 0, k: '' })
     return { ki, tkI, ngay, theoKenh, tong, tb: coChi.length ? tong / coChi.length : 0, soNgay: coChi.length, max, kMax }
-  }, [data, kyKhoa, tat, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, kyKhoa, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---- biểu đồ cột chi theo ngày (1 màu, tổng các kênh đang bật) ---- */
-  /* vẽ theo đúng bề rộng thật của khung (đo bằng ResizeObserver) - không kéo giãn SVG nên chữ trục không bị méo */
-  const W = Math.max(320, chartW); const H = 240; const padL = 50; const padB = 26; const padT = 12
-  const n = v.ngay.length
-  const yMax = Math.max(1e6, ...v.ngay.map(x => x.tong))   // chưa có số: trục 0 - 1tr cho dễ nhìn
-  const buoc = Math.pow(10, Math.floor(Math.log10(Math.max(1, yMax / 3))))
-  const tick = Math.max(1, Math.ceil(yMax / 3 / buoc) * buoc)
-  const top = tick * 3
-  const cw = (W - padL) / Math.max(1, n)
-  const bw = Math.max(2, Math.min(28, cw - 3))
-  const y = val => padT + (H - padT - padB) * (1 - val / top)
-  const hv = hover >= 0 && hover < n ? v.ngay[hover] : null
-  const tongKenhMax = Math.max(1, ...v.theoKenh.map(x => x.tong))
-  /* combo đang áp dụng (lựa chọn hiện tại trùng đúng 1 combo): danh sách chỉ hiện các kênh của combo, kênh khác ẩn */
-  const comboDang = (Array.isArray(data.combo) ? data.combo : []).find(c => { const co = c.kenh.filter(k => v.theoKenh.some(x => x.k === k)); return co.length && co.length === v.ki.length && co.every(k => v.theoKenh.some(x => x.k === k && x.on)) })
   const dongBang = v.ngay.slice().reverse()     // bảng: mới nhất ở trên như file gốc
-  /* lũy kế: kỳ này (dừng ở hôm nay) và kỳ trước cùng độ dài (Tháng: tháng trước; Mọi lúc: không so) - chỉ tính kênh đang chọn */
-  const kyTruoc = (() => {
-    if (ky === 'tat' || !kyNgay.length) return []
-    if (ky === 'thang') return ngayCuaThang(thangCong(thang, -1)).slice().reverse()
-    const e = new Date(kyNgay[0] + 'T00:00:00'); e.setDate(e.getDate() - 1); const s0 = new Date(e); s0.setDate(s0.getDate() - (kyNgay.length - 1))
-    return ngayTu(isoNgay(s0), isoNgay(e))
+  /* Ô số (MarkUp 2026-11-17, theo bảng Lark cũ): lead = khách hàng Kinh doanh có "Nguồn khách hàng" trùng tên kênh quảng cáo
+     (cùng quy tắc với Hiệu quả kênh). "/ngày" = hôm nay; "/tháng" = kỳ đang chọn. Không có quyền Kinh doanh -> ô lead hiện — */
+  const [leads, setLeads] = useState(null)
+  const [hqR, setHqR] = useState(null)   // kỳ đang chọn ở khối Hiệu quả kênh
+  useEffect(() => {
+    if (!visible) return undefined
+    let live = true
+    listLeads().then(ls => { if (live) setLeads(ls) }, () => { if (live) setLeads(null) })
+    return () => { live = false }
+  }, [visible])
+  // ô số chỉ tính các kênh đang tích ở khối Hiệu quả kênh (MarkUp 2026-11-17)
+  const kiO = thayHq && hqR && Array.isArray(hqR.kenh) ? v.ki.filter(i => hqR.kenh.indexOf(data.kenh[i]) >= 0) : v.ki
+  const kenhTen = new Set(kiO.map(i => String(data.kenh[i] || '').trim().toLowerCase()))
+  const leadQc = (leads || []).filter(l => kenhTen.has(String(l.source || '').trim().toLowerCase()))
+  /* Kỳ của ô số = bộ lọc thời gian của khối Hiệu quả kênh (onRange); khối đó ẩn (không có quyền xem) thì theo kỳ của bảng nhập.
+     Công thức: Leads/ngày = lead trong kỳ ÷ số ngày; Chi phí Ads/Ngày = chi trong kỳ ÷ số ngày; CPA = chi ÷ lead.
+     Số ngày tính tới hôm nay (Tháng này = số ngày đã qua); Mọi lúc: từ ngày có số / có lead sớm nhất */
+  const R0 = thayHq && hqR && !hqR.chua ? hqR
+    : { ky: ky === 'thang' ? 'thang' : '', tu: kyNgay[0] || null, den: kyNgay[kyNgay.length - 1] || null, nhan: nhanKy, chua: thayHq && hqR ? hqR.chua : false }
+  /* "Tháng này" = từ đầu tháng tới hôm nay; "Tuỳ chọn" = đúng khoảng ngày đã chọn (MarkUp 2026-11-17); nhãn ghi rõ khoảng ngày */
+  const R = R0.ky !== 'tuy' && R0.den && R0.den > homNay ? { ...R0, den: homNay } : R0
+  const nhanR = R.tu && R.den && R.den !== R0.den
+    ? (R.tu === R.den ? nhanNgay(R.den) + '/' + R.den.slice(0, 4) : nhanNgay(R.tu) + ' – ' + nhanNgay(R.den) + '/' + R.den.slice(0, 4)) : R.nhan
+  const inK = d => !!d && (!R.tu || d >= R.tu) && (!R.den || d <= R.den)
+  const chiKy = data.ngay.reduce((a, x) => (inK(x.d) ? a + kiO.reduce((b, i) => b + (Number(x.v[i]) || 0), 0) : a), 0)
+  const leadKy = leadQc.filter(l => inK(String(l.createdAt || '').slice(0, 10))).length
+  const soNgayKy = (() => {
+    if (R.chua) return 0
+    let tu = R.tu
+    if (!tu) {
+      const ds = [...data.ngay.filter(x => x.v.some(y => Number(y) > 0)).map(x => x.d), ...leadQc.map(l => String(l.createdAt || '').slice(0, 10)).filter(Boolean)].sort()
+      tu = ds[0] || homNay
+    }
+    const den = R.den || homNay   // Tuỳ chọn: tới ngày kết thúc đã chọn; còn lại: tới hôm nay
+    if (tu > den) return 0
+    return Math.round((Date.parse(den + 'T00:00:00Z') - Date.parse(tu + 'T00:00:00Z')) / 864e5) + 1
   })()
-  const byD = {}; data.ngay.forEach(x => { byD[x.d] = x.v })
-  const tongD = d => { const vv = byD[d]; return vv ? v.ki.reduce((a, i) => a + (Number(vv[i]) || 0), 0) : 0 }
-  let lk = 0; const lkCur = kyNgay.map(d => (d > homNay ? null : (lk += tongD(d))))
-  lk = 0; const lkPrev = kyTruoc.map(d => (lk += tongD(d)))
-  const tongPrev = lkPrev.length ? lkPrev[lkPrev.length - 1] : 0
-  // so cùng thời điểm: kỳ trước tới ngày thứ tương ứng hôm nay
-  const nCur = lkCur.filter(x => x != null).length
-  const prevCung = nCur && lkPrev.length ? lkPrev[Math.min(nCur, lkPrev.length) - 1] : 0
-  const doiPct = prevCung ? Math.round((v.tong - prevCung) / prevCung * 100) : null
-  const nhanPrev = ky === 'thang' ? nhanThang(thangCong(thang, -1)) : 'Kỳ trước'
+  const theoThang = R.ky === 'thang' || /^Tháng /.test(R.nhan || '')
+  /* Leads/ngày = lead TRONG NGÀY: hôm nay; Tuỳ chọn đúng 1 ngày thì ngày đó (MarkUp 2026-11-17) */
+  const ngayLead = R.ky === 'tuy' && R.tu && R.tu === R.den ? R.tu : homNay
+  const leadNgay = leadQc.filter(l => String(l.createdAt || '').slice(0, 10) === ngayLead).length
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
@@ -553,11 +495,33 @@ export default function AdsSpendTab({ visible }) {
       {!(trang === 'nhap' && !kenhCua.length) && <>
       {/* ô số */}
       <div className="mk-ads-kpis">
-        <div className="mk-ads-kpi"><span>Tổng chi</span><b>{fmt(v.tong)} đ</b><em>{nhanKy} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
-        <div className="mk-ads-kpi"><span>Trung bình / ngày</span><b>{fmt(v.tb)} đ</b><em>{v.soNgay} ngày có chi</em></div>
-        <div className="mk-ads-kpi"><span>Ngày chi cao nhất</span><b>{fmt(v.max.tong)} đ</b><em>{v.max.d ? nhanNgay(v.max.d) + '/' + v.max.d.slice(0, 4) : '—'}</em></div>
-        <div className="mk-ads-kpi"><span>Kênh chi nhiều nhất</span><b>{v.kMax.k || '—'}</b><em>{v.kMax.tong ? fmt(v.kMax.tong) + ' đ · ' + Math.round(v.kMax.tong / (v.tong || 1) * 100) + '%' : ''}</em></div>
+        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads ? leadNgay : '—'}</b><em>{ngayLead === homNay ? 'Hôm nay ' : 'Ngày '}{nhanNgay(ngayLead)}/{ngayLead.slice(0, 4)}{leads ? '' : ' · cần quyền Kinh doanh'}</em></div>
+        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{nhanR} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
+        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{nhanR}{soNgayKy ? ' · tổng chi ÷ ' + soNgayKy + ' ngày' : ''}</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanR} · từ kênh quảng cáo</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{nhanR} · {kiO.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
+
+      {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
+      {thayHq && <AdsLeadDash
+        visible={visible}
+        access={quanTri && online ? (
+          <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
+            {xemHq.map(u => (
+              <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
+                onClick={() => { if (window.confirm('Bỏ quyền xem báo cáo Hiệu quả kênh của ' + tenNguoi(u) + '?')) setData({ ...data, xemHq: xemHq.filter(x => x !== u) }) }}>{avChu(tenNguoi(u))}</button>
+            ))}
+            {users.length > 0 && <PtPicker ds={xemHq} users={users} onChange={m => setData({ ...data, xemHq: m })} />}
+          </div>
+        ) : null}
+        data={data}
+        kenh={v.theoKenh.map(x => x.k)}
+        Picker={KenhPicker}
+        onRange={setHqR}
+        combo={combo}
+        onSaveCombo={luuCombo}
+        onDelCombo={boCombo}
+      />}
 
       {/* BẢNG NHẬP: dòng = ngày, cột = kênh (như file), gõ số thẳng vào ô */}
       <div className="mk-ads-card">
@@ -602,7 +566,14 @@ export default function AdsSpendTab({ visible }) {
                 {/* cột Tổng ngày đứng đầu (ngay sau cột Ngày) */}
                 {thayTong && <th className="num kenh k tong">{trang === 'nhap' ? 'Tổng của tôi' : 'Tổng ngày'}</th>}
                 {kenhThay.map(i => { const k = data.kenh[i]; return (
-                  <th key={k} className="num kenh k">
+                  <th key={k} className={'num kenh k' + (keo.tu === i ? ' keo' : '') + (keo.tu >= 0 && keo.toi === i && keo.tu !== i ? (keo.tu < i ? ' dich-r' : ' dich-l') : '')}
+                    draggable={ql || undefined}
+                    title={ql ? 'Kéo sang trái / phải để đổi chỗ kênh' : undefined}
+                    onDragStart={ql ? e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', k); setKeo({ tu: i, toi: i }) } : undefined}
+                    onDragOver={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; if (keo.toi !== i) setKeo({ ...keo, toi: i }) } : undefined}
+                    onDrop={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); doiChoKenh(keo.tu, i); setKeo({ tu: -1, toi: -1 }) } : undefined}
+                    onDragEnd={ql ? () => setKeo({ tu: -1, toi: -1 }) : undefined}>
+                    {ql && <i className="keo-ic" aria-hidden="true">⠿</i>}
                     {ql ? <span title="Bấm để đổi tên kênh" onClick={() => doiTenKenh(i)}>{k}</span> : <span>{k}</span>}
                     {ql && <button type="button" title={'Bỏ kênh ' + k} onClick={() => boKenh(i)}>×</button>}
                   </th>
@@ -688,117 +659,6 @@ export default function AdsSpendTab({ visible }) {
         </div>
       </div>
 
-      {/* hiệu quả kênh: chi tiêu (bảng trên) ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
-      {thayHq && <AdsLeadDash
-        visible={visible}
-        access={quanTri && online ? (
-          <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
-            {xemHq.map(u => (
-              <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
-                onClick={() => { if (window.confirm('Bỏ quyền xem báo cáo Hiệu quả kênh của ' + tenNguoi(u) + '?')) setData({ ...data, xemHq: xemHq.filter(x => x !== u) }) }}>{avChu(tenNguoi(u))}</button>
-            ))}
-            {users.length > 0 && <PtPicker ds={xemHq} users={users} onChange={m => setData({ ...data, xemHq: m })} />}
-          </div>
-        ) : null}
-        data={data}
-        kenh={v.theoKenh.map(x => x.k)}
-        Picker={KenhPicker}
-        combo={combo}
-        onSaveCombo={luuCombo}
-        onDelCombo={boCombo}
-      />}
-
-      {/* chi theo kênh: bấm để bật / tắt kênh khỏi tổng (ô số, biểu đồ) */}
-      <div className="mk-ads-card">
-        {/* check list: đánh dấu các kênh (page) muốn xem -> tổng của riêng các kênh đó (ô số + biểu đồ cũng tính theo lựa chọn) */}
-        <div className="mk-ads-h mk-ads-hloc"><span className="mk-ads-h1"><b>Chi theo kênh</b>
-          <KenhPicker ds={v.theoKenh.map(x => x.k)} chon={v.theoKenh.filter(x => x.on).map(x => x.k)} onChange={datChon} />
-          {/* combo (phím tắt): mỗi combo đã lưu = 1 nút nhấn ngay cạnh Chọn kênh; bấm = chỉ chọn các kênh của combo */}
-          {combo.map(c => {
-            const co = c.kenh.filter(k => v.theoKenh.some(x => x.k === k))
-            const dang = co.length && co.length === v.ki.length && co.every(k => v.theoKenh.some(x => x.k === k && x.on))
-            return (
-              <span key={c.ten} className={'mk-ads-cb' + (dang ? ' on' : '')} title={c.ten + ': ' + c.kenh.join(' + ')}>
-                <button type="button" onClick={() => datChon(co)}>{c.ten}<i>{co.length}</i></button>
-                <button type="button" className="x" title={'Xoá combo ' + c.ten} onClick={() => boCombo(c.ten)}>×</button>
-              </span>
-            )
-          })}
-          <button type="button" className="mk-ads-cbmoi" onClick={() => luuCombo(v.theoKenh.filter(x => x.on).map(x => x.k))} title="Lưu các kênh đang chọn thành 1 combo (phím tắt) - vd Nhà thầu = HM Cons + Dezon">+ Lưu combo</button></span>
-          <div className="mk-ads-chon">
-            <span>Đã chọn <b>{v.ki.length}/{v.theoKenh.length}</b> kênh · Tổng <b className="t">{fmt(v.tong)} đ</b></span>
-            <button type="button" onClick={() => setTat({})} disabled={v.ki.length === v.theoKenh.length}>Chọn hết</button>
-            <button type="button" onClick={() => { const m = {}; v.theoKenh.forEach(x => { m[x.k] = 1 }); setTat(m) }} disabled={!v.ki.length}>Bỏ hết</button>
-          </div>
-        </div>
-        <div className="mk-ads-kenh">
-          {comboDang && (
-            <div className="mk-ads-cbdang">Đang xem combo <b>{comboDang.ten}</b> · các kênh khác đã ẩn
-              <button type="button" onClick={() => setTat({})}>Hiện tất cả kênh</button></div>
-          )}
-          {v.theoKenh.filter(x => !comboDang || x.on).sort((a, b) => b.tong - a.tong).map(x => (
-            <button type="button" key={x.k} className={'mk-ads-krow' + (x.on ? '' : ' off')} onClick={() => setTat(t => { const m = { ...t }; if (m[x.k]) delete m[x.k]; else m[x.k] = 1; return m })}
-              title={x.on ? 'Bỏ chọn kênh này (không tính vào tổng)' : 'Chọn kênh này để tính vào tổng'}>
-              <span className="nm"><i className={'ck' + (x.on ? ' on' : '')} aria-hidden="true" />{x.k}</span>
-              <span className="tr"><i style={{ width: (x.tong / tongKenhMax * 100) + '%' }} /></span>
-              <b>{x.tong ? fmt(x.tong) + ' đ' : '—'}</b>
-              <em>{x.on && v.tong ? Math.round(x.tong / v.tong * 100) + '%' : x.on ? '0%' : 'không chọn'}</em>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 2 biểu đồ cạnh nhau: chi theo ngày (cột) · lũy kế kỳ này so với kỳ trước (đường) */}
-      <div className="mk-ads-2c">
-      {/* chi theo ngày */}
-      <div className="mk-ads-card">
-        <div className="mk-ads-h"><b>Chi theo ngày</b><span>Tổng các kênh đang bật · rê chuột vào cột để xem từng kênh</span></div>
-        <div className="mk-ads-chart" ref={chartRef} onMouseLeave={() => setHover(-1)}>
-          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Biểu đồ chi tiêu theo ngày">
-            {[0, 1, 2, 3].map(t => (
-              <g key={t}>
-                <line x1={padL} x2={W} y1={y(tick * t)} y2={y(tick * t)} className="grid" />
-                <text x={padL - 6} y={y(tick * t) + 3} textAnchor="end" className="ax">{fmtM(tick * t)}</text>
-              </g>
-            ))}
-            {v.ngay.map((x, i) => {
-              const cx = padL + i * cw + cw / 2
-              const h = Math.max(0, y(0) - y(x.tong))
-              const r = Math.min(4, h, bw / 2)
-              return (
-                <g key={x.d}>
-                  {h > 0 && <path className={'bar' + (i === hover ? ' on' : '')}
-                    d={`M${cx - bw / 2},${y(0)} V${y(0) - h + r} Q${cx - bw / 2},${y(0) - h} ${cx - bw / 2 + r},${y(0) - h} H${cx + bw / 2 - r} Q${cx + bw / 2},${y(0) - h} ${cx + bw / 2},${y(0) - h + r} V${y(0)} Z`} />}
-                  <rect x={padL + i * cw} y={padT} width={cw} height={H - padT - padB} fill="transparent" onMouseEnter={() => setHover(i)} />
-                  {i % Math.ceil(n / Math.max(3, Math.floor(W / 80))) === 0 && <text x={cx} y={H - 7} textAnchor="middle" className="ax">{nhanNgay(x.d)}</text>}
-                </g>
-              )
-            })}
-            <line x1={padL} x2={W} y1={y(0)} y2={y(0)} className="base" />
-          </svg>
-          {hv && (
-            <div className="mk-ads-tip" style={{ left: ((padL + hover * cw + cw / 2) / W * 100) + '%' }}>
-              <b>{nhanNgay(hv.d)}/{hv.d.slice(0, 4)} · {fmt(hv.tong)} đ</b>
-              {v.ki.filter(i => Number(hv.v[i]) > 0).map(i => <span key={i}><i>{data.kenh[i]}</i>{fmt(hv.v[i])}</span>)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* lũy kế chi tiêu: kỳ này so với kỳ trước */}
-      <div className="mk-ads-card">
-        <div className="mk-ads-h mk-ads-hloc"><span className="mk-ads-h1"><b>Lũy kế chi tiêu</b>
-          <span className="mk-ads-lg"><em className="lk-sw cur" />Kỳ này{kyTruoc.length > 0 && <><em className="lk-sw prev" />{nhanPrev}</>}</span></span>
-          {kyTruoc.length > 0 && (
-            <span className="mk-ads-so">
-              {doiPct == null ? 'Kỳ trước chưa có số' : <>So cùng kỳ <b className={doiPct > 0 ? 'tang' : doiPct < 0 ? 'giam' : ''}>{doiPct > 0 ? '▲ ' : doiPct < 0 ? '▼ ' : ''}{Math.abs(doiPct)}%</b></>}
-              <i>· {nhanPrev} cả kỳ {fmt(tongPrev)} đ</i>
-            </span>
-          )}
-        </div>
-        <LuyKeChart ngay={kyNgay} cur={lkCur} prev={lkPrev} nhanPrev={nhanPrev} />
-      </div>
-      </div>
       </>}
     </div>
   )

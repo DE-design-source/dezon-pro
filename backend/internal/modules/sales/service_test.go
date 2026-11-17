@@ -234,6 +234,18 @@ func TestTaoSuaKhachHang(t *testing.T) {
 	if q := l.(*omap.Map).Val("quote").(*omap.Map); q.Val("ban") != 1500.0 || q.Val("von") != 900.0 {
 		t.Errorf("quote: %s", mustJSON(t, q))
 	}
+	// sửa ngày tạo: yyyy-mm-dd; sai định dạng -> 400; chuỗi rỗng -> giữ nguyên
+	if _, err := s.UpdateLead(ctx, a, id, omap.Of("createdAt", "14/11/2026")); status(err) != 400 {
+		t.Errorf("sửa createdAt sai định dạng phải 400: %v", err)
+	}
+	l, err = s.UpdateLead(ctx, a, id, omap.Of("createdAt", "2026-11-10"))
+	if err != nil || l.(*omap.Map).Val("createdAt") != "2026-11-10" {
+		t.Errorf("sửa ngày tạo: %v %v", err, l)
+	}
+	l, _ = s.UpdateLead(ctx, a, id, omap.Of("createdAt", "", "note", "x"))
+	if l.(*omap.Map).Val("createdAt") != "2026-11-10" {
+		t.Errorf("createdAt rỗng phải giữ nguyên: %v", l.(*omap.Map).Val("createdAt"))
+	}
 	if _, err := s.UpdateLead(ctx, a, 99, omap.Of("stage", "tu-van")); status(err) != 404 {
 		t.Errorf("sửa khách không có phải 404: %v", err)
 	}

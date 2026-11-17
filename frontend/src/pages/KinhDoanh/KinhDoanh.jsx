@@ -110,6 +110,14 @@ function KinhDoanhPage() {
     })
   }
 
+  /* Sửa ngày tạo (nút bút chì cạnh "Ngày tạo" ở trang khách hàng) */
+  function setCreatedAt(id, day) {
+    const old = leads.find(l => sameId(l.id, id))
+    if (!old || !day || day === old.createdAt) return
+    setLeads(prev => prev.map(l => (sameId(l.id, id) ? { ...l, createdAt: day } : l)))
+    kdApi.setLeadCreatedAt(old.id, day).then(replaceLead, e => { replaceLead(old); alert('Không lưu được ngày tạo: ' + e.message) })
+  }
+
   /* ---------- Chuyển giai đoạn (moveLead) ---------- */
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')   // Tên dự án (MarkUp 2026-11-16 16:17)
@@ -326,6 +334,7 @@ function KinhDoanhPage() {
             onBack={() => setDetail(d => ({ ...d, open: false }))}
             onEdit={() => openLeadModal(detailLead.id)}
             onMove={moveLead}
+            onSetCreated={d => setCreatedAt(detailLead.id, d)}
           />
         )}
         <div style={detail.open && detailLead ? { display: 'none' } : { display: 'contents' }}>
