@@ -303,7 +303,7 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 		row.Set("nguoi_tao_ten", a.U)
 	}
 	now := s.now().UTC().Format(time.RFC3339Nano)
-	// createdAt / wonAt (yyyy-mm-dd) chỉ khi tạo: nạp dữ liệu mẫu / dữ liệu cũ đúng ngày; giao diện không gửi
+	// createdAt / wonAt (yyyy-mm-dd) khi tạo: nạp dữ liệu mẫu / dữ liệu cũ đúng ngày (createdAt sửa được ở UpdateLead)
 	created, err := dayOr(body, "createdAt", now)
 	if err != nil {
 		return nil, err
@@ -348,6 +348,14 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 		} else if !isWon {
 			patch.Set("ngay_chot", nil)
 		}
+	}
+	// sửa ngày tạo (yyyy-mm-dd, nút sửa ở Dự án quan tâm): 9:00 giờ VN ngày đó như khi tạo
+	if str(body, "createdAt") != "" {
+		created, err := dayOr(body, "createdAt", "")
+		if err != nil {
+			return nil, err
+		}
+		patch.Set("ngay_tao", created)
 	}
 	patch.Set("cap_nhat", now)
 	old = old.Clone() // repo có thể trả lại chính map này sau khi sửa (repo giả trong test)
