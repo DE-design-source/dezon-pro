@@ -79,7 +79,7 @@ function Days({ title, days, get, fmt, note }) {
 }
 
 let cache = null
-export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Picker, combo = [], onSaveCombo, onDelCombo }) {
+export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Picker, combo = [], onSaveCombo, onDelCombo, onRange }) {
   const [tat, setTat] = useState({})   // kênh bỏ khỏi báo cáo {tên: 1}
   const kenh = kenhAll.filter(k => !tat[k])
   const datChon = ks => { const m = {}; kenhAll.forEach(k => { if (ks.indexOf(k) < 0) m[k] = 1 }); setTat(m) }
@@ -97,6 +97,8 @@ export default function AdsLeadDash({ data, kenh: kenhAll, visible, access, Pick
   }, [visible])
 
   const r = range(ky, tuy)
+  // báo kỳ đang chọn ra ngoài: ô số đầu tab Chi tiêu quảng cáo tính theo cùng bộ lọc này (MarkUp 2026-11-17)
+  useEffect(() => { if (onRange) onRange({ ky, tu: r.tu, den: r.den, nhan: r.nhan, chua: !!r.chua }) }, [ky, r.tu, r.den, r.nhan]) // eslint-disable-line react-hooks/exhaustive-deps
   const inR = d => d && (!r.tu || d >= r.tu) && (!r.den || d <= r.den)
   const ds = (leads || []).filter(l => inR(String(l.createdAt || '').slice(0, 10)))
   const kSet = new Set(kenh.map(ten))          // kênh đang chọn

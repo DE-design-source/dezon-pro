@@ -393,6 +393,7 @@ export default function AdsSpendTab({ visible }) {
   /* Ô số (MarkUp 2026-11-17, theo bảng Lark cũ): lead = khách hàng Kinh doanh có "Nguồn khách hàng" trùng tên kênh quảng cáo
      (cùng quy tắc với Hiệu quả kênh). "/ngày" = hôm nay; "/tháng" = kỳ đang chọn. Không có quyền Kinh doanh -> ô lead hiện — */
   const [leads, setLeads] = useState(null)
+  const [hqR, setHqR] = useState(null)   // kỳ đang chọn ở khối Hiệu quả kênh
   useEffect(() => {
     if (!visible) return undefined
     let live = true
@@ -401,11 +402,28 @@ export default function AdsSpendTab({ visible }) {
   }, [visible])
   const kenhTen = new Set(v.ki.map(i => String(data.kenh[i] || '').trim().toLowerCase()))
   const leadQc = (leads || []).filter(l => kenhTen.has(String(l.source || '').trim().toLowerCase()))
-  const kySet = new Set(kyNgay)
-  const leadKy = leadQc.filter(l => kySet.has(String(l.createdAt || '').slice(0, 10))).length
-  const leadNay = leadQc.filter(l => String(l.createdAt || '').slice(0, 10) === homNay).length
-  const chiNay = (() => { const x = data.ngay.find(n => n.d === homNay); return x ? v.ki.reduce((a, i) => a + (Number(x.v[i]) || 0), 0) : null })()
-  const theoThang = ky === 'thang'
+  /* Kỳ của ô số = bộ lọc thời gian của khối Hiệu quả kênh (onRange); khối đó ẩn (không có quyền xem) thì theo kỳ của bảng nhập.
+     Công thức: Leads/ngày = lead trong kỳ ÷ số ngày; Chi phí Ads/Ngày = chi trong kỳ ÷ số ngày; CPA = chi ÷ lead.
+     Số ngày tính tới hôm nay (Tháng này = số ngày đã qua); Mọi lúc: từ ngày có số / có lead sớm nhất */
+  const R = thayHq && hqR && !hqR.chua ? hqR
+    : { ky: ky === 'thang' ? 'thang' : '', tu: kyNgay[0] || null, den: kyNgay[kyNgay.length - 1] || null, nhan: nhanKy, chua: thayHq && hqR ? hqR.chua : false }
+  const inK = d => !!d && (!R.tu || d >= R.tu) && (!R.den || d <= R.den)
+  const chiKy = data.ngay.reduce((a, x) => (inK(x.d) ? a + v.ki.reduce((b, i) => b + (Number(x.v[i]) || 0), 0) : a), 0)
+  const leadKy = leadQc.filter(l => inK(String(l.createdAt || '').slice(0, 10))).length
+  const soNgayKy = (() => {
+    if (R.chua) return 0
+    let tu = R.tu
+    if (!tu) {
+      const ds = [...data.ngay.filter(x => x.v.some(y => Number(y) > 0)).map(x => x.d), ...leadQc.map(l => String(l.createdAt || '').slice(0, 10)).filter(Boolean)].sort()
+      tu = ds[0] || homNay
+    }
+    const den = R.den && R.den < homNay ? R.den : homNay
+    if (tu > den) return 0
+    return Math.round((Date.parse(den + 'T00:00:00Z') - Date.parse(tu + 'T00:00:00Z')) / 864e5) + 1
+  })()
+  const theoThang = R.ky === 'thang' || R.ky === 'truoc' || /^Tháng /.test(R.nhan || '')
+  const soLe = n => (Number.isInteger(n) ? fmt(n) : n.toFixed(1).replace('.', ','))
+  const ghiNgay = soNgayKy ? ' · TB ' + soNgayKy + ' ngày' : ''
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
@@ -462,11 +480,11 @@ export default function AdsSpendTab({ visible }) {
       {!(trang === 'nhap' && !kenhCua.length) && <>
       {/* ô số */}
       <div className="mk-ads-kpis">
-        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads ? leadNay : '—'}</b><em>Hôm nay {nhanNgay(homNay)}{leads ? '' : ' · cần quyền Kinh doanh'}</em></div>
-        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(v.tong / leadKy)) : '—'}</b><em>{nhanKy} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
-        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{chiNay == null ? '—' : fmt(chiNay)}</b><em>Hôm nay {nhanNgay(homNay)}{chiNay == null ? ' · chưa nhập' : ''}</em></div>
-        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanKy} · từ kênh quảng cáo</em></div>
-        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(v.tong)}</b><em>{nhanKy} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
+        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads && soNgayKy ? soLe(leadKy / soNgayKy) : '—'}</b><em>{R.nhan}{leads ? ghiNgay : ' · cần quyền Kinh doanh'}</em></div>
+        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{R.nhan} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
+        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{R.nhan}{ghiNgay}</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{R.nhan} · từ kênh quảng cáo</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{R.nhan} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
 
       {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
@@ -484,6 +502,7 @@ export default function AdsSpendTab({ visible }) {
         data={data}
         kenh={v.theoKenh.map(x => x.k)}
         Picker={KenhPicker}
+        onRange={setHqR}
         combo={combo}
         onSaveCombo={luuCombo}
         onDelCombo={boCombo}
