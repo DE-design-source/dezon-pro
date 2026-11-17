@@ -234,6 +234,12 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-btn:disabled{opacity:.5; cursor:default;}
 .mk-ads-tbl.nhap{min-width:100%; width:max-content;}
 .mk-ads-tbl.nhap th.kenh span{cursor:pointer;}
+.mk-ads-tbl.nhap th.kenh[draggable="true"]{cursor:grab;}
+.mk-ads-tbl.nhap th.kenh .keo-ic{font-style:normal; margin-right:4px; color:var(--text-muted); opacity:0; font-size:12px; cursor:grab;}
+.mk-ads-tbl.nhap th.kenh:hover .keo-ic{opacity:.8;}
+.mk-ads-tbl.nhap th.kenh.keo{opacity:.4;}
+.mk-ads-tbl.nhap th.kenh.dich-l{box-shadow:inset 3px 0 0 var(--marketing);}
+.mk-ads-tbl.nhap th.kenh.dich-r{box-shadow:inset -3px 0 0 var(--marketing);}
 .mk-ads-tbl.nhap th.kenh span:hover{color:var(--marketing);}
 .mk-ads-tbl.nhap th.kenh button{margin-left:6px; width:16px; height:16px; border:0; border-radius:50%; background:transparent; color:var(--text-muted); font-size:13px; line-height:1; cursor:pointer; opacity:0;}
 .mk-ads-tbl.nhap th.kenh:hover button{opacity:1;}

@@ -349,6 +349,14 @@ export default function AdsSpendTab({ visible }) {
     if (data.kenh.indexOf(ten) >= 0) { setLoi('Kênh "' + ten + '" đã có'); return }
     setData({ ...data, kenh: data.kenh.concat([ten]), ngay: data.ngay.map(x => ({ d: x.d, v: x.v.concat([null]) })) })
   }
+  /* kéo thả đổi chỗ cột kênh (MarkUp 2026-11-17): đổi thứ tự data.kenh + số từng ngày theo cùng thứ tự; lưu chung */
+  const [keo, setKeo] = useState({ tu: -1, toi: -1 })
+  function doiChoKenh(tu, den) {
+    if (tu < 0 || den < 0 || tu === den) return
+    const ord = data.kenh.map((k, i) => i)
+    ord.splice(den, 0, ord.splice(tu, 1)[0])
+    setData({ ...data, kenh: ord.map(i => data.kenh[i]), ngay: data.ngay.map(x => ({ d: x.d, v: ord.map(i => (x.v[i] == null ? null : x.v[i])) })) })
+  }
   function doiTenKenh(i) {
     const ten = (window.prompt('Đổi tên kênh', data.kenh[i]) || '').trim()
     if (!ten || ten === data.kenh[i]) return
@@ -558,7 +566,14 @@ export default function AdsSpendTab({ visible }) {
                 {/* cột Tổng ngày đứng đầu (ngay sau cột Ngày) */}
                 {thayTong && <th className="num kenh k tong">{trang === 'nhap' ? 'Tổng của tôi' : 'Tổng ngày'}</th>}
                 {kenhThay.map(i => { const k = data.kenh[i]; return (
-                  <th key={k} className="num kenh k">
+                  <th key={k} className={'num kenh k' + (keo.tu === i ? ' keo' : '') + (keo.tu >= 0 && keo.toi === i && keo.tu !== i ? (keo.tu < i ? ' dich-r' : ' dich-l') : '')}
+                    draggable={ql || undefined}
+                    title={ql ? 'Kéo sang trái / phải để đổi chỗ kênh' : undefined}
+                    onDragStart={ql ? e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', k); setKeo({ tu: i, toi: i }) } : undefined}
+                    onDragOver={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; if (keo.toi !== i) setKeo({ ...keo, toi: i }) } : undefined}
+                    onDrop={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); doiChoKenh(keo.tu, i); setKeo({ tu: -1, toi: -1 }) } : undefined}
+                    onDragEnd={ql ? () => setKeo({ tu: -1, toi: -1 }) : undefined}>
+                    {ql && <i className="keo-ic" aria-hidden="true">⠿</i>}
                     {ql ? <span title="Bấm để đổi tên kênh" onClick={() => doiTenKenh(i)}>{k}</span> : <span>{k}</span>}
                     {ql && <button type="button" title={'Bỏ kênh ' + k} onClick={() => boKenh(i)}>×</button>}
                   </th>
