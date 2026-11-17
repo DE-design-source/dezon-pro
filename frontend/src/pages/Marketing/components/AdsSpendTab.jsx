@@ -407,8 +407,8 @@ export default function AdsSpendTab({ visible }) {
      Số ngày tính tới hôm nay (Tháng này = số ngày đã qua); Mọi lúc: từ ngày có số / có lead sớm nhất */
   const R0 = thayHq && hqR && !hqR.chua ? hqR
     : { ky: ky === 'thang' ? 'thang' : '', tu: kyNgay[0] || null, den: kyNgay[kyNgay.length - 1] || null, nhan: nhanKy, chua: thayHq && hqR ? hqR.chua : false }
-  /* Mọi ô chỉ tính tới hôm nay: "Tháng này" = từ đầu tháng tới hôm nay (MarkUp 2026-11-17); nhãn ghi rõ khoảng ngày */
-  const R = R0.den && R0.den > homNay ? { ...R0, den: homNay } : R0
+  /* "Tháng này" = từ đầu tháng tới hôm nay; "Tuỳ chọn" = đúng khoảng ngày đã chọn (MarkUp 2026-11-17); nhãn ghi rõ khoảng ngày */
+  const R = R0.ky !== 'tuy' && R0.den && R0.den > homNay ? { ...R0, den: homNay } : R0
   const nhanR = R.tu && R.den && R.den !== R0.den
     ? (R.tu === R.den ? nhanNgay(R.den) + '/' + R.den.slice(0, 4) : nhanNgay(R.tu) + ' – ' + nhanNgay(R.den) + '/' + R.den.slice(0, 4)) : R.nhan
   const inK = d => !!d && (!R.tu || d >= R.tu) && (!R.den || d <= R.den)
@@ -421,13 +421,14 @@ export default function AdsSpendTab({ visible }) {
       const ds = [...data.ngay.filter(x => x.v.some(y => Number(y) > 0)).map(x => x.d), ...leadQc.map(l => String(l.createdAt || '').slice(0, 10)).filter(Boolean)].sort()
       tu = ds[0] || homNay
     }
-    const den = R.den || homNay
+    const den = R.den || homNay   // Tuỳ chọn: tới ngày kết thúc đã chọn; còn lại: tới hôm nay
     if (tu > den) return 0
     return Math.round((Date.parse(den + 'T00:00:00Z') - Date.parse(tu + 'T00:00:00Z')) / 864e5) + 1
   })()
   const theoThang = R.ky === 'thang' || /^Tháng /.test(R.nhan || '')
-  const soLe = n => (Number.isInteger(n) ? fmt(n) : n.toFixed(1).replace('.', ','))
-  const ghiNgay = soNgayKy ? ' · TB ' + soNgayKy + ' ngày' : ''
+  /* Leads/ngày = lead TRONG NGÀY: hôm nay; Tuỳ chọn đúng 1 ngày thì ngày đó (MarkUp 2026-11-17) */
+  const ngayLead = R.ky === 'tuy' && R.tu && R.tu === R.den ? R.tu : homNay
+  const leadNgay = leadQc.filter(l => String(l.createdAt || '').slice(0, 10) === ngayLead).length
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
@@ -484,9 +485,9 @@ export default function AdsSpendTab({ visible }) {
       {!(trang === 'nhap' && !kenhCua.length) && <>
       {/* ô số */}
       <div className="mk-ads-kpis">
-        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads && soNgayKy ? soLe(leadKy / soNgayKy) : '—'}</b><em>{nhanR}{leads ? ghiNgay : ' · cần quyền Kinh doanh'}</em></div>
+        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads ? leadNgay : '—'}</b><em>{ngayLead === homNay ? 'Hôm nay ' : 'Ngày '}{nhanNgay(ngayLead)}/{ngayLead.slice(0, 4)}{leads ? '' : ' · cần quyền Kinh doanh'}</em></div>
         <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{nhanR} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
-        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{nhanR}{ghiNgay}</em></div>
+        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{nhanR}{soNgayKy ? ' · tổng chi ÷ ' + soNgayKy + ' ngày' : ''}</em></div>
         <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanR} · từ kênh quảng cáo</em></div>
         <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{nhanR} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
