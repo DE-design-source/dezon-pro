@@ -451,6 +451,26 @@ export default function AdsSpendTab({ visible }) {
         <div className="mk-ads-kpi"><span>Kênh chi nhiều nhất</span><b>{v.kMax.k || '—'}</b><em>{v.kMax.tong ? fmt(v.kMax.tong) + ' đ · ' + Math.round(v.kMax.tong / (v.tong || 1) * 100) + '%' : ''}</em></div>
       </div>
 
+      {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
+      {thayHq && <AdsLeadDash
+        visible={visible}
+        access={quanTri && online ? (
+          <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
+            {xemHq.map(u => (
+              <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
+                onClick={() => { if (window.confirm('Bỏ quyền xem báo cáo Hiệu quả kênh của ' + tenNguoi(u) + '?')) setData({ ...data, xemHq: xemHq.filter(x => x !== u) }) }}>{avChu(tenNguoi(u))}</button>
+            ))}
+            {users.length > 0 && <PtPicker ds={xemHq} users={users} onChange={m => setData({ ...data, xemHq: m })} />}
+          </div>
+        ) : null}
+        data={data}
+        kenh={v.theoKenh.map(x => x.k)}
+        Picker={KenhPicker}
+        combo={combo}
+        onSaveCombo={luuCombo}
+        onDelCombo={boCombo}
+      />}
+
       {/* BẢNG NHẬP: dòng = ngày, cột = kênh (như file), gõ số thẳng vào ô */}
       <div className="mk-ads-card">
         {/* đầu bảng: bộ lọc thời gian (áp cho cả ô số, biểu đồ) */}
@@ -580,25 +600,6 @@ export default function AdsSpendTab({ visible }) {
         </div>
       </div>
 
-      {/* hiệu quả kênh: chi tiêu (bảng trên) ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
-      {thayHq && <AdsLeadDash
-        visible={visible}
-        access={quanTri && online ? (
-          <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
-            {xemHq.map(u => (
-              <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
-                onClick={() => { if (window.confirm('Bỏ quyền xem báo cáo Hiệu quả kênh của ' + tenNguoi(u) + '?')) setData({ ...data, xemHq: xemHq.filter(x => x !== u) }) }}>{avChu(tenNguoi(u))}</button>
-            ))}
-            {users.length > 0 && <PtPicker ds={xemHq} users={users} onChange={m => setData({ ...data, xemHq: m })} />}
-          </div>
-        ) : null}
-        data={data}
-        kenh={v.theoKenh.map(x => x.k)}
-        Picker={KenhPicker}
-        combo={combo}
-        onSaveCombo={luuCombo}
-        onDelCombo={boCombo}
-      />}
       </>}
     </div>
   )
