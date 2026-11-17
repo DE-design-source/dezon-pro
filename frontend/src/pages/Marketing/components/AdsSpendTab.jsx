@@ -400,7 +400,9 @@ export default function AdsSpendTab({ visible }) {
     listLeads().then(ls => { if (live) setLeads(ls) }, () => { if (live) setLeads(null) })
     return () => { live = false }
   }, [visible])
-  const kenhTen = new Set(v.ki.map(i => String(data.kenh[i] || '').trim().toLowerCase()))
+  // ô số chỉ tính các kênh đang tích ở khối Hiệu quả kênh (MarkUp 2026-11-17)
+  const kiO = thayHq && hqR && Array.isArray(hqR.kenh) ? v.ki.filter(i => hqR.kenh.indexOf(data.kenh[i]) >= 0) : v.ki
+  const kenhTen = new Set(kiO.map(i => String(data.kenh[i] || '').trim().toLowerCase()))
   const leadQc = (leads || []).filter(l => kenhTen.has(String(l.source || '').trim().toLowerCase()))
   /* Kỳ của ô số = bộ lọc thời gian của khối Hiệu quả kênh (onRange); khối đó ẩn (không có quyền xem) thì theo kỳ của bảng nhập.
      Công thức: Leads/ngày = lead trong kỳ ÷ số ngày; Chi phí Ads/Ngày = chi trong kỳ ÷ số ngày; CPA = chi ÷ lead.
@@ -412,7 +414,7 @@ export default function AdsSpendTab({ visible }) {
   const nhanR = R.tu && R.den && R.den !== R0.den
     ? (R.tu === R.den ? nhanNgay(R.den) + '/' + R.den.slice(0, 4) : nhanNgay(R.tu) + ' – ' + nhanNgay(R.den) + '/' + R.den.slice(0, 4)) : R.nhan
   const inK = d => !!d && (!R.tu || d >= R.tu) && (!R.den || d <= R.den)
-  const chiKy = data.ngay.reduce((a, x) => (inK(x.d) ? a + v.ki.reduce((b, i) => b + (Number(x.v[i]) || 0), 0) : a), 0)
+  const chiKy = data.ngay.reduce((a, x) => (inK(x.d) ? a + kiO.reduce((b, i) => b + (Number(x.v[i]) || 0), 0) : a), 0)
   const leadKy = leadQc.filter(l => inK(String(l.createdAt || '').slice(0, 10))).length
   const soNgayKy = (() => {
     if (R.chua) return 0
@@ -489,7 +491,7 @@ export default function AdsSpendTab({ visible }) {
         <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{nhanR} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
         <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{nhanR}{soNgayKy ? ' · tổng chi ÷ ' + soNgayKy + ' ngày' : ''}</em></div>
         <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanR} · từ kênh quảng cáo</em></div>
-        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{nhanR} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{nhanR} · {kiO.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
 
       {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}

@@ -601,6 +601,10 @@ html[data-theme="dark"] .mk-tbl2-h{background:#1e3a5f;}
 .mk-ld-t td.bar b{min-width:24px; text-align:right;}
 .mk-ld-t td.best{color:var(--success, #1e9e62); font-weight:800;}
 .mk-ld-t tr.mute td{color:var(--text-muted);}
+.mk-ld-t th.ck, .mk-ld-t td.ck{width:20px; padding-left:14px; padding-right:0;}
+.mk-ld-t .ck input{width:15px; height:15px; margin:0; vertical-align:middle; cursor:pointer; accent-color:var(--marketing);}
+.mk-ld-t tr.off td:not(.ck){color:var(--text-muted); opacity:.55;}
+.mk-ld-t tr.off td.bar .b i{background:var(--text-muted);}
 .mk-ld-t tr.other td.bar .b i{background:var(--text-muted);}
 .mk-ld-t tfoot td{border-bottom:0; border-top:1px solid var(--border); font-weight:800; padding-top:11px; padding-bottom:11px;}
 .mk-ld-err, .mk-ld-hint{margin:12px 16px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; font-size:12.5px; color:var(--text-muted);}
