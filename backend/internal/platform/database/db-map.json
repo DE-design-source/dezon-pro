@@ -1030,6 +1030,24 @@
    "ngay_tao": "created_at"
   }
  },
+ "chat_hen_gio": {
+  "table": "chat_scheduled_messages",
+  "columns": {
+   "id": "id",
+   "nguoi_dung_id": "user_id",
+   "hoi_thoai_id": "conversation_id",
+   "noi_dung": "content",
+   "nhac_ten": "mentions",
+   "tra_loi_tin_id": "reply_to_message_id",
+   "hen_luc": "send_at",
+   "trang_thai": "status",
+   "loi": "error",
+   "tin_nhan_id": "message_id",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at",
+   "gui_luc": "sent_at"
+  }
+ },
  "chat_dang_nhap_qr": {
   "table": "chat_qr_login_sessions",
   "columns": {

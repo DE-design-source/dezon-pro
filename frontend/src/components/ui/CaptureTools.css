@@ -1,0 +1,58 @@
+/* Hộp Chụp hình / Ảnh -> chữ / Quay màn hình (CaptureTools.jsx) */
+.cpt-ov{position:fixed; inset:0; z-index:3000; display:grid; place-items:center; padding:16px; background:rgba(15,23,42,.38);}
+.cpt-box{width:min(460px, 100%); max-height:calc(100vh - 32px); overflow-y:auto; box-sizing:border-box; display:flex; flex-direction:column; gap:12px; padding:16px 18px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--text); box-shadow:0 24px 60px -12px rgba(15,23,42,.35);}
+.cpt-h{display:flex; align-items:center; gap:8px; padding-bottom:10px; border-bottom:1px solid var(--border);}
+.cpt-h b{flex:1; font-size:15px;}
+.cpt-x{width:28px; height:28px; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text-muted); cursor:pointer; font-size:12px;}
+.cpt-x:disabled{opacity:.4; cursor:default;}
+.cpt-opts{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.cpt-opts.one{grid-template-columns:1fr;}
+.cpt-opts button{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:var(--surface-alt); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.cpt-opts button:hover:not(:disabled){border-color:var(--primary); background:var(--primary-tint);}
+.cpt-opts button:disabled{opacity:.55; cursor:default;}
+.cpt-opts b{font-size:13.5px;}
+.cpt-opts span{font-size:12px; color:var(--text-muted); line-height:1.45;}
+.cpt-drop{display:flex; flex-direction:column; gap:6px; padding:18px 14px; border:1.5px dashed var(--border); border-radius:12px; background:var(--surface-alt); text-align:center; cursor:pointer;}
+.cpt-drop:hover{border-color:var(--primary);}
+.cpt-drop b{font-size:13px;}
+.cpt-drop span{font-size:11.5px; color:var(--text-muted); line-height:1.45;}
+.cpt-out{display:flex; flex-direction:column; gap:8px;}
+.cpt-out textarea{width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:13px; line-height:1.5; resize:vertical;}
+.cpt-pri{align-self:flex-end; height:34px; padding:0 14px; border:none; border-radius:9px; background:var(--primary); color:#fff; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;}
+.cpt-busy{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);}
+.cpt-spin{width:14px; height:14px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--primary); animation:cpt-spin .8s linear infinite;}
+@keyframes cpt-spin{to{transform:rotate(360deg);}}
+.cpt-msg{font-size:12.5px; color:var(--danger);}
+/* thanh đang quay: nổi ở đáy giữa màn hình */
+.cpt-recbar{position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:3000; display:flex; align-items:center; gap:10px; padding:8px 10px 8px 14px; border-radius:999px; background:#111827; color:#fff; font-size:13px; box-shadow:0 12px 30px rgba(0,0,0,.3);}
+.cpt-recbar b{font-variant-numeric:tabular-nums;}
+.cpt-recbar button{height:30px; padding:0 14px; border:none; border-radius:999px; background:#EF4444; color:#fff; font:inherit; font-weight:700; cursor:pointer;}
+.cpt-dot{width:10px; height:10px; border-radius:50%; background:#EF4444; animation:cpt-blink 1s ease-in-out infinite;}
+@keyframes cpt-blink{50%{opacity:.25;}}
+/* chip trong Dezbot: biểu tượng + chữ thẳng hàng */
+.cpt-chip{display:inline-flex; align-items:center; gap:8px;}
+/* Chọn vùng: ảnh màn hình phủ kín, khung chọn sáng, ngoài khung tối (MarkUp 2026-11-16 19:05) */
+.cpt-opts button.wide{grid-column:1 / -1;}
+.cpt-crop{position:fixed; inset:0; z-index:3001; cursor:crosshair; user-select:none; touch-action:none;}
+.cpt-crop img{position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;}
+.cpt-crop-dim{position:absolute; inset:0; background:rgba(15,23,42,.35);}
+.cpt-crop-r{position:absolute; outline:2px solid #fff; box-shadow:0 0 0 9999px rgba(15,23,42,.45), 0 0 0 3px rgba(46,125,214,.9);}
+.cpt-crop-r span{position:absolute; left:0; top:-24px; padding:2px 7px; border-radius:6px; background:rgba(15,23,42,.8); color:#fff; font-size:11.5px; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.cpt-crop-hint{position:absolute; left:50%; top:18px; transform:translateX(-50%); padding:8px 14px; border-radius:999px; background:rgba(15,23,42,.85); color:#fff; font-size:13px; pointer-events:none;}
+.cpt-crop-bar{position:absolute; display:flex; gap:6px; padding:5px; border-radius:10px; background:#111827; box-shadow:0 10px 26px rgba(0,0,0,.35); cursor:default;}
+.cpt-crop-bar button{height:30px; padding:0 12px; border:none; border-radius:7px; background:rgba(255,255,255,.12); color:#fff; font:inherit; font-size:12.5px; cursor:pointer;}
+.cpt-crop-bar button.pri{background:#2E7DD6; font-weight:700;}
+/* Chọn vùng cuộn để chụp cuộn (MarkUp 2026-11-16 19:11) */
+.cpt-pick{position:fixed; inset:0; z-index:3001; cursor:pointer;}
+.cpt-pick-r{position:absolute; pointer-events:none; outline:3px solid #2E7DD6; outline-offset:-3px; background:rgba(46,125,214,.1); border-radius:4px;}
+.cpt-pick-r span{position:absolute; left:8px; top:8px; padding:4px 10px; border-radius:999px; background:#2E7DD6; color:#fff; font-size:12px; font-weight:600;}
+.cpt-pick-bar{position:absolute; left:50%; bottom:20px; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:6px 6px 6px 14px; border-radius:999px; background:#111827; color:#fff; font-size:13px; box-shadow:0 12px 30px rgba(0,0,0,.35); cursor:default; white-space:nowrap;}
+.cpt-pick-bar button{height:30px; padding:0 14px; border:none; border-radius:999px; background:rgba(255,255,255,.14); color:#fff; font:inherit; font-size:12.5px; cursor:pointer;}
+.cpt-pick-bar button.pri{background:#2E7DD6; font-weight:700;}
+/* Chụp cuộn theo tọa độ: khung kéo + thanh tiến trình đặt ngoài khung đang chụp (MarkUp 2026-11-16 19:16) */
+.cpt-pick{cursor:crosshair; touch-action:none; user-select:none;}
+.cpt-pick-r.box{outline:2px solid #fff; outline-offset:0; background:none; box-shadow:0 0 0 9999px rgba(15,23,42,.35), 0 0 0 4px rgba(46,125,214,.9);}
+.cpt-prog{position:fixed; left:50%; transform:translateX(-50%); z-index:3002; display:flex; align-items:center; gap:8px; min-width:220px; padding:8px 14px 12px; border-radius:12px; background:#111827; color:#fff; font-size:12.5px; overflow:hidden; box-shadow:0 10px 26px rgba(0,0,0,.3);}
+.cpt-prog b{position:absolute; left:0; bottom:0; height:3px; background:#2E7DD6; transition:width .25s;}
+.cpt-prog .cpt-spin{border-color:rgba(255,255,255,.25); border-top-color:#fff;}
+.cpt-crop-bar.all{left:50%; bottom:20px; transform:translateX(-50%);}

@@ -10,7 +10,7 @@ import './BugReport.css'
    Phiếu hiện ở Bảng điều khiển IT; người báo xem tiến độ ở tab "Đã gửi". */
 const MAX_W = 2880   // giữ gần độ phân giải gốc (màn 2K / Retina) để ảnh sắc nét khi phòng IT phóng to
 const COLORS = ['#E5483B', '#F59E0B', '#16A34A', '#2E7DD6', '#111827']
-const TOOLS = [['select', 'Chọn / sửa nét đã vẽ (V)'], ['rect', 'Khung (R)'], ['arrow', 'Mũi tên (A)'], ['curve', 'Mũi tên uốn A -> B, kéo 2 nút giữa để uốn (C)'], ['pen', 'Bút (P)'], ['text', 'Chữ (T)']]
+const TOOLS = [['select', 'Chọn / sửa nét đã vẽ (V)'], ['rect', 'Khung (R)'], ['arrow', 'Mũi tên (A)'], ['curve', 'Mũi tên uốn A -> B, kéo 2 nút giữa để uốn (C)'], ['taper', 'Mũi tên to dần: đuôi nhỏ, đầu to để nhấn mạnh (B); chọn rồi kéo nút xanh ở đuôi / cánh đầu để chỉnh độ to'], ['pen', 'Bút (P)'], ['text', 'Chữ (T)']]
 const PRIOS = ['low', 'medium', 'high', 'urgent']
 const STEPS = ['Đã gửi', 'IT tiếp nhận', 'Đang xử lý', 'Hoàn thành']
 const NAME_KEY = 'siteflow-bug-reporter'
@@ -80,6 +80,18 @@ function drawHead(ctx, tx, ty, a, h) {
   ctx.closePath(); ctx.fill()
 }
 
+/* Mũi tên to dần (MarkUp 2026-11-16 18:59): đuôi rộng tw, thân loe dần tới cổ, đầu tam giác rộng hw (px của khung vẽ).
+   Trả các điểm của đa giác + điểm cổ để vẽ / bắt chuột / đặt nút chỉnh */
+function taperGeo(s) {
+  const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L = Math.hypot(dx, dy) || 1
+  const ux = dx / L, uy = dy / L, px = -uy, py = ux
+  const hw = s.hw || 30, tw = s.tw != null ? s.tw : 4
+  const hl = Math.min(hw * 1.05, L * 0.6), bw = Math.max(tw, hw * 0.42)
+  const nx = s.x2 - ux * hl, ny = s.y2 - uy * hl
+  const P = (x, y, w) => [x + px * w / 2, y + py * w / 2]
+  const M = (x, y, w) => [x - px * w / 2, y - py * w / 2]
+  return { ux, uy, px, py, nx, ny, hw, tw, poly: [P(s.x1, s.y1, tw), P(nx, ny, bw), P(nx, ny, hw), [s.x2, s.y2], M(nx, ny, hw), M(nx, ny, bw), M(s.x1, s.y1, tw)] }
+}
 function drawShape(ctx, s, k) {
   const w = (s.w || DEF_W) * k
   ctx.strokeStyle = s.color; ctx.fillStyle = s.color
@@ -93,6 +105,11 @@ function drawShape(ctx, s, k) {
     for (let i = 1; i <= j; i++) ctx.lineTo(pts[i][0], pts[i][1])
     ctx.stroke()
     drawHead(ctx, s.x2, s.y2, Math.atan2(s.y2 - pts[j][1], s.x2 - pts[j][0]), h)
+  }
+  if (s.type === 'taper') {
+    const g = taperGeo(s)
+    ctx.beginPath(); g.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath()
+    ctx.lineWidth = 1.5 * k; ctx.fill(); ctx.stroke()
   }
   if (s.type === 'rect') ctx.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1))
   if (s.type === 'pen' && s.pts.length) { ctx.beginPath(); ctx.moveTo(s.pts[0][0], s.pts[0][1]); s.pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.stroke() }
@@ -117,13 +134,18 @@ function drawShape(ctx, s, k) {
 
 /* Chỉnh lại nét đã vẽ (như MarkUp): Khung - 8 nút góc / cạnh đổi kích thước; Mũi tên - kéo 2 đầu;
    Mũi tên uốn - kéo 2 đầu + 2 nút uốn giữa; kéo thân để di chuyển */
-const EDITABLE = { rect: 1, arrow: 1, curve: 1 }
+const EDITABLE = { rect: 1, arrow: 1, curve: 1, taper: 1 }
 const normRect = s => ({ ...s, x1: Math.min(s.x1, s.x2), y1: Math.min(s.y1, s.y2), x2: Math.max(s.x1, s.x2), y2: Math.max(s.y1, s.y2) })
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-const CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', p1: 'crosshair', p2: 'crosshair', c1: 'grab', c2: 'grab', move: 'move' }
+const CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', p1: 'crosshair', p2: 'crosshair', c1: 'grab', c2: 'grab', tw: 'grab', hw: 'grab', move: 'move' }
 function handlePts(s) {
   if (s.type === 'arrow') return { p1: [s.x1, s.y1], p2: [s.x2, s.y2] }
   if (s.type === 'curve') return { p1: [s.x1, s.y1], c1: [s.c1x, s.c1y], c2: [s.c2x, s.c2y], p2: [s.x2, s.y2] }
+  if (s.type === 'taper') {
+    // nút độ to: tw ở mép đuôi, hw ở cánh đầu mũi tên (kéo ra / vào vuông góc với thân)
+    const g = taperGeo(s)
+    return { p1: [s.x1, s.y1], p2: [s.x2, s.y2], tw: [s.x1 + g.px * (g.tw / 2 + 8), s.y1 + g.py * (g.tw / 2 + 8)], hw: [g.nx + g.px * g.hw / 2, g.ny + g.py * g.hw / 2] }
+  }
   const mx = (s.x1 + s.x2) / 2, my = (s.y1 + s.y2) / 2
   return { nw: [s.x1, s.y1], n: [mx, s.y1], ne: [s.x2, s.y1], e: [s.x2, my], se: [s.x2, s.y2], s: [mx, s.y2], sw: [s.x1, s.y2], w: [s.x1, my] }
 }
@@ -140,8 +162,9 @@ function drawHandles(ctx, s, k) {
     ctx.beginPath()
     if (s.type !== 'rect') ctx.arc(x, y, r * 1.2, 0, Math.PI * 2); else ctx.rect(x - r, y - r, r * 2, r * 2)
     // nút uốn của mũi tên uốn tô xanh để phân biệt với 2 đầu
-    ctx.fillStyle = h === 'c1' || h === 'c2' ? '#2E7DD6' : '#fff'; ctx.fill(); ctx.lineWidth = 2 * k
-    ctx.strokeStyle = h === 'c1' || h === 'c2' ? '#fff' : '#2E7DD6'; ctx.stroke()
+    const blue = h === 'c1' || h === 'c2' || h === 'tw' || h === 'hw'
+    ctx.fillStyle = blue ? '#2E7DD6' : '#fff'; ctx.fill(); ctx.lineWidth = 2 * k
+    ctx.strokeStyle = blue ? '#fff' : '#2E7DD6'; ctx.stroke()
   })
   ctx.restore()
 }
@@ -156,6 +179,7 @@ function hitShape(s, p, k) {
   const hp = handlePts(s)
   for (const h of Object.keys(hp)) if (Math.abs(p.x - hp[h][0]) <= tol && Math.abs(p.y - hp[h][1]) <= tol) return h
   if (s.type === 'arrow') return segDist(p, s) <= tol + (s.w || DEF_W) * k ? 'move' : null
+  if (s.type === 'taper') { const g = taperGeo(s); return segDist(p, s) <= tol + Math.max(g.tw, g.hw * 0.5) / 2 ? 'move' : null }
   if (s.type === 'curve') {
     const pts = curvePts(s, 48)
     for (let i = 1; i < pts.length; i++) {
@@ -172,6 +196,15 @@ function dragShape(o, mode, dx, dy) {
   if (mode === 'move') {
     r.x1 += dx; r.x2 += dx; r.y1 += dy; r.y2 += dy
     if (cv) { r.c1x += dx; r.c2x += dx; r.c1y += dy; r.c2y += dy }
+    return r
+  }
+  /* độ to của mũi tên to dần: khoảng cách (vuông góc) từ con trỏ tới trục mũi tên x 2 */
+  if (mode === 'tw' || mode === 'hw') {
+    const hp = handlePts(o)[mode], x = hp[0] + dx, y = hp[1] + dy
+    const L = Math.hypot(o.x2 - o.x1, o.y2 - o.y1) || 1
+    const dist = Math.abs(((x - o.x1) * (o.y2 - o.y1) - (y - o.y1) * (o.x2 - o.x1)) / L)
+    if (mode === 'tw') r.tw = Math.max(0, Math.min(2 * dist - 16, (o.hw || 30) * 0.9))
+    else r.hw = Math.max(10, 2 * dist)
     return r
   }
   if (mode === 'c1') { r.c1x += dx; r.c1y += dy; return r }
@@ -195,10 +228,11 @@ const TOOL_ICON = {
   rect: ico(<rect x="4.5" y="4.5" width="15" height="15" rx="3.2" />),
   arrow: ico(<><path d="M6 18 18 6" /><path d="M9 6h9v9" /></>),
   curve: ico(<><path d="M4.5 19c4.5 0 3.5-7 7.5-7s3-6 7-6" /><path d="M15.5 3 19 6l-3.5 3" /></>),
+  taper: <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 20.6 13 9.6l-1.8-1.8L20.5 3.5l-4.3 9.3-1.8-1.8L4.4 21.4z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg>,
   pen: ico(<><path d="M14.6 4.6a2 2 0 0 1 2.8 0l2 2a2 2 0 0 1 0 2.8L9.2 19.6 4 20l.4-5.2z" /><path d="m13 6.2 4.8 4.8" /></>),
   text: <svg width="21" height="19" viewBox="0 0 26 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 19 8 5l5.5 14" /><path d="M4.6 14h6.8" /><path d="M23 13.4V19" /><circle cx="19.6" cy="16" r="3.2" /></svg>,
 }
-const TOOL_KEY = { v: 'select', r: 'rect', a: 'arrow', c: 'curve', p: 'pen', t: 'text' }
+const TOOL_KEY = { v: 'select', r: 'rect', a: 'arrow', c: 'curve', b: 'taper', p: 'pen', t: 'text' }
 const IC_UNDO = ico(<><path d="M9 14 4.5 9.5 9 5" /><path d="M4.5 9.5H15a5 5 0 0 1 0 10h-3" /></>)
 const IC_REDO = ico(<><path d="m15 14 4.5-4.5L15 5" /><path d="M19.5 9.5H9a5 5 0 0 0 0 10h3" /></>)
 const IC_TRASH = ico(<><path d="M4.5 6.5h15" /><path d="M9.5 6.5V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v1.5" /><path d="M6.5 6.5l.8 12.1a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12.1" /><path d="M10.2 10.5v6M13.8 10.5v6" /></>)
@@ -251,7 +285,9 @@ export default function BugReport({ open, onClose, pageName = '' }) {
   useEffect(() => { if (sel >= shapes.length || (sel >= 0 && !EDITABLE[shapes[sel].type])) setSel(-1) }, [shapes, sel])
   /* Đổi màu / cỡ nét khi đang chọn 1 nét thì áp cho nét đó */
   function pickColor(c) { setColor(c); if (sel >= 0 && shapes[sel] && shapes[sel].color !== c) commit(shapes.map((x, i) => (i === sel ? { ...x, color: c } : x))) }
-  function pickSize(v) { setSize(v); if (sel >= 0 && shapes[sel]) setShapes(s => s.map((x, i) => (i === sel ? { ...x, w: v } : x))) }
+  /* thanh kéo cỡ nét: với mũi tên to dần thì phóng to / thu nhỏ cả đuôi lẫn đầu theo tỉ lệ (MarkUp 2026-11-16 18:59) */
+  const resizeTo = (x, v) => { if (x.type !== 'taper') return { ...x, w: v }; const r = v / (x.w || DEF_W); return { ...x, w: v, tw: (x.tw != null ? x.tw : 4) * r, hw: (x.hw || 30) * r } }
+  function pickSize(v) { setSize(v); if (sel >= 0 && shapes[sel]) setShapes(s => s.map((x, i) => (i === sel ? resizeTo(x, v) : x))) }
   /* Phím tắt: Delete / Backspace xoá nét đang chọn, Ctrl+Z hoàn tác, Ctrl+Shift+Z / Ctrl+Y làm lại (khi không gõ trong ô nhập) */
   useEffect(() => {
     if (!open || view !== 'new') return undefined
@@ -362,6 +398,8 @@ export default function BugReport({ open, onClose, pageName = '' }) {
     }
     draft.current = tool === 'pen' ? { type: 'pen', color, w: size, pts: [[p.x, p.y]] } : { type: tool, color, w: size, x1: p.x, y1: p.y, x2: p.x, y2: p.y }
     if (tool === 'curve') bendCurve(draft.current)
+    // mũi tên to dần: độ to mặc định theo cỡ nét đang chọn (px khung vẽ = px hiển thị x p.k)
+    if (tool === 'taper') { draft.current.tw = Math.max(2 * p.k, size * p.k * 0.6); draft.current.hw = Math.max(26 * p.k, size * p.k * 7) }
   }
   function move(e) {
     const g = drag.current

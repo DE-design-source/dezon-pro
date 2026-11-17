@@ -595,3 +595,15 @@ export function wsUrl() {
   u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'
   return u.href
 }
+
+/* ---- Hẹn giờ gửi tin (máy chủ tự gửi đúng giờ, kể cả khi người gửi đã tắt máy) - MarkUp 2026-11-16 18:57 ----
+   item: {id, conversation_id, content, mentions, reply_to_message_id, send_at, status, created_at} */
+export const listScheduled = convId => call('GET', '/conversations/' + convId + '/scheduled')
+export const createScheduled = (convId, { content, sendAt, mentions, replyTo }) => {
+  const body = { content, send_at: sendAt }
+  if (mentions && mentions.length) body.mentions = mentions
+  if (replyTo) body.reply_to_message_id = replyTo
+  return call('POST', '/conversations/' + convId + '/scheduled', { body })
+}
+export const updateScheduled = (id, patch) => call('PATCH', '/scheduled/' + id, { body: patch })
+export const deleteScheduled = id => call('DELETE', '/scheduled/' + id)

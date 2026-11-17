@@ -9,6 +9,8 @@ import PinnedBar from './PinnedBar'
 import { ConvAvatar, SearchIcon, StatusIcon, UsersIcon, avatarConv, colorFor, errText, initials } from './shared'
 import AddMemberPopover from './AddMemberPopover'
 import Composer from './Composer'
+import { ScheduledBar, botScheduled } from './Scheduled'
+import { createScheduled } from '../api/chatApi'
 import ForwardDialog from './ForwardDialog'
 import Lightbox from './Lightbox'
 import MediaBubble from './MediaBubble'
@@ -74,6 +76,16 @@ function useMinuteTick() {
    Tin gõ ở đây chỉ hiện trên máy này (bot không có máy chủ chat). */
 export function BotThread({ conv, requests, onUpdateRequest, onSend, meName }) {
   const boxRef = useRef(null)
+  const [schedSeq, setSchedSeq] = useState(0)
+  const sendRef = useRef(onSend)
+  sendRef.current = onSend
+  // tin hẹn giờ cho bot: kiểm mỗi 15 giây, đến giờ thì gửi như gõ tay
+  useEffect(() => {
+    const tick = () => { const due = botScheduled.takeDue(); if (due.length) { due.forEach(x => sendRef.current(x.content)); setSchedSeq(n => n + 1) } }
+    tick()
+    const t = setInterval(tick, 15000)
+    return () => clearInterval(t)
+  }, [])
   useEffect(() => {
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight
   }, [conv.messages])
@@ -115,7 +127,10 @@ export function BotThread({ conv, requests, onUpdateRequest, onSend, meName }) {
         {items}
       </div>
       <div className="ch-typing" />
-      <Composer onSend={onSend} placeholder="Nhập tin nhắn... (Enter để gửi)" />
+      <ScheduledBar cid="bot" seq={schedSeq} api={botScheduled} />
+      <Composer onSend={onSend} placeholder="Nhập tin nhắn... (Enter để gửi)"
+        scheduleNote="Bot không có máy chủ: tin gửi khi đến giờ mà trang Chat đang mở (mở lại sau giờ hẹn thì gửi ngay)."
+        onSchedule={(t, ms, iso) => botScheduled.create(t, iso).then(() => setSchedSeq(n => n + 1))} />
     </div>
   )
 }
@@ -123,6 +138,7 @@ export function BotThread({ conv, requests, onUpdateRequest, onSend, meName }) {
 /* Cột hội thoại thật (máy chủ chat): đầu thread, lịch sử (cuộn lên tải thêm), trạng thái tin, đang soạn, khung soạn tin */
 export default function Thread({ chat, conv, memberPopOpen, onToggleMemberPop, onCloseMemberPop, onLeft, onOpenSearch }) {
   useMinuteTick()
+  const [schedSeq, setSchedSeq] = useState(0)   // tăng sau mỗi lần hẹn giờ gửi -> thanh tin đã hẹn tải lại
   const me = chat.me
   const cid = conv.id
   const entry = chat.msgs[cid]
@@ -510,8 +526,13 @@ export default function Thread({ chat, conv, memberPopOpen, onToggleMemberPop, o
     )
   } else {
     bottom = (
+      <>
+      {/* tin đã hẹn giờ của tôi trong hội thoại này + nút hẹn giờ ở khung soạn (MarkUp 2026-11-16 18:57) */}
+      <ScheduledBar cid={cid} seq={schedSeq} />
       <Composer
         initialText={getDraft(cid)}
+        onSchedule={(t, ms, iso) => createScheduled(cid, { content: t, sendAt: iso, mentions: conv.type === 'direct' ? [] : L.normalizeMentions(t, ms, 0), replyTo: replyRaw && replyRaw.id })
+          .then(() => { setSchedSeq(n => n + 1); if (replyRaw) setReplyTo(cid, null) })}
         onDraft={v => setDraft(cid, v)}
         onTyping={v => noteTyping(cid, v)}
         onBlur={() => stopTyping(cid)}
@@ -528,6 +549,7 @@ export default function Thread({ chat, conv, memberPopOpen, onToggleMemberPop, o
         onSubmitEdit={(t, ms) => submitEdit(cid, editingMsg.id, t, ms).then(() => setEditing(cid, null))}
         onCancelEdit={() => setEditing(cid, null)}
       />
+      </>
     )
   }
   const canDrop = !!mediaCfg.enabled && !conv.left && !disbanded && !sendLocked && !(peer && peer.relation === 'blocked')

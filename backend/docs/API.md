@@ -283,7 +283,7 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/phases[/:itemId]` | `tkAddPhase / tkUpdatePhase / tkRemovePhase` | `rpc.Login` | delivery | Đề mục tiến độ (xoá kéo theo công việc). Mọi dự án luôn có "Mua hàng & cung ứng" và "Tài chính — dòng tiền" (tạo cùng dự án, migration 0033 bổ sung cho dự án cũ): xoá / đổi tên 2 đề mục này -> 400 |
 | `POST / PATCH / DELETE` | `/delivery/projects/:id/tasks[/:itemId]` | `tkAddTask / tkUpdateTask / tkRemoveTask` | `rpc.Login` | delivery | Công việc / cột mốc / mốc thu chi |
 | `POST` | `/delivery/projects/:id/tasks/:itemId/comments` | `tkAddComment` | `rpc.Login` | delivery | Bình luận công việc |
-| (nhiều) | `/chat/...` (36 route, kể cả `GET /chat/ws` và 4 route `/chat/media/...`) | `chat*` | `rpc.Public` (3 route đăng nhập) / `rpc.SelfAuth` (33) | chat | Chat MVP + tệp đính kèm: mục "Chat" ngay dưới |
+| (nhiều) | `/chat/...` (72 route, kể cả `GET /chat/ws`, 4 route `/chat/media/...` và 4 route tin hẹn giờ) | `chat*` | `rpc.Public` (5 route đăng nhập OTP / QR) / `rpc.Login` (`/chat/auth/dezon`) / `rpc.SelfAuth` (66) | chat | Chat MVP + tệp đính kèm + tin hẹn giờ: mục "Chat" ngay dưới |
 
 Kinh doanh (`sales`) và dự án triển khai (`delivery`, trang Quản lý thiết kế / Quản lý dự án), migration 0015-0016:
 - Route chỉ cần đăng nhập; quyền kiểm trong service như `canTab` của giao diện: super phải gửi `x-view-company` (không thì 400),
@@ -364,7 +364,7 @@ HR (`hr`, trang `/cham-cong`), migration 0024-0031 (chấm công tháng đã ch�
 - Service chặn: trùng mã NV, phòng ban / quản lý / trưởng đơn vị / thành viên không thuộc công ty, vòng quản lý, đơn vị nằm dưới chính nó,
   xoá đơn vị còn nhân sự hoặc đơn vị con, tổng kiêm nhiệm của 1 người > 90%.
 
-#### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023, 0045)
+#### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023, 0045, 0048)
 
 Chat MVP theo `backend/CHAT.md`: tài khoản riêng theo số điện thoại HOẶC email (bảng `chat_users`; tài khoản email không có số và ngược
 lại, chưa liên kết hai loại) hoặc gắn tài khoản Dezon Pro (`chat_users.qs_user_id`, migration 0045, chỉ tạo qua `POST /auth/dezon`), KHÔNG phải phiên QS, không theo công ty (`x-view-company` không có tác dụng). Lý do thiết kế:
@@ -432,6 +432,8 @@ trang Chat đổi phiên Dezon Pro lấy phiên chat bằng `POST /auth/dezon` (
 | `PATCH` | `/conversations/:id/members/:user_id` | `chatSetMemberRole` | SelfAuth | `{role: "admin" \| "member"}` (chỉ trưởng nhóm) -> ConversationDetail |
 | `PUT` | `/conversations/:id/mute` | `chatMuteConversation` | SelfAuth | `{until: RFC3339 \| "forever" \| null}` -> Conversation |
 | `GET` | `/conversations/:id/messages` | `chatListMessages` | SelfAuth | `?before_seq=` hoặc `?after_seq=`, `limit` 50 (tối đa 100) -> `{messages (tăng theo seq), has_more}`; không có cả hai = trang mới nhất |
+| `POST` / `GET` | `/conversations/:id/scheduled` | `chatCreateScheduled` / `chatListScheduled` | SelfAuth | POST `{content, send_at (RFC3339), mentions?, reply_to_message_id?}` -> Scheduled; GET -> `{items: [Scheduled]}` tin đang chờ của tôi, sớm trước. Mục "Tin hẹn giờ" |
+| `PATCH` / `DELETE` | `/scheduled/:sid` | `chatUpdateScheduled` / `chatCancelScheduled` | SelfAuth | PATCH `{content?, send_at?, mentions?}` -> Scheduled; DELETE -> `{ok: true}` (chỉ người hẹn, chỉ khi `pending`) |
 | `GET` | `/sync?cursor=` | `chatSync` | SelfAuth | `{conversations (kể cả dòng left: true), sync_cursor, truncated}`: dòng đổi từ `cursor` - 10 giây (client gộp idempotent), tối đa 500. Dòng `left: true` chỉ còn dữ liệu của mình: `name` null, `last_message` / `last_message_at` null, `member_count` 0, `last_seq` = `last_delivered_seq` của mình, `updated_at` = lúc rời (client giữ tên đã biết) |
 | `GET` | `/push/config` | `chatPushConfig` | SelfAuth | `{enabled, vapid_public_key}` |
 | `POST` / `DELETE` | `/devices/push` | `chatSetPushToken` / `chatClearPushToken` | SelfAuth | POST `{push_kind: "webpush", push_token: JSON.stringify(PushSubscription)}` (endpoint https của dịch vụ push đã biết): subscription đó bị gỡ khỏi thiết bị KHÁC của CÙNG người dùng (đăng nhập lại), thiết bị của người dùng khác vẫn giữ (một trình duyệt nhiều tài khoản, mỗi tab một tài khoản, dùng chung một subscription) / DELETE gỡ khỏi thiết bị hiện tại -> `{}` |
@@ -1002,6 +1004,24 @@ Không làm ở giai đoạn này: "xoá ở phía tôi", sửa chú thích ản
 
 **Giao diện - đường dẫn xác nhận QR:** `/chat/qr` (thêm `<Route path="chat/qr" element={<Chat />} />` cạnh `chat/join/:token`); trang
 đọc mã sau `#`, chưa đăng nhập chat thì qua cổng đăng nhập rồi quay lại (như link mời), rồi mở màn xác nhận (bước 3-4).
+
+**Tin hẹn giờ** (migration 0048, bảng `chat_scheduled_messages`; code `service_scheduled.go`): hẹn một tin VĂN BẢN, tới `send_at` máy chủ
+gửi hộ đúng như tôi tự gửi (`message.send`: lưu tin, `message.new` tới mọi thành viên kể cả các thiết bị của tôi, push), kể cả khi tôi offline.
+- Scheduled = `{id, conversation_id, content, mentions: [Mention] ([] = không nhắc ai), reply_to_message_id: số | null, send_at, status, created_at}`;
+  gói `scheduled.updated` có thêm `message_id` (đã gửi) / `error` (lỗi). `status`: `pending` / `sent` / `canceled` / `failed`.
+- Tạo / sửa: cổng như `message.send` (thành viên đang hoạt động, `admins_only_send`, chặn 1-1, nhóm giải tán -> cùng mã lỗi), `content` cắt
+  khoảng trắng 1..4000 ký tự, `mentions` / `reply_to_message_id` cùng luật (offset trên content đã cắt), `send_at` RFC3339 từ bây giờ + 30 giây
+  tới + 1 năm (`Giờ hẹn phải sau thời điểm hiện tại ít nhất 30 giây`, `Giờ hẹn tối đa 1 năm kể từ bây giờ`, sai dạng -> `send_at phải là
+  thời điểm RFC3339 ...`; đều 400 `BAD_REQUEST`). Tối đa 50 tin `pending` / người / hội thoại -> 409 `SCHEDULED_LIMIT`.
+- PATCH: khoá vắng = giữ nguyên; đổi `content` mà không gửi `mentions` = bỏ hết nhắc tên; chỉ gửi `mentions` = kiểm trên content hiện tại.
+  Tin của người khác / không có -> 404 `NOT_FOUND` (`Không tìm thấy tin hẹn giờ`); đã gửi / huỷ / lỗi -> 409 `SCHEDULED_DONE`. DELETE như vậy
+  (status -> `canceled`).
+- Mỗi lần tạo / sửa / huỷ / gửi / lỗi: gói WebSocket `scheduled.updated` (data = Scheduled) tới mọi thiết bị của người hẹn.
+- Worker (`StartScheduler`, bật ở `cmd/api` qua `Server.StartChatScheduler`, mỗi 15 giây, dừng khi server tắt): lấy từng tin `pending`
+  tới hạn bằng `FOR UPDATE SKIP LOCKED` (tối đa 100 / lượt), gửi qua đường của `message.send` với `client_msg_id` = UUID cố định suy từ `id`
+  (nhiều instance / chết giữa chừng -> ack trùng, không thêm tin), KHÔNG tính giới hạn 20 tin / giây. Kiểm lại mọi luật lúc gửi: lỗi nghiệp
+  vụ (đã rời nhóm, bị chặn, nhóm giải tán, @Tất cả mà không còn là trưởng / phó, tin trả lời đã thu hồi...) -> `failed` + `error` = thông báo
+  lỗi; lỗi database -> giữ `pending`, lượt sau thử lại.
 
 `GET /my-proposals/:code` (tag "Mua hàng"):
 - admin / super: như `GET /proposals/:code` (`getDeXuat`) - mọi phiếu của công ty; không có -> `Không tìm thấy đề xuất`.

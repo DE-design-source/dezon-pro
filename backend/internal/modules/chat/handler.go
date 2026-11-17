@@ -35,6 +35,7 @@ var (
 	// Giai đoạn 2: tin theo mã toàn hệ thống, thiết bị, mã QR, tìm tin.
 	msgPath    = rpc.GoField{Name: "message_id", In: "path", Type: "integer", Desc: "Mã tin nhắn (duy nhất toàn hệ thống)"}
 	devicePath = rpc.GoField{Name: "device_id", In: "path", Type: "integer", Desc: "Mã thiết bị"}
+	schedPath  = rpc.GoField{Name: "sid", In: "path", Type: "integer", Desc: "Mã tin hẹn giờ"}
 	qrCode     = rpc.GoField{Name: "code", In: "body", Type: "string", Required: true,
 		Desc: "Mã 10 ký tự (ABCDE-FGHJK; nhận chữ thường, gạch nối, khoảng trắng, O -> 0, I / L -> 1, hoặc cả URL <origin>/chat/qr#<code>)"}
 	searchQ      = rpc.GoField{Name: "q", In: "query", Type: "string", Required: true, Desc: "Từ khoá 2..100 ký tự, không phân biệt dấu / hoa thường, mỗi từ khớp tiền tố"}
@@ -177,6 +178,20 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		rpc.GoField{Name: "message_id", In: "body", Type: "integer", Required: true})
 	r("chatUnpinMessage", "DELETE", "/conversations/:id/pins/:message_id", rpc.SelfAuth, "Bỏ ghim tin", convPath,
 		rpc.GoField{Name: "message_id", In: "path", Type: "integer", Desc: "Mã tin nhắn"})
+	r("chatCreateScheduled", "POST", "/conversations/:id/scheduled", rpc.SelfAuth,
+		"Hẹn giờ gửi tin văn bản: tới send_at máy chủ gửi hộ như tôi tự gửi (kể cả khi offline); tối đa 50 tin đang chờ / hội thoại", convPath,
+		rpc.GoField{Name: "content", In: "body", Type: "string", Required: true, Desc: "1..4000 ký tự"},
+		rpc.GoField{Name: "send_at", In: "body", Type: "string", Required: true, Desc: "RFC3339, từ 30 giây tới 1 năm sau bây giờ"},
+		rpc.GoField{Name: "mentions", In: "body", Type: "array", Desc: "Như message.send (chỉ nhóm); kiểm lại lúc gửi"},
+		rpc.GoField{Name: "reply_to_message_id", In: "body", Type: "integer", Desc: "Trả lời tin này (cùng hội thoại); kiểm lại lúc gửi"})
+	r("chatListScheduled", "GET", "/conversations/:id/scheduled", rpc.SelfAuth,
+		"Tin hẹn giờ đang chờ của tôi trong hội thoại, sớm trước", convPath)
+	r("chatUpdateScheduled", "PATCH", "/scheduled/:sid", rpc.SelfAuth,
+		"Sửa tin hẹn giờ đang chờ của tôi (khoá vắng = giữ nguyên; đổi content mà không gửi mentions = bỏ nhắc tên)", schedPath,
+		rpc.GoField{Name: "content", In: "body", Type: "string", Desc: "1..4000 ký tự"},
+		rpc.GoField{Name: "send_at", In: "body", Type: "string", Desc: "RFC3339, từ 30 giây tới 1 năm sau bây giờ"},
+		rpc.GoField{Name: "mentions", In: "body", Type: "array", Desc: "Như message.send, offset trên content (mới)"})
+	r("chatCancelScheduled", "DELETE", "/scheduled/:sid", rpc.SelfAuth, "Huỷ tin hẹn giờ đang chờ của tôi", schedPath)
 	r("chatSync", "GET", "/sync", rpc.SelfAuth, "Hội thoại thay đổi từ lần đồng bộ trước (kể cả bị xoá khỏi nhóm: left = true)",
 		rpc.GoField{Name: "cursor", In: "query", Type: "string", Required: true, Desc: "sync_cursor (mili giây) của lần trước"})
 	r("chatPushConfig", "GET", "/push/config", rpc.SelfAuth, "Push có bật không + khoá công khai VAPID")
@@ -740,6 +755,39 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		}
 		return s.UnpinMessage(c.Request.Context(), uidOf(c), conv, mid)
 	}))
+	a.POST("/conversations/:id/scheduled", withConv(func(c *gin.Context, conv int64) (any, error) {
+		var in ScheduleInput
+		if err := bindJSON(c, &in); err != nil {
+			return nil, err
+		}
+		return s.CreateScheduled(c.Request.Context(), uidOf(c), conv, in)
+	}))
+	a.GET("/conversations/:id/scheduled", withConv(func(c *gin.Context, conv int64) (any, error) {
+		return s.ListScheduled(c.Request.Context(), uidOf(c), conv)
+	}))
+	a.PATCH("/scheduled/:sid", func(c *gin.Context) {
+		sid, err := pathID(c, "sid")
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		var in SchedulePatch
+		if err := bindJSON(c, &in); err != nil {
+			fail(c, err)
+			return
+		}
+		r, err := s.UpdateScheduled(c.Request.Context(), uidOf(c), sid, in)
+		reply(c, r, err)
+	})
+	a.DELETE("/scheduled/:sid", func(c *gin.Context) {
+		sid, err := pathID(c, "sid")
+		if err == nil {
+			err = s.CancelScheduled(c.Request.Context(), uidOf(c), sid)
+		}
+		reply(c, struct {
+			OK bool `json:"ok"`
+		}{true}, err)
+	})
 	a.GET("/sync", func(c *gin.Context) {
 		r, err := s.Sync(c.Request.Context(), uidOf(c), c.Query("cursor"))
 		reply(c, r, err)

@@ -152,6 +152,7 @@ func (s *Server) modules() []Module {
 	chatSvc.SetGateway(chatHub)
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
 	s.OnShutdown(chatSvc.Shutdown)
+	s.chatSched = chatSvc.StartScheduler // worker tin hẹn giờ: cmd/api bật qua Server.StartChatScheduler
 	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
 	// cài đặt mặc định toàn hệ thống (super lưu, mọi tài khoản đăng nhập đọc), không gọi module khác
 	settingsSvc := settings.New(settings.Deps{DB: d.DB, Cfg: d.Cfg})

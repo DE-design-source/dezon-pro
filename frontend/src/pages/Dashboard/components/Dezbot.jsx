@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BugChip } from '../../../components/ui/BugReport'
+import { CaptureChips } from '../../../components/ui/CaptureTools'
 import { AI_KB, AI_CHIPS, matchTopic } from '../../../data/dashboardData'
 
 const MIN_W = 260
@@ -96,6 +97,7 @@ export default function Dezbot() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {AI_CHIPS.map(c => <button key={c.topic} className="db-embed-chip" onClick={() => send(c.question)}>{c.label}</button>)}
                 <BugChip className="db-embed-chip" />
+                <CaptureChips className="db-embed-chip" />
               </div>
             </div>
           )}
