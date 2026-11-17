@@ -218,17 +218,6 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-card{border:1px solid var(--border); border-radius:14px; background:var(--surface); overflow:hidden;}
 .mk-ads-h{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 18px 10px; border-bottom:1px solid var(--border);}
 .mk-ads-h b{font-size:14px;} .mk-ads-h span{font-size:12px; color:var(--text-muted);}
-.mk-ads-chart{position:relative; padding:12px 18px 8px;}
-.mk-ads-chart svg{display:block; width:100%; height:240px;}
-.mk-ads-chart .grid{stroke:var(--border); stroke-width:1; vector-effect:non-scaling-stroke;}
-.mk-ads-chart .base{stroke:var(--text-muted); stroke-width:1; opacity:.5; vector-effect:non-scaling-stroke;}
-.mk-ads-chart .ax{font-size:11px; fill:var(--text-muted); font-family:inherit;}
-.mk-ads-chart .bar{fill:var(--marketing); opacity:.85;}
-.mk-ads-chart .bar.on{opacity:1;}
-.mk-ads-tip{position:absolute; top:8px; transform:translateX(-50%); z-index:3; min-width:200px; padding:9px 11px; border:1px solid var(--border); border-radius:9px; background:var(--surface); box-shadow:0 10px 26px rgba(15,23,42,.16); display:flex; flex-direction:column; gap:3px; pointer-events:none; font-size:12px;}
-.mk-ads-tip b{font-size:12.5px; margin-bottom:2px;}
-.mk-ads-tip span{display:flex; justify-content:space-between; gap:14px; color:var(--text); font-variant-numeric:tabular-nums;}
-.mk-ads-tip span i{font-style:normal; color:var(--text-muted);}
 .mk-ads-kenh{display:flex; flex-direction:column; padding:6px 10px 10px;}
 .mk-ads-krow{display:grid; grid-template-columns:minmax(120px,1.3fr) minmax(0,3fr) 130px 64px; gap:12px; align-items:center; padding:8px; border:0; border-radius:8px; background:none; font:inherit; text-align:left; cursor:pointer;}
 .mk-ads-krow:hover{background:var(--surface-alt);}
@@ -357,9 +346,6 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-nhanh-b .o .dp-trigger span{font-size:13px; font-weight:500; color:var(--text);}
 .mk-ads-kyn{font-size:12.5px; font-weight:600; color:var(--text);}
 
-/* biểu đồ: kích thước thật (không kéo giãn), chữ trục dùng font của trang (Montserrat) */
-.mk-ads-chart svg{width:100%; height:auto; max-width:100%;}
-.mk-ads-chart .ax{font-family:var(--mk-font); font-size:11px; font-weight:500;}
 
 /* cột Tổng ngày = 1 module như cột kênh, khác màu (tông màu Marketing); nút thêm kênh chỉ còn dấu + tròn */
 .mk-ads-tbl.nhap .k.tong{background:color-mix(in srgb, var(--marketing-tint) 45%, var(--surface)); border-color:color-mix(in srgb, var(--marketing) 30%, var(--border)); color:var(--marketing);}
@@ -443,25 +429,6 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-cbdang button{height:24px; padding:0 9px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;}
 .mk-ads-cbdang button:hover{border-color:var(--marketing); color:var(--marketing);}
 
-/* 2 biểu đồ cạnh nhau (hẹp thì xếp dọc) + biểu đồ lũy kế */
-.mk-ads-2c{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px;}
-@media (max-width: 1100px){ .mk-ads-2c{grid-template-columns:minmax(0,1fr);} }
-.mk-ads-chart .lk-cur{fill:none; stroke:var(--marketing); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round;}
-.mk-ads-chart .lk-area{fill:var(--marketing); opacity:.10;}
-.mk-ads-chart .lk-prev{fill:none; stroke:#9aa3af; stroke-width:2; stroke-dasharray:5 4; stroke-linejoin:round;}
-.mk-ads-chart .lk-dot{fill:var(--marketing); stroke:var(--surface); stroke-width:2;}
-.mk-ads-chart .lk-dotp{fill:#9aa3af; stroke:var(--surface); stroke-width:2;}
-.mk-ads-chart .lk-hair{stroke:var(--text-muted); stroke-width:1; stroke-dasharray:3 3; opacity:.6;}
-.lk-sw{display:inline-block; width:14px; height:3px; border-radius:2px; margin-right:5px; vertical-align:middle;}
-.lk-sw.cur{background:var(--marketing);}
-.lk-sw.prev{background:repeating-linear-gradient(90deg, #9aa3af 0 5px, transparent 5px 8px);}
-.mk-ads-lg{display:inline-flex; align-items:center; gap:4px; font-size:12px; color:var(--text-muted);}
-.mk-ads-lg .lk-sw.prev{margin-left:10px;}
-.mk-ads-so{font-size:12px; color:var(--text-muted);}
-.mk-ads-so b{font-size:13px; color:var(--text);}
-.mk-ads-so b.tang{color:#b91c1c;} .mk-ads-so b.giam{color:#15803d;}
-.mk-ads-so i{font-style:normal; margin-left:4px;}
-.mk-ads-tip span i .lk-sw{margin-right:6px;}
 
 /* ===================== Kiểu QS cho Chiến dịch · Danh mục · Báo giá ===================== */
 /* ô số có icon */

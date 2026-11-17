@@ -23,69 +23,6 @@ const khongDau = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/
 /* Nút "+" phụ trách: hộp nổi có ô gõ để tìm + danh sách đánh dấu (chọn / bỏ nhiều người, ghi ngay); bấm ra ngoài hoặc Esc để đóng.
    Hộp vẽ ra thẳng .mk-page (portal - giữ biến màu của trang) + position:fixed theo vị trí nút: ô tiêu đề sticky của bảng tạo lớp xếp chồng riêng,
    vẽ trong ô thì dòng Tổng (sticky) đè lên hộp */
-/* Biểu đồ "Lũy kế chi tiêu": đường cộng dồn chi tiêu theo ngày của kỳ đang xem (màu Marketing) so với kỳ trước cùng độ dài
-   (xám, nét đứt) - thấy ngay đang tiêu nhanh / chậm hơn kỳ trước. cur / prev = mảng lũy kế theo thứ tự ngày (null = ngày chưa tới).
-   Rê chuột: đường dóng + giá trị 2 kỳ tại ngày đó. Vẽ đúng bề rộng thật của khung (không kéo giãn chữ) */
-function LuyKeChart({ ngay, cur, prev, nhanPrev }) {
-  const ref = useRef(null)
-  const [w, setW] = useState(480)
-  const [hv, setHv] = useState(-1)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => { const x = Math.round(el.clientWidth - 36); if (x > 0) setW(x) })
-    ro.observe(el); return () => ro.disconnect()
-  }, [])
-  const W = Math.max(280, w); const H = 240; const padL = 50; const padB = 26; const padT = 14; const padR = 10
-  const n = Math.max(ngay.length, prev.length, 1)
-  const yMax = Math.max(1e6, ...cur.filter(x => x != null), ...prev)
-  const buoc = Math.pow(10, Math.floor(Math.log10(Math.max(1, yMax / 3))))
-  const tick = Math.max(1, Math.ceil(yMax / 3 / buoc) * buoc)
-  const top = tick * 3
-  const x = i => padL + (n <= 1 ? 0 : i * (W - padL - padR) / (n - 1))
-  const y = v => padT + (H - padT - padB) * (1 - v / top)
-  const duong = ds => { let d = ''; ds.forEach((v, i) => { if (v == null) return; d += (d ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) }); return d }
-  const cuoi = (() => { for (let i = cur.length - 1; i >= 0; i--) if (cur[i] != null) return i; return -1 })()
-  const buocNhan = Math.ceil(n / Math.max(3, Math.floor(W / 80)))
-  const onMove = e => {
-    const r = e.currentTarget.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width * W
-    setHv(Math.max(0, Math.min(n - 1, Math.round((px - padL) / ((W - padL - padR) / Math.max(1, n - 1))))))
-  }
-  const ci = hv >= 0 ? cur[hv] : null; const pi = hv >= 0 ? prev[hv] : null
-  return (
-    <div className="mk-ads-chart" ref={ref} onMouseLeave={() => setHv(-1)}>
-      <svg viewBox={'0 0 ' + W + ' ' + H} width={W} height={H} role="img" aria-label="Biểu đồ lũy kế chi tiêu kỳ này so với kỳ trước" onMouseMove={onMove}>
-        {[0, 1, 2, 3].map(t => (
-          <g key={t}>
-            <line x1={padL} x2={W - padR} y1={y(tick * t)} y2={y(tick * t)} className="grid" />
-            <text x={padL - 6} y={y(tick * t) + 3} textAnchor="end" className="ax">{fmtM(tick * t)}</text>
-          </g>
-        ))}
-        {ngay.map((d, i) => (i % buocNhan === 0 ? <text key={d} x={x(i)} y={H - 7} textAnchor="middle" className="ax">{nhanNgay(d)}</text> : null))}
-        <line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} className="base" />
-        {prev.length > 0 && <path d={duong(prev)} className="lk-prev" />}
-        {cuoi >= 0 && <path d={duong(cur) + 'L' + x(cuoi).toFixed(1) + ',' + y(0) + 'L' + x(0).toFixed(1) + ',' + y(0) + 'Z'} className="lk-area" />}
-        <path d={duong(cur)} className="lk-cur" />
-        {cuoi >= 0 && <circle cx={x(cuoi)} cy={y(cur[cuoi])} r="4.5" className="lk-dot" />}
-        {hv >= 0 && (
-          <g>
-            <line x1={x(hv)} x2={x(hv)} y1={padT} y2={y(0)} className="lk-hair" />
-            {ci != null && <circle cx={x(hv)} cy={y(ci)} r="4" className="lk-dot" />}
-            {pi != null && <circle cx={x(hv)} cy={y(pi)} r="4" className="lk-dotp" />}
-          </g>
-        )}
-      </svg>
-      {hv >= 0 && (
-        <div className="mk-ads-tip" style={{ left: (x(hv) / W * 100) + '%' }}>
-          <b>Ngày thứ {hv + 1}{ngay[hv] ? ' · ' + nhanNgay(ngay[hv]) : ''}</b>
-          <span><i><em className="lk-sw cur" />Kỳ này</i>{ci != null ? fmt(ci) + ' đ' : '—'}</span>
-          {prev.length > 0 && <span><i><em className="lk-sw prev" />{nhanPrev}</i>{pi != null ? fmt(pi) + ' đ' : '—'}</span>}
-        </div>
-      )}
-    </div>
-  )
-}
 /* Shortlist chọn kênh: nút "Chọn kênh (n/N)" mở hộp có ô gõ tìm + danh sách đánh dấu (chọn / bỏ nhiều kênh); hộp vẽ ra .mk-page */
 function KenhPicker({ ds, chon, onChange }) {
   const [mo, setMo] = useState(null)
@@ -174,7 +111,6 @@ function PtPicker({ ds, users, onChange }) {
 }
 const LS = 'mk_ads_spend'
 const fmt = n => Math.round(Number(n) || 0).toLocaleString('vi-VN')
-const fmtM = n => { n = Number(n) || 0; if (!n) return '0'; if (n < 1e6) return Math.round(n / 1000) + 'k'; const v = n / 1e6; return (v >= 10 ? v.toFixed(0) : v.toFixed(1)).replace('.', ',') + 'tr' }
 
 function napLs() { try { const v = JSON.parse(localStorage.getItem(LS) || 'null'); return v && Array.isArray(v.kenh) && Array.isArray(v.ngay) ? v : null } catch (e) { return null } }
 function luuLs(v) { try { if (v) localStorage.setItem(LS, JSON.stringify(v)); else localStorage.removeItem(LS) } catch (e) { /* bỏ qua */ } }
@@ -246,8 +182,6 @@ export default function AdsSpendTab({ visible }) {
   const setThang = k => { setKy('thang'); setThangS(k) }
   const [tat, setTat] = useState({})            // kênh tắt khỏi tổng {tên: 1}
   const [loi, setLoi] = useState('')
-  const [hover, setHover] = useState(-1)
-  const chartRef = useRef(null)
   /* nút + thêm kênh: căn đúng giữa cột trống cuối bảng (đo vị trí ô th.them so với khung, đo lại khi đổi cỡ / cuộn ngang) */
   const boxRef = useRef(null)
   const [themX, setThemX] = useState(null)
@@ -280,14 +214,6 @@ export default function AdsSpendTab({ visible }) {
     const raf = requestAnimationFrame(do_)   // đo lại sau khi trình duyệt dàn xong (font / CSS vừa nạp)
     return () => { if (ro) ro.disconnect(); if (wrap) wrap.removeEventListener('scroll', do_); window.removeEventListener('resize', do_); cancelAnimationFrame(raf) }
   })
-  const [chartW, setChartW] = useState(1000)
-  useEffect(() => {
-    const el = chartRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => { const w = Math.round(el.clientWidth - 36); if (w > 0) setChartW(w) })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
   const fileRef = useRef(null)
   /* phiên đăng nhập: quản trị (admin / super, hoặc chưa đăng nhập = dữ liệu chỉ ở máy này) thấy mọi kênh + giao kênh;
      nhân sự chỉ thấy kênh có phuTrach[kênh] = tên đăng nhập của mình */
@@ -464,39 +390,10 @@ export default function AdsSpendTab({ visible }) {
     return { ki, tkI, ngay, theoKenh, tong, tb: coChi.length ? tong / coChi.length : 0, soNgay: coChi.length, max, kMax }
   }, [data, kyKhoa, tat, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---- biểu đồ cột chi theo ngày (1 màu, tổng các kênh đang bật) ---- */
-  /* vẽ theo đúng bề rộng thật của khung (đo bằng ResizeObserver) - không kéo giãn SVG nên chữ trục không bị méo */
-  const W = Math.max(320, chartW); const H = 240; const padL = 50; const padB = 26; const padT = 12
-  const n = v.ngay.length
-  const yMax = Math.max(1e6, ...v.ngay.map(x => x.tong))   // chưa có số: trục 0 - 1tr cho dễ nhìn
-  const buoc = Math.pow(10, Math.floor(Math.log10(Math.max(1, yMax / 3))))
-  const tick = Math.max(1, Math.ceil(yMax / 3 / buoc) * buoc)
-  const top = tick * 3
-  const cw = (W - padL) / Math.max(1, n)
-  const bw = Math.max(2, Math.min(28, cw - 3))
-  const y = val => padT + (H - padT - padB) * (1 - val / top)
-  const hv = hover >= 0 && hover < n ? v.ngay[hover] : null
   const tongKenhMax = Math.max(1, ...v.theoKenh.map(x => x.tong))
   /* combo đang áp dụng (lựa chọn hiện tại trùng đúng 1 combo): danh sách chỉ hiện các kênh của combo, kênh khác ẩn */
   const comboDang = (Array.isArray(data.combo) ? data.combo : []).find(c => { const co = c.kenh.filter(k => v.theoKenh.some(x => x.k === k)); return co.length && co.length === v.ki.length && co.every(k => v.theoKenh.some(x => x.k === k && x.on)) })
   const dongBang = v.ngay.slice().reverse()     // bảng: mới nhất ở trên như file gốc
-  /* lũy kế: kỳ này (dừng ở hôm nay) và kỳ trước cùng độ dài (Tháng: tháng trước; Mọi lúc: không so) - chỉ tính kênh đang chọn */
-  const kyTruoc = (() => {
-    if (ky === 'tat' || !kyNgay.length) return []
-    if (ky === 'thang') return ngayCuaThang(thangCong(thang, -1)).slice().reverse()
-    const e = new Date(kyNgay[0] + 'T00:00:00'); e.setDate(e.getDate() - 1); const s0 = new Date(e); s0.setDate(s0.getDate() - (kyNgay.length - 1))
-    return ngayTu(isoNgay(s0), isoNgay(e))
-  })()
-  const byD = {}; data.ngay.forEach(x => { byD[x.d] = x.v })
-  const tongD = d => { const vv = byD[d]; return vv ? v.ki.reduce((a, i) => a + (Number(vv[i]) || 0), 0) : 0 }
-  let lk = 0; const lkCur = kyNgay.map(d => (d > homNay ? null : (lk += tongD(d))))
-  lk = 0; const lkPrev = kyTruoc.map(d => (lk += tongD(d)))
-  const tongPrev = lkPrev.length ? lkPrev[lkPrev.length - 1] : 0
-  // so cùng thời điểm: kỳ trước tới ngày thứ tương ứng hôm nay
-  const nCur = lkCur.filter(x => x != null).length
-  const prevCung = nCur && lkPrev.length ? lkPrev[Math.min(nCur, lkPrev.length) - 1] : 0
-  const doiPct = prevCung ? Math.round((v.tong - prevCung) / prevCung * 100) : null
-  const nhanPrev = ky === 'thang' ? nhanThang(thangCong(thang, -1)) : 'Kỳ trước'
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
@@ -748,57 +645,6 @@ export default function AdsSpendTab({ visible }) {
         </div>
       </div>
 
-      {/* 2 biểu đồ cạnh nhau: chi theo ngày (cột) · lũy kế kỳ này so với kỳ trước (đường) */}
-      <div className="mk-ads-2c">
-      {/* chi theo ngày */}
-      <div className="mk-ads-card">
-        <div className="mk-ads-h"><b>Chi theo ngày</b><span>Tổng các kênh đang bật · rê chuột vào cột để xem từng kênh</span></div>
-        <div className="mk-ads-chart" ref={chartRef} onMouseLeave={() => setHover(-1)}>
-          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Biểu đồ chi tiêu theo ngày">
-            {[0, 1, 2, 3].map(t => (
-              <g key={t}>
-                <line x1={padL} x2={W} y1={y(tick * t)} y2={y(tick * t)} className="grid" />
-                <text x={padL - 6} y={y(tick * t) + 3} textAnchor="end" className="ax">{fmtM(tick * t)}</text>
-              </g>
-            ))}
-            {v.ngay.map((x, i) => {
-              const cx = padL + i * cw + cw / 2
-              const h = Math.max(0, y(0) - y(x.tong))
-              const r = Math.min(4, h, bw / 2)
-              return (
-                <g key={x.d}>
-                  {h > 0 && <path className={'bar' + (i === hover ? ' on' : '')}
-                    d={`M${cx - bw / 2},${y(0)} V${y(0) - h + r} Q${cx - bw / 2},${y(0) - h} ${cx - bw / 2 + r},${y(0) - h} H${cx + bw / 2 - r} Q${cx + bw / 2},${y(0) - h} ${cx + bw / 2},${y(0) - h + r} V${y(0)} Z`} />}
-                  <rect x={padL + i * cw} y={padT} width={cw} height={H - padT - padB} fill="transparent" onMouseEnter={() => setHover(i)} />
-                  {i % Math.ceil(n / Math.max(3, Math.floor(W / 80))) === 0 && <text x={cx} y={H - 7} textAnchor="middle" className="ax">{nhanNgay(x.d)}</text>}
-                </g>
-              )
-            })}
-            <line x1={padL} x2={W} y1={y(0)} y2={y(0)} className="base" />
-          </svg>
-          {hv && (
-            <div className="mk-ads-tip" style={{ left: ((padL + hover * cw + cw / 2) / W * 100) + '%' }}>
-              <b>{nhanNgay(hv.d)}/{hv.d.slice(0, 4)} · {fmt(hv.tong)} đ</b>
-              {v.ki.filter(i => Number(hv.v[i]) > 0).map(i => <span key={i}><i>{data.kenh[i]}</i>{fmt(hv.v[i])}</span>)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* lũy kế chi tiêu: kỳ này so với kỳ trước */}
-      <div className="mk-ads-card">
-        <div className="mk-ads-h mk-ads-hloc"><span className="mk-ads-h1"><b>Lũy kế chi tiêu</b>
-          <span className="mk-ads-lg"><em className="lk-sw cur" />Kỳ này{kyTruoc.length > 0 && <><em className="lk-sw prev" />{nhanPrev}</>}</span></span>
-          {kyTruoc.length > 0 && (
-            <span className="mk-ads-so">
-              {doiPct == null ? 'Kỳ trước chưa có số' : <>So cùng kỳ <b className={doiPct > 0 ? 'tang' : doiPct < 0 ? 'giam' : ''}>{doiPct > 0 ? '▲ ' : doiPct < 0 ? '▼ ' : ''}{Math.abs(doiPct)}%</b></>}
-              <i>· {nhanPrev} cả kỳ {fmt(tongPrev)} đ</i>
-            </span>
-          )}
-        </div>
-        <LuyKeChart ngay={kyNgay} cur={lkCur} prev={lkPrev} nhanPrev={nhanPrev} />
-      </div>
-      </div>
       </>}
     </div>
   )
