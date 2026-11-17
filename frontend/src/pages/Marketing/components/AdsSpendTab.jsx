@@ -405,8 +405,12 @@ export default function AdsSpendTab({ visible }) {
   /* Kỳ của ô số = bộ lọc thời gian của khối Hiệu quả kênh (onRange); khối đó ẩn (không có quyền xem) thì theo kỳ của bảng nhập.
      Công thức: Leads/ngày = lead trong kỳ ÷ số ngày; Chi phí Ads/Ngày = chi trong kỳ ÷ số ngày; CPA = chi ÷ lead.
      Số ngày tính tới hôm nay (Tháng này = số ngày đã qua); Mọi lúc: từ ngày có số / có lead sớm nhất */
-  const R = thayHq && hqR && !hqR.chua ? hqR
+  const R0 = thayHq && hqR && !hqR.chua ? hqR
     : { ky: ky === 'thang' ? 'thang' : '', tu: kyNgay[0] || null, den: kyNgay[kyNgay.length - 1] || null, nhan: nhanKy, chua: thayHq && hqR ? hqR.chua : false }
+  /* Mọi ô chỉ tính tới hôm nay: "Tháng này" = từ đầu tháng tới hôm nay (MarkUp 2026-11-17); nhãn ghi rõ khoảng ngày */
+  const R = R0.den && R0.den > homNay ? { ...R0, den: homNay } : R0
+  const nhanR = R.tu && R.den && R.den !== R0.den
+    ? (R.tu === R.den ? nhanNgay(R.den) + '/' + R.den.slice(0, 4) : nhanNgay(R.tu) + ' – ' + nhanNgay(R.den) + '/' + R.den.slice(0, 4)) : R.nhan
   const inK = d => !!d && (!R.tu || d >= R.tu) && (!R.den || d <= R.den)
   const chiKy = data.ngay.reduce((a, x) => (inK(x.d) ? a + v.ki.reduce((b, i) => b + (Number(x.v[i]) || 0), 0) : a), 0)
   const leadKy = leadQc.filter(l => inK(String(l.createdAt || '').slice(0, 10))).length
@@ -417,7 +421,7 @@ export default function AdsSpendTab({ visible }) {
       const ds = [...data.ngay.filter(x => x.v.some(y => Number(y) > 0)).map(x => x.d), ...leadQc.map(l => String(l.createdAt || '').slice(0, 10)).filter(Boolean)].sort()
       tu = ds[0] || homNay
     }
-    const den = R.den && R.den < homNay ? R.den : homNay
+    const den = R.den || homNay
     if (tu > den) return 0
     return Math.round((Date.parse(den + 'T00:00:00Z') - Date.parse(tu + 'T00:00:00Z')) / 864e5) + 1
   })()
@@ -480,11 +484,11 @@ export default function AdsSpendTab({ visible }) {
       {!(trang === 'nhap' && !kenhCua.length) && <>
       {/* ô số */}
       <div className="mk-ads-kpis">
-        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads && soNgayKy ? soLe(leadKy / soNgayKy) : '—'}</b><em>{R.nhan}{leads ? ghiNgay : ' · cần quyền Kinh doanh'}</em></div>
-        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{R.nhan} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
-        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{R.nhan}{ghiNgay}</em></div>
-        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{R.nhan} · từ kênh quảng cáo</em></div>
-        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{R.nhan} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
+        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads && soNgayKy ? soLe(leadKy / soNgayKy) : '—'}</b><em>{nhanR}{leads ? ghiNgay : ' · cần quyền Kinh doanh'}</em></div>
+        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(chiKy / leadKy)) : '—'}</b><em>{nhanR} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
+        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{soNgayKy ? fmt(Math.round(chiKy / soNgayKy)) : '—'}</b><em>{nhanR}{ghiNgay}</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanR} · từ kênh quảng cáo</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(chiKy)}</b><em>{nhanR} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
 
       {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
