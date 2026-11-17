@@ -6,6 +6,7 @@ import * as qsApi from '../../QS/api/qsApi'
 import { LEAD_SOURCES } from '../../../data/kinhDoanhData'
 import { useKdOptions } from '../../KinhDoanh/components/ShortlistSelect'
 import AdsLeadDash from './AdsLeadDash'
+import { listLeads } from '../../KinhDoanh/api'
 
 /* Tab "Chi tiêu quảng cáo": chi tiêu hằng ngày theo kênh (Facebook, Google Ads...). Gồm: ô số tổng · BẢNG NHẬP (ngày x kênh, gõ thẳng) ·
    hiệu quả kênh (AdsLeadDash); nhập / xuất CSV cùng cấu trúc file gốc (cột đầu = Ngày dd/mm/yyyy, mỗi cột sau = 1 kênh; số có thể ở dạng
@@ -389,6 +390,22 @@ export default function AdsSpendTab({ visible }) {
   }, [data, kyKhoa, quanTri, toi, trang, ai])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const dongBang = v.ngay.slice().reverse()     // bảng: mới nhất ở trên như file gốc
+  /* Ô số (MarkUp 2026-11-17, theo bảng Lark cũ): lead = khách hàng Kinh doanh có "Nguồn khách hàng" trùng tên kênh quảng cáo
+     (cùng quy tắc với Hiệu quả kênh). "/ngày" = hôm nay; "/tháng" = kỳ đang chọn. Không có quyền Kinh doanh -> ô lead hiện — */
+  const [leads, setLeads] = useState(null)
+  useEffect(() => {
+    if (!visible) return undefined
+    let live = true
+    listLeads().then(ls => { if (live) setLeads(ls) }, () => { if (live) setLeads(null) })
+    return () => { live = false }
+  }, [visible])
+  const kenhTen = new Set(v.ki.map(i => String(data.kenh[i] || '').trim().toLowerCase()))
+  const leadQc = (leads || []).filter(l => kenhTen.has(String(l.source || '').trim().toLowerCase()))
+  const kySet = new Set(kyNgay)
+  const leadKy = leadQc.filter(l => kySet.has(String(l.createdAt || '').slice(0, 10))).length
+  const leadNay = leadQc.filter(l => String(l.createdAt || '').slice(0, 10) === homNay).length
+  const chiNay = (() => { const x = data.ngay.find(n => n.d === homNay); return x ? v.ki.reduce((a, i) => a + (Number(x.v[i]) || 0), 0) : null })()
+  const theoThang = ky === 'thang'
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
@@ -445,10 +462,11 @@ export default function AdsSpendTab({ visible }) {
       {!(trang === 'nhap' && !kenhCua.length) && <>
       {/* ô số */}
       <div className="mk-ads-kpis">
-        <div className="mk-ads-kpi"><span>Tổng chi</span><b>{fmt(v.tong)} đ</b><em>{nhanKy} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
-        <div className="mk-ads-kpi"><span>Trung bình / ngày</span><b>{fmt(v.tb)} đ</b><em>{v.soNgay} ngày có chi</em></div>
-        <div className="mk-ads-kpi"><span>Ngày chi cao nhất</span><b>{fmt(v.max.tong)} đ</b><em>{v.max.d ? nhanNgay(v.max.d) + '/' + v.max.d.slice(0, 4) : '—'}</em></div>
-        <div className="mk-ads-kpi"><span>Kênh chi nhiều nhất</span><b>{v.kMax.k || '—'}</b><em>{v.kMax.tong ? fmt(v.kMax.tong) + ' đ · ' + Math.round(v.kMax.tong / (v.tong || 1) * 100) + '%' : ''}</em></div>
+        <div className="mk-ads-kpi hot"><span>Leads/ngày</span><b>{leads ? leadNay : '—'}</b><em>Hôm nay {nhanNgay(homNay)}{leads ? '' : ' · cần quyền Kinh doanh'}</em></div>
+        <div className="mk-ads-kpi hot"><span>CPA (Chi phí / Lead)</span><b>{leads && leadKy ? fmt(Math.round(v.tong / leadKy)) : '—'}</b><em>{nhanKy} · {leads ? leadKy + ' lead' : 'chưa có số lead'}</em></div>
+        <div className="mk-ads-kpi"><span>Chi phí Ads/Ngày</span><b>{chiNay == null ? '—' : fmt(chiNay)}</b><em>Hôm nay {nhanNgay(homNay)}{chiNay == null ? ' · chưa nhập' : ''}</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Leads/tháng' : 'Leads trong kỳ'}</span><b>{leads ? leadKy : '—'}</b><em>{nhanKy} · từ kênh quảng cáo</em></div>
+        <div className="mk-ads-kpi"><span>{theoThang ? 'Tổng chi phí Ads/Tháng' : 'Tổng chi phí Ads'}</span><b>{fmt(v.tong)}</b><em>{nhanKy} · {v.ki.length}/{kenhThay.length} kênh{trang === 'nhap' ? ' của ' + (quanTri && ai !== toi ? tenNguoi(ai) : 'bạn') : ''}</em></div>
       </div>
 
       {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}

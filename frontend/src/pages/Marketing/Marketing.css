@@ -210,7 +210,8 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-err{font-style:normal; font-size:12px; color:#b91c1c;}
 .mk-ads-empty{display:flex; flex-direction:column; align-items:center; gap:10px; padding:48px 20px; border:1.5px dashed var(--border); border-radius:14px; background:var(--surface); text-align:center;}
 .mk-ads-empty b{font-size:14px;} .mk-ads-empty span{max-width:520px; font-size:12.5px; color:var(--text-muted); line-height:1.6;}
-.mk-ads-kpis{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px;}
+.mk-ads-kpis{display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:16px;}
+.mk-ads-kpi.hot b{color:#e5534b;}   /* Leads/ngày, CPA: tô đỏ như bảng cũ */
 .mk-ads-kpi{display:flex; flex-direction:column; gap:6px; padding:16px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface); min-width:0;}
 .mk-ads-kpi span{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
 .mk-ads-kpi b{font-size:22px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -225,6 +226,7 @@ html[data-theme="dark"][data-accent="teal"] .mk-page{--primary:#3FC2B6; --primar
 .mk-ads-tbl .num{text-align:right; font-variant-numeric:tabular-nums;}
 .mk-ads-tbl .b{font-weight:700;}
 .mk-ads-tbl tfoot td{position:sticky; bottom:0; background:var(--marketing-tint); font-weight:700;}
+@media (max-width: 1200px){ .mk-ads-kpis{grid-template-columns:repeat(3, minmax(0,1fr));} }
 @media (max-width: 900px){ .mk-ads-kpis{grid-template-columns:repeat(2, minmax(0,1fr));} }
 /* bảng nhập: ô số gõ thẳng, cột kênh đổi tên / bỏ được, cột "+ Kênh" */
 .mk-ads-month{position:absolute; inset:0; opacity:0; cursor:pointer;}
