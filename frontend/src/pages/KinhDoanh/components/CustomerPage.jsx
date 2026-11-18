@@ -268,8 +268,6 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa phụ trách" onClick={onEdit}>
             <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
           </button>
-          {/* nút đóng cột Chi tiết (quay lại 2 cột) dời lên khung đầu cột (MarkUp 2026-11-16 19:29) */}
-          {detail && <button type="button" className="kd-cp-edit" title="Đóng cột Chi tiết" aria-label="Đóng cột Chi tiết" onClick={() => setDetail(false)}><Ic d="M18 6 6 18M6 6l12 12" size={14} /></button>}
         </h4>
         <div className="kd-cp-people">
           {[['Phòng', DEPT_LABEL[l.dept]], ['Khởi tạo', l.creator], ['Quản lý', l.manager], ...(l.assignees || []).map(a => [a.role || 'Phụ trách', a.name])].filter(x => x[1]).map(([r, n], i) => (
@@ -374,8 +372,6 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
         {/* Cột Chi tiết = cột thứ 2, cạnh cột thông tin (MarkUp 2026-11-16 16:49): mở / đóng bằng nút mở rộng */}
         {detail && (
           <aside className="kd-cp-detail kd-cp-side" aria-label="Chi tiết khách hàng">
-            {/* Phụ trách ở đầu cột Chi tiết (MarkUp 2026-11-16 18:48) */}
-            {phuTrach}
             <div className="kd-cp-card">
               <div className="kd-cp-detail-h"><h3>Chi tiết</h3>
                 {/* nút sửa ở đầu thẻ thay cho nút "Sửa / thêm tài liệu" dưới đáy (MarkUp 2026-11-16 19:27) */}
@@ -399,6 +395,8 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
                 )) : <em className="kd-cp-dnone">Chưa có tệp</em>}
               </DSec>
             </div>
+            {/* Phụ trách ở dưới thẻ Chi tiết (MarkUp 2026-11-18) */}
+            {phuTrach}
           </aside>
         )}
 
