@@ -6,7 +6,7 @@ import {
   SALES_TABS, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, DEPT_LABEL,
   DESIGN_STAGES, DESIGN_LABEL, DESIGN_COLOR, CONSTRUCTION_STAGES, CONSTRUCTION_LABEL, CONSTRUCTION_COLOR, STAGE_LABEL,
 } from '../../data/kinhDoanhData'
-import { fmtTy, matchesTimeFilter } from './utils'
+import { fmtTy, matchesTimeFilter, phoneKeys, phoneNorms, emailKeys } from './utils'
 import { addKdRequest } from '../../services/kdRequestService'
 import OverviewTab from './components/OverviewTab'
 import PipelineTab from './components/PipelineTab'
@@ -291,6 +291,90 @@ function KinhDoanhPage() {
       ...m, [lead.id]: [saved, ...(m[lead.id] || [])].sort((a, b) => b.date.localeCompare(a.date)),
     })), e => alert('Không lưu được lịch sử chăm sóc: ' + e.message))
   }
+  /* Form thêm mới báo trùng > "Gộp vào khách này": bổ sung SĐT / email chưa có vào khách cũ, điền các ô khách cũ còn trống
+     (địa chỉ, concept, loại dự án, quy mô, giá trị, nguồn, hạng mục; Tỉnh / Tên dự án / Thời gian / đính kèm ở kdOptions),
+     ghi lịch sử chăm sóc "Khách liên hệ lại" đủ mọi thông tin đã nhập rồi mở trang khách cũ */
+  function mergeIntoLead(id, info) {
+    const lead = leads.find(l => sameId(l.id, id))
+    if (!lead) return
+    if (!window.confirm('Gộp thông tin vừa nhập vào khách ' + (lead.name || '') + '? SĐT/email mới được thêm vào, thông tin còn trống được điền, phần còn lại ghi vào lịch sử chăm sóc.')) return
+    const key = String(lead.id)
+    const changes = {}
+    /* So từng số / từng email riêng: "0903260987 0912345678" có 1 số đã biết thì vẫn thêm số còn lại */
+    const seenP = phoneKeys(lead.phone)
+    const newPhones = []
+    phoneNorms(info.phone).forEach(n => {
+      const k = n.slice(-9)
+      if (seenP.indexOf(k) < 0) { newPhones.push(n); seenP.push(k) }
+    })
+    if (newPhones.length) changes.phone = [lead.phone, ...newPhones].filter(Boolean).join(', ')
+    const oldE = emailKeys(lead.email)
+    const newEmails = emailKeys(info.email).filter(x => oldE.indexOf(x) < 0)
+    if (newEmails.length) changes.email = [lead.email, ...newEmails].filter(Boolean).join(', ')
+    /* Chỉ điền ô khách cũ còn trống */
+    const empty = v => !String(v == null ? '' : v).trim()
+    if (info.address && empty(lead.address)) changes.address = info.address
+    if (info.concept && empty(lead.concept)) changes.concept = info.concept
+    if (info.source && empty(lead.source)) changes.source = info.source
+    if (info.value > 0 && !(Number(lead.value) > 0)) changes.value = info.value
+    if (info.categories && info.categories.length && !(lead.categories && lead.categories.length)) changes.categories = info.categories
+    const fillType = info.projectType && empty(lead.projectType)
+    const fillScale = info.scale && empty(lead.scale)
+    if (fillType) changes.projectType = info.projectType
+    if (fillScale) changes.scale = info.scale
+    if (fillType || fillScale) {
+      const t = changes.projectType || lead.projectType || 'Chưa xác định'
+      const s = changes.scale || lead.scale || ''
+      changes.type = s ? `${t} (${s})` : t
+    }
+    if (Object.keys(changes).length) patchLead(lead.id, changes)
+    /* Tỉnh / Tên dự án / Thời gian / đính kèm: lưu chung kdOptions như saveLead */
+    const opt = {}
+    const g = info.geo || {}
+    const g0 = geoMap[key] || {}
+    if ((g.kv || g.tinh) && !g0.kv && !g0.tinh) opt.geo = { ...geoMap, [key]: { kv: g.kv || '', tinh: g.tinh || '' } }
+    if (info.projName && !projNameMap[key]) opt.projName = { ...projNameMap, [key]: info.projName }
+    const t = info.timeline || {}
+    const t0 = timelineMap[key] || {}
+    if ((t.start && !t0.start) || (t.end && !t0.end)) opt.timeline = { ...timelineMap, [key]: { start: t0.start || t.start || '', end: t0.end || t.end || '' } }
+    const a = info.attach || {}
+    const a0 = attachMap[key] || {}
+    const addTo = (old, more) => { const urls = (old || []).map(x => x.url); return [...(old || []), ...(more || []).filter(x => x && x.url && urls.indexOf(x.url) < 0 && urls.push(x.url))] }
+    const img = addTo(a0.img, a.img)
+    const file = addTo(a0.file, a.file)
+    if (img.length !== (a0.img || []).length || file.length !== (a0.file || []).length) opt.attach = { ...attachMap, [key]: { img, file } }
+    if (Object.keys(opt).length) saveKdOptionsMany(opt)
+    const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    const ddmm = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s || '') }
+    const names = l => (l || []).map(x => x && x.name).filter(Boolean).join(', ')
+    const x = {
+      type: 'note', date: iso, by: meName, title: 'Khách liên hệ lại' + (info.source ? ' - nguồn ' + info.source : ''),
+      content: [
+        info.name ? 'Tên: ' + info.name : '',
+        info.phone ? 'SĐT: ' + info.phone : '',
+        info.email ? 'Email: ' + info.email : '',
+        info.source ? 'Nguồn: ' + info.source : '',
+        info.address ? 'Địa chỉ: ' + info.address : '',
+        g.tinh || g.kv ? 'Tỉnh: ' + [g.tinh, g.kv].filter(Boolean).join(' - ') : '',
+        info.projName ? 'Tên dự án: ' + info.projName : '',
+        info.projectType ? 'Loại dự án: ' + info.projectType : '',
+        info.scale ? 'Quy mô: ' + info.scale : '',
+        info.value > 0 ? 'Giá trị: ' + fmtTy(info.value) : '',
+        info.categories && info.categories.length ? 'Hạng mục: ' + info.categories.join(', ') : '',
+        t.start || t.end ? 'Thời gian: ' + [t.start ? 'khởi công ' + ddmm(t.start) : '', t.end ? 'hoàn công ' + ddmm(t.end) : ''].filter(Boolean).join(', ') : '',
+        info.concept ? 'Concept: ' + info.concept : '',
+        info.notes ? 'Ghi chú: ' + info.notes : '',
+        names(a.img) ? 'Hình đính kèm: ' + names(a.img) : '',
+        names(a.file) ? 'Tệp đính kèm: ' + names(a.file) : '',
+      ].filter(Boolean).join('\n'),
+      outcome: 'good', next: '', nextNote: '',
+    }
+    /* Lịch sử chưa tải: addInteraction sẽ chỉ giữ 1 dòng mới (trang khách thấy đã có thì không tải lại) -> ghi xong tải lại cả danh sách */
+    if (interactions[lead.id]) addInteraction(lead, x)
+    else kdApi.addActivity(lead.id, x).then(() => kdApi.listActivities(lead.id)).then(list => setInteractions(m => ({ ...m, [lead.id]: list })), e => alert('Không lưu được lịch sử chăm sóc: ' + e.message))
+    closeLeadModal()
+    setDetail({ open: true, id: lead.id })
+  }
 
   return (
     <div
@@ -323,7 +407,8 @@ function KinhDoanhPage() {
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
       <div ref={scrollRef} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
         {/* Thêm / sửa khách hàng tiềm năng: trang đầy đủ thay chỗ nội dung tab (không còn hộp nổi) */}
-        <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} onClose={closeLeadModal} onSave={saveLead} />
+        <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} leads={leads} onClose={closeLeadModal} onSave={saveLead}
+          onOpenLead={id => { closeLeadModal(); setDetail({ open: true, id }) }} onMergeInto={mergeIntoLead} />
         <div style={leadModal.open ? { display: 'none' } : { display: 'contents' }}>
         {detail.open && detailLead && (
           <CustomerPage
@@ -347,7 +432,7 @@ function KinhDoanhPage() {
         {/* ================= TAB: PIPELINE ================= */}
         <div className="kd-pl-panel" style={panel('pipeline', 14)}>
           <PipelineTab
-            leads={filteredLeads} dept={dept} onDeptChange={setDept} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter}
+            leads={filteredLeads} allLeads={leads} dept={dept} onDeptChange={setDept} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter}
             scrollRef={scrollRef} onMove={moveLead} onDelete={deleteLead}
             onOpenDetail={id => setDetail({ open: true, id })}
             onEdit={id => openLeadModal(id)}

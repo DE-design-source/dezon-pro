@@ -106,3 +106,78 @@ export function removeSyncedProject(id) {
   arr = arr.filter(p => p.id !== id)
   try { localStorage.setItem(SYNC_KEY, JSON.stringify(arr)) } catch { /* bỏ qua */ }
 }
+
+/* ---------- Màu riêng theo nguồn khách (thẻ kanban, danh sách) ---------- */
+export const noDau = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim()
+const SRC_COLORS = [
+  ['kien phong', '#1E8E5A'], ['decox', '#2563EB'], ['vua thau', '#B98900'], ['smart cons', '#7C3AED'],
+  ['tin nghia', '#0E8A82'], ['hm cons', '#C2185B'], ['dezon', '#C2621A'], ['design', '#4F46E5'],
+  ['google', '#D93025'], ['website', '#D93025'], ['hotline', '#B45309'], ['zalo', '#0068FF'], ['email', '#475569'],
+]
+const SRC_FALLBACK = ['#0891B2', '#9333EA', '#65A30D', '#DB2777', '#0D9488', '#EA580C', '#4338CA']
+export function sourceColor(source) {
+  const k = noDau(source)
+  if (!k) return null
+  const hit = SRC_COLORS.find(([w]) => k.indexOf(w) >= 0)
+  let c = hit && hit[1]
+  if (!c) { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 9973; c = SRC_FALLBACK[h % SRC_FALLBACK.length] }
+  return { color: c, bg: `color-mix(in srgb, ${c} 14%, transparent)`, border: `color-mix(in srgb, ${c} 35%, transparent)` }
+}
+
+/* ---------- Phát hiện khách trùng (SĐT / email / tên) ----------
+   Ô SĐT nhận nhiều số (cách nhau dấu phẩy, chấm phẩy, /, xuống dòng hoặc "hoặc"); so 9 số cuối. */
+/* Độ dài 1 số theo đầu số: 0 + 9 số (di động) / 02 + 9 số (bàn); 84 thay cho 0; không rõ đầu số = 9 số */
+const phoneLen = c => (c.startsWith('84') ? (c[2] === '2' ? 12 : 11) : c.startsWith('0') ? (c[1] === '2' ? 11 : 10) : 9)
+/* Tách các số trong ô SĐT ('090 326 09 87', '+84 903 260 987', '0903260987 0912345678', '0903... (ext 12)'),
+   ghép các nhóm chữ số liền nhau tới đủ độ dài 1 số; trả về dạng chuẩn bắt đầu bằng 0 */
+export function phoneNorms(s) {
+  const out = []
+  let cur = ''
+  const flush = () => { if (cur.length >= 9) out.push(cur.startsWith('84') && cur.length >= 11 ? '0' + cur.slice(2) : cur); cur = '' }
+  String(s || '').split(/[,;/|\n]|ho[aặ]c|\bor\b/i).forEach(part => {
+    ;(part.match(/\d+/g) || []).forEach(g => {
+      if (!cur && g.length <= 2 && !/^(0|84)/.test(g)) return   // số lẻ như "SĐT 1:", "lần 2"
+      cur += g
+      while (cur.length >= phoneLen(cur)) { const n = phoneLen(cur); const x = cur.slice(0, n); cur = cur.slice(n); const keep = cur; cur = x; flush(); cur = keep }
+    })
+    flush()
+  })
+  return [...new Set(out)]
+}
+export function phoneKeys(s) {
+  return [...new Set(phoneNorms(s).map(x => x.slice(-9)))]
+}
+export function emailKeys(s) {
+  return [...new Set(String(s || '').toLowerCase().split(/[\s,;/|]+/).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))]
+}
+const NAME_PREFIX = /^(anh|chi|a\.|c\.|mr\.?|mrs\.?|ms\.?|co|chu|ong|ba|em|bac|di|cau|thay)\s+/
+export function nameKey(s) {
+  let k = noDau(s).replace(/[^a-z0-9\s.]/g, ' ').replace(/\s+/g, ' ').trim()
+  for (let i = 0; i < 2; i++) k = k.replace(NAME_PREFIX, '')
+  return k.split(' ').length >= 2 && k.length >= 6 ? k : ''
+}
+/* Khách trùng với thông tin đang nhập: [{lead, by: ['phone'|'email'|'name']}]; phone/email = chắc chắn, name = có thể */
+export function findDuplicates({ phone, email, name }, leads, excludeId) {
+  const ps = phoneKeys(phone), es = emailKeys(email), nk = nameKey(name)
+  const res = []
+  ;(leads || []).forEach(l => {
+    if (excludeId != null && String(l.id) === String(excludeId)) return
+    const by = []
+    if (ps.length && phoneKeys(l.phone).some(x => ps.indexOf(x) >= 0)) by.push('phone')
+    if (es.length && emailKeys(l.email).some(x => es.indexOf(x) >= 0)) by.push('email')
+    if (nk && nameKey(l.name) === nk) by.push('name')
+    if (by.length) res.push({ lead: l, by })
+  })
+  return res.sort((a, b) => (b.by.some(x => x !== 'name') - a.by.some(x => x !== 'name')))
+}
+/* Chỉ mục trùng chắc chắn (SĐT / email) cho cả danh sách: {id: [lead khác trùng]} */
+export function duplicateIndex(leads) {
+  const m = new Map(), idx = {}
+  const add = (k, l) => { if (!m.has(k)) m.set(k, []); m.get(k).push(l) }
+  ;(leads || []).forEach(l => { phoneKeys(l.phone).forEach(k => add('p' + k, l)); emailKeys(l.email).forEach(k => add('e' + k, l)) })
+  m.forEach(arr => {
+    if (arr.length < 2) return
+    arr.forEach(l => { const id = String(l.id); const cur = idx[id] || []; arr.forEach(o => { if (o !== l && cur.indexOf(o) < 0) cur.push(o) }); idx[id] = cur })
+  })
+  return idx
+}

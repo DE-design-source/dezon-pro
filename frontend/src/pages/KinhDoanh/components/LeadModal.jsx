@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { INITIAL_UNIT_HEADS, INITIAL_HR_EMPLOYEES } from '../../../data/hrData'
 
 /* Quản lý mặc định = trưởng phòng của phòng ban phụ trách (theo HR: kddd = KD dân dụng, kdda = KD dự án) */
@@ -8,11 +8,11 @@ const deptHead_ = dept => { const id = INITIAL_UNIT_HEADS[DEPT_UNIT[dept]]; cons
 const ADMIN_KD = 'Admin Kinh doanh'
 import {
   LEAD_STEPS, LEAD_STEP_TITLE, LEAD_STEP_TAB_LABEL, LEAD_SOURCES, LEAD_REGIONS, LEAD_PROVINCES, regionOfProvince, LEAD_PROJECT_TYPES, LEAD_DEPT_OPTIONS,
-  LEAD_STAGE_OPTIONS, LEAD_CATEGORY_GROUPS, LEAD_CATEGORIES, BOQ_DEFAULT_LABEL,
+  LEAD_STAGE_OPTIONS, LEAD_CATEGORY_GROUPS, LEAD_CATEGORIES, BOQ_DEFAULT_LABEL, STAGE_LABEL,
 } from '../../../data/kinhDoanhData'
-import { FONT_STACK, lmInitials } from '../utils'
+import { FONT_STACK, lmInitials, findDuplicates, sourceColor } from '../utils'
 import ShortlistSelect, { useKdMap, useMkChannels } from './ShortlistSelect'
-import AttachBox from './AttachBox'
+import AttachBox, { filesOf } from './AttachBox'
 import DatePicker from '../../../components/ui/DatePicker'
 
 /* ===================== Modal thêm / chỉnh sửa khách hàng tiềm năng (3 cấp độ) =====================
@@ -64,7 +64,35 @@ function initForm(lead, me) {
 /* Mức quy mô gợi ý (m2 sàn); gõ số tự do thì thẻ kanban tự thêm đơn vị m² */
 const LEAD_SCALES = ['Dưới 100 m²', '100 - 200 m²', '200 - 500 m²', '500 - 1.000 m²', '1.000 - 5.000 m²', 'Trên 5.000 m²']
 
-export default function LeadModal({ open, lead, me, onClose, onSave }) {
+/* Ô nhập dài (Concept, Ghi chú nội bộ): tự giãn cao theo nội dung (tối thiểu ~4 dòng, tối đa 50vh rồi mới cuộn), vẫn kéo giãn dọc tay được.
+   active = bước đang hiện (ô bị ẩn thì scrollHeight = 0, đo lại khi hiện).
+   Đặt height 'auto' để đo làm khung cuộn chứa ô ngắn lại trong chốc lát -> trình duyệt kéo scrollTop lên (trang nhảy khi đang cuộn gần đáy):
+   ghi scrollTop của mọi khung cuộn tổ tiên (và trang) trước khi đo, đặt lại sau khi đặt chiều cao mới */
+function AutoTextarea({ value, active, ...rest }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || !active) return
+    const saved = []
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const oy = window.getComputedStyle(p).overflowY
+      if (oy === 'auto' || oy === 'scroll') saved.push([p, p.scrollTop])
+    }
+    const se = document.scrollingElement
+    if (se) saved.push([se, se.scrollTop])
+    el.style.height = 'auto'
+    const h = el.scrollHeight + el.offsetHeight - el.clientHeight
+    el.style.height = Math.min(h, Math.round(window.innerHeight * 0.5)) + 'px'
+    saved.forEach(([p, top]) => { if (p.scrollTop !== top) p.scrollTop = top })
+  }, [value, active])
+  return <textarea ref={ref} className="kd-autogrow" rows={4} value={value} {...rest} />
+}
+
+const REASON = { phone: 'trùng SĐT', email: 'trùng email', name: 'trùng tên' }
+const ddmmyyyy_ = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : '' }
+const dupBtn = { border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', padding: '4px 10px', borderRadius: 7, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }
+
+export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOpenLead, onMergeInto }) {
   const mkKenh = useMkChannels() // kênh quảng cáo của tab Marketing: gợi ý thêm cho Nguồn khách hàng
   const [form, setForm] = useState(() => initForm(lead, me))
   const [step, setStep] = useState(0)
@@ -108,10 +136,59 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
   const overlayRef = useRef(null)
   const nameRef = useRef(null)
   const assigneeNameRef = useRef(null)
+  const imgBoxRef = useRef(null)
+  const fileBoxRef = useRef(null)
+  /* Số tệp đang tải lên ở 2 ô đính kèm: còn tệp chưa tải xong thì chưa cho lưu / gộp (lưu lúc đó sẽ mất tệp) */
+  const [imgBusy, setImgBusy] = useState(0)
+  const [fileBusy, setFileBusy] = useState(0)
+  const uploading = imgBusy + fileBusy > 0
+  const UPLOAD_WAIT = 'Đang tải tệp đính kèm lên, vui lòng đợi xong rồi lưu'
 
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }))
   const stepId = LEAD_STEPS[step]
   const isLast = step === LEAD_STEPS.length - 1
+
+  /* Báo trùng khách (SĐT / email = chắc chắn, tên = có thể); đang sửa thì bỏ chính lead này */
+  const dups = useMemo(() => findDuplicates({ phone: form.phone, email: form.email, name: form.name }, leads, lead ? lead.id : null), [form.phone, form.email, form.name, leads, lead])
+  const strongDups = dups.filter(d => d.by.some(x => x !== 'name'))
+
+  /* Dán (Ctrl+V) ở bước Nâng cao: ảnh -> ô Hình, tệp khác -> ô Tệp (ô đính kèm đang focus / rê chuột tự nhận trước, xem AttachBox).
+     Đang gõ trong ô chữ mà clipboard có chữ thì để dán chữ như thường */
+  useEffect(() => {
+    if (!open || stepId !== 'advanced') return
+    const onPaste = e => {
+      if (e.defaultPrevented) return
+      const cd = e.clipboardData
+      const fs = filesOf(cd)
+      if (!fs.length) return
+      const t = e.target
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName)) && cd.getData('text/plain')) return
+      e.preventDefault()
+      const isImg = f => String(f.type || '').indexOf('image/') === 0
+      const imgs = fs.filter(isImg)
+      const others = fs.filter(f => !isImg(f))
+      if (imgs.length && imgBoxRef.current) imgBoxRef.current.add(imgs)
+      if (others.length && fileBoxRef.current) fileBoxRef.current.add(others)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [open, stepId])
+
+  /* Form đang mở: thả tệp trượt ra ngoài ô đính kèm thì không để trình duyệt mở tệp (ô đính kèm tự preventDefault nên bỏ qua) */
+  useEffect(() => {
+    if (!open) return
+    const guard = e => {
+      if (e.defaultPrevented || !e.dataTransfer || Array.from(e.dataTransfer.types || []).indexOf('Files') < 0) return
+      e.preventDefault()
+      if (e.type === 'dragover') e.dataTransfer.dropEffect = 'none'
+    }
+    window.addEventListener('dragover', guard)
+    window.addEventListener('drop', guard)
+    return () => {
+      window.removeEventListener('dragover', guard)
+      window.removeEventListener('drop', guard)
+    }
+  }, [open])
 
   useEffect(() => { if (nameFocusTick && nameRef.current) nameRef.current.focus() }, [nameFocusTick])
   useEffect(() => { if (assigneeFocusTick && assigneeNameRef.current) assigneeNameRef.current.focus() }, [assigneeFocusTick])
@@ -169,9 +246,37 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
     if (step === 0 && !form.name.trim()) { nameRef.current.focus(); return }
     setStep(Math.min(step + 1, LEAD_STEPS.length - 1))
   }
+  /* Giá trị dự án quy ra tỷ VND (dùng chung cho Lưu và Gộp vào khách cũ) */
+  const valueTy = () => (Number(digits_(form.value)) || 0) * (form.cur === 'VND' ? 1 : (Number(digits_(form.rate)) || (CURRENCIES.find(c => c[0] === form.cur) || [0, 1])[1])) / 1e9
+  /* Gộp vào khách cũ: gửi mọi thông tin đã nhập, KinhDoanh.mergeIntoLead điền chỗ trống / ghi lịch sử chăm sóc */
+  function mergeInto(id) {
+    if (uploading) { alert(UPLOAD_WAIT); return }
+    const type = form.type || ''
+    onMergeInto(id, {
+      source: form.source,
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      name: form.name.trim(),
+      notes: form.notes.trim(),
+      concept: form.concept.trim(),
+      address: form.address.trim(),
+      projName: projName.trim(),
+      geo: { kv: geo.kv || '', tinh: geo.tinh || '' },
+      projectType: type,
+      scale: form.scale.trim(),
+      value: valueTy(),
+      categories: form.categories.slice(),
+      timeline: { start: tl.start || '', end: tl.end || '' },
+      attach: { img: attach.img.slice(), file: attach.file.slice() },
+    })
+  }
   function save() {
+    if (uploading) { alert(UPLOAD_WAIT); return }
     const name = form.name.trim()
     if (!name) { setStep(0); setNameFocusTick(t => t + 1); return }
+    if (!lead && strongDups.length && !window.confirm('Khách này trùng SĐT/email với: '
+      + strongDups.slice(0, 5).map(d => d.lead.name + (d.lead.source ? ' (' + d.lead.source + ')' : '')).join(', ') + (strongDups.length > 5 ? '...' : '')
+      + '\nVẫn lưu thành lead mới? (Bấm Huỷ để quay lại, có thể Gộp vào khách cũ)')) { setStep(0); return }
     const type = form.type || 'Chưa xác định'
     const scale = form.scale.trim()
     /* Tên đã gõ trong popover nhưng chưa bấm "Thêm" vẫn được lưu */
@@ -186,7 +291,7 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
       _attach: attach,
       _timeline: tl,
       type: scale ? `${type} (${scale})` : type,
-      value: (Number(digits_(form.value)) || 0) * (form.cur === 'VND' ? 1 : (Number(digits_(form.rate)) || (CURRENCIES.find(c => c[0] === form.cur) || [0, 1])[1])) / 1e9,   // quy ra tỷ VND
+      value: valueTy(),   // quy ra tỷ VND
       stage: !lead && form.stage === 'tiep-can' && finalAssignees.some(a => a && a.role !== ADMIN_KD) ? 'giao-ns' : form.stage,   // tạo mới đã có nhân sự KD phụ trách -> vào thẳng giai đoạn "Nhân sự KD phụ trách"
       dept: form.dept || 'dan-dung',
       creator: form.creator.trim(),
@@ -245,7 +350,7 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                 <div className="kd-field"><label>Tên dự án</label><input type="text" placeholder="VD: Nhà phố Anh Phú - Thủ Đức" value={projName} onChange={e => setProjName(e.target.value)} /></div>
                 <div style={grid2}>
                   <div className="kd-field"><label>Tên khách hàng *</label><input ref={nameRef} type="text" placeholder="VD: Anh Nguyễn Văn Phú" value={form.name} onChange={e => set('name', e.target.value)} /></div>
-                  <div className="kd-field"><label>Số điện thoại *</label><input type="text" placeholder="09xx xxx xxx" value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+                  <div className="kd-field"><label>Số điện thoại *</label><input type="text" placeholder="09xx xxx xxx (nhiều số: cách nhau dấu phẩy)" value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
                 </div>
                 <div style={grid2}>
                   <div className="kd-field"><label>Email</label><input type="text" placeholder="khachhang@email.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
@@ -253,6 +358,43 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
                     <ShortlistSelect value={form.source} onChange={v => set('source', v)} base={LEAD_SOURCES} optKey="source" placeholder="Chọn nguồn khách hàng" linked={mkKenh} linkedLabel="Marketing" />
                   </div>
                 </div>
+                {/* Cảnh báo khách trùng: đỏ = trùng SĐT / email, vàng = chỉ trùng tên */}
+                {dups.length ? (() => {
+                  const c = strongDups.length ? 'var(--danger, #dc2626)' : 'var(--warning, #d97706)'
+                  return (
+                    <div style={{ border: '1px solid color-mix(in srgb, ' + c + ' 40%, transparent)', background: 'color-mix(in srgb, ' + c + ' 8%, transparent)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: c, fontWeight: 700, fontSize: 12.5 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                        Có thể trùng khách hàng
+                      </div>
+                      {dups.slice(0, 5).map(({ lead: d, by }) => {
+                        const sc = sourceColor(d.source)
+                        const strong = by.some(x => x !== 'name')
+                        return (
+                          <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, paddingTop: 6, borderTop: '1px dashed var(--border)' }}>
+                            <div style={{ flex: 1, minWidth: 180, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <b style={{ color: 'var(--text)' }}>{d.name}</b>
+                              {d.phone ? <span style={{ color: 'var(--text-muted)' }}>{d.phone}</span> : null}
+                              {d.source ? <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600, ...(sc ? { color: sc.color, background: sc.bg, border: '1px solid ' + sc.border } : { border: '1px solid var(--border)' }) }}>{d.source}</span> : null}
+                              {STAGE_LABEL[d.stage] ? <span style={{ color: 'var(--text-muted)' }}>· {STAGE_LABEL[d.stage]}</span> : null}
+                              {d.createdAt ? <span style={{ color: 'var(--text-muted)' }}>· {ddmmyyyy_(d.createdAt)}</span> : null}
+                              {d.creator ? <span style={{ color: 'var(--text-muted)' }}>· {d.creator}</span> : null}
+                              <span style={{ color: strong ? 'var(--danger, #dc2626)' : 'var(--warning, #d97706)', fontWeight: 600 }}>({by.map(x => REASON[x]).join(', ')})</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
+                              {onOpenLead ? <button type="button" style={dupBtn} onClick={() => onOpenLead(d.id)}>Mở khách cũ</button> : null}
+                              {!lead && onMergeInto ? (
+                                <button type="button" style={{ ...dupBtn, border: 'none', background: 'var(--sales)', color: '#fff' }}
+                                  onClick={() => mergeInto(d.id)}>Gộp vào khách này</button>
+                              ) : null}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {dups.length > 5 ? <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>+{dups.length - 5} khách khác</div> : null}
+                    </div>
+                  )
+                })() : null}
               </section>
 
               {/* cột phải hàng 1: Địa điểm + Thời gian dự án xếp chồng, giữ bố cục 2 x 2 của các nhóm */}
@@ -410,11 +552,11 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
               </div>
               {/* Concept | Hình đính kèm | Tệp đính kèm trên 1 hàng (MarkUp 2026-11-16 16:20) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>
-                <div className="kd-field"><label>Concept / Ý tưởng thiết kế</label><textarea rows={3} placeholder="Mô tả phong cách, ý tưởng thiết kế mong muốn của khách hàng..." value={form.concept} onChange={e => set('concept', e.target.value)} /></div>
-                <AttachBox kind="img" label="Hình đính kèm" items={attach.img} onChange={img => setAttach(a => ({ ...a, img }))} />
-                <AttachBox kind="file" label="Tệp đính kèm" items={attach.file} onChange={file => setAttach(a => ({ ...a, file }))} />
+                <div className="kd-field"><label>Concept / Ý tưởng thiết kế</label><AutoTextarea active={open && stepId === 'advanced'} placeholder="Mô tả phong cách, ý tưởng thiết kế mong muốn của khách hàng..." value={form.concept} onChange={e => set('concept', e.target.value)} /></div>
+                <AttachBox ref={imgBoxRef} kind="img" label="Hình đính kèm" items={attach.img} onChange={img => setAttach(a => ({ ...a, img }))} onBusy={setImgBusy} />
+                <AttachBox ref={fileBoxRef} kind="file" label="Tệp đính kèm" items={attach.file} onChange={file => setAttach(a => ({ ...a, file }))} onBusy={setFileBusy} />
               </div>
-              <div className="kd-field"><label>Ghi chú nội bộ</label><textarea rows={2} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật..." value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
+              <div className="kd-field"><label>Ghi chú nội bộ</label><AutoTextarea active={open && stepId === 'advanced'} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật..." value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
               <div className="kd-field">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
                   <input type="checkbox" checked={form.partner} onChange={e => set('partner', e.target.checked)} style={{ width: 15, height: 15, accentColor: 'var(--primary)', cursor: 'pointer' }} />
@@ -430,7 +572,7 @@ export default function LeadModal({ open, lead, me, onClose, onSave }) {
               <button onClick={() => setStep(Math.max(step - 1, 0))} style={{ display: step === 0 ? 'none' : 'inline-block', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', padding: '9px 16px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Quay lại</button>
               <button onClick={next} style={{ display: isLast ? 'none' : 'inline-block', border: 'none', background: 'var(--sales)', color: '#fff', padding: '9px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Tiếp theo</button>
               {/* Khi chỉnh sửa: cho lưu ngay ở mọi bước, không bắt đi hết 3 bước */}
-              <button onClick={save} style={{ display: isLast || lead ? 'inline-block' : 'none', border: 'none', background: 'var(--sales)', color: '#fff', padding: '9px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{lead ? 'Lưu thay đổi' : 'Lưu khách hàng'}</button>
+              <button onClick={save} title={uploading ? UPLOAD_WAIT : undefined} aria-disabled={uploading} style={{ display: isLast || lead ? 'inline-block' : 'none', border: 'none', background: 'var(--sales)', color: '#fff', padding: '9px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: uploading ? 'wait' : 'pointer', opacity: uploading ? 0.6 : 1, fontFamily: 'inherit' }}>{uploading ? 'Đang tải tệp…' : (lead ? 'Lưu thay đổi' : 'Lưu khách hàng')}</button>
             </div>
           </div>
         </div>

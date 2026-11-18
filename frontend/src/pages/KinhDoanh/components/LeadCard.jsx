@@ -1,5 +1,5 @@
-import { STAGES, STAGE_LABEL, DEPT_COLOR, DEPT_SHORT, DEPT_TINT } from '../../../data/kinhDoanhData'
-import { fmtTy, stageAccent } from '../utils'
+import { DEPT_COLOR, DEPT_SHORT, DEPT_TINT } from '../../../data/kinhDoanhData'
+import { fmtTy, stageAccent, sourceColor } from '../utils'
 import CardMembers from './CardMembers'
 import { RatingStars } from './CustomerPage'
 import { useKdMap } from './ShortlistSelect'
@@ -11,7 +11,8 @@ const pill = { fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius:
 /* Quy mô gõ tự do: chỉ là số thì thêm đơn vị m2 */
 const fmtScale = s => (/^\d+([.,]\d+)?$/.test(String(s).trim()) ? String(s).trim() + ' m²' : String(s).trim())
 
-export default function LeadCard({ lead: l, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee }) {
+/* onMove giữ trong chữ ký cho caller cũ (đã bỏ ô chọn giai đoạn trên thẻ: màu kanban đã cho biết giai đoạn) */
+export default function LeadCard({ lead: l, dups, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee }) {
   const stageId = l.stage
   const accent = stageAccent(stageId)
   const isLostStage = stageId === 'truot-thau' || stageId === 'spam' || stageId === 'khong-tham-gia'
@@ -20,6 +21,10 @@ export default function LeadCard({ lead: l, dragging, onDragStart, onDragEnd, on
   /* Tỉnh / TP lưu chung công ty ở kdOptions.geo {mã lead: {kv, tinh}} (LeadModal) */
   const geo = useKdMap('geo')[String(l.id)] || {}
   const noi = geo.tinh || geo.kv || ''
+  const addr = String(l.address || '').trim()
+  const noiTitle = [geo.kv, geo.tinh, addr].filter(Boolean).join(' · ')
+  const srcC = l.source ? sourceColor(l.source) : null
+  const dupList = Array.isArray(dups) ? dups : []
   return (
     <div
       className={`kd-lead-card${dragging ? ' dragging' : ''}${memberOpen ? ' pop-open' : ''}`}
@@ -28,7 +33,7 @@ export default function LeadCard({ lead: l, dragging, onDragStart, onDragEnd, on
       onDragEnd={onDragEnd}
       onClick={() => onOpen(l.id)}
       style={{
-        cursor: 'pointer', minHeight: 236,   /* minHeight (không cố định height): cỡ chữ lớn / thêm dòng tỉnh thành không bị cắt chữ (MarkUp 2026-11-16 16:41) */ boxSizing: 'border-box', overflow: memberOpen ? 'visible' : 'hidden', position: 'relative', zIndex: memberOpen ? 30 : undefined,   // mở hộp người phụ trách: không cắt hộp, nổi trên thẻ khác
+        cursor: 'pointer', minHeight: 200,   /* bỏ ô chọn giai đoạn: 236 -> 200; minHeight (không cố định height): cỡ chữ lớn / thêm dòng tỉnh thành không bị cắt chữ (MarkUp 2026-11-16 16:41) */ boxSizing: 'border-box', overflow: memberOpen ? 'visible' : 'hidden', position: 'relative', zIndex: memberOpen ? 30 : undefined,   // mở hộp người phụ trách: không cắt hộp, nổi trên thẻ khác
         ...(accent ? { borderColor: accent.border } : null),
         ...(isQuoteStage ? { borderColor: 'var(--danger)' } : null),
         ...(isLostStage ? { background: stageId === 'truot-thau' ? 'var(--danger-tint)' : 'var(--surface-alt)' } : null),
@@ -48,8 +53,10 @@ export default function LeadCard({ lead: l, dragging, onDragStart, onDragEnd, on
       <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 6, minHeight: 22, maxHeight: 48, overflow: 'hidden' }}>
         {/* chỉ 1 nhãn phòng ban: Dân dụng hoặc Dự án (bỏ chip '→ Dự án' dễ nhầm là 2 phòng) */}
         <span style={{ ...pill, color: DEPT_COLOR[l.dept], background: DEPT_TINT[l.dept] }}>{DEPT_SHORT[l.dept]}</span>
-        {/* nguồn khách hàng */}
-        {l.source ? <span title={'Nguồn: ' + l.source} style={{ ...pill, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--surface-alt)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.source}</span> : null}
+        {/* khách trùng SĐT / email: đặt ngay sau phòng ban để không bị ẩn bởi maxHeight */}
+        {dupList.length > 0 && <span title={'Trùng SĐT/email với: ' + dupList.map(d => (d.name || '') + (d.source ? ' (' + d.source + ')' : '')).join(', ')} style={{ ...pill, color: 'var(--danger)', background: 'var(--danger-tint)' }}>⚠ Trùng {dupList.length}</span>}
+        {/* nguồn khách hàng: màu riêng theo nguồn (sourceColor) */}
+        {l.source ? <span title={'Nguồn: ' + l.source} style={{ ...pill, fontWeight: 700, color: srcC ? srcC.color : 'var(--text-muted)', background: srcC ? srcC.bg : 'var(--surface-alt)', border: srcC ? '1px solid ' + srcC.border : undefined, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.source}</span> : null}
         {h && (h.status === 'pending-qs' || h.status === 'pending-handoff') && <span style={{ ...pill, color: 'var(--gold)', background: 'var(--gold-tint)' }}>⏳ Chờ {h.dept} xác nhận</span>}
         {h && h.status === 'self-quoted' && <span style={{ ...pill, color: 'var(--sales)', background: 'var(--sales-tint)' }}>KD tự đề xuất</span>}
       </div>
@@ -58,18 +65,15 @@ export default function LeadCard({ lead: l, dragging, onDragStart, onDragEnd, on
         <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>
         <RatingStars id={String(l.id)} small />
       </div>
-      <select
-        value={stageId}
-        onClick={e => e.stopPropagation()}
-        onChange={e => onMove(l.id, e.target.value)}
-        style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', fontSize: 10.5, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', fontFamily: 'inherit', overflow: 'hidden', textOverflow: 'ellipsis' }}
-      >
-        {STAGES.map(s => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
-      </select>
-      {/* tỉnh thành */}
-      <div title={noi ? (geo.kv && geo.tinh ? geo.kv + ' · ' + geo.tinh : noi) : ''} style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flex: 'none', minHeight: 17, lineHeight: 1.5, fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
-        {noi ? <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{noi}</span> : <span style={{ opacity: 0.6 }}>Chưa có tỉnh thành</span>}
+      {/* địa chỉ công trình: đậm, to (thông tin quan trọng khi chọn thầu); tỉnh · địa chỉ chi tiết */}
+      <div title={noiTitle} style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flex: 'none', minHeight: 19, lineHeight: 1.5, fontSize: 12.5, fontWeight: 700, color: noi || addr ? 'var(--text)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+        {noi || addr ? (
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {noi}
+            {addr ? <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>{(noi ? ' · ' : '') + addr}</span> : null}
+          </span>
+        ) : <span style={{ opacity: 0.6, fontSize: 11, fontWeight: 400 }}>Chưa có tỉnh thành</span>}
       </div>
     </div>
   )
