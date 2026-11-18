@@ -32,7 +32,7 @@ const hue_ = s => { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.
 const initials_ = s => String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
 export default function ProjectGallery() {
-  const { projects, cur, selectProject } = useQs()
+  const { projects, cur, selectProject, visibleSeq, consumeIntent } = useQs()
   const [q, setQ] = useState('')
   const [flt, setFlt] = useState({})
   const [open, setOpen] = useState('')       // nhóm lọc đang mở danh sách
@@ -72,6 +72,12 @@ export default function ProjectGallery() {
   const [detail, setDetail] = useState('')
   const dp = detail ? (projects || []).find(x => x.maDA === detail) : null
   const showDetail = ma => { setDetail(ma); const sc = document.querySelector('.qs-scroll'); if (sc) sc.scrollTop = 0 }
+  // Trang khác (Nhà cung cấp > Dự án đang dùng) mở thẳng chi tiết 1 dự án: showTab('dsduan', { detail: maDA })
+  const dsVis = visibleSeq('dsduan')
+  useEffect(() => {
+    const it = consumeIntent('dsduan')
+    if (it && it.detail) showDetail(String(it.detail))
+  }, [dsVis]) // eslint-disable-line react-hooks/exhaustive-deps
   async function openProject(x) {
     if (!cur || cur.maDA !== x.maDA) { const ok = await selectProject(x.maDA); if (ok === false) return }
     showTab('boc')

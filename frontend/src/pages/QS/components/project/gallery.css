@@ -199,9 +199,15 @@
 .qs-pd-sec{min-height:120px;}
 .qs-pd-err{color:var(--danger); font-size:13px;}
 .qs-pd-empty{padding:30px; text-align:center; color:var(--text-muted); border:1px dashed var(--border); border-radius:12px;}
-.qs-pd-intro{max-width:900px; margin-bottom:18px;}
-.qs-pd-intro h3{margin:0 0 6px; font-size:16px;}
-.qs-pd-intro p{margin:0; font-size:15px; line-height:1.7; white-space:pre-wrap; color:var(--text);}
+.qs-pd-intro{position:relative; margin:0 0 16px; padding:16px 22px 14px; border:1px solid var(--border); border-radius:12px; background:var(--surface);}
+.qs-pd-intro h3{display:flex; align-items:center; gap:8px; margin:0 0 10px; font-size:15px; font-weight:700;}
+.qs-pd-intro h3 svg{color:var(--dash-accent, var(--primary));}
+.qs-pd-intro .tx{columns:2 420px; column-gap:36px;}
+.qs-pd-intro p{margin:0 0 10px; font-size:14.5px; line-height:1.7; white-space:pre-wrap; color:var(--text); text-align:justify; break-inside:avoid-column;}
+.qs-pd-intro p:last-child{margin-bottom:0;}
+/* Chữ dài: thu gọn ~5 dòng, mờ dần ở đáy; Xem thêm mở hết */
+.qs-pd-intro.clamp .tx{max-height:8.6em; overflow:hidden; columns:auto; -webkit-mask-image:linear-gradient(#000 55%, transparent); mask-image:linear-gradient(#000 55%, transparent);}
+.qs-pd-intro .more{display:inline-flex; align-items:center; gap:4px; margin-top:8px; padding:0; border:0; background:none; color:var(--dash-accent, var(--primary)); font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
 .qs-pd-gal{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px;}
 .qs-pd-gal button{aspect-ratio:1; padding:8px; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:zoom-in;}
 .qs-pd-gal img{width:100%; height:100%; object-fit:contain;}

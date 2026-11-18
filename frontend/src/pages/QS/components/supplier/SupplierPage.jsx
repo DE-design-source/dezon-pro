@@ -49,13 +49,81 @@ function useLogos() {
   async function upload(ten, file) {
     if (!file) return
     if (!/^image\//.test(file.type)) { toast('Chỉ nhận file ảnh (png, jpg, svg, webp…)'); return }
-    try { const r = await uploadRaw(file); if (r && r.url) { await save({ ...(logoCache || {}), [ten]: r.url }); toast('Đã lưu logo ' + ten) } } catch (e) { toast('Tải logo lỗi: ' + e.message) }
+    try {
+      const f = await logoFile_(file)
+      const r = await uploadRaw(f); if (r && r.url) { await save({ ...(logoCache || {}), [ten]: r.url }); toast('Đã lưu logo ' + ten) }
+    } catch (e) { toast('Tải logo lỗi: ' + e.message) }
   }
+  /* Logo kéo từ trang web khác: tải ảnh về rồi lưu như file; trang nguồn chặn thì hướng dẫn dán */
+  async function uploadUrl(ten, url) {
+    let blob
+    try { const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status); blob = await res.blob() } catch (e) {
+      toast('Trang nguồn chặn tải ảnh - bấm chuột phải ảnh > Sao chép hình ảnh, rê chuột vào ô logo rồi dán (Ctrl+V)'); return
+    }
+    upload(ten, new File([blob], 'logo-' + Date.now(), { type: String(blob.type || '').split(';')[0] }))
+  }
+  /* Kéo thả (file hoặc ảnh từ trang web) / dán Ctrl+V khi rê chuột vào ô logo */
+  function dropProps(ten) {
+    return {
+      onDragOver: e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy' },
+      onDrop: e => {
+        e.preventDefault(); e.stopPropagation()
+        const f = [...(e.dataTransfer.files || [])].find(x => /^image\//.test(x.type))
+        if (f) { upload(ten, f); return }
+        const u = droppedUrl_(e.dataTransfer)
+        if (u) uploadUrl(ten, u); else toast('Không nhận được ảnh - thử kéo file ảnh hoặc dán (Ctrl+V)')
+      },
+      onMouseEnter: () => { logoHover = ten },
+      onMouseLeave: () => { if (logoHover === ten) logoHover = '' },
+    }
+  }
+  useEffect(() => {
+    const h = e => {
+      if (!logoHover) return
+      const t = e.target
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(x => /^image\//.test(x.type))
+      if (!f) return
+      e.preventDefault(); e.stopImmediatePropagation()
+      upload(logoHover, f)
+    }
+    document.addEventListener('paste', h, true)
+    return () => document.removeEventListener('paste', h, true)
+  })
   async function remove(ten) {
     if (!await qsConfirm('Xoá logo của ' + ten + '?')) return
     const n = { ...(logoCache || {}) }; delete n[ten]; save(n)
   }
-  return { logos, upload, remove }
+  return { logos, upload, remove, dropProps }
+}
+let logoHover = ''   // thương hiệu có ô logo đang được rê chuột (dán Ctrl+V vào đó)
+const LOGO_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' }
+/* Máy chủ chỉ nhận png / jpg / webp / gif: ảnh loại khác (svg, avif, bmp, ico…) vẽ lại thành PNG (tối đa 600px);
+   tên file đặt theo loại ảnh để máy chủ nhận đúng đuôi */
+async function logoFile_(file) {
+  const ext = LOGO_EXT[String(file.type).toLowerCase()]
+  if (ext) return /\.(png|jpe?g|webp|gif)$/i.test(file.name) ? file : new File([file], 'logo-' + Date.now() + '.' + ext, { type: file.type })
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Không đọc được ảnh ' + (file.name || ''))); i.src = url })
+    const w0 = img.naturalWidth || 600, h0 = img.naturalHeight || 600
+    const k = Math.min(1, 600 / Math.max(w0, h0)) || 1
+    const c = document.createElement('canvas')
+    c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k))
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'))
+    if (!blob) throw new Error('Không chuyển được ảnh sang PNG')
+    return new File([blob], String(file.name || 'logo').replace(/\.\w+$/, '') + '.png', { type: 'image/png' })
+  } finally { URL.revokeObjectURL(url) }
+}
+/* URL ảnh khi kéo từ trang web khác: <img src> trong text/html, rồi text/uri-list, rồi text/plain */
+function droppedUrl_(dt) {
+  const m = /<img[^>]+src\s*=\s*["']([^"']+)["']/i.exec(dt.getData('text/html') || '')
+  if (m) return m[1].replace(/&amp;/g, '&')
+  const uri = (dt.getData('text/uri-list') || '').split(/\r?\n/).map(s => s.trim()).find(s => s && s[0] !== '#')
+  if (uri) return uri
+  const t = (dt.getData('text/plain') || '').trim()
+  return /^(https?:|data:)/i.test(t) ? t : ''
 }
 function LogoPick({ onFile, children, className, title }) {
   const ref = useRef(null)
@@ -182,7 +250,7 @@ export default function SupplierPage() {
               <div key={o.ten} className="qs-sup-card" style={{ '--h': hue_(o.ten) }} onClick={() => setDetail(o.ten)} title={'Xem nhà cung cấp ' + o.ten}>
                 {/* Module 1: logo thương hiệu (chưa có -> chữ viết tắt + nút Thêm logo) */}
                 {view !== 'logo' && (
-                  <div className={'qs-sup-m1' + (logo ? '' : ' none')}>
+                  <div className={'qs-sup-m1' + (logo ? '' : ' none')} {...L.dropProps(o.ten)}>
                     {logo ? <img src={mediaUrl(logo)} alt={'Logo ' + o.ten} loading="lazy" /> : <b className="ini">{o.ten.slice(0, 2).toUpperCase()}</b>}
                     <LogoPick className="qs-sup-logobtn" title={logo ? 'Đổi logo' : 'Thêm logo'} onFile={f => L.upload(o.ten, f)}><Icon name={logo ? 'edit' : 'upload'} size={13} /><span>{logo ? 'Đổi logo' : 'Thêm logo'}</span></LogoPick>
                   </div>
@@ -243,11 +311,25 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
   const [tab, setTab] = useState('sp')
   const [hm, setHm] = useState('')
   const hms = Object.keys(o.hm).sort((a, b) => o.hm[b] - o.hm[a])
-  const sp = hm ? o.sp.filter(p => s_(p.hangMuc) === hm) : o.sp
+  const [dist, setDist] = useState('')   // lọc tab Sản phẩm theo nhà phân phối (bấm thẻ ở tab Nhà phân phối)
+  const sp = o.sp.filter(p => (!hm || s_(p.hangMuc) === hm) && (!dist || s_(p.ncc) === dist))
   const dists = Object.keys(o.dist).sort((a, b) => o.dist[b] - o.dist[a])
+  /* Số liệu từng nhà phân phối: ảnh 3 sản phẩm đầu, khoảng giá, hạng mục */
+  const distSt = useMemo(() => {
+    const m = {}
+    o.sp.forEach(p => {
+      const d = s_(p.ncc); if (!d) return
+      const x = m[d] || (m[d] = { imgs: [], min: Infinity, max: 0, hm: {} })
+      const im = img1(p.hinhAnh); if (im && x.imgs.length < 3 && x.imgs.indexOf(im) < 0) x.imgs.push(im)
+      const g = Number(p.donGiaBan) || 0; if (g > 0) { x.min = Math.min(x.min, g); x.max = Math.max(x.max, g) }
+      const h = s_(p.hangMuc); if (h) x.hm[h] = (x.hm[h] || 0) + 1
+    })
+    return m
+  }, [o.sp])
   const NI = useNccInfo()
   const hs = NI.info[o.ten] || {}
   const saveHs = part => NI.patch(o.ten, part)
+  const nOf = x => ((statCache[x.maDA] || {}).nccN || {})[o.ten] || 0   // số dòng sản phẩm của hãng trong dự án
   const TABS = [['sp', 'Sản phẩm', o.sp.length], ['pj', 'Dự án đang dùng', projs.length], ['dist', 'Nhà phân phối', dists.length],
     ['intro', 'Giới thiệu', 0], ['partner', 'Đối tác', (hs.doiTac || []).length], ['cat', 'Catalogue', (hs.catalogue || []).length]]
   return (
@@ -263,7 +345,7 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
         <button type="button" className="qs-pd-back" onClick={onBack}><Icon name="arrowLeft" size={16} /> Nhà cung cấp</button>
       </div>
       <div className="qs-pd-title">
-        <div className="qs-sup-dlogo">
+        <div className="qs-sup-dlogo" title="Kéo thả hoặc dán (Ctrl+V) ảnh logo vào đây" {...L.dropProps(o.ten)}>
           {L.logos[o.ten] ? <img src={mediaUrl(L.logos[o.ten])} alt={'Logo ' + o.ten} /> : <span>{o.ten.slice(0, 2).toUpperCase()}</span>}
         </div>
         <h1>{o.ten}</h1>
@@ -283,6 +365,7 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
                 {hms.map(h => <button type="button" key={h} className={hm === h ? 'on' : ''} onClick={() => setHm(h)}>{h}<small>{o.hm[h]}</small></button>)}
               </div>
             ) : <span />}
+            {dist && <button type="button" className="qs-sup-distf" title="Bỏ lọc nhà phân phối" onClick={() => setDist('')}>Nhà phân phối: <b>{dist}</b><small>{sp.length}</small><Icon name="x" size={13} /></button>}
             <div className="qs-pd-spv" role="group" aria-label="Chế độ xem sản phẩm">
               {SPD_VIEWS.map(v => <button type="button" key={v[0]} className={spv === v[0] ? 'on' : ''} title={'Xem dạng ' + v[1]} onClick={() => setSpv(v[0])}><Icon name={v[2]} size={15} /><span>{v[1]}</span></button>)}
             </div>
@@ -331,12 +414,27 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
       {tab === 'pj' && (
         <div className="qs-pd-sec">
           {projs.length ? (
-            <div className="qs-pd-rel">
-              {projs.map(x => (
-                <button type="button" key={x.maDA} className="qs-pd-relc" title="Mở trang Danh sách dự án" onClick={() => showTab('dsduan')}>
-                  <b>{x.ten}</b><span>{[x.khachHang, x.trangThai || 'Bản nháp'].filter(v => s_(v)).join(' · ')}</span>
-                </button>
-              ))}
+            <div className="qs-sup-pj">
+              {[...projs].sort((a, b) => nOf(b) - nOf(a) || s_(a.ten).localeCompare(s_(b.ten), 'vi')).map(x => {
+                const st = statCache[x.maDA] || {}
+                const tt = x.trangThai || 'Bản nháp'
+                const sub = [x.diaChi, x.phanKhuc, x.namHoanThien].filter(v => s_(v)).join(' · ')
+                return (
+                  <button type="button" key={x.maDA} className="qs-sup-pjc" title={'Xem chi tiết dự án ' + x.ten} onClick={() => showTab('dsduan', { detail: x.maDA })}>
+                    <span className="cv" style={{ '--h': hue_(x.ten) }}>
+                      {st.cover ? <img src={mediaUrl(st.cover)} alt="" loading="lazy" /> : <b className="ini">{s_(x.ten).split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'}</b>}
+                      <span className={'st' + (tt === 'Hoàn thành' ? ' ok' : '')}>{tt}</span>
+                      {nOf(x) > 0 && <span className="n">{nOf(x)} sản phẩm {o.ten}</span>}
+                      {st.nAnh > 1 && <span className="na"><Icon name="grid" size={12} /> {st.nAnh}</span>}
+                    </span>
+                    <span className="tx">
+                      <b>{x.ten}</b>
+                      <span className={sub ? '' : 'nil'}>{sub || 'Chưa có địa điểm'}</span>
+                      {s_(x.khachHang) && <small>Khách hàng: {x.khachHang}</small>}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           ) : <div className="qs-pd-empty">{statDone ? 'Chưa có dự án nào dùng sản phẩm của nhà cung cấp này.' : 'Đang đếm…'}</div>}
         </div>
@@ -344,8 +442,32 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
       {tab === 'dist' && (
         <div className="qs-pd-sec">
           {dists.length ? (
-            <div className="qs-pd-ncc">
-              {dists.map(d => <div key={d} className="qs-pd-nccc"><b>{d}</b><span>{o.dist[d]} sản phẩm</span></div>)}
+            <div className="qs-sup-pj">
+              {dists.map(d => {
+                const x = distSt[d] || { imgs: [], min: Infinity, max: 0, hm: {} }
+                const logo = L.logos[d]
+                const hmT = Object.keys(x.hm).sort((a, b) => x.hm[b] - x.hm[a])
+                const lh = NI.info[d] || {}
+                const lien = [lh.dienThoai, lh.diaChi].filter(v => s_(v)).join(' · ')
+                return (
+                  <div key={d} role="button" tabIndex={0} className="qs-sup-pjc qs-sup-dc" title={'Xem ' + o.dist[d] + ' sản phẩm ' + o.ten + ' của ' + d}
+                    onClick={e => { if (e.target.closest && e.target.closest('input,.qs-sup-logobtn')) return; setDist(d); setHm(''); setTab('sp') }} onKeyDown={e => { if (e.key === 'Enter') { setDist(d); setHm(''); setTab('sp') } }}>
+                    <span className={'cv' + (logo ? '' : x.imgs.length ? ' col' : '')} style={{ '--h': hue_(d) }} {...L.dropProps(d)}>
+                      {logo ? <img src={mediaUrl(logo)} alt={'Logo ' + d} loading="lazy" />
+                        : x.imgs.length ? x.imgs.map((u, j) => <i key={j}><img src={u} alt="" loading="lazy" /></i>)
+                          : <b className="ini">{d.slice(0, 2).toUpperCase()}</b>}
+                      <span className="n">{o.dist[d]} sản phẩm</span>
+                      <LogoPick className="qs-sup-logobtn" title={logo ? 'Đổi logo' : 'Thêm logo'} onFile={f => L.upload(d, f)}><Icon name={logo ? 'edit' : 'upload'} size={13} /><span>{logo ? 'Đổi logo' : 'Thêm logo'}</span></LogoPick>
+                    </span>
+                    <span className="tx">
+                      <b>{d}</b>
+                      <span>{x.max > 0 ? (x.min === x.max ? money(x.min) + ' đ' : money(x.min) + ' – ' + money(x.max) + ' đ') : 'Chưa có giá'}</span>
+                      {hmT.length > 0 && <span className="hm">{hmT.slice(0, 3).map(h => <em key={h}>{h}</em>)}{hmT.length > 3 && <em>+{hmT.length - 3}</em>}</span>}
+                      <small className={lien ? '' : 'nil'}>{lien || 'Chưa có thông tin liên hệ'}</small>
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           ) : <div className="qs-pd-empty">Sản phẩm chưa ghi nhà phân phối.</div>}
         </div>

@@ -66,6 +66,22 @@ const SP_VIEWS = [['table', 'Bảng', 'table'], ['grid', 'Lưới thẻ', 'grid'
 const SPV_LS = 'qs_pd_spview'
 const spvGet = () => { try { const v = localStorage.getItem(SPV_LS); return SP_VIEWS.some(x => x[0] === v) ? v : 'table' } catch (e) { return 'table' } }
 
+/* Khối Nhu cầu / Hiện trạng / Ghi chú: khung thẻ, tách đoạn theo dòng trống; chữ dài (bài giới thiệu dự án) thu gọn còn ~5 dòng + Xem thêm */
+const INTRO_LONG = 480
+function IntroBlock({ title, text }) {
+  const t = s_(text)
+  const long = t.length > INTRO_LONG
+  const [open, setOpen] = useState(false)
+  const paras = t.split(/\n\s*\n|\n/).map(s_).filter(Boolean)
+  return (
+    <section className={'qs-pd-intro' + (long && !open ? ' clamp' : '')}>
+      <h3><Icon name="fileText" size={15} /> {title}</h3>
+      <div className="tx">{paras.map((x, i) => <p key={i}>{x}</p>)}</div>
+      {long && <button type="button" className="more" onClick={() => setOpen(!open)}>{open ? 'Thu gọn' : 'Xem thêm'}<Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} /></button>}
+    </section>
+  )
+}
+
 export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }) {
   const [lines, setLines] = useState(null)
   const [err, setErr] = useState('')
@@ -318,7 +334,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                 <label key={r[1]}><h3>{r[0]}</h3><textarea value={f[r[1]]} onChange={setFld(r[1])} placeholder={r[2]} /></label>
               ))}
             </div>
-          ) : intro.length ? intro.map(x => <div key={x[0]} className="qs-pd-intro"><h3>{x[0]}</h3><p>{x[1]}</p></div>)
+          ) : intro.length ? intro.map(x => <IntroBlock key={x[0]} title={x[0]} text={x[1]} />)
             : <div className="qs-pd-empty">Chưa có phần giới thiệu (Nhu cầu / Hiện trạng / Ghi chú) — bấm {yc.canApprove ? 'Sửa thông tin' : 'Yêu cầu sửa'} để nhập.</div>}
         </div>
       )}
