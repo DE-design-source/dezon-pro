@@ -832,7 +832,46 @@ html[data-theme="dark"] .ios-cal-g .dow{color:rgba(235,235,245,.3);}
 .kd-pl-trange input{flex:1; min-width:0; padding:5px 6px; border:1px solid var(--border); border-radius:7px; background:var(--surface-alt); color:var(--text); font:inherit; font-size:12px;}
 .kd-pl-trange span{color:var(--text-muted); font-size:12px;}
 /* Khung Phụ trách dời sang cột Chi tiết khi mở (MarkUp 2026-11-16 18:46): thẻ Chi tiết cao theo nội dung, Phụ trách kéo tới đáy */
-.kd-cp.detail-open .kd-cp-detail > .kd-cp-card{flex:1;}   /* Phụ trách ở trên, thẻ Chi tiết kéo tới đáy (MarkUp 2026-11-16 18:48) */
+.kd-cp.detail-open .kd-cp-detail > .kd-cp-card{flex:1;}   /* thẻ Chi tiết kéo giãn, Phụ trách nằm dưới (MarkUp 2026-11-18) */
 .kd-cp.detail-open .kd-cp-detail > .kd-cp-pt{flex:none;}
 .kd-cp-detail-h .kd-cp-edit + .kd-cp-edit{margin-left:0;}   /* nút sửa + nút đóng sát nhau ở góc phải (MarkUp 2026-11-16 19:27) */
 .kd-cp-side h4 .kd-cp-edit + .kd-cp-edit{margin-left:0;}
+/* Pipeline: thanh công cụ + tiêu đề cột Danh sách cố định khi cuộn (MarkUp 2026-11-18) */
+.kd-pl-sticky{position:sticky; top:0; z-index:40; display:flex; flex-direction:column; margin-top:-8px; padding-top:8px; background:var(--bg);}
+.kd-pl-search{display:inline-flex; align-items:center; gap:6px; height:32px; width:230px; padding:0 8px 0 10px; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:rgba(255,255,255,.08); color:#cfe0f3; box-sizing:border-box; cursor:text;}
+.kd-pl-search.on, .kd-pl-search:focus-within{border-color:#F5A524; background:rgba(255,255,255,.14);}
+.kd-pl-search input{flex:1; min-width:0; height:100%; border:none; outline:none; background:transparent; color:#fff; font:inherit; font-size:12.5px;}
+.kd-pl-search input::placeholder{color:#9fc0e3;}
+.kd-pl-search input::-webkit-search-cancel-button{display:none;}
+.kd-pl-bar .kd-pl-search button{flex:none; width:20px; height:20px; padding:0; border:none; border-radius:50%; font-size:15px; line-height:1; cursor:pointer;}
+.kd-list-head{margin-top:14px; padding:6px 20px 0; border:1px solid var(--border); border-bottom:none; border-radius:14px 14px 0 0; background:var(--surface);}
+.kd-list-tools{display:flex; align-items:center; gap:10px; padding:6px 4px 4px; font-size:11.5px; color:var(--text-muted);}
+.kd-list-tools .hint{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.kd-list-tools .cnt{flex:none; font-weight:600;}
+.kd-list-care{display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 11px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:12px; font-weight:600; cursor:pointer; flex:none;}
+.kd-list-care:hover{color:var(--sales); border-color:var(--sales);}
+.kd-list-care.on{background:var(--sales-tint); border-color:var(--sales); color:var(--sales);}
+.kd-list-cols{display:grid; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
+.kd-list-cols > button{display:inline-flex; align-items:center; gap:4px; min-width:0; padding:0; border:none; background:none; color:inherit; font:inherit; letter-spacing:inherit; text-transform:inherit; text-align:left; cursor:pointer;}
+.kd-list-cols > button span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.kd-list-cols > button:hover, .kd-list-cols > button.on{color:var(--sales);}
+.kd-list-cols > button.on{font-weight:700;}
+.kd-list-body{padding:0 20px 8px; border:1px solid var(--border); border-top:none; border-radius:0 0 14px 14px; background:var(--surface);}
+.kd-pl-panel > .kd-list-body{margin-top:-14px;}
+.kd-list-empty{padding:28px 4px; text-align:center; font-size:13px; color:var(--text-muted);}
+.kd-list-row.dragging{opacity:.45;}
+.kd-list-row.drop-before{box-shadow:inset 0 2px 0 var(--sales);}
+.kd-list-row.drop-after{box-shadow:inset 0 -2px 0 var(--sales);}
+.kd-list-grip{font-style:normal; font-size:14px; line-height:1; color:var(--text-muted); opacity:.55; cursor:grab;}
+.kd-list-row:hover .kd-list-grip{opacity:1; color:var(--sales);}
+.kd-dup-tag{flex:none; padding:1px 7px; border-radius:999px; background:var(--danger-tint); color:var(--danger); font-size:10px; font-weight:700; white-space:nowrap;}
+
+/* Form khách hàng: ô Concept / Ghi chú nội bộ tự giãn cao theo nội dung (JS đặt height, tối đa 50vh rồi cuộn), vẫn kéo giãn dọc tay */
+.kd-field textarea.kd-autogrow{box-sizing:border-box; min-height:calc(4 * 1.5em + 20px); line-height:1.5; resize:vertical; overflow-y:auto;}
+/* Giao diện Glass / Super Glass: --bg trong suốt, --surface bán trong -> thanh cố định cần nền kính đậm + làm mờ để chữ các dòng phía dưới không lộ qua */
+html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky,
+html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky .kd-list-head{
+  background: var(--glass-surface-strong, var(--sg-surface-strong, var(--surface))) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(160%); backdrop-filter: blur(30px) saturate(160%);
+}
+html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky .kd-list-head{-webkit-backdrop-filter:none; backdrop-filter:none;}
