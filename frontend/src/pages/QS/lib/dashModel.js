@@ -52,6 +52,9 @@ export function addDraftPayload_(g){ return {ten:g.name, khachHang:g.khachHang, 
 /* Link bài dự án trên dezon.vn */
 export function dezonHost_(u){ try{ return new URL(u).hostname; }catch(e){ return ''; } }
 export function dezonUrl_(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:('https://'+u); }
+/* Nền tảng dự án (cột projects.platform, migration 0050): giá trị đã chọn; chưa chọn thì Dezon.vn = đã gắn link dezon.vn, Dezon Pro = chưa gắn */
+export const NEN_TANG = ['Dezon.vn', 'Dezon Pro']
+export const nenTangOf = x => String(x.nenTang || '').trim() || (String(x.linkDezon || '').trim() ? 'Dezon.vn' : 'Dezon Pro')
 // Chuẩn hoá link người dán: thêm https:// nếu thiếu; lạ = không thuộc dezon.vn (bản gốc hỏi lại trước khi lưu)
 export function dezonLinkIn_(v){
   v=String(v==null?'':v).trim();

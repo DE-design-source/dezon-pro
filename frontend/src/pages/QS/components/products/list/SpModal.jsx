@@ -8,6 +8,7 @@ import * as api from '../../../api/qsApi'
 import { isAbort } from '../../../api/http'
 import { mediaUrl } from '../../../api/files'
 import { money } from '../../../lib/format.js'
+import { nenTangOf } from '../../../lib/dashModel.js'
 import { coSpec_, nganhCuaSP_, prodDocs_ } from '../../../lib/productFields.js'
 import { pdImgs_, pdKeyItems_, pdSpecBlocks_ } from '../../breakdown/catalog/catalogModel'
 import { putCombo } from '../../breakdown/catalog/comboCache'
@@ -246,10 +247,10 @@ function SpCombo({ product }) {
    Khu vực = đoạn cuối của địa chỉ (sau dấu phẩy cuối). Dự án chưa có trường Studio / Kiến trúc sư nên chưa lọc được theo đó. */
 const kv_ = x => { const a = String(x.diaChi || '').split(',').map(t => t.trim()).filter(Boolean); return a.length ? a[a.length - 1] : '' }
 /* Nhóm lọc: [khoá, tên, lấy giá trị, tuỳ chọn {fixed: danh sách giá trị cố định, empty: ghi chú khi chưa có dữ liệu}].
-   Nền tảng: Dezon.vn = dự án đã gắn link bài dezon.vn, Dezon Pro = chưa gắn link; "Dự án của tôi" chưa có dữ liệu người tạo.
+   Nền tảng: nenTangOf (giá trị đã chọn, chưa chọn thì Dezon.vn = đã gắn link bài dezon.vn, Dezon Pro = chưa gắn); "Dự án của tôi" chưa có dữ liệu người tạo.
    Studio / Kiến trúc sư: đọc x.studio / x.kienTrucSu — dự án chưa có 2 trường này (cần thêm vào database + form Thông tin dự án) */
 const MP_GROUPS = [
-  ['nenTang', 'Nền tảng', x => (String(x.linkDezon || '').trim() ? 'Dezon.vn' : 'Dezon Pro'), { fixed: ['Dezon.vn', 'Dezon Pro', 'Dự án của tôi'] }],
+  ['nenTang', 'Nền tảng', nenTangOf, { fixed: ['Dezon.vn', 'Dezon Pro', 'Dự án của tôi'] }],
   ['studio', 'Studio', x => String(x.studio || '').trim(), { empty: 'Chưa có dữ liệu Studio trong thông tin dự án' }],
   ['kts', 'Kiến trúc sư', x => String(x.kienTrucSu || '').trim(), { empty: 'Chưa có dữ liệu Kiến trúc sư trong thông tin dự án' }],
   ['khachHang', 'Khách hàng', x => String(x.khachHang || '').trim()],

@@ -13,6 +13,7 @@ import { addProdSame_, addProdBuild_, addProdSl_, addProdFloor_, prodNode_ } fro
 import { floorsList } from '../../../lib/sheetModel.js'
 import { spKey_, spPatchLocal_, spNhomBienThe_ } from './spModel'
 import { LY_DO_MAX } from '../../admin/adminUtil'
+import { resetStats } from '../../project/projectStats'
 
 const S = () => getState()
 const errMsg = e => String((e && e.message) || e || '')
@@ -201,6 +202,7 @@ export function spAddManyToProject_(list) {
 export async function spAddToProject(p) {
   if (!S().cur) { toast('Chưa chọn dự án'); return }
   await addProdObj(p)
+  resetStats([S().cur && S().cur.maDA])
 }
 /* Ghi danh 1 sản phẩm vào nhiều dự án một lần (hộp "Ghi danh vào nhiều dự án" của modal Thông tin sản phẩm).
    Dự án đang mở: qua addProdObj (bảng cập nhật ngay). Dự án khác: đọc dòng của dự án đó, trùng SP cùng tầng / đề mục thì cộng
@@ -225,6 +227,7 @@ export async function spAddToProjects(p, maDAs, sl) {
       fail.push(((pj && pj.ten) || maDA) + ': ' + errMsg(e))
     }
   }
+  if (ok) resetStats(maDAs)
   if (fail.length) qsAlert('Ghi danh "' + (p.ten || '') + '": xong ' + ok + ' dự án, lỗi ' + fail.length + ':\n' + fail.join('\n'))
   else toast('Đã ghi danh "' + (p.ten || '') + '"' + (sl > 1 ? ' ×' + sl : '') + ' vào ' + ok + ' dự án')
   return { ok, fail: fail.length }

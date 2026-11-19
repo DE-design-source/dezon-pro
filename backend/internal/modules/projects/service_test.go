@@ -382,7 +382,7 @@ var (
 
 // Cột chỉ bản Go (migration 0011, M8.3: projects.current_condition = du_an.hien_trang; migration 0036:
 // projects.architect = du_an.kien_truc_su; migration 0038: projects.studio = du_an.studio; migration 0039: design_team,
-// photographer, contractor, completion_year): golden Node không có
+// photographer, contractor, completion_year; migration 0050: platform): golden Node không có
 // -> bỏ khỏi kết quả và khỏi chi tiết lỗi "Failing row contains" trước khi so (backend/docs/ARCHITECTURE.md 10.4).
 // Chỉ bỏ khi giá trị là null (goonly.StripNull): cột chỉ ghi khi client gửi khoá, ca golden không gửi, nên giá trị
 // khác null = ghi sai và phép so báo khác.
@@ -390,9 +390,9 @@ var (
 // Khoá kết quả chỉ bản Go: goOnlyResultKeys (projToObj đọc từ các cột goOnlyKeys, cùng thứ tự). Ca golden không ghi cột này nên khoá luôn là chuỗi rỗng;
 // stripGoOnlyResult kiểm điều đó rồi mới bỏ khoá (giá trị khác rỗng = đọc / ghi sai, test báo lỗi).
 var (
-	goOnlyKeys       = []string{"hien_trang", "kien_truc_su", "studio", "nhom_thiet_ke", "nhiep_anh_gia", "nha_thau_thi_cong", "nam_hoan_thien"}
-	goOnlyCols       = map[string]int{"projects": 7}
-	goOnlyResultKeys = []string{"hienTrang", "kienTrucSu", "studio", "nhomThietKe", "nhiepAnhGia", "nhaThauThiCong", "namHoanThien"}
+	goOnlyKeys       = []string{"hien_trang", "kien_truc_su", "studio", "nhom_thiet_ke", "nhiep_anh_gia", "nha_thau_thi_cong", "nam_hoan_thien", "nen_tang"}
+	goOnlyCols       = map[string]int{"projects": 8}
+	goOnlyResultKeys = []string{"hienTrang", "kienTrucSu", "studio", "nhomThietKe", "nhiepAnhGia", "nhaThauThiCong", "namHoanThien", "nenTang"}
 )
 
 // stripGoOnlyResult: khoá kết quả chỉ bản Go phải rỗng ở mọi chỗ, rồi bỏ khỏi v trước khi so với golden.
