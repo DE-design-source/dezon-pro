@@ -709,7 +709,7 @@ function DesignerDetail({ o, sub, sum, statOf, lk, onOpen, onBack, onEdit, onDel
                 const st = statOf(g)
                 const d = g.drafts[g.drafts.length - 1]
                 return (
-                  <button type="button" key={d.maDA} className="qs-ntk-pjc" title="Mở trang Danh sách dự án" onClick={() => showTab('dsduan')}>
+                  <button type="button" key={d.maDA} className="qs-ntk-pjc" title={'Mở trang dự án ' + g.name} onClick={() => showTab('dsduan', { detail: d.maDA })}>
                     <b>{g.name}</b>
                     <span>{[g.khachHang, g.diaChi, d.trangThai || 'Bản nháp'].filter(s_).join(' · ')}</span>
                     <span className="v">{st ? (st.n ? money(st.tong) + ' đ · ' + st.n + ' dòng' : 'Chưa có báo giá') : 'Đang đếm…'}</span>

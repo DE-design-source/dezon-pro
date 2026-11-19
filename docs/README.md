@@ -7,6 +7,7 @@ Mục lục mọi tài liệu trong `docs/`. Cập nhật file này mỗi khi th
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
 | [kien-truc-he-thong.md](02-ky-thuat/kien-truc/kien-truc-he-thong.md) | Ảnh chụp kiến trúc hiện tại: khối hệ thống, tầng backend, 18 module, trang gọi server, dữ liệu, triển khai, điểm đáng chú ý. Sinh bằng lệnh `/architecture`, chạy lại để cập nhật | **Hiện hành** |
+| [phan-quyen.md](02-ky-thuat/kien-truc/phan-quyen.md) | Phân quyền: vai trò super / admin / staff, luồng một request, tách dữ liệu theo công ty, quản lý tài khoản, quyền theo tab, lớp quyền HR, quyền riêng từng module, điểm cần lưu ý (sơ đồ Mermaid) | **Hiện hành** |
 
 ## 02-ky-thuat / database
 
@@ -15,6 +16,8 @@ Các tài liệu loại "Mốc audit" / "Đề xuất gốc" viết khi còn app
 
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
+| [tach-du-lieu-cong-ty.md](02-ky-thuat/database/tach-du-lieu-cong-ty.md) | Thiết kế tách dữ liệu theo công ty: bảng cha có `company_id`, bảng con lấy theo dòng cha, `TenantTables`, luồng đọc / ghi, trường hợp đặc biệt, ràng buộc khi thêm bảng (sơ đồ Mermaid) | **Hiện hành** |
+| [luong-truy-van-theo-cong-ty.md](02-ky-thuat/database/luong-truy-van-theo-cong-ty.md) | Ví dụ cụ thể: đăng nhập Super / admin đi qua bảng nào, câu SQL thật khi đọc / sửa / xoá / thêm, vì sao công ty này không đụng dữ liệu công ty khác, truy cập thẳng database (sơ đồ Mermaid) | **Hiện hành** |
 | [schema-hien-hanh.md](02-ky-thuat/database/schema-hien-hanh.md) | Cấu trúc ĐANG CHẠY: bảng, nhiệm vụ, khoá, sơ đồ quan hệ, cột (sinh từ database) | **Hiện hành** |
 | [ket-qua-trien-khai.md](02-ky-thuat/database/ket-qua-trien-khai.md) | Đã làm gì, khác gì đề xuất, kết quả kiểm thử, dữ liệu cách ly, cách vận hành | **Hiện hành** |
 | [database-rules.md](02-ky-thuat/database/database-rules.md) | 40 quy tắc khi thêm hoặc sửa bảng | **Hiện hành** |

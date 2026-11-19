@@ -5,13 +5,17 @@ import ImgViewer from '../common/ImgViewer'
 import * as api from '../../api/qsApi'
 import { mediaUrl } from '../../api/files'
 import { safeUrl_, money } from '../../lib/format.js'
-import { dezonUrl_ } from '../../lib/dashModel.js'
+import { dezonUrl_, NEN_TANG, nenTangOf } from '../../lib/dashModel.js'
 import { qsToast as toast } from '../common/dialogs'
 import { HeroSlider, ImageManager } from './ProjectImages'
 import { nodeName } from '../../lib/tree.js'
 import { uploadRaw } from '../../api/files'
 import { qsAsk } from '../common/dialogs'
 import { resolveProjectEdit, editProjectForm } from './projectActions'
+import { statCache, loadStats_ } from './projectStats'
+import '../supplier/supplier.css'
+const REL_HUES = [212, 196, 168, 28, 262, 340, 145, 18]
+const relHue_ = s => { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return REL_HUES[h % REL_HUES.length] }
 
 /* Trang chi tiết 1 dự án (mở từ trang Danh sách dự án, tham khảo trang dự án của dezon.vn):
    tên dự án ở đầu trang · ảnh công trình của dự án (dữ liệu phụ 'anhDuAn', trình chiếu như dezon.vn; chưa có thì bấm để thêm) · tab Thông tin (bảng thông tin 2 cột nhãn IN HOA : giá trị + giới thiệu) / Hình ảnh / Sản phẩm /
@@ -43,7 +47,8 @@ const BASIC_ROWS = [
 const INFO_ROWS = [
   ['Mã báo giá', 'maBaoGia'],
   ['Khách hàng', 'khachHang'], ['Điện thoại', 'sdt'],
-  ['Phân khúc', 'phanKhuc'], ['Quy mô', 'quyMo'],
+  ['Phân khúc', 'phanKhuc'], ['Nền tảng', 'nenTang', 'nt'],
+  ['Quy mô', 'quyMo'],
   ['Tổng diện tích', 'tongDT', 'm2'], ['Diện tích báo giá', 'dtBaoGia', 'm2'],
   ['Trạng thái', 'trangThai', 'tt'], ['Tiến độ', 'tienDo', 'pct'],
   ['VAT', 'vat', 'vat', 'edit'], ['Link Dezon', 'linkDezon', 'url', 'edit'],
@@ -66,6 +71,22 @@ const SP_VIEWS = [['table', 'Bảng', 'table'], ['grid', 'Lưới thẻ', 'grid'
 const SPV_LS = 'qs_pd_spview'
 const spvGet = () => { try { const v = localStorage.getItem(SPV_LS); return SP_VIEWS.some(x => x[0] === v) ? v : 'table' } catch (e) { return 'table' } }
 
+/* Khối Nhu cầu / Hiện trạng / Ghi chú: khung thẻ, tách đoạn theo dòng trống; chữ dài (bài giới thiệu dự án) thu gọn còn ~5 dòng + Xem thêm */
+const INTRO_LONG = 480
+function IntroBlock({ title, text }) {
+  const t = s_(text)
+  const long = t.length > INTRO_LONG
+  const [open, setOpen] = useState(false)
+  const paras = t.split(/\n\s*\n|\n/).map(s_).filter(Boolean)
+  return (
+    <section className={'qs-pd-intro' + (long && !open ? ' clamp' : '')}>
+      <h3><Icon name="fileText" size={15} /> {title}</h3>
+      <div className="tx">{paras.map((x, i) => <p key={i}>{x}</p>)}</div>
+      {long && <button type="button" className="more" onClick={() => setOpen(!open)}>{open ? 'Thu gọn' : 'Xem thêm'}<Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} /></button>}
+    </section>
+  )
+}
+
 export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }) {
   const [lines, setLines] = useState(null)
   const [err, setErr] = useState('')
@@ -76,7 +97,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const [fold, setFoldSt] = useState(foldGet)
   const toggleFold = k => setFoldSt(f => { const n = { ...f, [k]: !f[k] }; foldSet(n); return n })
   const [nganh, setNganh] = useState('')        // lọc tab Sản phẩm theo ngành hàng
-  const [nccOpen, setNccOpen] = useState('')    // tab Nhà cung cấp: thẻ đang mở danh sách sản phẩm
+  const [nccOpen, setNccOpen] = useState('')    // tab Nhà cung cấp: thẻ đang chọn ('' = hiện sản phẩm mọi nhà)
   const [spv, setSpvSt] = useState(spvGet)
   const setSpv = v => { setSpvSt(v); try { localStorage.setItem(SPV_LS, v) } catch (e) { /* bỏ qua */ } }
   const [boq, setBoq] = useState(null)          // file BOQ đính kèm (mảng {url, name, at})
@@ -140,6 +161,15 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
     return Object.values(m).sort((a, b) => b.tong - a.tong)
   }, [lines])   // eslint-disable-line react-hooks/exhaustive-deps
   const related = (projects || []).filter(x => x.maDA !== p.maDA && ((s_(p.khachHang) && s_(x.khachHang) === s_(p.khachHang)) || (kv_(p) && kv_(x) === kv_(p))))
+  /* Tab Dự án liên quan: đếm ảnh bìa / số ảnh / số dòng của các dự án liên quan (dùng chung statCache với Danh sách dự án) */
+  const [, setRelVer] = useState(0)
+  const relKey = related.map(x => x.maDA).join('|')
+  useEffect(() => {
+    if (tab !== 'rel' || !related.length) return undefined
+    let alive = true
+    loadStats_(related, () => { if (alive) setRelVer(v => v + 1) })
+    return () => { alive = false }
+  }, [tab, relKey])   // eslint-disable-line react-hooks/exhaustive-deps
   const link = s_(p.linkDezon)
   const pics = anh || []
   async function saveAnh(list) {
@@ -158,6 +188,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
     if (r[2] === 'm2') return v ? v + ' m²' : ''
     if (r[2] === 'pct') return p.tienDo != null && p.tienDo !== '' ? (Number(p.tienDo) || 0) + '%' : ''
     if (r[2] === 'tt') return v || 'Bản nháp'
+    if (r[2] === 'nt') return nenTangOf(p)
     return v
   }
   /* Ô sửa của 1 hàng (sửa tại chỗ) */
@@ -166,6 +197,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
     if (!k) return <input value={kv_({ diaChi: f.diaChi })} readOnly tabIndex={-1} placeholder="Tự lấy từ Địa điểm" />
     if (r[2] === 'ma') return <input value={s_(p[k])} readOnly tabIndex={-1} title="Mã tự tạo khi nhập dự án, không sửa được" />
     if (r[2] === 'tt') return <select value={f.trangThai} onChange={setFld('trangThai')}>{TRANG_THAI.map(o => <option key={o}>{o}</option>)}</select>
+    if (r[2] === 'nt') return <select value={f.nenTang} onChange={setFld('nenTang')}><option value="">Tự theo link Dezon ({nenTangOf({ linkDezon: f.linkDezon })})</option>{NEN_TANG.map(o => <option key={o}>{o}</option>)}</select>
     if (r[2] === 'pct') return <span className="rg"><input type="range" min="0" max="100" value={f.tienDo} onChange={setFld('tienDo')} /><b>{f.tienDo}%</b></span>
     if (r[2] === 'vat') return <span className="un"><input type="number" min="0" max="100" value={f.vat} onChange={setFld('vat')} /><i>%</i></span>
     if (r[2] === 'm2') return <span className="un"><input inputMode="decimal" value={f[k]} onChange={setFld(k)} /><i>m²</i></span>
@@ -318,7 +350,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                 <label key={r[1]}><h3>{r[0]}</h3><textarea value={f[r[1]]} onChange={setFld(r[1])} placeholder={r[2]} /></label>
               ))}
             </div>
-          ) : intro.length ? intro.map(x => <div key={x[0]} className="qs-pd-intro"><h3>{x[0]}</h3><p>{x[1]}</p></div>)
+          ) : intro.length ? intro.map(x => <IntroBlock key={x[0]} title={x[0]} text={x[1]} />)
             : <div className="qs-pd-empty">Chưa có phần giới thiệu (Nhu cầu / Hiện trạng / Ghi chú) — bấm {yc.canApprove ? 'Sửa thông tin' : 'Yêu cầu sửa'} để nhập.</div>}
         </div>
       )}
@@ -407,7 +439,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
             <div className="qs-pd-ncc">
               {ncc.map(o => (
                 <div key={o.ten} className={`qs-pd-nccc${nccOpen === o.ten ? ' on' : ''}`} role="button" tabIndex={0} aria-expanded={nccOpen === o.ten}
-                  title={nccOpen === o.ten ? 'Bấm để thu gọn' : 'Bấm để xem sản phẩm ' + o.ten}
+                  title={nccOpen === o.ten ? 'Bấm để xem tất cả nhà cung cấp' : 'Bấm để chỉ xem sản phẩm ' + o.ten}
                   onClick={() => setNccOpen(v => (v === o.ten ? '' : o.ten))} onKeyDown={e => { if (e.key === 'Enter') setNccOpen(v => (v === o.ten ? '' : o.ten)) }}>
                   <b>{o.ten}</b>
                   <span>{o.n} sản phẩm · SL {o.sl}</span>
@@ -417,13 +449,14 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
               ))}
             </div>
           ) : null}
-          {ncc.length && nccOpen ? (
-            <div className="qs-pd-nccsp">
-              <div className="h"><b>Sản phẩm {nccOpen}</b><span>{ls.filter(l => (s_(l.thuongHieu) || 'Chưa rõ thương hiệu') === nccOpen).length} dòng</span>
-                <button type="button" className="qs-pd-foldb" title="Đóng" onClick={() => setNccOpen('')}><Icon name="x" size={14} /></button></div>
+          {/* Sản phẩm theo nhà cung cấp: mặc định hiện tất cả, gom theo từng nhà; bấm thẻ = chỉ xem nhà đó */}
+          {ncc.length ? ncc.filter(o => !nccOpen || o.ten === nccOpen).map(o => (
+            <div key={o.ten} className="qs-pd-nccsp">
+              <div className="h"><b>Sản phẩm {o.ten}</b><span>{o.n} dòng · {money(o.tong)} đ</span>
+                {nccOpen && <button type="button" className="qs-pd-foldb" title="Xem tất cả nhà cung cấp" onClick={() => setNccOpen('')}><Icon name="x" size={14} /></button>}</div>
               <div className="qs-pd-sp">
                 <div className="qs-pd-sprow head"><span>Ảnh</span><span>Sản phẩm</span><span>Thương hiệu</span><span>Tầng</span><span className="r">SL</span><span className="r">Đơn giá</span><span className="r">Thành tiền</span></div>
-                {ls.filter(l => (s_(l.thuongHieu) || 'Chưa rõ thương hiệu') === nccOpen).map(l => (
+                {ls.filter(l => (s_(l.thuongHieu) || 'Chưa rõ thương hiệu') === o.ten).map(l => (
                   <div key={l.lineId} className="qs-pd-sprow">
                     <ProductThumb product={l} size={44} src={img1(l.hinhAnh)} onClick={l.hinhAnh ? () => setView(img1(l.hinhAnh)) : undefined} />
                     <span className="nm" title={l.ten}>{l.ten}</span>
@@ -436,18 +469,34 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                 ))}
               </div>
             </div>
-          ) : (!ncc.length ? <div className="qs-pd-empty">{lines == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div> : null)}
+          )) : <div className="qs-pd-empty">{lines == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div>}
         </div>
       )}
       {tab === 'rel' && (
         <div className="qs-pd-sec">
           {related.length ? (
-            <div className="qs-pd-rel">
-              {related.map(x => (
-                <button type="button" key={x.maDA} className="qs-pd-relc" onClick={() => onOpen(x)}>
-                  <b>{x.ten}</b><span>{[x.khachHang, kv_(x)].filter(v => s_(v)).join(' · ') || '—'}</span>
-                </button>
-              ))}
+            /* Thẻ như tab Dự án đang dùng của Nhà cung cấp: ảnh bìa, trạng thái, số sản phẩm, số ảnh, địa điểm · phân khúc · năm */
+            <div className="qs-sup-pj">
+              {related.map(x => {
+                const st = statCache[x.maDA] || {}
+                const tt = x.trangThai || 'Bản nháp'
+                const sub = [x.diaChi, x.phanKhuc, x.namHoanThien].filter(v => s_(v)).join(' · ')
+                return (
+                  <button type="button" key={x.maDA} className="qs-sup-pjc" title={'Xem chi tiết dự án ' + x.ten} onClick={() => onOpen(x)}>
+                    <span className="cv" style={{ '--h': relHue_(x.ten) }}>
+                      {st.cover ? <img src={mediaUrl(st.cover)} alt="" loading="lazy" /> : <b className="ini">{s_(x.ten).split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'}</b>}
+                      <span className={'st' + (tt === 'Hoàn thành' ? ' ok' : '')}>{tt}</span>
+                      {st.n > 0 && <span className="n">{st.n} sản phẩm</span>}
+                      {st.nAnh > 1 && <span className="na"><Icon name="grid" size={12} /> {st.nAnh}</span>}
+                    </span>
+                    <span className="tx">
+                      <b>{x.ten}</b>
+                      <span className={sub ? '' : 'nil'}>{sub || 'Chưa có địa điểm'}</span>
+                      {s_(x.khachHang) && <small>Khách hàng: {x.khachHang}</small>}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           ) : <div className="qs-pd-empty">Không có dự án cùng khách hàng / khu vực.</div>}
         </div>

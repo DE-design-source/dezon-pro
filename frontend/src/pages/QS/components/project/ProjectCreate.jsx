@@ -4,6 +4,7 @@ import { useQs } from '../../state/QsData'
 import { qsToast as toast } from '../common/dialogs'
 import { showTab } from '../../state/store'
 import { importProjectForm, attachBoqFiles } from './projectActions'
+import { NEN_TANG, nenTangOf } from '../../lib/dashModel.js'
 import './gallery.css'
 
 /* Trang "Nhập dự án" (mở từ nút Nhập dự án của Danh sách dự án): cùng khung với trang chi tiết (ProjectDetail),
@@ -21,7 +22,7 @@ import './gallery.css'
    noDash ẩn thẻ "Tạo BOQ từ Dezon Pro". */
 const TRANG_THAI = ['Bản nháp', 'Đang thực hiện', 'Hoàn thành']
 const EMPTY = {
-  kienTrucSu: '', ten: '', khachHang: '', diaChi: '', sdt: '', phanKhuc: '', quyMo: '', tongDT: '', dtBaoGia: '',
+  kienTrucSu: '', ten: '', khachHang: '', diaChi: '', sdt: '', phanKhuc: '', nenTang: '', quyMo: '', tongDT: '', dtBaoGia: '',
   trangThai: TRANG_THAI[0], tienDo: 0, maBaoGia: '', vat: '0', linkDezon: '', nhuCau: '', hienTrang: '', ghiChu: '',
 }
 const BOQ_ACCEPT = '.xlsx,.xls,.csv,.pdf'
@@ -153,6 +154,13 @@ export default function ProjectCreate({ onBack, onCreated, onOpen, openOnSave, b
             </select>
           </label>
           {fld('VAT (%)', 'vat', { type: 'number', min: 0, max: 100 })}
+          <label className="qs-field">
+            <span>Nền tảng</span>
+            <select value={f.nenTang} onChange={set('nenTang')}>
+              <option value="">Tự theo link Dezon ({nenTangOf({ linkDezon: f.linkDezon })})</option>
+              {NEN_TANG.map(o => <option key={o}>{o}</option>)}
+            </select>
+          </label>
           <label className="qs-field qs-pn-wide">
             <span>Link dự án trên Dezon</span>
             <input type="url" value={f.linkDezon} onChange={set('linkDezon')} placeholder="https://dezon.vn/…" />

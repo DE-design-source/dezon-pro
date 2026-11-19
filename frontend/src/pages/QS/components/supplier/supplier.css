@@ -57,6 +57,9 @@
 .qs-sup-name .mini{width:22px; height:22px; object-fit:contain; vertical-align:middle; margin-right:8px;}
 .qs-sup-dlogo{width:64px; height:64px; flex:none; border:1px solid var(--border); border-radius:12px; background:#fff; display:grid; place-items:center; overflow:hidden;}
 .qs-sup-dlogo img{max-width:85%; max-height:85%; object-fit:contain;}
+/* Trang chi tiết: ô logo cùng tỉ lệ 16:10 với thẻ, logo phủ kín ô (cover) */
+.qs-sup-dlogo:has(img){width:102px;}
+.qs-sup-dlogo img{width:100%; height:100%; max-width:none; max-height:none; object-fit:cover;}
 .qs-sup-dlogo span{font-size:22px; font-weight:800; color:var(--text-muted);}
 /* Tách 2 module riêng trong thẻ: khung Hình ảnh / Logo (trên) và khung Thông tin (dưới), cách nhau 10px, mỗi khung có viền + bo góc riêng.
    Ảnh luôn nằm gọn trong ô của nó (hàng lưới minmax(0,1fr) + ô cắt phần thừa) */
@@ -90,9 +93,9 @@
 .qs-sup-grid.list .qs-sup-m2{flex:none; width:300px;}
 .qs-sup-grid.list .qs-sup-body{flex:1; flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:5px;}
 .qs-sup-grid.list .qs-sup-name{flex:none;}
-/* Logo luôn hiện đủ: đặt trong 1 ô vuông giữa khung (cao 84% khung, tối đa 84% bề ngang), logo co vừa ô (contain), tự co theo kích thước thẻ */
+/* Logo phủ kín khung (cover): ảnh giãn đầy khung, phần thừa so với tỉ lệ khung 16:10 bị cắt đều 2 bên */
 .qs-sup-m1{padding:0;}
-.qs-sup-m1 img{position:absolute; top:8%; left:50%; transform:translateX(-50%); height:84%; width:auto; max-width:84%; aspect-ratio:1 / 1; object-fit:contain;}
+.qs-sup-m1 img{position:absolute; inset:0; width:100%; height:100%; max-width:none; max-height:none; object-fit:cover;}
 /* Ảnh sản phẩm tiêu biểu luôn nằm trọn trong ô vuông: ảnh đặt tuyệt đối cách mép 10%, co vừa (contain), tự co theo cỡ ô */
 .qs-sup-m2 span{position:relative; padding:0;}
 .qs-sup-m2 span img{position:absolute; inset:10%; width:80%; height:80%; max-width:none; max-height:none; object-fit:contain;}
@@ -306,3 +309,40 @@
 @media (hover:none){ .qs-sui-cc .ck{opacity:1;} }
 @media (max-width:1000px){ .qs-sui-intro{grid-template-columns:1fr;} .qs-sui-prow{grid-template-columns:22px minmax(0, 1fr) 140px 30px;} .qs-sui-prow > input:nth-of-type(2){grid-column:2 / 4;} .qs-sui-catadd{grid-template-columns:1fr;} }
 @media (max-width:640px){ .qs-sui-prow.head{display:none;} .qs-sui-pft{flex-wrap:wrap;} .qs-sui-pft span{flex:1 1 100%; order:3;} }
+
+/* Tab "Dự án đang dùng": thẻ có ảnh bìa dự án (ảnh đầu của Ảnh công trình; chưa có -> nền màu + chữ viết tắt),
+   trạng thái, số sản phẩm của hãng, số ảnh; dưới là tên, địa điểm · phân khúc · năm, khách hàng */
+.qs-sup-pj{display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px;}
+.qs-sup-pjc{display:flex; flex-direction:column; gap:10px; padding:0; border:0; background:none; text-align:left; cursor:pointer; color:var(--text); font:inherit; min-width:0;}
+.qs-sup-pjc .cv{position:relative; display:grid; place-items:center; aspect-ratio:16 / 10; border-radius:12px; overflow:hidden;
+  background:linear-gradient(135deg, hsl(var(--h) 38% 30%), hsl(calc(var(--h) + 30) 42% 52%)); transition:transform .18s, box-shadow .18s;}
+.qs-sup-pjc:hover .cv{transform:translateY(-2px); box-shadow:0 14px 30px rgba(15,23,42,.18);}
+.qs-sup-pjc .cv img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
+.qs-sup-pjc .cv .ini{font-size:44px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,.88);}
+.qs-sup-pjc .cv .st, .qs-sup-pjc .cv .n, .qs-sup-pjc .cv .na{position:absolute; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; line-height:1.4;}
+.qs-sup-pjc .cv .st{left:10px; bottom:10px; background:rgba(0,0,0,.5); color:#fff;}
+.qs-sup-pjc .cv .st.ok{background:#16A34A;}
+.qs-sup-pjc .cv .n{left:10px; top:10px; background:#fff; color:#0B2545; font-weight:700;}
+.qs-sup-pjc .cv .na{right:10px; bottom:10px; display:inline-flex; align-items:center; gap:4px; background:rgba(0,0,0,.5); color:#fff;}
+.qs-sup-pjc .tx{display:flex; flex-direction:column; gap:3px; padding:0 2px; min-width:0;}
+.qs-sup-pjc .tx b{font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qs-sup-pjc:hover .tx b{color:var(--dash-accent, var(--primary));}
+.qs-sup-pjc .tx span{font-size:13px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qs-sup-pjc .tx span.nil{font-style:italic; opacity:.7;}
+.qs-sup-pjc .tx small{font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+/* Tab "Nhà phân phối": cùng kiểu thẻ với "Dự án đang dùng". Ảnh trên = logo nhà phân phối (phủ kín, cùng kho logo nccLogo),
+   chưa có logo -> ghép 3 ảnh sản phẩm của nhà phân phối; rê chuột hiện nút Thêm / Đổi logo (kéo thả, dán Ctrl+V cũng được) */
+.qs-sup-dc{outline:none;}
+.qs-sup-dc:focus-visible .cv{box-shadow:0 0 0 3px var(--dash-accent-border, var(--primary));}
+.qs-sup-dc .cv.col{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1px; background:var(--border); place-items:stretch;}
+.qs-sup-dc .cv.col i{position:relative; background:#fff; min-width:0;}
+.qs-sup-dc .cv.col i img{position:absolute; inset:12%; width:76%; height:76%; object-fit:contain;}
+.qs-sup-dc:hover .qs-sup-logobtn{opacity:1;}
+.qs-sup-dc .tx .hm{display:flex; flex-wrap:wrap; gap:4px; white-space:normal;}
+.qs-sup-dc .tx .hm em{font-style:normal; font-size:11.5px; font-weight:600; padding:1px 8px; border-radius:10px; background:var(--dash-soft, var(--surface-alt)); color:var(--dash-accent, var(--primary));}
+.qs-sup-dc .tx small.nil{font-style:italic; opacity:.7;}
+/* Chip lọc nhà phân phối ở tab Sản phẩm */
+.qs-sup-distf{display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 10px 0 12px; margin-left:auto; margin-right:10px; border:1px solid var(--dash-accent-border, var(--border)); border-radius:15px; background:var(--dash-soft, var(--surface)); color:var(--text); font:inherit; font-size:12.5px; cursor:pointer;}
+.qs-sup-distf small{font-size:11px; font-weight:700; color:var(--text-muted);}
+.qs-sup-distf:hover{border-color:var(--danger, #DC2626); color:var(--danger, #DC2626);}

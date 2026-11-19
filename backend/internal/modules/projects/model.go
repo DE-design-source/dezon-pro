@@ -6,7 +6,7 @@ import "regexp"
 // hienTrang (cột projects.current_condition, migration 0011, M8.3) là khoá CHỈ BẢN GO, nối cuối: tạo / sửa chỉ ghi khi
 // client gửi khoá này, kết quả dự án có thêm hienTrang (backend/docs/ARCHITECTURE.md 10.4).
 // kienTrucSu (cột projects.architect, migration 0036) và studio (cột projects.studio, migration 0038) cùng cách:
-// khoá chỉ bản Go, nối sau hienTrang; nhomThietKe / nhiepAnhGia / nhaThauThiCong / namHoanThien (migration 0039) nối tiếp.
+// khoá chỉ bản Go, nối sau hienTrang; nhomThietKe / nhiepAnhGia / nhaThauThiCong / namHoanThien (migration 0039) nối tiếp, rồi nenTang (migration 0050).
 var projMap = [][2]string{
 	{"ten", "ten_du_an"}, {"khachHang", "khach_hang"}, {"diaChi", "dia_chi"}, {"sdt", "sdt"}, {"trangThai", "trang_thai"},
 	{"vat", "vat_pct"}, {"tienDo", "tien_do_pct"}, {"ghiChu", "ghi_chu"}, {"quyMo", "quy_mo"}, {"tongDT", "tong_dt"},
@@ -14,6 +14,7 @@ var projMap = [][2]string{
 	{"nhomTuTao", "nhom_tu_tao"}, {"tangTuTao", "tang_tu_tao"}, {"tenBanNhap", "ten_ban_nhap"}, {"linkDezon", "link_dezon"},
 	{"hienTrang", "hien_trang"}, {"kienTrucSu", "kien_truc_su"}, {"studio", "studio"},
 	{"nhomThietKe", "nhom_thiet_ke"}, {"nhiepAnhGia", "nhiep_anh_gia"}, {"nhaThauThiCong", "nha_thau_thi_cong"}, {"namHoanThien", "nam_hoan_thien"},
+	{"nenTang", "nen_tang"},
 }
 
 // projCol: tra nhanh khoá client -> cột.

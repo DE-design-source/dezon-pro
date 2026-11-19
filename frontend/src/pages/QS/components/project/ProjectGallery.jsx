@@ -4,17 +4,17 @@ import { useQs } from '../../state/QsData'
 import { showTab } from '../../state/store'
 import { safeUrl_, money, qbNorm_ } from '../../lib/format.js'
 import { mediaUrl } from '../../api/files'
-import { dezonUrl_ } from '../../lib/dashModel.js'
+import { dezonUrl_, nenTangOf } from '../../lib/dashModel.js'
 import ProjectDetail from './ProjectDetail'
-import { statCache, loadStats_ } from './projectStats'
+import { statCache, loadStats_, onStatsReset } from './projectStats'
 import ProjectCreate from './ProjectCreate'
 import './gallery.css'
 
 /* Trang "Danh sách dự án" (tham khảo dezon.vn/du-an): ô tìm lớn, hàng lọc (Nền tảng · Trạng thái · Khu vực · Phân khúc),
    lưới thẻ dự án 3 cột. Bấm thẻ = trang chi tiết dự án (ProjectDetail). Dự án chưa có ảnh bìa nên thẻ dùng nền màu theo tên + chữ cái đầu.
-   Khu vực = đoạn cuối của địa chỉ; Nền tảng: Dezon.vn = đã gắn link bài dezon.vn, Dezon Pro = chưa gắn. */
+   Khu vực = đoạn cuối của địa chỉ; Nền tảng: nenTangOf (giá trị đã chọn, chưa chọn thì theo link dezon.vn). */
 const kv_ = x => { const a = String(x.diaChi || '').split(',').map(t => t.trim()).filter(Boolean); return a.length ? a[a.length - 1] : '' }
-const nenTang_ = x => (String(x.linkDezon || '').trim() ? 'Dezon.vn' : 'Dezon Pro')
+const nenTang_ = nenTangOf
 const GROUPS = [
   ['nenTang', 'Nền tảng', nenTang_],
   ['trangThai', 'Trạng thái', x => String(x.trangThai || '').trim() || 'Bản nháp'],
@@ -32,7 +32,7 @@ const hue_ = s => { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.
 const initials_ = s => String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
 export default function ProjectGallery() {
-  const { projects, cur, selectProject } = useQs()
+  const { projects, cur, selectProject, visibleSeq, consumeIntent } = useQs()
   const [q, setQ] = useState('')
   const [flt, setFlt] = useState({})
   const [open, setOpen] = useState('')       // nhóm lọc đang mở danh sách
@@ -45,7 +45,13 @@ export default function ProjectGallery() {
   const setCols = n => setColsSt(c => { const x = { ...c, [pgv]: n }; try { localStorage.setItem('qs_pg_cols', JSON.stringify(x)) } catch (e) { /* bỏ qua */ } return x })
   const nCol = cols[pgv] || COLS_DEF[pgv] || 4
   const [statVer, setStatVer] = useState(0)
-  useEffect(() => { let alive = true; loadStats_(projects || [], () => { if (alive) setStatVer(v => v + 1) }); return () => { alive = false } }, [projects])
+  useEffect(() => {
+    let alive = true
+    const run = () => loadStats_(projects || [], () => { if (alive) setStatVer(v => v + 1) })
+    run()
+    const off = onStatsReset(() => { if (alive) { setStatVer(v => v + 1); run() } })
+    return () => { alive = false; off() }
+  }, [projects])
   const statDone = (projects || []).every(x => statCache[x.maDA])
   const nCoBG = (projects || []).filter(x => statCache[x.maDA] && statCache[x.maDA].n > 0).length
   const qq = q.trim().toLowerCase()
@@ -72,6 +78,12 @@ export default function ProjectGallery() {
   const [detail, setDetail] = useState('')
   const dp = detail ? (projects || []).find(x => x.maDA === detail) : null
   const showDetail = ma => { setDetail(ma); const sc = document.querySelector('.qs-scroll'); if (sc) sc.scrollTop = 0 }
+  // Trang khác (Nhà cung cấp > Dự án đang dùng) mở thẳng chi tiết 1 dự án: showTab('dsduan', { detail: maDA })
+  const dsVis = visibleSeq('dsduan')
+  useEffect(() => {
+    const it = consumeIntent('dsduan')
+    if (it && it.detail) showDetail(String(it.detail))
+  }, [dsVis]) // eslint-disable-line react-hooks/exhaustive-deps
   async function openProject(x) {
     if (!cur || cur.maDA !== x.maDA) { const ok = await selectProject(x.maDA); if (ok === false) return }
     showTab('boc')

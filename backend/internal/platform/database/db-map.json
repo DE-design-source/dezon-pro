@@ -379,7 +379,8 @@
    "nhom_thiet_ke": "design_team",
    "nhiep_anh_gia": "photographer",
    "nha_thau_thi_cong": "contractor",
-   "nam_hoan_thien": "completion_year"
+   "nam_hoan_thien": "completion_year",
+   "nen_tang": "platform"
   }
  },
  "du_an_data": {

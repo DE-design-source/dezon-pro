@@ -169,7 +169,7 @@ const formFields_ = f => {
     ten: t('ten'), kienTrucSu: t('kienTrucSu'), studio: t('studio'),
     nhomThietKe: t('nhomThietKe'), nhiepAnhGia: t('nhiepAnhGia'), nhaThauThiCong: t('nhaThauThiCong'), namHoanThien: t('namHoanThien'),
     khachHang: t('khachHang'), sdt: t('sdt'), diaChi: t('diaChi'), linkDezon: link ? dezonUrl_(link) : '',
-    phanKhuc: t('phanKhuc'), quyMo: t('quyMo'), tongDT: t('tongDT'), dtBaoGia: t('dtBaoGia'), maBaoGia: t('maBaoGia'),
+    phanKhuc: t('phanKhuc'), nenTang: t('nenTang'), quyMo: t('quyMo'), tongDT: t('tongDT'), dtBaoGia: t('dtBaoGia'), maBaoGia: t('maBaoGia'),
     trangThai: t('trangThai'), tienDo: Number(f.tienDo) || 0, vat: Number(f.vat) || 0,
     nhuCau: t('nhuCau'), hienTrang: t('hienTrang'), ghiChu: t('ghiChu'),
   }
