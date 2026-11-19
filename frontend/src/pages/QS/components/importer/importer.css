@@ -176,14 +176,6 @@ html[data-theme="dark"] .qsi-field input.qsi-calc{color:var(--dash-bar-2);}
 .qsi-cb-empty{font-size:11.5px; color:var(--text-muted); padding:9px 2px;}
 
 /* ---------- Biến thể (.var-*) ---------- */
-.qsi-var-note{margin-top:10px; font-size:12px; color:var(--text-muted); line-height:1.6;}
-.qsi-var-note.qsi-on{color:var(--text);}
-.qsi-var-note i{color:var(--text-muted); font-style:normal; font-size:11.5px;}
-.qsi-var-math{font-size:13px; color:var(--text); margin-bottom:8px;}
-.qsi-var-math b{color:var(--text-muted); font-weight:500; margin:0 2px;}
-.qsi-var-total{background:var(--dash-accent-tint); color:var(--dash-accent); font-weight:600; border-radius:99px; padding:3px 11px; margin-left:4px;}
-.qsi-var-list{display:flex; flex-wrap:wrap; gap:4px; align-items:center;}
-.qsi-var-chip{display:inline-block; background:var(--dash-accent-tint); color:var(--text); border-radius:99px; padding:2px 9px; font-size:11px; font-weight:500; margin:2px 3px 0 0;}
 
 /* ---------- Ghi danh + nút lưu ---------- */
 .qsi-ghck{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--text); cursor:pointer; font-weight:600;}
@@ -288,14 +280,6 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-pc-btn.qsi-del:hover{border-color:#f0a3a3; color:#c33; background:#fff5f5;}
 
 /* Ảnh theo biến thể (khối Nhập biến thể) */
-.qsi-varimg{margin-top:12px; border-top:1px dashed var(--border); padding-top:10px;}
-.qsi-varimg-h{font-size:12px; color:var(--text-muted, #64748b); margin-bottom:8px;}
-.qsi-varimg-h b{color:var(--text);}
-.qsi-varimg-box{position:relative; width:72px; height:72px; min-height:0; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; cursor:pointer;}
-.qsi-varimg-box img{width:100%; height:100%; object-fit:cover;}
-.qsi-varimg-box .qsi-upx{opacity:1;}
-.qsi-varimg-link{font-size:10.5px; color:var(--dash-accent, #2563eb); background:none; border:0; padding:0; cursor:pointer;}
-.qsi-varimg-more{font-size:11px; align-self:center;}
 
 /* Ghi danh nhiều dự án */
 .qsi-ghi-da{grid-column:span 2;}
@@ -305,14 +289,6 @@ html[data-theme="dark"] .qsi-pc.qsi-editing{border-color:var(--dash-accent); bac
 .qsi-ghi-none{font-size:12px; color:var(--text-muted, #64748b);}
 
 /* Bảng biến thể: Ảnh · Biến thể · Mã · Giá */
-.qsi-vartbl{display:flex; flex-direction:column; gap:6px;}
-.qsi-vartbl-r{display:grid; grid-template-columns:64px minmax(140px,1.4fr) 1fr 1fr; gap:10px; align-items:center;}
-.qsi-vartbl-h{font-size:11px; font-weight:600; color:var(--text-muted, #64748b); text-transform:uppercase; letter-spacing:.03em;}
-.qsi-vartbl-r input{height:34px; border:1px solid var(--border); border-radius:8px; padding:0 10px; font:inherit; font-size:13px; min-width:0; background:var(--surface); color:var(--text);}
-.qsi-vartbl-r input.num{text-align:right;}
-.qsi-vartbl-lb{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.qsi-varimg-cell{display:flex; flex-direction:column; align-items:center; gap:2px;}
-.qsi-vartbl .qsi-varimg-box{width:48px; height:48px;}
 
 /* Panel Sản phẩm vừa nhập: tab Phiên này / Lịch sử nhập */
 .qsi-recent-tabs{display:flex; gap:4px; padding:6px 12px; border-bottom:1px solid var(--border);}

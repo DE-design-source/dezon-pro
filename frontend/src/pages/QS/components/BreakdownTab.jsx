@@ -41,6 +41,8 @@ import ResizeDialog from './breakdown/sheet/ResizeDialog'
 import { measureColW } from './breakdown/SheetGrid'
 import ColFilterPop from './breakdown/sheet/ColFilterPop'
 import LinePicker from './breakdown/sheet/LinePicker'
+import GachPop from './breakdown/sheet/GachPop'
+import { laGach_ } from '../lib/gach.js'
 import BulkBar from './breakdown/sheet/BulkBar'
 import { LineUpdatePop, PriceSyncModal, LnPickPop, RecentPop, HistoryDock } from './breakdown/sheet/SyncPops'
 import './breakdown/sheet/sheet.css'
@@ -390,6 +392,17 @@ export default function BreakdownTab() {
         </span>
       )
     }
+    /* Dòng gạch: nút quy đổi m² / hao hụt / hộp ở ô Số lượng (GachPop) */
+    if (c.key === 'soLuong' && laGach_(l)) {
+      const g = l.extra && l.extra.gach
+      return (
+        <span className="qs-tk-slcell">
+          <span>{info.live != null ? info.live : lineText(l, 'soLuong')}</span>
+          <button className={`qs-tk-gachbtn${g ? ' on' : ''}`} title={g ? g.dt + ' m² + ' + g.hh + '% hao hụt → ' + g.hop + ' hộp · ' + g.mua + ' m² · ' + g.vien + ' viên (bấm để sửa)' : 'Quy đổi gạch: m² + hao hụt → số hộp / viên'}
+            onMouseDown={ev => ev.stopPropagation()} onClick={ev => setPop({ kind: 'gach', anchor: ev.currentTarget, line: l })}>{g && g.hop ? g.hop + ' hộp' : 'm²⇄hộp'}</button>
+        </span>
+      )
+    }
     if (c.key === 'lnPct' && plain) {   // nút ▾ chỉ ở Bảng thường như bản gốc
       return (
         <span className="qs-tk-lncell">
@@ -494,6 +507,7 @@ export default function BreakdownTab() {
       mutate.updateLine(l.lineId, d); toast('Đã xoá nội dung ô')
     },
     pick: (l, at) => setPop({ kind: 'pick', anchor: at, line: l }),
+    gach: (l, at) => setPop({ kind: 'gach', anchor: at, line: l }),
     selectRow: l => selClick(null, l.lineId),
     selectAll: () => { if (cur) tickSet_(cur.maDA, shownIds); if (!plain && sheetApi.current) sheetApi.current.selectRows(shownIds) },
     dupRow: l => act.dupRows([l.lineId]),
@@ -912,6 +926,7 @@ export default function BreakdownTab() {
         <ColFilterPop anchor={pop.anchor} colKey={pop.key} label={(columns.filter(c => c.key === pop.key)[0] || {}).label || pop.key}
           lines={nodeLines} value={colFilter[pop.key]} sortKey={sort.key} freezeN={freezeN} act={A} onClose={() => setPop(null)} />
       )}
+      {visible && pop && pop.kind === 'gach' && <GachPop anchor={pop.anchor} line={lineOf(pop.line.lineId) || pop.line} products={products} onApply={fl => { mutate.updateLine(pop.line.lineId, fl); toast('Đã quy đổi: ' + fl.soLuong + ' ' + fl.dvt) }} onClose={() => setPop(null)} />}
       {visible && pop && pop.kind === 'pick' && pop.line && <LinePicker anchor={pop.anchor} line={pop.line} products={products} onClose={() => setPop(null)} />}
       {visible && pop && pop.kind === 'lnupd' && <LineUpdatePop anchor={pop.anchor} line={lineOf(pop.line.lineId) || pop.line} products={products} onClose={() => setPop(null)} />}
       {visible && pop && pop.kind === 'lnpick' && <LnPickPop anchor={pop.anchor} line={pop.line} onPick={v => mutate.updateLine(pop.line.lineId, { lnPct: v })} onClose={() => setPop(null)} />}

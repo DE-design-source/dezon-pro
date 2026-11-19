@@ -4,12 +4,11 @@
 import { useSyncExternalStore } from 'react'
 import { getState as qsGet, subscribe as qsSub } from '../../state/store'
 
-const VARS0 = { varKelvin: '', varWatt: '', varAngle: '', varColor: '', varSize: '' }
 let formSeq = 0
 let pendSeq = 0
 export function emptyForm_() {
   // ghi.ds = danh sách mã dự án ghi danh; null = theo dự án đang mở (bản gốc chọn sẵn S.cur lúc vẽ form)
-  return { seq: ++formSeq, vals: {}, imgMain: '', imgList: [], combo: [], vars: { ...VARS0 }, varImg: {}, varMeta: {}, ghi: { on: false, ds: null, qty: '1' } }
+  return { seq: ++formSeq, vals: {}, imgMain: '', imgList: [], combo: [], varRows: [], ghi: { on: false, ds: null, qty: '1' } }
 }
 function initial(key) {
   return {
@@ -35,9 +34,8 @@ const LS_ = key => 'qs_imp_' + key
 const noData_ = v => (typeof v === 'string' && v.indexOf('data:') === 0 ? '' : v)
 function snap_(s) {
   const f = s.form || {}
-  const vi = {}; Object.keys(f.varImg || {}).forEach(k => { vi[k] = noData_(f.varImg[k]) })
   return { v: 1, loai: s.loai, pending: s.pending, sessionAdded: s.sessionAdded,
-    form: { ...f, imgMain: noData_(f.imgMain), imgList: (f.imgList || []).filter(x => noData_(x)), varImg: vi } }
+    form: { ...f, imgMain: noData_(f.imgMain), imgList: (f.imgList || []).filter(x => noData_(x)), varRows: (f.varRows || []).map(r => ({ ...r, anh: noData_(r.anh) })) } }
 }
 function restore_(key) {
   if (!key) return null

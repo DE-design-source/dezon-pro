@@ -32,6 +32,7 @@ export default function ContextMenu({ mode = 'plain', at, entry, col, text, ids,
     ] },
     item && { id: 'row', ic: 'list', t: 'Dòng', items: [
       it('search', 'Đổi sản phẩm từ danh mục…', () => act.pick(item, at)),
+      act.gach && it('layers', 'Quy đổi gạch (m², hao hụt, hộp)…', () => act.gach(item, at)),
       it('copy', 'Sao chép cả dòng', () => act.copyRow(item)),
       it('copy', 'Nhân bản dòng', () => act.dupRow(item)),
       it('plus', 'Chèn dòng trống bên dưới', () => act.insertRow(item)),

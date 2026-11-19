@@ -215,7 +215,7 @@ function Cell({ c, p, r, on, skuCount, ts }) {
   const m = r.m
   switch (c.kind) {
     case 'stt': return <span className={`qspl-stt${m.k ? ' sub' : ''}`}>{m.no}</span>
-    case 'thumb': return <ProductThumb product={p} size={ts || 40} src={img1(p.hinhAnh)} className="qspl-th" />
+    case 'thumb': return <ProductThumb product={p} size={ts || 40} src={img1(p.hinhAnh)} className="qspl-th" title="Bấm để xem ảnh lớn" onClick={p.hinhAnh && on.img ? e => { e.stopPropagation(); on.img(p) } : undefined} />
     case 'ten': return <NameCell p={p} r={r} on={on} />
     case 'duyet': return (
       <span className={`qspl-duyet${p.daDuyet ? ' on' : ''}`}
@@ -253,8 +253,10 @@ function EditCell({ c, p, r, on, skuCount, ts }) {
       </span>
     )
   }
-  if (c.kind === 'thumb') return <SpImgCell p={p} ts={ts} />
+  if (c.kind === 'thumb') return <SpImgCell p={p} ts={ts} onView={on.img} />
   if (!c.e) return <Cell c={c} p={p} r={r} on={on} skuCount={skuCount} ts={ts} />
+  // series trống: hiện mờ giá trị đang lấy theo Dòng sản phẩm; gõ vào ô mới lưu series riêng
+  if (c.e.col === 'nhom_sp') return <SpInp p={p} e={c.e} val={String((p.raw || {}).nhom_sp || '')} placeholder={spColVal_(p, 'dong_sp')} />
   return <SpInp p={p} e={c.e} val={spEditRaw_(p, c.e.col)} />
 }
 

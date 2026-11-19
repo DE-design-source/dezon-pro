@@ -9,7 +9,8 @@ import { useQsStore, isAdminRole_, setState as setStore, getState } from '../../
 import { isAbort } from '../../../api/http'
 import * as api from '../../../api/qsApi'
 import { mediaUrl } from '../../../api/files'
-import { money } from '../../../lib/format.js'
+import ImgViewer from '../../common/ImgViewer'
+import { money, qbNorm_ } from '../../../lib/format.js'
 import { nodeName } from '../../../lib/tree.js'
 import { csMyCols_, csMyOn_, csMyApply_, csMyKey_, csQuickLabel_, csPresetCols_, csWant_, csPresetList_, csPresetKeys_ } from '../../../lib/columns.js'
 import { ctSyncTemplate_, ptTemplateNew_ } from '../../../lib/phantho.js'
@@ -28,7 +29,7 @@ import {
   lsJson, lsSet, spKey_, spPanelHidden_, foldCols_, foldColsToggle_, spNganhCur_, spPTMode_, spAllCols_, spSkuMap_, spSkuCount_,
   spColsNg_, spColScope_, spColsLoad_, spCfgLoad_, spCfgSave_, spQuickLoad_, spOrder_, spColOn_, SP_PRICE_COLS, spColList_, spVisCols_, SP_COL_CB, spColset_, spMoveCol_,
   SP_PER, spPageNums_, spNodeCount_, spScopeProducts_, SP_FLT_EMPTY, spFltCount_, spAnyFilter_, spSortNext_,
-  spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_, spTrungSet_, spTrungK_,
+  spDataList_, spVarGroups2_, spNhomBienThe_, spPageRows_, spSelProds_, spBulkFields_, spLabel2Col_, spTrungSet_, spTrungK_, spDistinctVals_,
 } from './spModel'
 import {
   spFav, spFavBulk, spDuyet, spDuyetBulk, undoSubscribe, undoGet, spUndo_, spExportXlsx, spAddManyToProject_, spAddToProject,
@@ -172,6 +173,10 @@ export default function ProductList() {
     colList.forEach(c => { if (c.k !== 'ten' && c.k !== 'stt') m[c.k] = !!on })
     saveCols({ colOn: m })
   }
+  /* Tìm trường trong dải chip cột (gõ không dấu); Hiện / Ẩn các cột khớp một lần */
+  const [colQ, setColQ] = useState('')
+  const colKhop_ = c => { const w = qbNorm_(colQ).trim().split(/\s+/).filter(Boolean); const t = qbNorm_(c.label); return w.every(x => t.indexOf(x) >= 0) }
+  function colSetMany(ks, on) { const m = { ...colOn }; ks.forEach(k => { m[k] = !!on }); saveCols({ colOn: m }) }
   function colCoBan() { const m = {}; SP_COL_CB.forEach(k => { m[k] = 1 }); colSet(m) }
 
   /* Bộ cột "Của tôi" (csMyCols_ / csMySave_ / csMyClear_, app.js:1696-1731) */
@@ -287,6 +292,20 @@ export default function ProductList() {
   const cbData = {}
   Object.keys(U.cbOpen).forEach(k => { const c = combo[k]; if (c && c.list) cbData[k] = c.list; else if (c && c.error) cbData[k] = { err: c.error } })
   const pr = spPageRows_(groups, U.page, U.per, U.btOpen, U.cbOpen, cbData)
+  /* Xem ảnh lớn từ bảng / thẻ: bấm ảnh 1 SP -> lướt ←/→ liên tục qua mọi ảnh của các SP trên trang (chú thích tên · mã) */
+  const [xemAnh, setXemAnh] = useState('')
+  const anhTrang = useMemo(() => {
+    const g = [], cap = [], dau = {}
+    pr.rows.forEach(r => {
+      const p = r.p; if (!p || (r.m && (r.m.k === 'note' || r.m.k === 'sum'))) return
+      const ds = String(p.anhTatCa || p.hinhAnh || '').split('\n').map(x => x.trim()).filter(Boolean)
+      ds.forEach((x, i) => {
+        if (!i) dau[spKey_(p)] = g.length   // ảnh đầu của SP: chỗ mở khi bấm ảnh SP đó
+        g.push(mediaUrl(x)); cap.push((p.ten || '') + (p.ma ? ' · ' + p.ma : '') + (ds.length > 1 ? ' (ảnh ' + (i + 1) + '/' + ds.length + ')' : ''))
+      })
+    })
+    return { g, cap, dau }
+  }, [pr.rows])
   useEffect(() => { if (!PT && pr.cur !== U.page) setU({ page: pr.cur }) }, [PT, pr.cur, U.page])
   useEffect(() => { Object.keys(U.cbOpen).forEach(k => { if (!combo[k]) loadCombo(k) }) }, [U.cbOpen, combo])
 
@@ -504,6 +523,7 @@ export default function ProductList() {
     resize: (k, px, done) => { const nw = { ...w, [k]: px }; if (done) saveCols({ w: nw }); else setU({ w: nw }) },
     selAll, selToggle,
     open: p => setDlg({ kind: 'detail', p }),
+    img: p => setXemAnh(spKey_(p)),
     dragStart, dragEnd,
     fav: p => spFav(p, !p.yeuThich),
     add: p => spAddToProject(p),
@@ -525,7 +545,7 @@ export default function ProductList() {
     ['chua', 'Chưa duyệt', chua ? String(chua) : ''],
     ['da', 'Đã duyệt', (scope.length - chua) ? String(scope.length - chua) : ''],
   ]
-  if (trungN || U.view === 'trung') viewTabs.push(['trung', 'Trùng mã', trungN ? String(trungN) : ''])
+  if (trungN || U.view === 'trung') viewTabs.push(['trung', 'Trùng SP', trungN ? String(trungN) : ''])
   const favN = scope.filter(p => p.yeuThich).length
   const catLabel = node ? (node + '.' + nodeName(node)) : 'Tất cả hạng mục'
   const catCnt = node ? nodeCount(node) : (products || []).length
@@ -584,8 +604,8 @@ export default function ProductList() {
                 <div className="qspl-vtabs qspl-mod">
                   {viewTabs.map(t => (
                     <button type="button" key={t[0]} className={`qspl-vt${U.view === t[0] ? ' on' : ''}${t[0] === 'chua' ? ' warn' : (t[0] === 'fav' ? ' fav' : (t[0] === 'trung' ? ' trung' : ''))}`}
-                      title={t[0] === 'trung' ? 'Sản phẩm trùng mã + nhà cung cấp — giữ 1 bản, xoá bản dư' : undefined}
-                      onClick={() => { setU({ view: t[0], page: 1 }); if (t[0] === 'trung' && trungN) toast(trungN + ' sản phẩm trùng mã + NCC (các bản trùng xếp cạnh nhau) — tick bản dư rồi bấm Xoá') }}>
+                      title={t[0] === 'trung' ? 'Sản phẩm trùng: cùng mã + NCC + tên + mọi thông số kỹ thuật (biến thể khác màu / kích thước… không tính) — giữ 1 bản, xoá bản dư' : undefined}
+                      onClick={() => { setU({ view: t[0], page: 1 }); if (t[0] === 'trung' && trungN) toast(trungN + ' sản phẩm trùng mã + thông số (các bản trùng xếp cạnh nhau) — tick bản dư rồi bấm Xoá') }}>
                       {t[1]}{t[2] && <span className="n">{t[2]}</span>}
                     </button>
                   ))}
@@ -701,7 +721,24 @@ export default function ProductList() {
               {/* dải chip cột (mở / đóng bằng nút Cột hiển thị trên thanh công cụ), cuối dải: Hiện tất cả · Cột cơ bản; nút đóng góc phải */}
               {!folded && (
                 <div className="qs-bd-strip qs-bd-colmod qspl-colbox">
-                  {colList.filter(c => c.k !== 'stt' && c.k !== 'ten').map(c => {
+                  {(() => {
+                    const ds = colList.filter(c => c.k !== 'stt' && c.k !== 'ten'), khop = colQ.trim() ? ds.filter(colKhop_) : ds
+                    return (
+                      <div className="qspl-colfind">
+                        <span className="in"><QsIcon name="search" size={13} />
+                          <input value={colQ} placeholder="Tìm trường dữ liệu…" aria-label="Tìm trường dữ liệu"
+                            onChange={e => setColQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setColQ('') }} />
+                          {colQ && <button type="button" title="Xoá tìm" onClick={() => setColQ('')}>✕</button>}
+                        </span>
+                        {colQ.trim() && <>
+                          <span className="n">{khop.length} / {ds.length} trường</span>
+                          {khop.length > 0 && <button type="button" className="qs-bd-strip-btn qs-colchip-act" onClick={() => colSetMany(khop.map(c => c.k), 1)}>Hiện {khop.length} cột khớp</button>}
+                          {khop.length > 0 && <button type="button" className="qs-bd-strip-btn qs-colchip-act" onClick={() => colSetMany(khop.map(c => c.k), 0)}>Ẩn {khop.length} cột khớp</button>}
+                        </>}
+                      </div>
+                    )
+                  })()}
+                  {colList.filter(c => c.k !== 'stt' && c.k !== 'ten' && (!colQ.trim() || colKhop_(c))).map(c => {
                     const on = !!spColOn_(colOn, c.k), gia = SP_PRICE_COLS.indexOf(c.k) >= 0
                     return <button type="button" key={c.k} className={`qs-bd-strip-chip qs-colchip${on ? ' on' : ''}${gia ? ' sp-hl' : ''}${c.k === 'thumb' || c.k === 'thuong_hieu' ? ' sp-hl2' : ''}`}
                       title={on ? 'Đang hiện — bấm để ẩn' : 'Đang ẩn — bấm để hiện'} onClick={() => colToggle(c.k)}>{c.label}</button>
@@ -807,7 +844,8 @@ export default function ProductList() {
       )}
       {pop && pop.kind === 'bbedit' && nSel > 0 && (
         <BulkEditPop anchor={pop.anchor} fields={spBulkFields_(ng, specs)} n={nSel} toast={toast} onClose={() => setPop(null)}
-          onApply={(fld, val, label) => chay('Đang sửa "' + label + '"', cb => spBulkApply(selNhom(), fld, val, label, spLabel2Col_(specs, fld), cb))} />
+          valsOf={fld => spDistinctVals_(selNhom(), spLabel2Col_(specs, fld))}
+          onApply={(fld, val, label, cu) => chay('Đang sửa "' + label + '"', cb => spBulkApply(selNhom(), fld, val, label, spLabel2Col_(specs, fld), cb, cu))} />
       )}
       {pop && pop.kind === 'bbmore' && nSel > 0 && (
         <MorePop anchor={pop.anchor} n={nSel} canDuyet={canDuyet} isAdmin={isAdmin} onClose={() => setPop(null)}
@@ -818,6 +856,7 @@ export default function ProductList() {
           onCopy={() => editP(pop.p, 'copy')} onVariant={() => editP(pop.p, 'variant')} onQuick={() => editP(pop.p, 'nbt')} />
       )}
 
+      {xemAnh && anhTrang.dau[xemAnh] != null && <ImgViewer src={anhTrang.g[anhTrang.dau[xemAnh]]} startAt={anhTrang.dau[xemAnh]} gallery={anhTrang.g} captions={anhTrang.cap} onClose={() => setXemAnh('')} />}
       {dlg && dlg.kind === 'detail' && (
         <SpModal product={live} specs={specs} specErr={specErr} canEdit={canEdit} onClose={() => setDlg(null)} onEdit={p => editP(p)} />
       )}

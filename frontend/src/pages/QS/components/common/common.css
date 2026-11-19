@@ -191,3 +191,25 @@ html[data-theme="dark"] .qsc-toast{background:rgba(58,64,80,.97); box-shadow:0 1
 .qsc-ss-foot button{height:26px; padding:0 9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;}
 .qsc-ss-foot button:disabled{opacity:.45; cursor:default;}
 .qsc-ss-foot button.ok{border-color:var(--dash-accent); background:var(--dash-accent); color:#fff;}
+/* Bảng biến thể dùng chung (VariantTable): mỗi dòng 1 biến thể */
+.qsc-vt{display:flex; flex-direction:column; gap:8px;}
+.qsc-vt-t{border:1px solid var(--border); border-radius:10px; overflow:auto;}
+.qsc-vt-r{display:grid; align-items:center; gap:6px; padding:6px 8px; border-top:1px solid var(--border); box-sizing:border-box;}
+.qsc-vt-r:first-child{border-top:0;}
+.qsc-vt-h{background:var(--surface-alt); font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em;}
+.qsc-vt-r input{height:32px; width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--border); border-radius:7px; padding:0 8px; font:inherit; font-size:13px; background:var(--surface); color:var(--text);}
+.qsc-vt-r input:focus{outline:none; border-color:var(--dash-accent);}
+.qsc-vt-r input.num{text-align:right;}
+.qsc-vt-anh{position:relative; width:40px; height:40px; border:1px dashed var(--border); border-radius:8px; display:grid; place-items:center; color:var(--text-muted); cursor:pointer; overflow:hidden; background:var(--surface);}
+.qsc-vt-anh.on{border-style:solid;}
+.qsc-vt-anh img{width:100%; height:100%; object-fit:cover;}
+.qsc-vt-anh button{position:absolute; top:1px; right:1px; width:16px; height:16px; border:0; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; font-size:9px; line-height:16px; padding:0; cursor:pointer;}
+.qsc-vt-act{display:flex; gap:3px; justify-content:flex-end;}
+.qsc-vt-act button{width:24px; height:24px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-muted); display:grid; place-items:center; cursor:pointer; padding:0;}
+.qsc-vt-act button:hover{color:var(--dash-accent); border-color:var(--dash-accent);}
+.qsc-vt-act button.del:hover{color:#dc2626; border-color:#dc2626;}
+.qsc-vt-f{display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted);}
+.qsc-vt-add{display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 14px; border:1px dashed var(--dash-accent); border-radius:8px; background:transparent; color:var(--dash-accent); font:inherit; font-size:13px; font-weight:600; cursor:pointer;}
+.qsc-vt-add:hover{background:var(--dash-soft);}
+
+.qsc-iv-cap{position:fixed; top:18px; left:50%; transform:translateX(-50%); max-width:70vw; color:#fff; font-size:13px; font-weight:600; background:rgba(0,0,0,.45); border-radius:20px; padding:6px 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}

@@ -14,7 +14,7 @@ let daCopy = ''   // link ảnh vừa Copy trong bảng (dùng chung mọi ô)
 
 const ds_ = p => String(p.anhTatCa || p.hinhAnh || '').split('\n').map(x => x.trim()).filter(Boolean)
 
-export default function SpImgCell({ p, ts }) {
+export default function SpImgCell({ p, ts, onView }) {
   const [busy, setBusy] = useState('')
   const [, setTick] = useState(0)   // vẽ lại nút Dán sau khi Copy
   const list = ds_(p), main = list[0] || ''
@@ -75,7 +75,8 @@ export default function SpImgCell({ p, ts }) {
   return (
     <div className="qspl-imgc" tabIndex={0} title="Chọn ô rồi Ctrl+V để dán ảnh, hoặc kéo thả file ảnh vào"
       onClick={e => e.stopPropagation()} onPaste={onPaste} onDragOver={e => { e.preventDefault(); e.stopPropagation() }} onDrop={onDrop}>
-      <ProductThumb product={p} size={ts || 40} src={main ? mediaUrl(main) : ''} className="qspl-th" />
+      <ProductThumb product={p} size={ts || 40} src={main ? mediaUrl(main) : ''} className="qspl-th" title={main ? 'Bấm để xem ảnh lớn' : undefined}
+        onClick={main && onView ? () => onView(p) : undefined} />
       {busy && <span className="qspl-imgc-busy">{busy}</span>}
       <span className="qspl-imgc-bar">
         <button type="button" title={main ? 'Đổi ảnh (chọn file)' : 'Thêm ảnh (chọn file)'} disabled={!!busy} onClick={chon}><QsIcon name="camera" size={14} /></button>

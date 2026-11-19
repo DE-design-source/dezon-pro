@@ -66,6 +66,6 @@ export function giaLechList_(lines, products){
   return (lines||[]).map(function(l){
     var g=giaSpCuaDong_(l, products); if(!g) return null;
     if(Math.round(Number(l.donGiaVon)||0)===g.von && (Number(l.chietKhau)||0)===g.ck) return null;
-    return {l:l, von:g.von, ck:g.ck, cu:Math.round(Number(l.donGiaVon)||0)};
+    return {l:l, von:g.von, ck:g.ck, cu:Math.round(Number(l.donGiaVon)||0), p:g.p};
   }).filter(Boolean);
 }

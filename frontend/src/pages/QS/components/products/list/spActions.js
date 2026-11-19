@@ -11,7 +11,7 @@ import { qsToast as toast, qsConfirm, qsAlert, qsAsk } from '../../common/dialog
 import { money } from '../../../lib/format.js'
 import { addProdSame_, addProdBuild_, addProdSl_, addProdFloor_, prodNode_ } from '../../../lib/calc.js'
 import { floorsList } from '../../../lib/sheetModel.js'
-import { spKey_, spPatchLocal_, spNhomBienThe_ } from './spModel'
+import { spKey_, spPatchLocal_, spNhomBienThe_, spValKey_, spEditRaw_ } from './spModel'
 import { LY_DO_MAX } from '../../admin/adminUtil'
 import { resetStats } from '../../project/projectStats'
 
@@ -249,14 +249,16 @@ export async function spAddCombo(chinh, list, bo) {
 }
 
 /* ---------- Sửa / xoá hàng loạt ---------- */
-export async function spBulkApply(all, lark, val, label, col, onProgress) {
+export async function spBulkApply(all, lark, val, label, col, onProgress, cu) {
   val = String(val == null ? '' : val).trim()
   if (!lark) return false
   if (val === '') { toast('Chưa nhập giá trị mới'); return false }
   if (!all.length) return false
-  const prods = all.filter(p => !p.spChung), bo = all.length - prods.length
-  if (!prods.length) { toast('Các sản phẩm đã chọn đều thuộc kho chung của Dezon — không sửa được'); return false }
-  if (!await qsConfirm('Đặt "' + label + '" = "' + val + '" cho ' + prods.length + ' sản phẩm đã chọn?'
+  // cu = giá trị cũ: chỉ sửa SP đang có đúng giá trị đó (null = sửa mọi SP đã chọn)
+  const khop = cu == null ? all : all.filter(p => spValKey_(spEditRaw_(p, col)) === spValKey_(cu))
+  const prods = khop.filter(p => !p.spChung), bo = khop.length - prods.length
+  if (!prods.length) { toast(cu != null && !khop.length ? 'Không có sản phẩm nào đang có "' + label + '" = "' + cu + '"' : 'Các sản phẩm đã chọn đều thuộc kho chung của Dezon — không sửa được'); return false }
+  if (!await qsConfirm((cu != null ? 'Đổi "' + label + '" từ "' + (String(cu).trim() || '(trống)') + '" thành "' + val + '" cho ' : 'Đặt "' + label + '" = "' + val + '" cho ') + prods.length + ' sản phẩm' + (cu != null && khop.length < all.length ? ' (trong ' + all.length + ' đã chọn)' : ' đã chọn') + '?'
     + (bo ? '\n(Bỏ qua ' + bo + ' sản phẩm kho chung Dezon)' : ''))) return false
   let ok = 0
   const errs = [], undo = []

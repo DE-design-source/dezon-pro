@@ -346,3 +346,11 @@
 .qs-sup-distf{display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 10px 0 12px; margin-left:auto; margin-right:10px; border:1px solid var(--dash-accent-border, var(--border)); border-radius:15px; background:var(--dash-soft, var(--surface)); color:var(--text); font:inherit; font-size:12.5px; cursor:pointer;}
 .qs-sup-distf small{font-size:11px; font-weight:700; color:var(--text-muted);}
 .qs-sup-distf:hover{border-color:var(--danger, #DC2626); color:var(--danger, #DC2626);}
+/* Tab Sản phẩm của NCC: ô tìm sản phẩm + bấm SP xem thông tin mở rộng */
+.qs-sup-spq{flex:1 1 220px; max-width:340px; display:flex; align-items:center; gap:6px; height:36px; padding:0 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text-muted);}
+.qs-sup-spq:focus-within{border-color:var(--dash-accent);}
+.qs-sup-spq input{flex:1; min-width:0; border:none; outline:none; background:transparent; color:var(--text); font:inherit; font-size:13px;}
+.qs-sup-spq button{display:inline-flex; padding:2px; border:none; background:none; color:var(--text-muted); cursor:pointer;}
+.qs-sup-click{cursor:pointer;}
+.qs-sup-click:hover{border-color:var(--dash-accent);}
+.qs-pd-sprow.qs-sup-click:hover{background:var(--surface-alt);}
