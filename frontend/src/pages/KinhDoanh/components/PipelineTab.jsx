@@ -9,7 +9,7 @@ import { RatingStars } from './CustomerPage'
 const STAR_FLT = [5, 4, 3, 2, 1, 0]
 const StarIc = ({ on }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: on ? '#F5A524' : 'var(--border)' }}><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
 /* sortOn / onSort: nút ưu tiên sắp xếp 5 sao trước -> 1 sao -> chưa đánh giá (MarkUp 2026-11-16 17:44) */
-function StarFilter({ value, onChange, count, sortOn, onSort }) {
+function StarFilter({ value, onChange, count, sortOn, onSort, iconOnly }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
   useEffect(() => {
@@ -22,9 +22,10 @@ function StarFilter({ value, onChange, count, sortOn, onSort }) {
   const label = !value.length ? 'Tất cả sao' : value.slice().sort((a, b) => b - a).map(n => (n ? n + '★' : 'Chưa đánh giá')).join(', ')
   return (
     <div className="kd-pl-sdd" ref={box}>
-      <button type="button" className={'kd-pl-sbtn' + (value.length ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <StarIc on /><span>{label}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      <button type="button" className={'kd-pl-sbtn' + (iconOnly ? ' ic' : '') + (value.length ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open}
+        title={'Sao: ' + label} aria-label={'Sao: ' + label}>
+        <StarIc on />{!iconOnly && <span>{label}</span>}
+        {!iconOnly && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>}
       </button>
       {open && (
         <div className="kd-pl-spop">
@@ -53,7 +54,7 @@ function StarFilter({ value, onChange, count, sortOn, onSort }) {
 /* Bộ lọc chọn nhiều (Nguồn, Nhân sự phụ trách - MarkUp 2026-11-16 17:42): cùng kiểu nút + hộp tích của bộ lọc sao, có ô tìm.
    options [{v, label, n}]; value [] = tất cả */
 const NONE = '__none__'
-function MultiFilter({ icon, allLabel, options, value, onChange }) {
+function MultiFilter({ icon, allLabel, options, value, onChange, iconOnly }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const box = useRef(null)
@@ -70,9 +71,10 @@ function MultiFilter({ icon, allLabel, options, value, onChange }) {
   const shown = options.filter(o => !t || o.label.toLowerCase().indexOf(t) >= 0)
   return (
     <div className="kd-pl-sdd" ref={box}>
-      <button type="button" className={'kd-pl-sbtn' + (value.length ? ' on' : '')} onClick={() => { setOpen(o => !o); setQ('') }} aria-expanded={open} title={label}>
-        {icon}<span>{label}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      <button type="button" className={'kd-pl-sbtn' + (iconOnly ? ' ic' : '') + (value.length ? ' on' : '')} onClick={() => { setOpen(o => !o); setQ('') }} aria-expanded={open}
+        title={label} aria-label={label}>
+        {icon}{!iconOnly && <span>{label}</span>}
+        {!iconOnly && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>}
       </button>
       {open && (
         <div className="kd-pl-spop">
@@ -126,6 +128,16 @@ const LIST_HEAD = [
   [null, 'STT'], ['name', 'Lead khách hàng', 1], ['source', 'Nguồn', 1], ['type', 'Loại dự án', 1], ['addr', 'Địa chỉ', 1],
   ['star', 'Sao', -1], ['dept', 'Phòng ban', 1], ['value', 'Giá trị', -1], ['stage', 'Giai đoạn', 1], ['created', 'Ngày tạo', -1], [null, 'Chuyển tới'], [null, ''],
 ]
+/* Lọc "Phòng KD Dự Án" (MarkUp 2026-11-19): Chủ đầu tư là cột đầu tiên (sau STT), rồi Người phụ trách (= tên khách), Chức vụ,
+   Phòng ban phụ trách - đều là người bên CĐT (kdOptions.cdtContact); bỏ cột Phòng ban (KD) vì mọi dòng đều là Dự án */
+const LIST_COLS_DA = '36px minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,.95fr) minmax(0,.85fr) minmax(0,1.2fr) 92px minmax(0,.7fr) minmax(0,1.1fr) 82px minmax(0,1fr) 34px'
+const LIST_HEAD_DA = [
+  [null, 'STT'], ['investor', 'Chủ đầu tư', 1], ['name', 'Người phụ trách', 1], ['cdtRole', 'Chức vụ', 1], ['cdtDept', 'Phòng ban phụ trách', 1],
+  ['source', 'Nguồn', 1], ['type', 'Loại dự án', 1], ['addr', 'Địa chỉ', 1],
+  ['star', 'Sao', -1], ['value', 'Giá trị', -1], ['stage', 'Giai đoạn', 1], ['created', 'Ngày tạo', -1], [null, 'Chuyển tới'], [null, ''],
+]
+const cellTxt = { fontSize: 12.5, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }
+const cellLine = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 const SORT_LS = 'kd-list-sort'
 const readSort = () => { try { const v = JSON.parse(localStorage.getItem(SORT_LS) || 'null'); if (v && v.key) return v } catch { /* bỏ qua */ } return { key: 'care', dir: 1 } }
 const fmtDay = iso => (iso ? iso.split('-').reverse().join('/') : '')
@@ -161,8 +173,21 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
     const a = String(l.address || '').trim(), t = tinhOf(l)
     return a && t && noDau(a).indexOf(noDau(t)) < 0 ? a + ', ' + t : (a || t)
   }
+  const investorMap = useKdMap('investor')
+  const investorOf = l => String(investorMap[String(l.id)] || '').trim()
+  const isDA = dept === 'du-an'
+  const LIST_COLS_V = isDA ? LIST_COLS_DA : LIST_COLS
+  const LIST_HEAD_V = isDA ? LIST_HEAD_DA : LIST_HEAD
+  /* Chức vụ / Phòng ban của người phụ trách bên CĐT */
+  const cdtMap = useKdMap('cdtContact')
+  const cdtOf = l => { const c = cdtMap[String(l.id)] || {}; return { role: String(c.role || '').trim(), dept: String(c.dept || '').trim() } }
   const qt = q.trim()
-  const leadsAll = qt ? leadsIn.filter(l => matchQuery(l, qt, [tinhOf(l), projNameMap[String(l.id)]].filter(Boolean).join(' '))) : leadsIn
+  const leadsQ = qt ? leadsIn.filter(l => matchQuery(l, qt, [tinhOf(l), projNameMap[String(l.id)], investorOf(l), cdtOf(l).role, cdtOf(l).dept].filter(Boolean).join(' '))) : leadsIn
+  /* Bộ lọc Chủ đầu tư (MarkUp 2026-11-19): chỉ hiện + chỉ áp khi lọc Phòng KD Dự Án */
+  const [invF, setInvF] = useState([])
+  const invKeys = l => { const v = investorOf(l); return v ? [v] : [] }
+  const okInv = l => { if (!isDA || !invF.length) return true; const v = investorOf(l); return invF.indexOf(v || NONE) >= 0 }
+  const leadsAll = leadsQ.filter(okInv)
   /* Khách trùng SĐT / email (tính trên toàn bộ khách, không theo bộ lọc) */
   const everyLead = allLeads || leadsIn
   const dupIdx = useMemo(() => duplicateIndex(everyLead), [everyLead])
@@ -202,18 +227,21 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
     name: l => noDau(l.name), source: l => noDau(l.source), type: l => noDau(l.projectType), addr: l => noDau(addrOf(l)),
     star: l => rateOf(l) || null, dept: l => l.dept || '', value: l => Number(l.value) || null, stage: l => STAGES.indexOf(l.stage),
     created: l => l.createdAt || '',
+    investor: l => noDau(investorOf(l)), cdtRole: l => noDau(cdtOf(l).role), cdtDept: l => noDau(cdtOf(l).dept),
   }
+  /* cột đang sắp xếp không có trong bảng hiện tại (vd rời lọc Dự án) -> về Ưu tiên chăm sóc */
+  const sortKey = LIST_HEAD_V.some(h => h[0] === sort.key) ? sort.key : 'care'
   const listLeads = leads0.slice().sort((a, b) => {
     /* công tắc "Ưu tiên 5 sao trước" ở bộ lọc sao: áp trước, rồi tới cách sắp xếp đang chọn */
     if (starSort) { const s = (rateOf(b) || -1) - (rateOf(a) || -1); if (s) return s }
-    if (sort.key === 'care' || !sortVal[sort.key]) return careCmp(a, b)
-    const f = sortVal[sort.key], va = f(a), vb = f(b)
+    if (sortKey === 'care' || !sortVal[sortKey]) return careCmp(a, b)
+    const f = sortVal[sortKey], va = f(a), vb = f(b)
     const ea = va == null || va === '', eb = vb == null || vb === ''
     if (ea || eb) return ea === eb ? careCmp(a, b) : (ea ? 1 : -1)   // ô trống luôn xuống cuối
     const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'vi')
     return c ? c * sort.dir : careCmp(a, b)
   })
-  const careMode = sort.key === 'care'
+  const careMode = sortKey === 'care'
   const clickHead = (key, def) => setSort(sort.key === key ? { key, dir: -sort.dir } : { key, dir: def })
   /* Thả dòng: đổi thứ tự các dòng đang hiện, giữ chỗ của khách bị ẩn do bộ lọc, rồi lưu hạng mới cho toàn bộ khách */
   function dropRow(targetId, after) {
@@ -240,6 +268,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const stageOpts = STAGES.map(st => ({ v: st, label: STAGE_LABEL[st], n: forStage.filter(l => l.stage === st).length }))
   const forVal = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l))
   const valOpts = VAL_BANDS.map(([v, label]) => ({ v, label, n: forVal.filter(l => bandOf(l) === v).length }))
+  const invOpts = isDA ? optsOf(leadsQ.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l)), invKeys, 'Chưa có chủ đầu tư') : []
   const [draggingId, setDraggingId] = useState(null)
   const [hoverStage, setHoverStage] = useState(null)
   const [memberOpenFor, setMemberOpenFor] = useState(null)
@@ -351,27 +380,30 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
       {/* 1 module xanh đậm (như băng dự án QS): phòng ban · thời gian | Kanban / Danh sách */}
       <div className="kd-pl-bar">
         <DeptFilter dept={dept} onChange={onDeptChange} />
-        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill />
-        <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} />
+        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill iconOnly />
+        <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} iconOnly />
         <MultiFilter allLabel="Tất cả nguồn" options={srcOpts} value={srcF} onChange={setSrcF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></svg>} />
-        <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF}
+        <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF} iconOnly
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
         <MultiFilter allLabel="Tất cả giai đoạn" options={stageOpts} value={stageF} onChange={setStageF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>} />
         <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
+        {isDA && <MultiFilter allLabel="Tất cả chủ đầu tư" options={invOpts} value={invF} onChange={setInvF}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg>} />}
         <span style={{ flex: 1 }} />
+        {/* Kanban / Danh sách dời lên hàng trên, ngay trước ô tìm (MarkUp 2026-11-19) */}
+        <div className="kd-pl-view" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>
+          <button className={view === 'list' ? 'active' : undefined} style={viewBtnStyle(view === 'list')} onClick={() => setView('list')}>Danh sách</button>
+        </div>
         <label className={'kd-pl-search' + (qt ? ' on' : '')} title="Tìm theo tên, SĐT, email, địa chỉ, nguồn, tên dự án">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm khách: tên, SĐT…" aria-label="Tìm khách hàng"
             onKeyDown={e => { if (e.key === 'Escape') setQ('') }} />
           {qt ? <button type="button" onClick={() => setQ('')} title="Xoá tìm kiếm" aria-label="Xoá tìm kiếm">×</button> : null}
         </label>
-        <div className="kd-pl-view" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          <button className={view === 'kanban' ? 'active' : undefined} style={viewBtnStyle(view === 'kanban')} onClick={() => setView('kanban')}>Kanban</button>
-          <button className={view === 'list' ? 'active' : undefined} style={viewBtnStyle(view === 'list')} onClick={() => setView('list')}>Danh sách</button>
-        </div>
       </div>
       {view === 'list' && (
         <div className="kd-list-head">
@@ -385,15 +417,15 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
               {starSort ? 'Đang bật ưu tiên 5 sao trước (bộ lọc sao). ' : ''}
               {careMode
                 ? 'Kéo ⠿ ở đầu dòng để xếp khách cần chăm sóc lên trước. Khách mới (chưa xếp) hiện trên cùng.'
-                : 'Đang sắp xếp theo "' + ((LIST_HEAD.find(h => h[0] === sort.key) || [])[1] || '') + '" ' + (sort.dir === 1 ? '(tăng dần)' : '(giảm dần)') + ' - bấm tiêu đề cột để đổi.'}
+                : 'Đang sắp xếp theo "' + ((LIST_HEAD_V.find(h => h[0] === sortKey) || [])[1] || '') + '" ' + (sort.dir === 1 ? '(tăng dần)' : '(giảm dần)') + ' - bấm tiêu đề cột để đổi.'}
             </span>
             <span className="cnt">{listLeads.length} khách{qt ? ' khớp "' + qt + '"' : ''}</span>
           </div>
-          <div className="kd-list-cols" style={{ gridTemplateColumns: LIST_COLS }}>
-            {LIST_HEAD.map(([key, label, def], i) => (key ? (
-              <button key={i} type="button" className={sort.key === key ? 'on' : undefined} onClick={() => clickHead(key, def)}
-                title={'Sắp xếp theo ' + label.toLowerCase()} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
-                <span>{label}</span><SortIc dir={sort.key === key ? sort.dir : 0} />
+          <div className="kd-list-cols" style={{ gridTemplateColumns: LIST_COLS_V }}>
+            {LIST_HEAD_V.map(([key, label, def], i) => (key ? (
+              <button key={i} type="button" className={sortKey === key ? 'on' : undefined} onClick={() => clickHead(key, def)}
+                title={'Sắp xếp theo ' + label.toLowerCase()} aria-sort={sortKey === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+                <span>{label}</span><SortIc dir={sortKey === key ? sort.dir : 0} />
               </button>
             ) : <span key={i} style={i === 0 ? { textAlign: 'right' } : undefined}>{label}</span>))}
           </div>
@@ -431,7 +463,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
                 {!items.length && <div className="kd-stage-empty">Kéo thẻ vào đây</div>}
                 {items.map(l => (
                   <LeadCard
-                    key={l.id} lead={l} dups={dupIdx[String(l.id)]}
+                    key={l.id} lead={l} projMode={isDA} dups={dupIdx[String(l.id)]}
                     dragging={draggingId === l.id}
                     onDragStart={setDraggingId}
                     onDragEnd={() => setDraggingId(null)}
@@ -486,10 +518,14 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
               onDrop={careMode && dragRow != null ? e => { e.preventDefault(); dropRow(l.id, dropAt ? dropAt.after : false) } : undefined}
               onClick={() => onOpenDetail && onOpenDetail(l.id)}
               onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpenDetail && onOpenDetail(l.id) } }}
-              style={{ display: 'grid', gridTemplateColumns: LIST_COLS, gap: 10, alignItems: 'center', padding: '10px 4px', cursor: careMode ? 'grab' : 'pointer', ...(i < listLeads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
+              style={{ display: 'grid', gridTemplateColumns: LIST_COLS_V, gap: 10, alignItems: 'center', padding: '10px 4px', cursor: careMode ? 'grab' : 'pointer', ...(i < listLeads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
               <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
                 {careMode ? <i className="kd-list-grip" title="Kéo để đổi thứ tự ưu tiên" aria-hidden="true">⠿</i> : null}{i + 1}
               </span>
+              {isDA && (() => {
+                const inv = investorOf(l)
+                return <span title={inv} style={{ ...cellTxt, fontWeight: inv ? 600 : 400 }}>{inv ? <span style={cellLine}>{inv}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+              })()}
               <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                   <b title={l.name} style={{ fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</b>
@@ -499,6 +535,11 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
                 </span>
                 {l.phone ? <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.phone}</span> : null}
               </span>
+              {isDA && (() => {
+                const c = cdtOf(l)
+                const cell = v => <span title={v} style={cellTxt}><span style={{ ...cellLine, color: v ? 'var(--text)' : 'var(--text-muted)' }}>{v || '—'}</span></span>
+                return <>{cell(c.role)}{cell(c.dept)}</>
+              })()}
               <span style={{ minWidth: 0 }}>
                 {l.source ? (
                   <span title={l.source} style={{ display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box', padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle', ...(sc ? { color: sc.color, background: sc.bg, border: '1px solid ' + sc.border } : { color: 'var(--text)', background: 'var(--surface-alt)' }) }}>{l.source}</span>
@@ -507,7 +548,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
               <span title={l.type} style={{ fontSize: 12.5, color: 'var(--text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.type}</span>
               <span title={addr} style={{ fontSize: 12.5, fontWeight: addr ? 600 : 400, color: addr ? 'var(--text)' : 'var(--text-muted)', minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}>{addr || '—'}</span>
               <span style={{ minWidth: 0 }}><RatingStars id={String(l.id)} small /></span>
-              <span style={{ padding: '3px 9px', borderRadius: 999, background: DEPT_TINT[l.dept], color: DEPT_COLOR[l.dept], fontSize: 10.5, fontWeight: 600, justifySelf: 'start' }}>{DEPT_SHORT[l.dept]}</span>
+              {!isDA && <span style={{ padding: '3px 9px', borderRadius: 999, background: DEPT_TINT[l.dept], color: DEPT_COLOR[l.dept], fontSize: 10.5, fontWeight: 600, justifySelf: 'start' }}>{DEPT_SHORT[l.dept]}</span>}
               <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>
               <span style={{ padding: '3px 9px', borderRadius: 999, background: a ? a.bg : 'var(--sales-tint)', color: a ? a.color : 'var(--sales)', fontSize: 11, fontWeight: 600, justifySelf: 'start' }}>{STAGE_LABEL[l.stage]}</span>
               <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDay(l.createdAt) || '—'}</span>

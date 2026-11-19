@@ -52,7 +52,7 @@ function initForm(lead, me) {
     notes: lead ? (lead.notes || '') : '',
     partner: lead ? !!lead.partner : false,
     source: lead && lead.source ? lead.source : LEAD_SOURCES[0],
-    dept: lead ? (lead.dept || 'dan-dung') : 'dan-dung',
+    dept: lead ? (lead.dept || 'dan-dung') : '',   // tạo mới: bước 1 phải chọn phòng (MarkUp 2026-11-19)
     creator: lead ? (lead.creator || '') : me,
     manager: lead ? (lead.manager || '') : (deptHead_(lead ? lead.dept : 'dan-dung') || me),
     type: lead && lead.projectType ? lead.projectType : 'Nhà phố',
@@ -110,6 +110,18 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   const [projName, setProjName] = useState(lead ? projNameMap[String(lead.id)] || '' : '')
   const projNameKey = lead ? projNameMap[String(lead.id)] : null
   useEffect(() => { if (projNameKey && !projName) setProjName(projNameKey) }, [projNameKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Chủ đầu tư (MarkUp 2026-11-19): kdOptions.investor {mã lead: tên} như projName */
+  const investorMap = useKdMap('investor')
+  const [investor, setInvestor] = useState(lead ? investorMap[String(lead.id)] || '' : '')
+  const investorKey = lead ? investorMap[String(lead.id)] : null
+  useEffect(() => { if (investorKey && !investor) setInvestor(investorKey) }, [investorKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Người phụ trách bên CĐT (khách Phòng KD Dự Án) = Tên khách hàng; Chức vụ + Phòng ban: kdOptions.cdtContact {mã lead: {role, dept}} */
+  const cdtMap = useKdMap('cdtContact')
+  const cdtKey = lead ? cdtMap[String(lead.id)] : null
+  const [cdt, setCdt] = useState(() => ({ role: (cdtKey && cdtKey.role) || '', dept: (cdtKey && cdtKey.dept) || '' }))
+  useEffect(() => { if (cdtKey && !cdt.role && !cdt.dept) setCdt({ role: cdtKey.role || '', dept: cdtKey.dept || '' }) }, [cdtKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [deptWarn, setDeptWarn] = useState(false)
+  const isDA = form.dept === 'du-an'
   /* Hình / tệp đính kèm (MarkUp 2026-11-16 16:20): kdOptions.attach {mã lead: {img: [{name, url}], file: [...]}} */
   const attachMap = useKdMap('attach')
   const [attach, setAttach] = useState(() => { const a = lead ? attachMap[String(lead.id)] || {} : {}; return { img: a.img || [], file: a.file || [] } })
@@ -272,6 +284,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   }
   function save() {
     if (uploading) { alert(UPLOAD_WAIT); return }
+    if (!form.dept) { setStep(0); setDeptWarn(true); return }
     const name = form.name.trim()
     if (!name) { setStep(0); setNameFocusTick(t => t + 1); return }
     if (!lead && strongDups.length && !window.confirm('Khách này trùng SĐT/email với: '
@@ -288,6 +301,8 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
       name,
       _geo: geo,
       _projName: projName.trim(),
+      _investor: isDA ? investor.trim() : '',   // CĐT chỉ có ở khách Phòng KD Dự Án; đổi sang Dân dụng thì xoá
+      _cdt: isDA ? { role: cdt.role.trim(), dept: cdt.dept.trim() } : { role: '', dept: '' },
       _attach: attach,
       _timeline: tl,
       type: scale ? `${type} (${scale})` : type,
@@ -345,13 +360,40 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
           <div style={{ padding: '22px 24px' }}>
             {/* ---- Bước 1: Cơ bản - 4 nhóm thẻ: Khách hàng · Địa điểm | Dự án · Phụ trách ---- */}
             <div className="kd-lf-grid" style={stepId === 'basic' ? undefined : { display: 'none' }}>
+              {/* Bước đầu tiên: chọn phòng KD (MarkUp 2026-11-19). Phòng KD Dự Án mới có Chủ đầu tư + người phụ trách / chức vụ / phòng ban bên CĐT */}
+              <div className={'kd-lf-dept' + (deptWarn && !form.dept ? ' warn' : '')} role="radiogroup" aria-label="Phòng kinh doanh">
+                <span className="lb">Phòng ban phụ trách dự án *</span>
+                <div className="opts">
+                  {LEAD_DEPT_OPTIONS.map(([v, label]) => (
+                    <button key={v} type="button" role="radio" aria-checked={form.dept === v} className={form.dept === v ? 'on' : undefined}
+                      onClick={() => { set('dept', v); setDeptWarn(false); if (!managerTouched) { const h = deptHead_(v); if (h) set('manager', h) } }}>
+                      <i aria-hidden="true" />
+                      <span><b>{label}</b><em>{v === 'du-an' ? 'Có Chủ đầu tư, người phụ trách, chức vụ, phòng ban bên CĐT' : 'Khách lẻ: nhà ở, căn hộ, nhà phố'}</em></span>
+                    </button>
+                  ))}
+                </div>
+                {deptWarn && !form.dept ? <span className="msg">Chọn phòng kinh doanh trước khi lưu</span> : null}
+              </div>
               <section className="kd-lf-sec">
                 <h4><i>1</i>Thông tin khách hàng</h4>
-                <div className="kd-field"><label>Tên dự án</label><input type="text" placeholder="VD: Nhà phố Anh Phú - Thủ Đức" value={projName} onChange={e => setProjName(e.target.value)} /></div>
+                {isDA ? (
+                  <div style={grid2}>
+                    <div className="kd-field"><label>Tên dự án</label><input type="text" placeholder="VD: Nhà phố Anh Phú - Thủ Đức" value={projName} onChange={e => setProjName(e.target.value)} /></div>
+                    <div className="kd-field"><label>Chủ đầu tư</label><input type="text" placeholder="VD: Công ty CP Đầu tư ABC" value={investor} onChange={e => setInvestor(e.target.value)} /></div>
+                  </div>
+                ) : (
+                  <div className="kd-field"><label>Tên dự án</label><input type="text" placeholder="VD: Nhà phố Anh Phú - Thủ Đức" value={projName} onChange={e => setProjName(e.target.value)} /></div>
+                )}
                 <div style={grid2}>
-                  <div className="kd-field"><label>Tên khách hàng *</label><input ref={nameRef} type="text" placeholder="VD: Anh Nguyễn Văn Phú" value={form.name} onChange={e => set('name', e.target.value)} /></div>
+                  <div className="kd-field"><label>{isDA ? 'Người phụ trách (bên CĐT) *' : 'Tên khách hàng *'}</label><input ref={nameRef} type="text" placeholder="VD: Anh Nguyễn Văn Phú" value={form.name} onChange={e => set('name', e.target.value)} /></div>
                   <div className="kd-field"><label>Số điện thoại *</label><input type="text" placeholder="09xx xxx xxx (nhiều số: cách nhau dấu phẩy)" value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
                 </div>
+                {isDA && (
+                  <div style={grid2}>
+                    <div className="kd-field"><label>Chức vụ</label><input type="text" placeholder="VD: Trưởng ban quản lý dự án" value={cdt.role} onChange={e => setCdt(c => ({ ...c, role: e.target.value }))} /></div>
+                    <div className="kd-field"><label>Phòng ban phụ trách</label><input type="text" placeholder="VD: Ban QLDA" value={cdt.dept} onChange={e => setCdt(c => ({ ...c, dept: e.target.value }))} /></div>
+                  </div>
+                )}
                 <div style={grid2}>
                   <div className="kd-field"><label>Email</label><input type="text" placeholder="khachhang@email.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
                   <div className="kd-field"><label>Nguồn khách hàng</label>
@@ -476,18 +518,15 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
 
               <section className="kd-lf-sec">
                 <h4><i>4</i>Phụ trách</h4>
+                {/* Phòng ban (KD) chọn ở đầu form (MarkUp 2026-11-19). Quản lý: mặc định trưởng phòng của phòng đã chọn (đổi phòng thì đổi theo), vẫn sửa tay được */}
                 <div style={grid2}>
-                  <div className="kd-field"><label>Phòng ban phụ trách</label>
-                    <select value={form.dept} onChange={e => { const d = e.target.value; set('dept', d); if (!managerTouched) { const h = deptHead_(d); if (h) set('manager', h) } }}>{LEAD_DEPT_OPTIONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select>
-                  </div>
-                  {/* Quản lý: mặc định trưởng phòng của phòng ban phụ trách (đổi phòng ban thì đổi theo), vẫn sửa tay được */}
                   <div className="kd-field"><label>Quản lý</label>
                     <ShortlistSelect value={form.manager} onChange={v => { setManagerTouched(true); set('manager', v) }} free optKey="manager" placeholder="Trưởng phòng ban phụ trách"
                       base={[...new Set(Object.keys(DEPT_UNIT).map(deptHead_).filter(Boolean))]} />
                   </div>
+                  {/* Người khởi tạo = chủ tài khoản đang đăng nhập (lead cũ giữ người đã tạo), không sửa */}
+                  <div className="kd-field"><label>Người khởi tạo</label><input type="text" readOnly title="Chủ tài khoản tạo lead" value={form.creator} style={{ opacity: 0.85, cursor: 'default' }} /></div>
                 </div>
-                {/* Người khởi tạo = chủ tài khoản đang đăng nhập (lead cũ giữ người đã tạo), không sửa */}
-                <div className="kd-field"><label>Người khởi tạo</label><input type="text" readOnly title="Chủ tài khoản tạo lead" value={form.creator} style={{ opacity: 0.85, cursor: 'default' }} /></div>
                 <div style={grid2}>
                   <div className="kd-field" style={{ position: 'relative' }}>
                     <label>Nhân sự phụ trách</label>

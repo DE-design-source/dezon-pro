@@ -121,6 +121,8 @@ function KinhDoanhPage() {
   /* ---------- Chuyển giai đoạn (moveLead) ---------- */
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')   // Tên dự án (MarkUp 2026-11-16 16:17)
+  const investorMap = useKdMap('investor')   // Chủ đầu tư (MarkUp 2026-11-19)
+  const cdtMap = useKdMap('cdtContact')      // Chức vụ / Phòng ban của người phụ trách bên CĐT (MarkUp 2026-11-19)
   const attachMap = useKdMap('attach')       // Hình / tệp đính kèm (MarkUp 2026-11-16 16:20)
   const timelineMap = useKdMap('timeline')   // Thời gian khởi công / hoàn công (MarkUp 2026-11-16 16:48)
   /* Kéo thẻ vào "Nhân sự KD phụ trách": hiện phiếu yêu cầu nhân sự trước, xác nhận mới chuyển giai đoạn */
@@ -172,7 +174,7 @@ function KinhDoanhPage() {
   const openLeadModal = id => { setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 })); if (scrollRef.current) scrollRef.current.scrollTop = 0 }
   const closeLeadModal = () => setLeadModal(m => ({ ...m, open: false }))
   async function saveLead(input) {
-    const { _geo: geo, _projName: projName, _attach: attach, _timeline: timeline, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
+    const { _geo: geo, _projName: projName, _investor: investor, _cdt: cdt, _attach: attach, _timeline: timeline, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
@@ -186,6 +188,19 @@ function KinhDoanhPage() {
         const m = { ...projNameMap }
         if (projName) m[String(saved.id)] = projName; else delete m[String(saved.id)]
         patch.projName = m
+      }
+      if (investor !== undefined && (investor || investorMap[String(saved.id)])) {
+        const m = { ...investorMap }
+        if (investor) m[String(saved.id)] = investor; else delete m[String(saved.id)]
+        patch.investor = m
+      }
+      if (cdt) {
+        const has = cdt.role || cdt.dept
+        if (has || cdtMap[String(saved.id)]) {
+          const m = { ...cdtMap }
+          if (has) m[String(saved.id)] = { role: cdt.role || '', dept: cdt.dept || '' }; else delete m[String(saved.id)]
+          patch.cdtContact = m
+        }
       }
       if (attach) {
         const has = (attach.img && attach.img.length) || (attach.file && attach.file.length)

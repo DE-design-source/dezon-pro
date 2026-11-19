@@ -530,10 +530,17 @@ html[data-theme="dark"] .qs-sm-more.warn{border-color:#7A2E28; background:#3A1A1
      = 100 + Dự án tính từ mép dòng, trừ 78 của bản nháp -> left = 22 + Dự án. Chữ bản nháp (bắt đầu ở 54) dừng trước cột đó 12px. */
   .qs-dash-rows .qs-dash-row-body .qs-dash-draft-tools{position:absolute; top:0; bottom:0; left:calc(22px + var(--w-name, 280px)); width:var(--w-kh, 200px); justify-content:flex-start;}
   .qs-dash-rows .qs-dash-row-body .qs-dash-draft-txt{max-width:calc(var(--w-name, 280px) - 44px);}
+  /* có nút bản chính: chừa chỗ cho nút trong cột Dự án, không đè sang cột Khách hàng */
+  .qs-dash-rows .qs-dash-row-body .qs-dash-draft:has(.qs-dash-setmain) .qs-dash-draft-txt{max-width:calc(var(--w-name, 280px) - 44px - 130px);}
 }
 .qs-dash-list-head .qs-dash-create{flex:none; white-space:nowrap;}/* Bản nháp: chữ co theo nội dung, nhóm nút sửa tên / nhân bản / xoá ngay sau chữ (hiện khi rê chuột), nút Dùng đẩy về cuối (MarkUp 10:36) */
 .qs-dash-draft-txt{flex:0 1 auto; min-width:0;}
 .qs-dash-draft-tools{flex:none; display:flex; align-items:center; gap:4px;}
+/* Nút đặt bản chính cạnh tên bản nháp (MarkUp 2026-11-19): viền nét đứt khi chưa chọn, nền vàng + sao đặc khi là bản chính */
+.qs-dash-setmain{flex:none; display:inline-flex; align-items:center; gap:4px; height:24px; padding:0 8px; border:1px dashed var(--border); border-radius:999px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:11.5px; font-weight:600; white-space:nowrap; cursor:pointer; transition:border-color .12s, color .12s, background .12s;}
+.qs-dash-setmain:hover{border-style:solid; border-color:#F5A524; color:#B7791F;}
+.qs-dash-setmain.on{border:1px solid #F5A524; background:#FEF3C7; color:#B7791F;}
+.qs-dash-setmain.on svg{fill:currentColor;}
 .qs-dash-draft > .qs-dash-draft-acts{margin-left:auto;}
 /* Bản nháp: bấm biểu tượng = Thông tin chi tiết, bấm tên = mở ở Bóc tách (MarkUp 10:32) */
 button.qs-dash-draft-info{padding:0; border:1px solid transparent; font:inherit; cursor:pointer; transition:border-color .12s, color .12s, background .12s;}
