@@ -21,8 +21,8 @@ export function DeptFilter({ dept, onChange }) {
 }
 
 /* pill: kiểu nút + hộp chọn như các bộ lọc sao / nguồn / nhân sự của thanh Pipeline (MarkUp 2026-11-16 18:03) */
-export function TimeFilter({ filter, onChange, pill }) {
-  if (pill) return <TimePill filter={filter} onChange={onChange} />
+export function TimeFilter({ filter, onChange, pill, iconOnly }) {
+  if (pill) return <TimePill filter={filter} onChange={onChange} iconOnly={iconOnly} />
   return (
     <>
       <select
@@ -42,7 +42,8 @@ export function TimeFilter({ filter, onChange, pill }) {
 }
 
 const fmtD = iso => (iso ? iso.split('-').reverse().join('/') : '…')
-function TimePill({ filter, onChange }) {
+/* iconOnly: chỉ hiện icon, nhãn đưa vào tooltip (MarkUp 2026-11-19) */
+function TimePill({ filter, onChange, iconOnly }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
   useEffect(() => {
@@ -56,10 +57,11 @@ function TimePill({ filter, onChange }) {
   const pick = v => { onChange({ ...filter, time: v }); if (v !== 'custom') setOpen(false) }
   return (
     <div className="kd-pl-sdd" ref={box}>
-      <button type="button" className={'kd-pl-sbtn' + (filter.time !== 'all' ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open} title={label}>
+      <button type="button" className={'kd-pl-sbtn' + (iconOnly ? ' ic' : '') + (filter.time !== 'all' ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open}
+        title={'Thời gian: ' + label} aria-label={'Thời gian: ' + label}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
-        <span>{label}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        {!iconOnly && <span>{label}</span>}
+        {!iconOnly && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>}
       </button>
       {open && (
         <div className="kd-pl-spop" role="listbox">

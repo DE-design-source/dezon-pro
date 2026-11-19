@@ -212,6 +212,8 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
   const setDetail = v => { setDetailRaw(v); try { localStorage.setItem(DETAIL_LS, v ? '1' : '0') } catch { /* bỏ qua */ } }
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')
+  const investorMap = useKdMap('investor')
+  const cdtMap = useKdMap('cdtContact')
   const attachMap = useKdMap('attach')
   const apptMap = useKdMap('appt')
   const [apptOpen, setApptOpen] = useState(false)   // false | true (đặt mới) | {lịch hẹn đang sửa}
@@ -314,7 +316,18 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               </button>
             </h4>
             <dl>
-              <dt>Tên khách hàng</dt><dd>{l.name || '—'}</dd>
+              {/* khách Phòng KD Dự Án (MarkUp 2026-11-19): Chủ đầu tư -> Người phụ trách (= tên khách) -> Chức vụ -> Phòng ban phụ trách, đều bên CĐT */}
+              {l.dept === 'du-an' ? (() => {
+                const cdt = cdtMap[String(l.id)] || {}
+                return (
+                  <>
+                    <dt>Chủ đầu tư</dt><dd>{investorMap[String(l.id)] || '—'}</dd>
+                    <dt>Người phụ trách</dt><dd>{l.name || '—'}</dd>
+                    <dt>Chức vụ</dt><dd>{cdt.role || '—'}</dd>
+                    <dt>Phòng ban phụ trách</dt><dd>{cdt.dept || '—'}</dd>
+                  </>
+                )
+              })() : <><dt>Tên khách hàng</dt><dd>{l.name || '—'}</dd></>}
               <dt>Điện thoại</dt><dd>{l.phone || '—'}</dd>
               <dt>Email</dt><dd>{l.email || '—'}</dd>
               <dt>Tỉnh thành</dt><dd>{tinhThanh || '—'}</dd>

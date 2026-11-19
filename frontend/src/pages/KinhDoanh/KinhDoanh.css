@@ -616,6 +616,10 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-pl-bar .kd-pl-sbtn{display:inline-flex; align-items:center; gap:6px; height:32px; max-width:220px; padding:0 10px; border:1px solid rgba(255,255,255,.25) !important; border-radius:8px; background:rgba(255,255,255,.08) !important; color:#fff !important; font:inherit; font-size:12px; font-weight:600; cursor:pointer;}
 .kd-pl-bar .kd-pl-sbtn span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .kd-pl-bar .kd-pl-sbtn.on{border-color:#F5A524 !important; color:#FCD38A !important;}
+/* bộ lọc thu thành nút icon vuông (Thời gian / Sao / Nhân sự - MarkUp 2026-11-19); đang lọc: chấm cam ở góc */
+.kd-pl-bar .kd-pl-sbtn.ic{position:relative; justify-content:center; width:32px; padding:0;}
+.kd-pl-bar .kd-pl-sbtn.ic svg{width:15px; height:15px;}
+.kd-pl-bar .kd-pl-sbtn.ic.on::after{content:''; position:absolute; top:3px; right:3px; width:6px; height:6px; border-radius:50%; background:#F5A524;}
 .kd-pl-spop{position:absolute; z-index:40; top:calc(100% + 6px); left:0; width:230px; padding:6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 14px 34px rgba(15,23,42,.22); display:flex; flex-direction:column; gap:1px;}
 .kd-pl-spop label{display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; cursor:pointer; color:var(--text); font-size:12.5px;}
 .kd-pl-spop label:hover{background:var(--surface-alt);}
@@ -661,6 +665,21 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-lf-sec > h4{display:flex; align-items:center; gap:8px; margin:0 0 2px; padding-bottom:10px; border-bottom:1px solid var(--border); font-size:13.5px; font-weight:700; color:var(--text);}
 .kd-lf-sec > h4 i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--sales-tint); color:var(--sales); font-style:normal; font-size:11px; font-weight:800;}
 @media (max-width:1100px){ .kd-lf-grid{grid-template-columns:minmax(0, 1fr);} }
+/* Form khách hàng: bước đầu chọn phòng KD (MarkUp 2026-11-19) */
+.kd-lf-dept{grid-column:1 / -1; display:flex; flex-direction:column; gap:8px; padding:14px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface);}
+.kd-lf-dept.warn{border-color:var(--danger);}
+.kd-lf-dept .lb{font-size:13.5px; font-weight:700; color:var(--text);}
+.kd-lf-dept .opts{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px;}
+.kd-lf-dept button{display:flex; align-items:center; gap:12px; padding:12px 14px; border:1.5px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.kd-lf-dept button:hover{border-color:var(--sales);}
+.kd-lf-dept button.on{border-color:var(--sales); background:var(--sales-tint);}
+.kd-lf-dept button > i{flex:none; width:16px; height:16px; border:2px solid var(--border); border-radius:50%; box-sizing:border-box;}
+.kd-lf-dept button.on > i{border:5px solid var(--sales);}
+.kd-lf-dept button span{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.kd-lf-dept button b{font-size:13.5px; font-weight:700;}
+.kd-lf-dept button em{font-style:normal; font-size:11.5px; color:var(--text-muted);}
+.kd-lf-dept .msg{font-size:12px; font-weight:600; color:var(--danger);}
+@media (max-width:640px){ .kd-lf-dept .opts{grid-template-columns:minmax(0, 1fr);} }
 
 /* Ô chọn nhanh: nhóm gợi ý lấy từ nơi khác (kênh Marketing) */
 .kd-sl-grp{padding:8px 10px 4px; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); margin-top:4px;}

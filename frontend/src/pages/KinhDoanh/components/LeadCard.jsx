@@ -12,7 +12,9 @@ const pill = { fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius:
 const fmtScale = s => (/^\d+([.,]\d+)?$/.test(String(s).trim()) ? String(s).trim() + ' m²' : String(s).trim())
 
 /* onMove giữ trong chữ ký cho caller cũ (đã bỏ ô chọn giai đoạn trên thẻ: màu kanban đã cho biết giai đoạn) */
-export default function LeadCard({ lead: l, dups, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee }) {
+/* projMode (lọc Phòng KD Dự Án, MarkUp 2026-11-19): dòng 1 = Tên dự án, dòng 2 = Chủ đầu tư,
+   dòng 3 = Người phụ trách bên CĐT (= tên khách) · chức vụ (kdOptions.cdtContact) */
+export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee }) {
   const stageId = l.stage
   const accent = stageAccent(stageId)
   const isLostStage = stageId === 'truot-thau' || stageId === 'spam' || stageId === 'khong-tham-gia'
@@ -25,6 +27,14 @@ export default function LeadCard({ lead: l, dups, dragging, onDragStart, onDragE
   const noiTitle = [geo.kv, geo.tinh, addr].filter(Boolean).join(' · ')
   const srcC = l.source ? sourceColor(l.source) : null
   const dupList = Array.isArray(dups) ? dups : []
+  const projName = String(useKdMap('projName')[String(l.id)] || '').trim()
+  const investor = String(useKdMap('investor')[String(l.id)] || '').trim()
+  const cdt = useKdMap('cdtContact')[String(l.id)] || {}
+  const contact = [l.name, cdt.role].map(x => String(x || '').trim()).filter(Boolean).join(' · ')
+  const title = projMode && projName ? projName : l.name
+  const dupPill = dupList.length > 0 && <span title={'Trùng SĐT/email với: ' + dupList.map(d => (d.name || '') + (d.source ? ' (' + d.source + ')' : '')).join(', ')} style={{ ...pill, color: 'var(--danger)', background: 'var(--danger-tint)' }}>⚠ Trùng {dupList.length}</span>
+  const pendingPill = h && (h.status === 'pending-qs' || h.status === 'pending-handoff') && <span style={{ ...pill, color: 'var(--gold)', background: 'var(--gold-tint)' }}>⏳ Chờ {h.dept} xác nhận</span>
+  const muted = { opacity: 0.6 }
   return (
     <div
       className={`kd-lead-card${dragging ? ' dragging' : ''}${memberOpen ? ' pop-open' : ''}`}
@@ -40,11 +50,28 @@ export default function LeadCard({ lead: l, dups, dragging, onDragStart, onDragE
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-        <div title={l.name} style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, minHeight: 34, flex: 1, minWidth: 0, ...clamp2 }}>{l.name}</div>
+        <div title={projMode ? (projName ? 'Dự án: ' + projName + ' - Khách: ' : 'Chưa có tên dự án - Khách: ') + l.name : l.name} style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, minHeight: 34, flex: 1, minWidth: 0, ...clamp2 }}>{title}</div>
         <button title="Xoá" onClick={e => { e.stopPropagation(); onDelete(l.id) }} style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex', flex: 'none' }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-.9 14a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
         </button>
       </div>
+      {projMode ? (
+        <>
+          <div title={investor ? 'Chủ đầu tư: ' + investor : ''} style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.3, minHeight: 30, ...clamp2 }}>
+            {investor ? <><span style={{ color: 'var(--text-muted)' }}>CĐT: </span><b style={{ fontWeight: 600 }}>{investor}</b></> : <span style={{ ...muted, color: 'var(--text-muted)' }}>Chưa có thông tin chủ đầu tư</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minHeight: 22, maxHeight: 48, overflow: 'hidden', fontSize: 11.5 }}>
+            <span title={contact ? 'Người phụ trách (CĐT): ' + [contact, cdt.dept].filter(Boolean).join(' · ') : ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, maxWidth: '100%', color: contact ? 'var(--text)' : 'var(--text-muted)', fontWeight: contact ? 600 : 400 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || <span style={muted}>Chưa có người phụ trách</span>}</span>
+            </span>
+            {dupPill}
+            {pendingPill}
+          </div>
+          {/* gạch ngang chia phần: thông tin dự án (tên / CĐT / người phụ trách) | phần còn lại (MarkUp 2026-11-19) */}
+          <div aria-hidden="true" style={{ flex: 'none', height: 0, borderTop: '1px solid var(--border)', margin: '2px 0' }} />
+        </>
+      ) : (<>
       {/* loại công trình · quy mô m2 (MarkUp 2026-11-16 16:16) */}
       <div title={l.type} style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.3, minHeight: 30, ...clamp2 }}>
         {l.projectType || 'Chưa xác định'}{' · '}
@@ -54,12 +81,13 @@ export default function LeadCard({ lead: l, dups, dragging, onDragStart, onDragE
         {/* chỉ 1 nhãn phòng ban: Dân dụng hoặc Dự án (bỏ chip '→ Dự án' dễ nhầm là 2 phòng) */}
         <span style={{ ...pill, color: DEPT_COLOR[l.dept], background: DEPT_TINT[l.dept] }}>{DEPT_SHORT[l.dept]}</span>
         {/* khách trùng SĐT / email: đặt ngay sau phòng ban để không bị ẩn bởi maxHeight */}
-        {dupList.length > 0 && <span title={'Trùng SĐT/email với: ' + dupList.map(d => (d.name || '') + (d.source ? ' (' + d.source + ')' : '')).join(', ')} style={{ ...pill, color: 'var(--danger)', background: 'var(--danger-tint)' }}>⚠ Trùng {dupList.length}</span>}
+        {dupPill}
         {/* nguồn khách hàng: màu riêng theo nguồn (sourceColor) */}
         {l.source ? <span title={'Nguồn: ' + l.source} style={{ ...pill, fontWeight: 700, color: srcC ? srcC.color : 'var(--text-muted)', background: srcC ? srcC.bg : 'var(--surface-alt)', border: srcC ? '1px solid ' + srcC.border : undefined, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.source}</span> : null}
-        {h && (h.status === 'pending-qs' || h.status === 'pending-handoff') && <span style={{ ...pill, color: 'var(--gold)', background: 'var(--gold-tint)' }}>⏳ Chờ {h.dept} xác nhận</span>}
+        {pendingPill}
         {h && h.status === 'self-quoted' && <span style={{ ...pill, color: 'var(--sales)', background: 'var(--sales-tint)' }}>KD tự đề xuất</span>}
       </div>
+      </>)}
       <CardMembers lead={l} open={memberOpen} onToggle={onToggleMember} onClose={onCloseMember} onAdd={onAddAssignee} onRemove={onRemoveAssignee} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
         <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>

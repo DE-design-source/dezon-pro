@@ -24,7 +24,7 @@ export default function ProjectCard({ group: g, curMa }) {
         <Icon name="trash" size={13} />
       </button>
       <div className="qs-dash-project-body">
-        {g.drafts.map((d, i) => <DraftItem key={d.maDA} draft={d} index={i} active={d.maDA === curMa} />)}
+        {g.drafts.map((d, i) => <DraftItem key={d.maDA} draft={d} index={i} active={d.maDA === curMa} groupMas={g.drafts.map(x => x.maDA)} />)}
         <button type="button" className="qs-dash-add-draft" onClick={() => addDraft(key)}><Icon name="plus" size={14} />Thêm bản nháp</button>
       </div>
     </div>

@@ -160,7 +160,7 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
       {open && (
         <div className="qs-dash-project-body qs-dash-row-body">
           {/* bọc từng bản nháp để vẽ đường nối cây cha - con từ biểu tượng dự án xuống từng bản nháp (.qs-dash-tree-i) */}
-          {g.drafts.map((d, i) => <div key={d.maDA} className="qs-dash-tree-i"><DraftItem draft={d} index={i} active={d.maDA === curMa} /></div>)}
+          {g.drafts.map((d, i) => <div key={d.maDA} className="qs-dash-tree-i"><DraftItem draft={d} index={i} active={d.maDA === curMa} groupMas={g.drafts.map(x => x.maDA)} /></div>)}
           {/* "Thêm bản nháp" là 1 nhánh cuối của cây, đồng cấp với các bản nháp: biểu tượng (+) thay biểu tượng tệp */}
           <div className="qs-dash-tree-i">
             <button type="button" className="qs-dash-draft qs-dash-add-row" onClick={() => addDraft(key)}>
