@@ -306,3 +306,12 @@
 @media (hover:none){ .qs-sui-cc .ck{opacity:1;} }
 @media (max-width:1000px){ .qs-sui-intro{grid-template-columns:1fr;} .qs-sui-prow{grid-template-columns:22px minmax(0, 1fr) 140px 30px;} .qs-sui-prow > input:nth-of-type(2){grid-column:2 / 4;} .qs-sui-catadd{grid-template-columns:1fr;} }
 @media (max-width:640px){ .qs-sui-prow.head{display:none;} .qs-sui-pft{flex-wrap:wrap;} .qs-sui-pft span{flex:1 1 100%; order:3;} }
+
+/* Tab Sản phẩm của NCC: ô tìm sản phẩm + bấm SP xem thông tin mở rộng */
+.qs-sup-spq{flex:1 1 220px; max-width:340px; display:flex; align-items:center; gap:6px; height:36px; padding:0 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text-muted);}
+.qs-sup-spq:focus-within{border-color:var(--dash-accent);}
+.qs-sup-spq input{flex:1; min-width:0; border:none; outline:none; background:transparent; color:var(--text); font:inherit; font-size:13px;}
+.qs-sup-spq button{display:inline-flex; padding:2px; border:none; background:none; color:var(--text-muted); cursor:pointer;}
+.qs-sup-click{cursor:pointer;}
+.qs-sup-click:hover{border-color:var(--dash-accent);}
+.qs-pd-sprow.qs-sup-click:hover{background:var(--surface-alt);}

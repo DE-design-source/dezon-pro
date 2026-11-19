@@ -3,7 +3,7 @@ import QsIcon from '../common/QsIcon'
 import StatusView from '../common/StatusView'
 import { useQs } from '../../state/QsData'
 import { useQsStore } from '../../state/store'
-import { coSpec_ } from '../../lib/productFields'
+import { coSpec_, nganhCuaSP_ } from '../../lib/productFields'
 import { money } from '../../lib/format'
 import { mediaUrl } from '../../api/files'
 import ImgUpBlock from './ImgUpBlock'
@@ -13,9 +13,10 @@ import DbCard from './DbCard'
 import '../products/list/list.css'
 import { useImp, impForm } from './importStore'
 import GhiPicker from './GhiPicker'
-import { impGroups_, vsApply_, dbCalcDaiLy_, tdSave_, varCombos_, btLabel_ } from './importLogic'
-import { upFilesSeq_, pickFiles_ } from './imgUpload'
-import { pendingEditCancel_, impCbAdd_, impCbDel_, impCbSL_, impCbSearch_, cbLbl_, varPreview_ } from './importActions'
+import { impGroups_, vsApply_, dbCalcDaiLy_, tdSave_ } from './importLogic'
+import VariantTable from '../common/VariantTable'
+import { varCols_ } from '../../lib/variants'
+import { pendingEditCancel_, impCbAdd_, impCbDel_, impCbSL_, impCbSearch_, cbLbl_ } from './importActions'
 
 /* Cột trái tab Nhập dữ liệu (port renderImport / dbInput / dbCard_ / vsApplyHM_ / impCbRender_ / varPreview_, PUB/nhap.js:151-164,
    259-284, 455-459, 767-870). Giá trị form nằm ở importStore (giữ khi rời tab). Props: specs (null khi chưa nạp), specErr, onRetrySpecs. */
@@ -67,13 +68,14 @@ function DbField({ f, idx, vals, vs, goiY, maCo }) {
       </>
     )
   } else if (goiY && goiY[lark]) {
-    const ds = goiY[lark], k = khoaTen_(val), co = k && ds.some(x => khoaTen_(x) === k && x === val.trim())
+    // ds = gợi ý hiện ra (Thương hiệu: chỉ của ngành đang chọn); all = mọi giá trị đã có (đồng bộ chính tả, báo "Mới")
+    const { ds, all } = goiY[lark], k = khoaTen_(val), co = k && all.some(x => khoaTen_(x) === k && x === val.trim())
     inner = (
       <>
         <input list={'qsi-gy-' + idx} placeholder={ph} value={val} onChange={e => set(e.target.value)}
-          onBlur={() => { const m = ds.filter(x => khoaTen_(x) === khoaTen_(val))[0]; if (m && m !== val) set(m) }} />
+          onBlur={() => { const m = all.filter(x => khoaTen_(x) === khoaTen_(val))[0]; if (m && m !== val) set(m) }} />
         <datalist id={'qsi-gy-' + idx}>{ds.map(o => <option key={o} value={o} />)}</datalist>
-        {val.trim() && !co && !ds.some(x => khoaTen_(x) === k) ? <small className="qsi-gy-new">Mới — chưa có trong danh mục, sẽ tạo thêm</small> : null}
+        {val.trim() && !co && !all.some(x => khoaTen_(x) === k) ? <small className="qsi-gy-new">Mới — chưa có trong danh mục, sẽ tạo thêm</small> : null}
       </>
     )
   } else if (lark === 'MÃ SẢN PHẨM' && maCo) {
@@ -147,91 +149,14 @@ function ComboCard({ form, loai, specs }) {
   )
 }
 
-function VarCard({ form, loai }) {
-  const v = form.vars
-  const inp = (key, label, ph) => (
-    <div className="qsi-field"><label>{label}</label>
-      <input placeholder={ph} value={v[key] || ''} onChange={e => impForm(F => ({ vars: { ...F.vars, [key]: e.target.value } }))} /></div>
-  )
-  // chỉ xem trước các ô đang hiện theo ngành
-  const shown = { varKelvin: '', varWatt: '', varAngle: '', varColor: v.varColor, varSize: '' }
-  if (loai === 'son' || loai === 'vs' || loai === 'gach') shown.varSize = v.varSize
-  else if (loai !== 'ct' && loai !== 'dl') { shown.varKelvin = v.varKelvin; shown.varWatt = v.varWatt; shown.varAngle = v.varAngle }
-  const pv = varPreview_(shown)
+/* Biến thể: bảng mỗi dòng 1 biến thể (VariantTable) - trục theo ngành, Mã / Giá / Ảnh riêng; ô trống = theo giá trị chung ở trên */
+function VarCard({ form, loai, vs }) {
+  const cols = varCols_(loai, vs && vs.SPEC, vs && vs.hm)
   return (
-    <DbCard title="Nhập biến thể (tuỳ chọn)" ic="sliders" note="Nhập nhiều giá trị cách nhau bằng dấu phẩy — hệ thống tạo 1 sản phẩm cho MỖI tổ hợp (cùng mã SP, khác thông số).">
-      <div className="qsi-dbgrid">
-        {/* Ba trục nhiệt độ / công suất / góc chỉ có nghĩa với ĐÈN */}
-        {loai === 'ct' || loai === 'dl' ? null : loai === 'son' ? inp('varSize', 'Quy cách (dung tích)', 'VD: 1L, 5L, 18L')
-          : loai === 'vs' ? inp('varSize', 'Kích thước', 'VD: L580 x W380, L620 x W390')
-            : loai === 'gach' ? inp('varSize', 'Kích thước', 'VD: 600 x 600 (mm), 600 x 1200 (mm)')
-            : <>{inp('varKelvin', 'Nhiệt độ màu (K)', 'VD: 3000, 4000, 6500')}{inp('varWatt', 'Công suất (W)', 'VD: 7, 9, 12')}{inp('varAngle', 'Góc chiếu (°)', 'VD: 24, 36, 60')}</>}
-        {inp('varColor', 'Màu sắc', 'VD: Đen, Trắng, Vàng')}
-      </div>
-      {pv ? (
-        <div className="qsi-var-note qsi-on">
-          <div className="qsi-var-math">{pv.parts.map((p, i) => <span key={i}>{i ? <> <b>×</b> </> : null}{p}</span>)} <b>=</b> <span className="qsi-var-total">{pv.total} sản phẩm</span></div>
-          <div className="qsi-var-list">{pv.chips.map((c, i) => <span className="qsi-var-chip" key={i}>{c}</span>)}{pv.more ? <i> … +{pv.more} nữa</i> : null}</div>
-        </div>
-      ) : <div className="qsi-var-note">Bỏ trống = chỉ tạo 1 sản phẩm theo thông số đã nhập ở trên.</div>}
-      <VarImgs labels={pv ? varCombos_(shown).map(btLabel_) : []} imgs={form.varImg || {}} meta={form.varMeta || {}}
+    <DbCard title="Biến thể (tuỳ chọn)" ic="sliders" note="Mỗi dòng = 1 sản phẩm (cùng tên, thông số chung ở trên). Ô để trống dùng giá trị chung; mỗi biến thể có Mã, Giá, Ảnh riêng.">
+      <VariantTable cols={cols} rows={form.varRows || []} onChange={fn => impForm(F => ({ varRows: fn(F.varRows || []) }))}
         maGoc={form.vals['MÃ SẢN PHẨM'] || ''} giaGoc={form.vals['GIÁ BÁN LẺ'] || ''} />
     </DbCard>
-  )
-}
-
-/* Bảng biến thể: mỗi tổ hợp 1 dòng Ảnh · Mã SP · Giá bán lẻ (form.varImg / form.varMeta theo nhãn biến thể).
-   Khi Đưa vào danh sách chờ (tdSave_): ảnh thành hình đại diện của SP biến thể; mã / giá để trống thì theo mã / giá chung ở trên.
-   ponytail: hiện tối đa 60 dòng; nhiều hơn thì cần lọc theo trục (vd chỉ theo màu) */
-const VAR_IMG_MAX = 60
-function VarImgs({ labels, imgs, meta, maGoc, giaGoc }) {
-  const acc = lb => ({
-    main: imgs[lb] || '', list: [],
-    put: fn => impForm(F => { const v = F.varImg || {}, nx = fn({ main: v[lb] || '', list: [] }); return { varImg: { ...v, [lb]: nx.main } } }),
-  })
-  const setMeta = (lb, k, val) => impForm(F => { const m = F.varMeta || {}; return { varMeta: { ...m, [lb]: { ...(m[lb] || {}), [k]: val } } } })
-  const drop = (e, lb) => {
-    e.preventDefault()
-    const fs = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []).filter(f => !f.type || /^image\//.test(f.type))
-    if (fs.length) upFilesSeq_('main', fs.slice(0, 1), acc(lb))
-  }
-  const addUrl = lb => {
-    const u = window.prompt('Dán link ảnh cho biến thể "' + lb + '"')
-    if (u && u.trim()) acc(lb).put(s => ({ ...s, main: u.trim() }))
-  }
-  const ds = labels.slice(0, VAR_IMG_MAX)
-  if (!labels.length) return (
-    <div className="qsi-varimg">
-      <div className="qsi-varimg-h"><b>Biến thể</b> <span>(tuỳ chọn) — nhập giá trị biến thể ở các ô trên (VD Màu sắc: Đen, Trắng), mỗi biến thể sẽ có 1 dòng để nhập Ảnh · Mã sản phẩm · Giá riêng.</span></div>
-    </div>
-  )
-  return (
-    <div className="qsi-varimg">
-      <div className="qsi-varimg-h"><b>Biến thể ({labels.length})</b> <span>— mỗi dòng 1 sản phẩm. Ảnh, Mã, Giá để trống thì dùng ảnh / mã / giá chung ở trên.</span></div>
-      <div className="qsi-vartbl">
-        <div className="qsi-vartbl-r qsi-vartbl-h"><span>Ảnh</span><span>Biến thể</span><span>Mã sản phẩm</span><span>Giá bán lẻ (đ)</span></div>
-        {ds.map(lb => {
-          const v = imgs[lb] || '', m = meta[lb] || {}
-          return (
-            <div className="qsi-vartbl-r" key={lb}>
-              <div className="qsi-varimg-cell">
-                <div className={'qsi-upzone qsi-varimg-box' + (v ? ' qsi-has' : '')} tabIndex={0} title={v ? 'Bấm để đổi ảnh' : 'Bấm hoặc kéo ảnh vào'}
-                  onClick={() => pickFiles_(false, 'image/*', fs => upFilesSeq_('main', fs, acc(lb)))}
-                  onDragOver={e => e.preventDefault()} onDrop={e => drop(e, lb)}>
-                  {v ? <img src={mediaUrl(v)} alt="" /> : <QsIcon name="camera" size={16} />}
-                  {v ? <button className="qsi-upx" title="Bỏ ảnh" onClick={e => { e.stopPropagation(); acc(lb).put(s => ({ ...s, main: '' })) }}>✕</button> : null}
-                </div>
-                <button type="button" className="qsi-varimg-link" onClick={() => addUrl(lb)}>Dán link</button>
-              </div>
-              <div className="qsi-vartbl-lb" title={lb}>{lb}</div>
-              <input value={m.ma || ''} placeholder={maGoc || 'Mã riêng (tuỳ chọn)'} onChange={e => setMeta(lb, 'ma', e.target.value)} />
-              <input className="num" inputMode="numeric" value={m.gia || ''} placeholder={giaGoc ? money(giaGoc) : 'Giá riêng (tuỳ chọn)'} onChange={e => setMeta(lb, 'gia', e.target.value)} />
-            </div>
-          )
-        })}
-        {labels.length > VAR_IMG_MAX ? <i className="qsi-varimg-more">… +{labels.length - VAR_IMG_MAX} biến thể nữa dùng ảnh / mã / giá chung</i> : null}
-      </div>
-    </div>
   )
 }
 
@@ -246,22 +171,25 @@ function GhiCard({ form, projSelRef }) {
 export default function ProductForm({ specs, specErr, onRetrySpecs }) {
   const form = useImp(s => s.form)
   const { products: dsSP } = useQs()
-  // danh sách Thương hiệu / NCC đã có (không trùng theo chữ thường), xếp theo chữ cái
+  const loai = useImp(s => s.loai)
+  /* danh sách Thương hiệu / NCC đã có (không trùng theo chữ thường), xếp theo chữ cái. Thương hiệu chỉ GỢI Ý của ngành đang chọn
+     (SP cùng ngành, nganhCuaSP_); ngành chưa có SP nào thì gợi ý tất cả. Gõ thương hiệu mới vẫn được. */
   const goiY = useMemo(() => {
     const o = {}
+    const ds_ = arr => { const m = {}; arr.forEach(p => { const v = String(p || '').trim(); if (v && !m[khoaTen_(v)]) m[khoaTen_(v)] = v }); return Object.values(m).sort((a, b) => a.localeCompare(b, 'vi')) }
+    const cungNganh = loai && loai !== 'pt' ? (dsSP || []).filter(p => nganhCuaSP_(p, specs) === (loai === 'sp' ? 'den' : loai)) : []   // 'sp' = ngành đèn
     Object.keys(GOI_Y).forEach(lb => {
-      const m = {}
-      ;(dsSP || []).forEach(p => { const v = String(p[GOI_Y[lb]] || '').trim(); if (v && !m[khoaTen_(v)]) m[khoaTen_(v)] = v })
-      o[lb] = Object.values(m).sort((a, b) => a.localeCompare(b, 'vi'))
+      const all = ds_((dsSP || []).map(p => p[GOI_Y[lb]]))
+      const rieng = lb === 'THƯƠNG HIỆU' ? ds_(cungNganh.map(p => p[GOI_Y[lb]])) : []
+      o[lb] = { all, ds: rieng.length ? rieng : all }
     })
     return o
-  }, [dsSP])
+  }, [dsSP, loai, specs])
   const maCo = useMemo(() => {
     const m = {}
     ;(dsSP || []).forEach(p => { const k = khoaTen_(p.ma); if (k) (m[k] = m[k] || []).push(p) })
     return m
   }, [dsSP])
-  const loai = useImp(s => s.loai)
   const pendEdit = useImp(s => s.pendEdit)
   const onTab = useQsStore(s => s.tab) === 'import'
   const [btn, setBtnSt] = useState({ dis: false, text: '' })
@@ -303,7 +231,7 @@ export default function ProductForm({ specs, specErr, onRetrySpecs }) {
         )
       })}
       <ComboCard form={form} loai={loai} specs={specs} />
-      <VarCard form={form} loai={loai} />
+      <VarCard form={form} loai={loai} vs={vs} />
       <GhiCard form={form} projSelRef={projSelRef} />
       {pendEdit ? (
         <div className="qsi-savebar">

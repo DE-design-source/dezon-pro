@@ -12,7 +12,8 @@ import { statCache, loadStats_ } from '../project/projectStats'
 import '../project/gallery.css'
 import '../products/list/list.css'
 import './supplier.css'
-import { MultiProjPop } from '../products/list/SpModal'
+import SpModal, { MultiProjPop } from '../products/list/SpModal'
+import { useSpecs } from '../breakdown/catalog/useSpecs'
 import { MrootPortal } from '../common/Mroot'
 import { spAddToProject } from '../products/list/spActions'
 import { useNccInfo, IntroTab, PartnerTab, CatalogueTab } from './SupplierInfo'
@@ -242,8 +243,14 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
   const setSpv = v => { setSpvSt(v); try { localStorage.setItem('qs_sup_spview', v) } catch (e) { /* bỏ qua */ } }
   const [tab, setTab] = useState('sp')
   const [hm, setHm] = useState('')
+  const [spq, setSpq] = useState('')          // ô tìm sản phẩm của NCC (tên, mã, hạng mục, nhà phân phối; không dấu)
+  const [xem, setXem] = useState(null)        // SP đang xem thông tin mở rộng (SpModal) trước khi thêm vào dự án
+  const { specs, error: specErr } = useSpecs()
   const hms = Object.keys(o.hm).sort((a, b) => o.hm[b] - o.hm[a])
-  const sp = hm ? o.sp.filter(p => s_(p.hangMuc) === hm) : o.sp
+  const qw = qbNorm_(spq).trim().split(/\s+/).filter(Boolean)
+  const sp = o.sp.filter(p => (!hm || s_(p.hangMuc) === hm)
+    && (!qw.length || (t => qw.every(w => t.includes(w)))(qbNorm_([p.ten, p.ma, p.hangMuc, p.dongSanPham, p.ncc].join(' ')))))
+  const mo = p => ({ onClick: () => setXem(p), title: 'Bấm để xem thông tin mở rộng (ảnh, thông số, tài liệu)' })
   const dists = Object.keys(o.dist).sort((a, b) => o.dist[b] - o.dist[a])
   const NI = useNccInfo()
   const hs = NI.info[o.ten] || {}
@@ -252,6 +259,7 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
     ['intro', 'Giới thiệu', 0], ['partner', 'Đối tác', (hs.doiTac || []).length], ['cat', 'Catalogue', (hs.catalogue || []).length]]
   return (
     <div className="qs-pd">
+      {xem && <SpModal product={xem} specs={specs} specErr={specErr} canEdit={false} onClose={() => setXem(null)} onEdit={() => {}} />}
       {multiP && (
         <MrootPortal>
           <div className="qsc-ov qspl-ov" onMouseDown={e => { if (e.target === e.currentTarget) setMultiP(null) }}>
@@ -283,15 +291,19 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
                 {hms.map(h => <button type="button" key={h} className={hm === h ? 'on' : ''} onClick={() => setHm(h)}>{h}<small>{o.hm[h]}</small></button>)}
               </div>
             ) : <span />}
+            <label className="qs-sup-spq"><Icon name="search" size={14} />
+              <input value={spq} placeholder={'Tìm trong ' + o.sp.length + ' sản phẩm: tên, mã…'} onChange={e => setSpq(e.target.value)} />
+              {spq && <button type="button" title="Xoá tìm" onClick={() => setSpq('')}><Icon name="x" size={12} /></button>}
+            </label>
             <div className="qs-pd-spv" role="group" aria-label="Chế độ xem sản phẩm">
               {SPD_VIEWS.map(v => <button type="button" key={v[0]} className={spv === v[0] ? 'on' : ''} title={'Xem dạng ' + v[1]} onClick={() => setSpv(v[0])}><Icon name={v[2]} size={15} /><span>{v[1]}</span></button>)}
             </div>
           </div>
-          {spv === 'table' ? (
+          {!sp.length ? <div className="qs-pd-empty">Không có sản phẩm khớp "{spq}".</div> : spv === 'table' ? (
             <div className="qs-pd-sp">
               <div className="qs-pd-sprow head qs-sup-sprow"><span>Ảnh</span><span>Sản phẩm</span><span>Mã</span><span>Hạng mục</span><span>Trạng thái</span><span className="r">Giá</span><span /></div>
               {sp.map(p => (
-                <div key={p.recordId || p.ma} className="qs-pd-sprow qs-sup-sprow">
+                <div key={p.recordId || p.ma} className="qs-pd-sprow qs-sup-sprow qs-sup-click" {...mo(p)}>
                   <ProductThumb product={p} size={44} src={img1(p.hinhAnh)} />
                   <span className="nm" title={p.ten}>{p.ten}</span>
                   <span>{p.ma || '—'}</span>
@@ -305,7 +317,7 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
           ) : spv === 'list' ? (
             <div className="qs-sup-splist">
               {sp.map(p => (
-                <div key={p.recordId || p.ma} className="qs-sup-spli">
+                <div key={p.recordId || p.ma} className="qs-sup-spli qs-sup-click" {...mo(p)}>
                   <span className="im"><ProductThumb product={p} size={96} src={img1(p.hinhAnh)} /></span>
                   <div className="tx"><b title={p.ten}>{p.ten}</b><span>{[p.ma, p.hangMuc, p.ncc].filter(v => s_(v)).join(' · ')}</span><span>{p.daDuyet ? 'Đã duyệt' : 'Chưa duyệt'}</span></div>
                   <b className="tt">{money(p.donGiaBan)} đ</b>
@@ -316,7 +328,7 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
           ) : (
           <div className={'qs-pd-spgrid' + (spv === 'small' ? ' small' : '')}>
             {sp.map(p => (
-              <div key={p.recordId || p.ma} className="qs-pd-spcard">
+              <div key={p.recordId || p.ma} className="qs-pd-spcard qs-sup-click" {...mo(p)}>
                 <div className="img"><ProductThumb product={p} size={150} src={img1(p.hinhAnh)} /></div>
                 <b title={p.ten}>{p.ten}</b>
                 <span className="br">{[p.ma, p.hangMuc].filter(v => s_(v)).join(' · ')}</span>

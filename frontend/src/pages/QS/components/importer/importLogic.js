@@ -1,11 +1,12 @@
 /* Nghiệp vụ tab Nhập dữ liệu (port nguyên văn PUB/nhap.js): bộ trường theo ngành, lưu form vào danh sách chờ (tdSave),
-   sửa dòng chờ (pendItemData_ / pendFillForm_), biến thể (varCombos_), lưu danh sách chờ vào Database (pendingCommit_),
+   sửa dòng chờ (pendItemData_ / pendFillForm_), biến thể (bảng VariantTable, lib/variants.js), lưu danh sách chờ vào Database (pendingCommit_),
    đồng bộ danh sách "vừa nhập" sau khi sửa (impSyncSession_). Spec ngành là tham số specs = {VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC}. */
 import * as api from '../../api/qsApi'
 import { getState, subscribe, reloadProducts, reloadLines } from '../../state/store'
 import { qsToast, qsConfirm, qsAlert } from '../common/dialogs'
 import { coSpec_, specNganh_, groupsOfNganh_, flat_, IMP_TRUC, impGon_ } from '../../lib/productFields'
 import { tkNum_ } from '../../lib/format'
+import { varCols_, varRowCo_, varRowLb_ } from '../../lib/variants'
 import { nodeName } from '../../lib/tree'
 import { impGet, impSet, emptyForm_, pendingAdd_, pendUid_, sessionAdd_, waitUploads_, nowIsoClient_, bulkCleared_ } from './importStore'
 
@@ -31,31 +32,6 @@ export function dbCalcDaiLy_(vals) {
   return g ? Math.round(g * (1 - ck / 100)) : ''
 }
 
-/* ===== BIẾN THỂ (nhap.js:1298-1314) ===== */
-export function varList_(s) { return String(s || '').split(',').map(x => x.trim()).filter(Boolean) }
-export function varCombos_(vars) {
-  const K = varList_(vars.varKelvin), W = varList_(vars.varWatt), A = varList_(vars.varAngle), C = varList_(vars.varColor), Z = varList_(vars.varSize)
-  if (!K.length && !W.length && !A.length && !C.length && !Z.length) return []
-  const out = []
-  ;(K.length ? K : [null]).forEach(k => {
-    (W.length ? W : [null]).forEach(w => {
-      (A.length ? A : [null]).forEach(a => {
-        (C.length ? C : [null]).forEach(c => {
-          (Z.length ? Z : [null]).forEach(z => { out.push({ k, w, a, c, z }) })
-        })
-      })
-    })
-  })
-  return out
-}
-// Chỉ lấy ô biến thể đang hiện theo ngành (bản gốc đọc theo id ô có trong DOM)
-export function varsOfLoai_(vars, loai) {
-  const v = { varKelvin: '', varWatt: '', varAngle: '', varColor: vars.varColor || '', varSize: '' }
-  if (loai === 'ct' || loai === 'dl') return v
-  if (loai === 'son' || loai === 'vs' || loai === 'gach') return { ...v, varSize: vars.varSize || '' }
-  return { ...v, varKelvin: vars.varKelvin || '', varWatt: vars.varWatt || '', varAngle: vars.varAngle || '' }
-}
-export const btLabel_ = x => [x.w ? x.w + 'W' : '', x.k ? x.k + 'K' : '', x.a ? x.a + '°' : '', x.c || '', x.z || ''].filter(Boolean).join(' · ')
 
 /* "Xoá form" / form mới (renderImport) */
 export function resetForm_() { impSet(s => ({ form: emptyForm_(), bulk: bulkCleared_(s.bulk) })) }
@@ -116,14 +92,14 @@ export async function tdSave_(specs, setBtn) {
     if (m) data[lb] = String(m[pk]).trim()
   })
   const ten = String(data['TÊN SẢN PHẨM'] || '').trim(); if (!ten) { toast('Nhập Tên sản phẩm'); return }
-  const vars = varsOfLoai_(F.vars, ngIn)
+  // biến thể dạng bảng (VariantTable): mỗi dòng có nội dung = 1 sản phẩm
+  const vCols = varCols_(ngIn, SPEC, hmVS), vRows = (F.varRows || []).filter(varRowCo_)
   if (laVS) {
     const hmTuDien = !hmVS && String(F.vals['HẠNG MỤC'] || '').trim()   // "Khác — tự điền": không có bộ thông số, bỏ kiểm bắt buộc
     if (!hmVS && !hmTuDien) { toast('Chọn Hạng mục ' + (ngIn === 'son' ? 'sơn nước' : (ngIn === 'ct' ? 'công tắc - ổ cắm' : (ngIn === 'dl' ? 'điện lạnh' : (ngIn === 'gach' ? 'gạch ốp lát' : 'thiết bị vệ sinh'))))); return }
     let thieu = hmVS ? SPEC.HM[hmVS].req.filter(lb => !data[lb]) : []
-    // biến thể theo màu / kích thước điền ở khối Biến thể thì không tính là thiếu
-    if (varList_(vars.varColor).length) thieu = thieu.filter(lb => lb !== 'MÀU SẮC')
-    if (varList_(vars.varSize).length) thieu = thieu.filter(lb => lb !== 'KÍCH THƯỚC')
+    // trục biến thể điền đủ ở MỌI dòng của bảng Biến thể thì không tính là thiếu
+    if (vRows.length) thieu = thieu.filter(lb => !vRows.every(r => String((r.v || {})[lb] || '').trim()))
     if (thieu.length) { toast(hmVS + ' cần nhập: ' + thieu.map(lb => SPEC.METRIC[lb][1]).join(', ')); return }
   }
   delete data['GIÁ ĐẠI LÝ']
@@ -136,25 +112,18 @@ export async function tdSave_(specs, setBtn) {
     const imgs = [F2.imgMain].concat(F2.imgList || []).filter(Boolean).filter(v => v.indexOf('data:') !== 0)   // bỏ ảnh tạm chưa tải xong
     if (imgs.length) data['ẢNH SẢN PHẨM'] = imgs.join('\n')
     const meta = { thuongHieu: data['THƯƠNG HIỆU'] || '', ncc: data['NHÀ CUNG CẤP'] || '', hinhAnh: data['ẢNH SẢN PHẨM'] || '', nganh: data['NGÀNH HÀNG'] }
-    const combos = varCombos_(vars), items = []
-    if (combos.length) {
-      // BIẾN THỂ: 1 sản phẩm cho mỗi tổ hợp (cùng mã SP, khác nhiệt độ/công suất/góc/màu/kích thước)
-      const varImg = F2.varImg || {}, varMeta = F2.varMeta || {}
-      combos.forEach(c => {
+    const items = []
+    if (vRows.length) {
+      if (vRows.some(r => String(r.anh || '').indexOf('data:') === 0)) { toast('Đợi ảnh biến thể tải lên xong rồi bấm lại'); return }
+      // BIẾN THỂ: 1 sản phẩm cho mỗi dòng; ô trục / mã / giá / ảnh để trống = theo giá trị chung ở trên
+      vRows.forEach(r => {
         const d2 = Object.assign({}, data)
-        // Mã SP / giá bán lẻ riêng của biến thể (bảng biến thể); để trống = theo mã / giá chung ở trên
-        const vm = varMeta[btLabel_(c)] || {}
-        if (String(vm.ma || '').trim()) d2['MÃ SẢN PHẨM'] = String(vm.ma).trim()
-        if (tkNum_(vm.gia) > 0) d2['GIÁ BÁN LẺ'] = String(tkNum_(vm.gia))
-        // Ảnh riêng của biến thể (khối Nhập biến thể) làm ảnh đại diện, ảnh chung của SP xếp sau
-        const vi = varImg[btLabel_(c)]
-        if (vi && vi.indexOf('data:') !== 0) d2['ẢNH SẢN PHẨM'] = [vi].concat(imgs.filter(x => x !== vi)).join('\n')
-        if (c.k) d2['NHIỆT ĐỘ MÀU (K)'] = c.k
-        if (c.w) d2['CÔNG SUẤT (W)'] = c.w
-        if (c.a) d2['GÓC CHIẾU (°)'] = c.a
-        if (c.c) d2['MÀU SẮC'] = c.c
-        if (c.z) d2['KÍCH THƯỚC'] = c.z
-        items.push(Object.assign({ kind: 'form', data: d2, ten, bienThe: btLabel_(c), ma: d2['MÃ SẢN PHẨM'] || '' }, meta, { hinhAnh: d2['ẢNH SẢN PHẨM'] || '' }))
+        vCols.forEach(c => { const x = String((r.v || {})[c.lb] || '').trim(); if (x) d2[c.lb] = x })
+        if (String(r.ma || '').trim()) d2['MÃ SẢN PHẨM'] = String(r.ma).trim()
+        if (tkNum_(r.gia) > 0) d2['GIÁ BÁN LẺ'] = String(tkNum_(r.gia))
+        if (r.anh) d2['ẢNH SẢN PHẨM'] = [r.anh].concat(imgs.filter(x => x !== r.anh)).join('\n')
+        const bt = varRowLb_(r, vCols) || d2['MÃ SẢN PHẨM'] || ''
+        items.push(Object.assign({ kind: 'form', data: d2, ten, bienThe: bt, ma: d2['MÃ SẢN PHẨM'] || '' }, meta, { hinhAnh: d2['ẢNH SẢN PHẨM'] || '' }))
       })
     } else items.push(Object.assign({ kind: 'form', data, ten, ma: data['MÃ SẢN PHẨM'] || '' }, meta))
     const cbo = (F2.combo || []).map(x => Object.assign({}, x))

@@ -23,7 +23,8 @@ export default function SpCards({ layout, cols, rows, sel, skuCount, canDuyet, o
         return (
           <div key={key} className={`qspl-pc${isSel ? ' sel' : ''}${r.kid ? ' kid' : ''}`} onClick={() => on.open(p)}>
             <div className="qspl-pc-img">
-              <ProductThumb product={p} size={layout === 'grid' ? 160 : 96} src={img1(p.hinhAnh)} />
+              <ProductThumb product={p} size={layout === 'grid' ? 160 : 96} src={img1(p.hinhAnh)} title="Bấm để xem ảnh lớn"
+                onClick={p.hinhAnh && on.img ? e => { e.stopPropagation(); on.img(p) } : undefined} />
               <input type="checkbox" className="qspl-ck qspl-pc-ck" checked={isSel} title="Chọn"
                 onClick={e => e.stopPropagation()} onChange={e => on.selToggle(key, e.target.checked)} />
               <button type="button" className={`qspl-pc-fav${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'}

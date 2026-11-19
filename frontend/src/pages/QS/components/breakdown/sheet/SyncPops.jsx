@@ -9,6 +9,8 @@ import { lnDiff_ } from '../../../lib/bocSync.js'
 import { mediaUrl } from '../../../api/files'
 import { lineUpdateApply, giaSyncApply } from './bocActions'
 import { qsToast as toast } from '../../common/dialogs'
+import * as api from '../../../api/qsApi'
+import { fmtDateTime_ } from '../../products/edit/editModel'
 
 const img1 = v => mediaUrl(String(v || '').split('\n')[0].trim())
 
@@ -54,7 +56,15 @@ export function LineUpdatePop({ anchor, line, products, onClose }) {
 export function PriceSyncModal({ ds, onClose }) {
   const [off, setOff] = useState({})
   const [busy, setBusy] = useState(null)
+  const [mo, setMo] = useState(-1)        // dòng đang mở chi tiết
+  const [hist, setHist] = useState({})    // maSP -> lịch sử sửa SP (mảng | {err})
   const chon = ds.filter((x, i) => !off[i])
+  const xem = (i, ma) => {
+    setMo(m => (m === i ? -1 : i))
+    if (!ma || hist[ma]) return
+    setHist(h => ({ ...h, [ma]: 'loading' }))
+    api.getProductHistory(ma).then(r => setHist(h => ({ ...h, [ma]: r || [] })), e => setHist(h => ({ ...h, [ma]: { err: (e && e.message) || 'lỗi' } })))
+  }
   useEffect(() => {
     const k = e => { if (e.key === 'Escape' && busy === null) onClose() }
     document.addEventListener('keydown', k)
@@ -77,12 +87,39 @@ export function PriceSyncModal({ ds, onClose }) {
           <div className="qs-tk-gsxb">
             {ds.map((x, i) => {
               const phu = [x.l.tang, x.l.khuVuc, x.l.maSP].map(t => String(t || '').trim()).filter(Boolean).join(' · ')
+              const ma = String(x.l.maSP || '').trim(), h = hist[ma], p = x.p || {}
               return (
-                <label key={x.l.lineId} className="qs-tk-gsxi">
-                  <input type="checkbox" checked={!off[i]} onChange={e => setOff({ ...off, [i]: !e.target.checked })} />
-                  <div className="qs-tk-gsxc"><div className="nm">{x.l.ten || '(không tên)'}</div>{phu && <div className="sub">{phu}</div>}</div>
-                  <div className="qs-tk-gsxv"><span className="cu">{money(x.cu)}</span><span className="ar">→</span><span className="moi">{money(x.von)}</span></div>
-                </label>
+                <div key={x.l.lineId} className={'qs-tk-gsxw' + (mo === i ? ' on' : '')}>
+                  <div className="qs-tk-gsxi" title="Bấm để xem nội dung thay đổi, người sửa" onClick={() => xem(i, ma)}>
+                    <input type="checkbox" checked={!off[i]} onClick={e => e.stopPropagation()} onChange={e => setOff({ ...off, [i]: !e.target.checked })} />
+                    <div className="qs-tk-gsxc"><div className="nm">{x.l.ten || '(không tên)'}</div>{phu && <div className="sub">{phu}</div>}</div>
+                    <div className="qs-tk-gsxv">{x.cu !== x.von || x.ck === (Number(x.l.chietKhau) || 0)
+                      ? <><span className="cu">{money(x.cu)}</span><span className="ar">→</span><span className="moi">{money(x.von)}</span></>
+                      : <><span className="cu">CK {(Number(x.l.chietKhau) || 0)}%</span><span className="ar">→</span><span className="moi">CK {x.ck}%</span></>}</div>
+                    <Icon name={mo === i ? 'chevronUp' : 'chevronDown'} size={14} />
+                  </div>
+                  {mo === i && (
+                    <div className="qs-tk-gsxd">
+                      <div className="qs-tk-gsxdg">
+                        {[['Giá bán lẻ', money(x.cu), money(x.von)], ['CK đại lý', (Number(x.l.chietKhau) || 0) + '%', (Number(x.ck) || 0) + '%']].map(([lb, a, b]) => (a === b
+                          ? [<span key={lb}>{lb}</span>, <span key={lb + 1} className="gsx-keep">{a} (không đổi)</span>]
+                          : [<span key={lb}>{lb}</span>, <span key={lb + 1}><span className="cu">{a}</span> → <b>{b}</b></span>]))}
+                      </div>
+                      <div className="qs-tk-gsxds">Giá trong bảng = bản chụp lúc thêm dòng · Danh sách SP sửa cuối bởi <b>{p.nguoiSua || '—'}</b>{p.ngayCapNhat ? ' · ' + fmtDateTime_(p.ngayCapNhat) : ''}</div>
+                      <div className="qs-tk-gsxdh">Lịch sử sửa sản phẩm {ma && <i>({ma})</i>}</div>
+                      {!ma ? <div className="qs-tk-gsxde">Dòng chưa có mã SP.</div>
+                        : h === 'loading' || !h ? <div className="qs-tk-gsxde">Đang tải…</div>
+                          : h.err ? <div className="qs-tk-gsxde err">Không tải được lịch sử: {h.err}</div>
+                            : !h.length ? <div className="qs-tk-gsxde">Chưa có lịch sử sửa.</div>
+                              : h.slice(0, 20).map((r, j) => (
+                                <div key={j} className={'qs-tk-gsxdr' + (/GIÁ|CHIẾT KHẤU/i.test(r.field || '') ? ' gia' : '')}>
+                                  <div><b>{r.field}</b><span>{(r.by || '?') + ' · ' + fmtDateTime_(r.at)}</span></div>
+                                  <div><span className="cu">{r.old || '—'}</span> → <span className="moi">{r.new || '—'}</span></div>
+                                </div>
+                              ))}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>

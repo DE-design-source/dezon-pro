@@ -127,21 +127,6 @@ export function vsApply_(hmRaw, ng, larks, specs){
   return out;
 }
 
-/* ═══ Tạo nhanh biến thể ═══ */
-export const NBT_BM=['Bề mặt bóng','Bóng mờ','Mờ','Siêu mờ','Siêu bóng','Bán bóng'];
-// dòng mới: lấy mặc định từ SP gốc (mã, bề mặt, dung tích) hoặc từ dòng trên cùng (a)
-export function spNbtDong_(p, a){ var raw=(p&&p.raw)||{};
-  return {ma:a.ma||(p&&p.ma)||'', mau:'', bm:a.bm!=null?a.bm:String(raw.be_mat||''), kt:a.kt!=null?a.kt:String(raw.kich_thuoc||''), gia:''}; }
-// dán từ Excel vào ô Mã: 5 cột Mã ⇥ Màu ⇥ Bề mặt ⇥ Dung tích ⇥ Giá · 3 cột Màu ⇥ Dung tích ⇥ Giá · 2 cột Màu ⇥ Giá. null = không phải dán bảng
-export function nbtParsePaste_(t, d0){
-  t=String(t||''); if(t.indexOf('\n')<0 && t.indexOf('\t')<0) return null;
-  return t.split(/\r?\n/).map(function(d){ return d.split('\t').map(function(x){ return String(x||'').trim(); }); })
-    .filter(function(c){ return c.some(Boolean); }).map(function(c){
-      if(c.length>=5) return {ma:c[0]||d0.ma, mau:c[1], bm:c[2], kt:c[3]||d0.kt, gia:c[4]};
-      if(c.length>=3) return {ma:d0.ma, mau:c[0], bm:d0.bm, kt:c[1]||d0.kt, gia:c[2]};
-      return {ma:d0.ma, mau:c[0], bm:d0.bm, kt:d0.kt, gia:c[1]||''}; });
-}
-
 /* ═══ Ảnh: nén ở client rồi tải lên kho (có thử lại) ═══ */
 export function readB64_(f){ return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(String(r.result));}; r.onerror=rej; r.readAsDataURL(f); }); }
 export function downscaleImage_(file, maxDim, quality){

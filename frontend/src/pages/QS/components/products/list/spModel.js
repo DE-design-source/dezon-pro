@@ -128,6 +128,8 @@ export function spAllCols_(node, specs, hm) {
 export function spColVal_(p, col) {
   const prop = COL2PROP[col]
   const v = (prop && p[prop] != null && p[prop] !== '') ? p[prop] : (p.raw || {})[col]
+  // Nhóm sản phẩm (series) để trống = lấy theo Dòng sản phẩm (như máy chủ: nhom = nhom_sp || dong_sp)
+  if (col === 'nhom_sp' && (v == null || String(v).trim() === '')) return spColVal_(p, 'dong_sp')
   return v == null ? '' : String(v)
 }
 export function spEditRaw_(p, col) { const r = p.raw || {}; return r[col] != null ? String(r[col]) : spColVal_(p, col) }
@@ -330,8 +332,27 @@ export function spSapXep_(list, sort, cols) {
     return String(x).localeCompare(String(y), 'vi', { numeric: true }) * d
   })
 }
-/* Dữ liệu trùng (chỉ bản Go): cùng mã sản phẩm + cùng NCC (không phân biệt hoa / thường, khoảng trắng) */
-export const spTrungK_ = p => { const m = spNorm_(p.ma); return m ? m + '|' + spNorm_(p.ncc) : '' }
+/* Sản phẩm trùng (chỉ bản Go): cùng mã + NCC + tên + MỌI thông số kỹ thuật (raw). Biến thể cùng mã nhưng khác màu / kích thước /
+   bề mặt... không tính là trùng. Bỏ qua giá, chiết khấu, link tài liệu, trạng thái, ghi chú, lưu ý, tính năng (không phải thông số).
+   So bỏ qua cách ghi: hoa / thường, dấu, khoảng trắng, ký tự ngăn cách, đơn vị trong ngoặc cuối ("600 x 600 (mm)" = "600x600"),
+   số theo giá trị ("30" = "30,0"). Database đã chặn trùng y hệt mã + màu + kích thước + công suất... nên bản trùng thật thường chỉ khác cách ghi.
+   Khoá nhớ theo object SP (WeakMap). */
+const trungV_ = v => {
+  const s = String(v == null ? '' : v).trim()
+  const n = Number(s.replace(',', '.'))
+  if (s !== '' && isFinite(n)) return String(n)
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s*\([^()]*\)\s*$/, '').replace(/×/g, 'x').replace(/[^a-z0-9]+/g, '')
+}
+const TRUNG_BO = { gia_ban_le: 1, ck_dai_ly_pct: 1, gia_ban_bo_nguon: 1, link_datasheet: 1, trang_thai: 1, ghi_chu: 1, thong_so_file: 1,
+  huong_dan_lap_dat: 1, file_ban_ve: 1, luu_y: 1, tinh_nang: 1 }
+const trungMemo = new WeakMap()
+export const spTrungK_ = p => {
+  if (trungMemo.has(p)) return trungMemo.get(p)
+  const m = spNorm_(p.ma), r = p.raw || {}
+  const k = m ? [m, trungV_(p.ncc), trungV_(p.ten)].concat(Object.keys(r).sort().filter(c => !TRUNG_BO[c]).map(c => trungV_(r[c]))).join('|') : ''
+  trungMemo.set(p, k)
+  return k
+}
 export function spTrungSet_(products) {
   const n = {}
   ;(products || []).forEach(p => { const k = spTrungK_(p); if (k) n[k] = (n[k] || 0) + 1 })
@@ -348,7 +369,7 @@ export function spDataList_(products, q, f, view, sort, cols) {
     if (tr && !tr.has(spTrungK_(p))) return false
     if (q && (p.ten + ' ' + p.ma + ' ' + p.thuongHieu + ' ' + p.ncc).toLowerCase().indexOf(q) < 0) return false
     if (f.node) { const c = spNodeCodeOf_(p); if (!(c === f.node || c.indexOf(f.node + '.') === 0)) return false }
-    if (f.dong && spNorm_(p.nhom) !== spNorm_(f.dong)) return false
+    if (f.dong && spNorm_(p.dongSanPham || p.nhom) !== spNorm_(f.dong)) return false   // lọc đúng cột Dòng SP (không lấy Nhóm SP / series)
     if (view === 'fav' && !p.yeuThich) return false
     if (view === 'chua' && p.daDuyet) return false
     if (view === 'da' && !p.daDuyet) return false
@@ -462,6 +483,17 @@ export function spBulkFields_(ng, specs) {
   return out
 }
 export const spLabel2Col_ = (specs, lark) => dbLabelMaps_(specs).DB_LABEL2COL_[lark] || ''
+/* Sửa hàng loạt "giá trị cũ -> giá trị mới": khoá so khớp 1 giá trị (số so theo số: "45" = 45 = "45,0"; chữ không phân biệt hoa thường) */
+export function spValKey_(v) {
+  const t = String(v == null ? '' : v).trim(), x = Number(t.replace(',', '.'))
+  return t !== '' && isFinite(x) ? 'n' + x : 't' + t.toLowerCase().replace(/\s+/g, ' ')
+}
+/* Các giá trị đang có của 1 cột trong nhóm SP: [{k, v, n}] nhiều SP trước */
+export function spDistinctVals_(prods, col) {
+  const m = {}
+  ;(prods || []).forEach(p => { const v = String(spEditRaw_(p, col)).trim(), k = spValKey_(v); (m[k] = m[k] || { k, v, n: 0 }).n++ })
+  return Object.values(m).sort((a, b) => b.n - a.n || String(a.v).localeCompare(String(b.v), 'vi', { numeric: true }))
+}
 
 /* Tiền hiển thị trong ô nhập (930000 -> 930.000) */
 export const spMoneyShow_ = v => (v === '' ? '' : money(v))

@@ -5,7 +5,7 @@ import { TREE } from '../../../lib/tree.js'
 import { pad2, spNorm_ } from '../../../lib/format.js'
 import { ctColor } from '../../../lib/catalogFilters.js'
 import { csPresetList_, csPresetKeys_, csPresetOn_ } from '../../../lib/columns.js'
-import { spOptList_, spSingleVals_, spSpecOpts_, lsJson, lsSet } from './spModel'
+import { spOptList_, spSingleVals_, spSpecOpts_, actKeys_, lsJson, lsSet } from './spModel'
 import SearchSelect from '../../common/SearchSelect'
 import { FChips } from '../../breakdown/FilterSections'
 
@@ -104,8 +104,12 @@ export function FilterPop({ anchor, top, scope, f, onSel, onSpec, onNhieuXoa, on
       </div>
     )
   }
+  // Hạng mục / Dòng SP chỉ liệt kê giá trị của thương hiệu đang lọc; Dòng SP thêm theo hạng mục đang chọn
+  const bk = actKeys_(f.brands)
+  const theoTH = scope.filter(p => (!f.brand || spNorm_(p.thuongHieu) === spNorm_(f.brand)) && (!bk.length || bk.indexOf(String(p.thuongHieu || '')) >= 0))
   function fsel(key, lb, field, ph) {
-    const opts = spOptList_(scope, field), cur = f[key] || ''
+    const sc = key === 'dong' && f.hangMuc ? theoTH.filter(p => spNorm_(p.hangMuc) === spNorm_(f.hangMuc)) : theoTH
+    const opts = spOptList_(sc, field), cur = f[key] || ''
     const v = opts.filter(o => spNorm_(o) === spNorm_(cur))[0] || ''
     return (
       <label className="qspl-fcol2" key={key}><span>{lb}</span>
@@ -197,7 +201,7 @@ export function FilterPop({ anchor, top, scope, f, onSel, onSpec, onNhieuXoa, on
         <div key="s" className="qspl-fsel3">
           {brandMulti()}
           {fsel('hangMuc', 'Hạng mục sản phẩm', 'hangMuc', 'Tất cả hạng mục SP')}
-          {fsel('dong', 'Dòng sản phẩm', 'nhom', 'Tất cả dòng SP')}
+          {fsel('dong', 'Dòng sản phẩm', 'dongSanPham', 'Tất cả dòng SP')}
         </div>
       )],
     },
@@ -365,12 +369,16 @@ export function OverPop({ anchor, customs, onPick, onClose }) {
 
 /* Sửa hàng loạt: tìm trường (gõ chữ, không dấu cũng được) + chọn trường (xếp theo chữ cái) + giá trị mới, Enter = Áp dụng */
 const boDau_ = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim()
-export function BulkEditPop({ anchor, fields, n, onApply, onClose, toast }) {
+export function BulkEditPop({ anchor, fields, n, valsOf, onApply, onClose, toast }) {
   const xep = useMemo(() => fields.slice().sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'vi')), [fields])
   const [q, setQ] = useState('')
   const loc = useMemo(() => { const k = boDau_(q); return k ? xep.filter(f => boDau_(f[1]).indexOf(k) >= 0) : xep }, [xep, q])
   const [fld, setFld] = useState(xep.length ? xep[0][0] : '')
   const [val, setVal] = useState('')
+  // giá trị cũ: '*' = mọi giá trị (sửa cả nhóm đã chọn); khác = chỉ sửa SP đang có đúng giá trị này
+  const [cu, setCu] = useState('*')
+  const cuDs = useMemo(() => (valsOf && fld ? valsOf(fld) : []), [valsOf, fld])
+  useEffect(() => { setCu('*') }, [fld])
   const inp = useRef(null)
   // đang gõ tìm mà trường đang chọn không còn trong kết quả -> chọn kết quả đầu
   useEffect(() => { if (loc.length && !loc.some(f => f[0] === fld)) setFld(loc[0][0]) }, [loc, fld])
@@ -380,7 +388,8 @@ export function BulkEditPop({ anchor, fields, n, onApply, onClose, toast }) {
     if (String(val).trim() === '') { toast('Chưa nhập giá trị mới'); if (inp.current) inp.current.focus(); return }
     const f = fields.filter(x => x[0] === fld)[0]
     onClose()
-    onApply(fld, val, f ? f[1] : fld)
+    const o = cu === '*' ? null : (cuDs.find(x => x.k === cu) || {}).v
+    onApply(fld, val, f ? f[1] : fld, o == null ? null : o)
   }
   return (
     <FloatPop anchor={anchor} place="above-center" onClose={onClose} className="qspl-bbpop">
@@ -393,6 +402,11 @@ export function BulkEditPop({ anchor, fields, n, onApply, onClose, toast }) {
           {loc.map(f => <option key={f[0]} value={f[0]}>{f[1]}</option>)}
         </select>
         {!loc.length && <div className="qspl-bb-none">Không có trường nào khớp "{q}"</div>}
+        <label>Giá trị cũ <i>(chỉ sửa sản phẩm đang có giá trị này)</i></label>
+        <select value={cu} onChange={e => setCu(e.target.value)}>
+          <option value="*">— Mọi giá trị (sửa cả {n} dòng) —</option>
+          {cuDs.map(x => <option key={x.k} value={x.k}>{(String(x.v).trim() || '(trống)') + ' — ' + x.n + ' SP'}</option>)}
+        </select>
         <label>Giá trị mới</label>
         <input ref={inp} placeholder="Nhập giá trị…" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') apply() }} />
       </div>

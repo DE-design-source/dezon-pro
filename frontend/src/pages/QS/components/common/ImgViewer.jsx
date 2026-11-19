@@ -5,12 +5,13 @@ import './common.css'
 /* Xem ảnh cỡ lớn (port imgPop_, PUB/nhap.js:294-349): lật ‹ › bằng chuột hoặc phím ←/→, Esc để đóng, có số đếm.
    Phóng to / thu nhỏ (chỉ bản Go): lăn chuột, nút − / + / Vừa khung, phím + / − / 0, bấm đúp ảnh = 2.5x ↔ vừa khung;
    đang phóng to thì kéo ảnh để xem phần khác.
-   Props: src (URL đã qua mediaUrl; rỗng = không hiện), gallery (mảng URL của panel chi tiết, tuỳ chọn),
+   Props: src (URL đã qua mediaUrl; rỗng = không hiện), gallery (mảng URL của panel chi tiết, tuỳ chọn), captions (chú thích theo từng ảnh của gallery, tuỳ chọn),
           onClose(), onIndexChange(i) (tuỳ chọn: chỉ gọi khi đang lật đúng bộ ảnh gallery, để panel chi tiết đổi ảnh theo).
    Như bản gốc: chỉ dùng gallery khi src nằm trong gallery, ngược lại chỉ xem 1 ảnh src. */
-export default function ImgViewer({ src, gallery, onClose, onIndexChange }) {
+export default function ImgViewer({ src, gallery, captions, startAt, onClose, onIndexChange }) {
   const gal = gallery && gallery.length ? gallery : []
-  const at = src ? gal.indexOf(src) : -1
+  // startAt: vị trí mở đầu khi gallery có ảnh trùng (vd biến thể dùng chung ảnh)
+  const at = src ? (startAt != null && gal[startAt] === src ? startAt : gal.indexOf(src)) : -1
   const list = at >= 0 ? gal : (src ? [src] : [])
   /* Vị trí đang xem gắn với src: mở ảnh khác thì quay về đúng ảnh vừa bấm */
   const [pos, setPos] = useState(() => ({ src, i: at >= 0 ? at : 0 }))
@@ -66,6 +67,7 @@ export default function ImgViewer({ src, gallery, onClose, onIndexChange }) {
         </div>
         {many && <button type="button" className="qsc-iv-nav next" title="Ảnh sau (→)" onClick={e => { e.stopPropagation(); go(1) }}>›</button>}
         {many && <span className="qsc-iv-n">{idx + 1} / {list.length}</span>}
+        {at >= 0 && captions && captions[idx] ? <span className="qsc-iv-cap">{captions[idx]}</span> : null}
         <button type="button" className="qsc-iv-x" title="Đóng (Esc)" onClick={e => { e.stopPropagation(); onClose && onClose() }}>✕</button>
       </div>
     </MrootPortal>

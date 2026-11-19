@@ -4,7 +4,7 @@ import * as api from '../../api/qsApi'
 import { qsToast, qsConfirm } from '../common/dialogs'
 import { coSpec_, specNganh_, nganhCuaSP_ } from '../../lib/productFields'
 import { impGet, impSet, impForm, emptyForm_, pendingAdd_, waitUploads_, bulkCleared_ } from './importStore'
-import { pendNganhLoai_, pendFormOf_, varCombos_, varList_, btLabel_, ghiDs_, ndOfNganh_ } from './importLogic'
+import { pendNganhLoai_, pendFormOf_, ghiDs_, ndOfNganh_ } from './importLogic'
 import { getState } from '../../state/store'
 import { readB64_ } from './imgUpload'
 
@@ -55,19 +55,6 @@ export function impCbSearch_(q, loai, hmVal, combo, products, specs) {
     hit = hit.slice(0, 8)
   }
   return { tieuDe, hit }
-}
-
-/* ===== BIẾN THỂ: chữ xem trước (varPreview_, nhap.js:1315-1331); null = "Bỏ trống = chỉ tạo 1 sản phẩm..." ===== */
-export function varPreview_(vars) {
-  const c = varCombos_(vars); if (!c.length) return null
-  const K = varList_(vars.varKelvin), W = varList_(vars.varWatt), A = varList_(vars.varAngle), C = varList_(vars.varColor), Z = varList_(vars.varSize)
-  const parts = []
-  if (K.length) parts.push(K.length + ' nhiệt độ')
-  if (W.length) parts.push(W.length + ' công suất')
-  if (A.length) parts.push(A.length + ' góc')
-  if (C.length) parts.push(C.length + ' màu')
-  if (Z.length) parts.push(Z.length + ' kích thước')
-  return { parts, total: c.length, chips: c.slice(0, 8).map(btLabel_), more: c.length > 8 ? c.length - 8 : 0 }
 }
 
 /* ===== NHẬP HÀNG LOẠT TỪ FILE (impPick / impShow / impVsCheck_ / impCommit, nhap.js:1147-1296) =====
