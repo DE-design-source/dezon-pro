@@ -9410,6 +9410,7 @@ CREATE TABLE public.sales_leads (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    stage_changed_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_sales_leads_assignees CHECK ((jsonb_typeof(assignees) = 'array'::text)),
     CONSTRAINT ck_sales_leads_board_stage CHECK (((board_stage IS NULL) OR (board_stage = ANY (ARRAY['intake'::text, 'concept'::text, 'drafting'::text, 'review'::text, 'approved'::text, 'prep'::text, 'structure'::text, 'finishing'::text, 'acceptance'::text, 'handover'::text])))),
     CONSTRAINT ck_sales_leads_customer_name CHECK ((customer_name <> ''::text)),
@@ -9614,6 +9615,13 @@ COMMENT ON COLUMN public.sales_leads.created_at IS 'Row creation time.';
 --
 
 COMMENT ON COLUMN public.sales_leads.updated_at IS 'Last change time (set by the service).';
+
+
+--
+-- Name: COLUMN sales_leads.stage_changed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_leads.stage_changed_at IS 'When the lead entered its current stage (set by the service when stage changes; backfilled from updated_at).';
 
 
 --
@@ -13044,6 +13052,575 @@ ALTER TABLE ONLY public.work_item_histories
 
 ALTER TABLE ONLY public.work_items
     ADD CONSTRAINT fk_work_items_company_id FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sales_lead_appointments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_lead_appointments (
+    id bigint NOT NULL,
+    lead_id bigint NOT NULL,
+    appointment_date date NOT NULL,
+    start_time text DEFAULT ''::text NOT NULL,
+    end_time text DEFAULT ''::text NOT NULL,
+    title text NOT NULL,
+    meeting_mode text DEFAULT ''::text NOT NULL,
+    place text DEFAULT ''::text NOT NULL,
+    goal text DEFAULT ''::text NOT NULL,
+    members jsonb DEFAULT '[]'::jsonb NOT NULL,
+    prep_items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    status text DEFAULT 'planned'::text NOT NULL,
+    author_name text DEFAULT ''::text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sales_lead_appointments_end_time CHECK (((end_time = ''::text) OR (end_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'::text))),
+    CONSTRAINT ck_sales_lead_appointments_members CHECK ((jsonb_typeof(members) = 'array'::text)),
+    CONSTRAINT ck_sales_lead_appointments_prep_items CHECK ((jsonb_typeof(prep_items) = 'array'::text)),
+    CONSTRAINT ck_sales_lead_appointments_start_time CHECK (((start_time = ''::text) OR (start_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'::text))),
+    CONSTRAINT ck_sales_lead_appointments_status CHECK ((status = ANY (ARRAY['planned'::text, 'done'::text, 'cancelled'::text]))),
+    CONSTRAINT ck_sales_lead_appointments_title CHECK ((title <> ''::text))
+);
+
+
+--
+-- Name: TABLE sales_lead_appointments; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.sales_lead_appointments IS 'Planned meetings with a sales lead (Việc tiếp theo; child of sales_leads, company comes from the lead).';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.id IS 'Primary key.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.lead_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.lead_id IS 'Owning lead; rows are deleted with it.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.appointment_date; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.appointment_date IS 'Meeting date.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.start_time; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.start_time IS 'Start time HH:MM (local Vietnam time); empty = not set.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.end_time; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.end_time IS 'End time HH:MM; empty = not set.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.title; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.title IS 'Short title.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.meeting_mode; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.meeting_mode IS 'How the meeting happens (Họp trực tiếp, Online, ...). Open list, no CHECK.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.place; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.place IS 'Meeting place / link.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.goal; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.goal IS 'Goal of the meeting.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.members; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.members IS 'Document read/written whole: ["display name", ...] - attendees.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.prep_items; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.prep_items IS 'Document read/written whole: [{"text": text, "done": bool}] - preparation checklist.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.status IS 'planned / done / cancelled.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.author_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.author_name IS 'Display name of the writer at the time (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.created_by IS 'User who created the row; set null if the user is deleted.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.created_at IS 'Row creation time.';
+
+
+--
+-- Name: COLUMN sales_lead_appointments.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_appointments.updated_at IS 'Last change time (set by the service).';
+
+
+--
+-- Name: sales_lead_appointments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sales_lead_appointments ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sales_lead_appointments_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: sales_lead_insights; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_lead_insights (
+    id bigint NOT NULL,
+    lead_id bigint NOT NULL,
+    content jsonb NOT NULL,
+    engine text NOT NULL,
+    model_name text DEFAULT ''::text NOT NULL,
+    sources jsonb DEFAULT '[]'::jsonb NOT NULL,
+    warning text DEFAULT ''::text NOT NULL,
+    created_by uuid,
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sales_lead_insights_content CHECK ((jsonb_typeof(content) = 'object'::text)),
+    CONSTRAINT ck_sales_lead_insights_engine CHECK ((engine = ANY (ARRAY['gemini'::text, 'rules'::text]))),
+    CONSTRAINT ck_sales_lead_insights_sources CHECK ((jsonb_typeof(sources) = 'array'::text))
+);
+
+
+--
+-- Name: TABLE sales_lead_insights; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.sales_lead_insights IS 'Generated analyses of a sales lead (AI or rule based); the newest row is shown (child of sales_leads).';
+
+
+--
+-- Name: COLUMN sales_lead_insights.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.id IS 'Primary key.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.lead_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.lead_id IS 'Owning lead; rows are deleted with it.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.content; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.content IS 'Document read/written whole: {"actions","strategy","ideas","roadmap"} as returned to the UI.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.engine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.engine IS 'gemini = Gemini API answer; rules = server-side rule-based fallback.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.model_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.model_name IS 'Gemini model used; empty for rules.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.sources; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.sources IS 'Document read/written whole: [{"kind","date","summary","by"}] - data the analysis was built from.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.warning; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.warning IS 'Why the rule-based fallback was used (Vietnamese, shown to the user); empty when Gemini answered.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.created_by IS 'User who asked for the analysis; set null if the user is deleted.';
+
+
+--
+-- Name: COLUMN sales_lead_insights.generated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_insights.generated_at IS 'Generation time.';
+
+
+--
+-- Name: sales_lead_insights_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sales_lead_insights ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sales_lead_insights_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: sales_lead_scores; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_lead_scores (
+    lead_id bigint NOT NULL,
+    checks jsonb DEFAULT '{}'::jsonb NOT NULL,
+    history jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_by text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sales_lead_scores_checks CHECK ((jsonb_typeof(checks) = 'object'::text)),
+    CONSTRAINT ck_sales_lead_scores_history CHECK ((jsonb_typeof(history) = 'array'::text))
+);
+
+
+--
+-- Name: TABLE sales_lead_scores; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.sales_lead_scores IS 'Deal score checklist of a sales lead: 6 criteria x 4 questions (child of sales_leads, one row per lead).';
+
+
+--
+-- Name: COLUMN sales_lead_scores.lead_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_scores.lead_id IS 'Owning lead (primary key); row is deleted with it.';
+
+
+--
+-- Name: COLUMN sales_lead_scores.checks; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_scores.checks IS 'Document read/written whole: {"<criterion key>": [bool x4]} - which questions are answered yes.';
+
+
+--
+-- Name: COLUMN sales_lead_scores.history; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_scores.history IS 'Document read/written whole: [{"at": ISO time, "score": deal score}] appended on each save (capped by the service).';
+
+
+--
+-- Name: COLUMN sales_lead_scores.updated_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_scores.updated_by IS 'Display name of the last editor (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_scores.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_scores.updated_at IS 'Last save time.';
+
+
+--
+-- Name: sales_lead_tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_lead_tasks (
+    id bigint NOT NULL,
+    lead_id bigint NOT NULL,
+    title text NOT NULL,
+    due_date date,
+    assignees jsonb DEFAULT '[]'::jsonb NOT NULL,
+    note text DEFAULT ''::text NOT NULL,
+    is_done boolean DEFAULT false NOT NULL,
+    done_at timestamp with time zone,
+    task_source text DEFAULT ''::text NOT NULL,
+    author_name text DEFAULT ''::text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sales_lead_tasks_assignees CHECK ((jsonb_typeof(assignees) = 'array'::text)),
+    CONSTRAINT ck_sales_lead_tasks_task_source CHECK ((task_source = ANY (ARRAY[''::text, 'ai'::text]))),
+    CONSTRAINT ck_sales_lead_tasks_title CHECK ((title <> ''::text))
+);
+
+
+--
+-- Name: TABLE sales_lead_tasks; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.sales_lead_tasks IS 'To-do items of a sales lead (Danh sách Task; child of sales_leads, company comes from the lead).';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.id IS 'Primary key.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.lead_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.lead_id IS 'Owning lead; rows are deleted with it.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.title; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.title IS 'What to do.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.due_date; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.due_date IS 'Deadline; null = none.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.assignees; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.assignees IS 'Document read/written whole: [{"name": text, "username": text}] - people doing it.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.note; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.note IS 'Free note.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.is_done; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.is_done IS 'True when finished.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.done_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.done_at IS 'When it was marked done; null while open.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.task_source; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.task_source IS 'Empty = typed by a user; ai = created from an AI suggestion.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.author_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.author_name IS 'Display name of the writer at the time (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.created_by IS 'User who created the row; set null if the user is deleted.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.created_at IS 'Row creation time.';
+
+
+--
+-- Name: COLUMN sales_lead_tasks.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_tasks.updated_at IS 'Last change time (set by the service).';
+
+
+--
+-- Name: sales_lead_tasks_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sales_lead_tasks ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sales_lead_tasks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: sales_lead_appointments pk_sales_lead_appointments; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_appointments
+    ADD CONSTRAINT pk_sales_lead_appointments PRIMARY KEY (id);
+
+
+--
+-- Name: sales_lead_insights pk_sales_lead_insights; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_insights
+    ADD CONSTRAINT pk_sales_lead_insights PRIMARY KEY (id);
+
+
+--
+-- Name: sales_lead_scores pk_sales_lead_scores; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_scores
+    ADD CONSTRAINT pk_sales_lead_scores PRIMARY KEY (lead_id);
+
+
+--
+-- Name: sales_lead_tasks pk_sales_lead_tasks; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_tasks
+    ADD CONSTRAINT pk_sales_lead_tasks PRIMARY KEY (id);
+
+
+--
+-- Name: idx_sales_lead_appointments_lead_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sales_lead_appointments_lead_id ON public.sales_lead_appointments USING btree (lead_id);
+
+
+--
+-- Name: idx_sales_lead_insights_lead_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sales_lead_insights_lead_id ON public.sales_lead_insights USING btree (lead_id);
+
+
+--
+-- Name: idx_sales_lead_tasks_lead_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sales_lead_tasks_lead_id ON public.sales_lead_tasks USING btree (lead_id);
+
+
+--
+-- Name: sales_lead_appointments fk_sales_lead_appointments_created_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_appointments
+    ADD CONSTRAINT fk_sales_lead_appointments_created_by FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sales_lead_appointments fk_sales_lead_appointments_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_appointments
+    ADD CONSTRAINT fk_sales_lead_appointments_lead_id FOREIGN KEY (lead_id) REFERENCES public.sales_leads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sales_lead_insights fk_sales_lead_insights_created_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_insights
+    ADD CONSTRAINT fk_sales_lead_insights_created_by FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sales_lead_insights fk_sales_lead_insights_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_insights
+    ADD CONSTRAINT fk_sales_lead_insights_lead_id FOREIGN KEY (lead_id) REFERENCES public.sales_leads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sales_lead_scores fk_sales_lead_scores_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_scores
+    ADD CONSTRAINT fk_sales_lead_scores_lead_id FOREIGN KEY (lead_id) REFERENCES public.sales_leads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sales_lead_tasks fk_sales_lead_tasks_created_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_tasks
+    ADD CONSTRAINT fk_sales_lead_tasks_created_by FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sales_lead_tasks fk_sales_lead_tasks_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_tasks
+    ADD CONSTRAINT fk_sales_lead_tasks_lead_id FOREIGN KEY (lead_id) REFERENCES public.sales_leads(id) ON DELETE CASCADE;
 
 
 --

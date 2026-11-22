@@ -2,12 +2,14 @@ package sales
 
 import (
 	"context"
+	"strings"
 
 	"qspro-backend/internal/platform/database"
+	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
 )
 
-// Repository: truy cập dữ liệu. kd_khach_hang / kd_cham_soc nằm trong TenantTables nên mọi lệnh tự lọc theo công ty
+// Repository: truy cập dữ liệu. kd_khach_hang / kd_cham_soc (+ 4 bảng con của 0053) nằm trong TenantTables nên mọi lệnh tự lọc theo công ty
 // (bảng con kd_cham_soc xét qua dòng cha).
 type Repository interface {
 	Company(ctx context.Context, id any) (*omap.Map, error)
@@ -19,6 +21,25 @@ type Repository interface {
 	ListActivities(ctx context.Context, leadID float64) ([]*omap.Map, error)
 	InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map, error)
 	ListStaff(ctx context.Context) ([]*omap.Map, error)
+
+	// trang khách hàng dạng dashboard (migration 0053): kd_cham_diem, kd_lich_hen, kd_nhiem_vu_kh, kd_goi_y - bảng con,
+	// công ty xét qua dòng cha kd_khach_hang nên đọc / sửa theo id cũng không ra khỏi công ty
+	GetScore(ctx context.Context, leadID float64) (*omap.Map, error)
+	InsertScore(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	UpdateScore(ctx context.Context, leadID float64, patch *omap.Map) (*omap.Map, error)
+	ListAppointments(ctx context.Context, leadID float64) ([]*omap.Map, error)
+	GetAppointment(ctx context.Context, id float64) (*omap.Map, error)
+	InsertAppointment(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	UpdateAppointment(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
+	DeleteAppointment(ctx context.Context, id float64) (int, error)
+	ListTasks(ctx context.Context, leadID float64) ([]*omap.Map, error)
+	GetTask(ctx context.Context, id float64) (*omap.Map, error)
+	InsertTask(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	UpdateTask(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
+	DeleteTask(ctx context.Context, id float64) (int, error)
+	LatestInsight(ctx context.Context, leadID float64) (*omap.Map, error)
+	InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	PruneInsights(ctx context.Context, leadID float64, keep int) error
 }
 
 type pgRepo struct{ db *database.DB }
@@ -69,4 +90,81 @@ func (r *pgRepo) InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map, 
 // ListStaff: tài khoản đang hoạt động của công ty (users thuộc TenantTables nên tự lọc theo công ty; super không có công ty nên không lẫn vào).
 func (r *pgRepo) ListStaff(ctx context.Context) ([]*omap.Map, error) {
 	return r.db.Select(ctx, "users", database.SelectOpt{Select: "id,username,ho_ten,phong_ban,role,perms", Filter: database.Eq("active", true), Order: "username.asc", Limit: 1000})
+}
+
+func (r *pgRepo) GetScore(ctx context.Context, leadID float64) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "kd_cham_diem", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Limit: 1}))
+}
+
+func (r *pgRepo) InsertScore(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	return first(r.db.InsertOne(ctx, "kd_cham_diem", row))
+}
+
+func (r *pgRepo) UpdateScore(ctx context.Context, leadID float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_cham_diem", database.Eq("khach_hang_id", leadID), patch))
+}
+
+func (r *pgRepo) ListAppointments(ctx context.Context, leadID float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_lich_hen", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Order: "ngay.asc,gio_bat_dau.asc,id.asc", Limit: 500})
+}
+
+func (r *pgRepo) GetAppointment(ctx context.Context, id float64) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "kd_lich_hen", database.SelectOpt{Filter: database.Eq("id", id), Limit: 1}))
+}
+
+func (r *pgRepo) InsertAppointment(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	return first(r.db.InsertOne(ctx, "kd_lich_hen", row))
+}
+
+func (r *pgRepo) UpdateAppointment(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_lich_hen", database.Eq("id", id), patch))
+}
+
+func (r *pgRepo) DeleteAppointment(ctx context.Context, id float64) (int, error) {
+	rows, err := r.db.Remove(ctx, "kd_lich_hen", database.Eq("id", id))
+	return len(rows), err
+}
+
+func (r *pgRepo) ListTasks(ctx context.Context, leadID float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_nhiem_vu_kh", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Order: "xong.asc,han.asc.nullslast,id.asc", Limit: 500})
+}
+
+func (r *pgRepo) GetTask(ctx context.Context, id float64) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "kd_nhiem_vu_kh", database.SelectOpt{Filter: database.Eq("id", id), Limit: 1}))
+}
+
+func (r *pgRepo) InsertTask(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	return first(r.db.InsertOne(ctx, "kd_nhiem_vu_kh", row))
+}
+
+func (r *pgRepo) UpdateTask(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_nhiem_vu_kh", database.Eq("id", id), patch))
+}
+
+func (r *pgRepo) DeleteTask(ctx context.Context, id float64) (int, error) {
+	rows, err := r.db.Remove(ctx, "kd_nhiem_vu_kh", database.Eq("id", id))
+	return len(rows), err
+}
+
+// LatestInsight: bản phân tích mới nhất (các bản cũ giữ lại làm lịch sử, không trả ra).
+func (r *pgRepo) LatestInsight(ctx context.Context, leadID float64) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "kd_goi_y", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Order: "ngay_tao.desc,id.desc", Limit: 1}))
+}
+
+func (r *pgRepo) InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	return first(r.db.InsertOne(ctx, "kd_goi_y", row))
+}
+
+// PruneInsights: chỉ giữ keep bản phân tích mới nhất của khách (thứ tự như LatestInsight).
+func (r *pgRepo) PruneInsights(ctx context.Context, leadID float64, keep int) error {
+	rows, err := r.db.Select(ctx, "kd_goi_y", database.SelectOpt{Select: "id", Filter: database.Eq("khach_hang_id", leadID), Order: "ngay_tao.desc,id.desc", Limit: keep + 200})
+	if err != nil || len(rows) <= keep {
+		return err
+	}
+	ids := make([]string, 0, len(rows)-keep)
+	for _, x := range rows[keep:] {
+		ids = append(ids, jsval.Str(x.Val("id")))
+	}
+	_, err = r.db.Remove(ctx, "kd_goi_y", database.Eq("khach_hang_id", leadID)+"&id=in.("+strings.Join(ids, ",")+")")
+	return err
 }

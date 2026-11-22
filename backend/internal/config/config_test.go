@@ -15,7 +15,8 @@ var bienCauHinh = []string{"PORT", "DATABASE_URL", "DB_POOL_MAX", "DB_SORT_COLLA
 	"TRUSTED_PROXIES", "UPLOAD_DIR", "CHAT_JWT_SECRET", "CHAT_ACCESS_TTL_MIN", "CHAT_REFRESH_TTL_DAYS", "CHAT_OTP_DEV",
 	"CHAT_VAPID_PUBLIC_KEY", "CHAT_VAPID_PRIVATE_KEY", "CHAT_VAPID_SUBJECT", "SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME",
 	"SMTP_PASSWORD", "SMTP_FROM", "CHAT_S3_ENDPOINT", "CHAT_S3_PUBLIC_URL", "CHAT_S3_ACCESS_KEY", "CHAT_S3_SECRET_KEY",
-	"CHAT_S3_BUCKET", "CHAT_S3_REGION", "CHAT_MEDIA_MAX_IMAGE_MB", "CHAT_MEDIA_MAX_FILE_MB", "CHAT_MEDIA_DAILY_MB", "CHAT_MEDIA_URL_TTL_MIN"}
+	"CHAT_S3_BUCKET", "CHAT_S3_REGION", "CHAT_MEDIA_MAX_IMAGE_MB", "CHAT_MEDIA_MAX_FILE_MB", "CHAT_MEDIA_DAILY_MB", "CHAT_MEDIA_URL_TTL_MIN",
+	"GEMINI_API_KEY", "GEMINI_MODEL"}
 
 // xoaEnv bỏ mọi biến cấu hình trong lúc test (t.Setenv trước để hết test được trả lại giá trị cũ).
 func xoaEnv(t *testing.T) {
@@ -56,9 +57,20 @@ func TestLoadDefaults(t *testing.T) {
 		// tệp chat: chưa đặt CHAT_S3_ENDPOINT = tắt; giới hạn mặc định
 		ChatS3Bucket: "chat-media", ChatS3Region: "us-east-1", ChatMediaMaxImageMB: 25, ChatMediaMaxFileMB: 100, ChatMediaDailyMB: 2048,
 		ChatMediaURLTTLMin: 60,
+		GeminiModel:        "gemini-3.8-flash", // chưa đặt GEMINI_API_KEY = phân tích khách hàng theo quy tắc
 	}
 	if !reflect.DeepEqual(c, want) {
 		t.Errorf("mặc định:\n got %+v\nwant %+v", c, want)
+	}
+}
+
+// Gemini: khoá và model cắt khoảng trắng; model trống = gemini-3.8-flash.
+func TestLoadGemini(t *testing.T) {
+	xoaEnv(t)
+	t.Setenv("GEMINI_API_KEY", "  khoa  ")
+	t.Setenv("GEMINI_MODEL", " gemini-2.5-pro ")
+	if c := Load(); c.GeminiAPIKey != "khoa" || c.GeminiModel != "gemini-2.5-pro" {
+		t.Errorf("gemini: %q %q", c.GeminiAPIKey, c.GeminiModel)
 	}
 }
 
@@ -227,6 +239,7 @@ func TestLoadValues(t *testing.T) {
 		ChatAccessTTLMin: 15, ChatRefreshTTLDays: 30, SMTPPort: 587,
 		ChatS3Bucket: "chat-media", ChatS3Region: "us-east-1", ChatMediaMaxImageMB: 25, ChatMediaMaxFileMB: 100, ChatMediaDailyMB: 2048,
 		ChatMediaURLTTLMin: 60,
+		GeminiModel:        "gemini-3.8-flash", // chưa đặt GEMINI_API_KEY = phân tích khách hàng theo quy tắc
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("đặt đủ:\n got %+v\nwant %+v", got, want)

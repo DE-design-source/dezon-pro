@@ -1,9 +1,4 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { INITIAL_UNIT_HEADS, INITIAL_HR_EMPLOYEES } from '../../../data/hrData'
-
-/* Quản lý mặc định = trưởng phòng của phòng ban phụ trách (theo HR: kddd = KD dân dụng, kdda = KD dự án) */
-const DEPT_UNIT = { 'dan-dung': 'kddd', 'du-an': 'kdda' }
-const deptHead_ = dept => { const id = INITIAL_UNIT_HEADS[DEPT_UNIT[dept]]; const e = INITIAL_HR_EMPLOYEES.find(x => x.id === id); return e ? e.name : '' }
 /* "Admin Kinh doanh" lưu chung mảng assignees (phu_trach) với vai trò này, không cần cột mới */
 const ADMIN_KD = 'Admin Kinh doanh'
 import {
@@ -14,6 +9,8 @@ import { FONT_STACK, lmInitials, findDuplicates, sourceColor } from '../utils'
 import ShortlistSelect, { useKdMap, useMkChannels } from './ShortlistSelect'
 import AttachBox, { filesOf } from './AttachBox'
 import DatePicker from '../../../components/ui/DatePicker'
+import { OWNER_GROUPS } from './customer/CdOwners'
+const GROUP_LABEL = Object.fromEntries(OWNER_GROUPS.map(g => [g.key, g.label]))
 
 /* ===================== Modal thêm / chỉnh sửa khách hàng tiềm năng (3 cấp độ) =====================
    Component được mount sẵn (ẩn bằng display) như bản HTML; trang cha đổi `key` mỗi lần mở
@@ -54,7 +51,7 @@ function initForm(lead, me) {
     source: lead && lead.source ? lead.source : LEAD_SOURCES[0],
     dept: lead ? (lead.dept || 'dan-dung') : '',   // tạo mới: bước 1 phải chọn phòng (MarkUp 2026-11-19)
     creator: lead ? (lead.creator || '') : me,
-    manager: lead ? (lead.manager || '') : (deptHead_(lead ? lead.dept : 'dan-dung') || me),
+    manager: lead ? (lead.manager || '') : me,
     type: lead && lead.projectType ? lead.projectType : 'Nhà phố',
     stage: lead ? lead.stage : 'tiep-can',
     categories: lead && lead.categories ? LEAD_CATEGORIES.filter(c => lead.categories.indexOf(c) !== -1) : [],
@@ -103,7 +100,6 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   const [adminOpen, setAdminOpen] = useState(false)
   const [adminName, setAdminName] = useState('')
   const addAdmin = () => { const n = adminName.trim(); if (n && admins.indexOf(n) < 0) setAdmins(l => [...l, n]); setAdminName(''); setAdminOpen(false) }
-  const [managerTouched, setManagerTouched] = useState(!!lead)
   /* Khu vực + Tỉnh / TP: máy chủ chưa có cột -> lưu chung công ty kdOptions.geo {mã lead: {kv, tinh}} (KinhDoanh.saveLead ghi) */
   /* Tên dự án (MarkUp 2026-11-16 16:17): máy chủ chưa có cột -> kdOptions.projName {mã lead: tên} như geo */
   const projNameMap = useKdMap('projName')
@@ -142,6 +138,8 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   const [assigneeOpen, setAssigneeOpen] = useState(false)
   const [assigneeName, setAssigneeName] = useState('')
   const [assigneeRole, setAssigneeRole] = useState('')
+  /* Nhóm phụ trách (assignees[].dept: kinhdoanh / ctv / concept / thietke / nhathau), khối Phụ trách trang khách hàng gom theo nhóm này */
+  const [assigneeDept, setAssigneeDept] = useState('kinhdoanh')
   const [catPos, setCatPos] = useState(null) // vị trí popover hạng mục (null = đóng)
   const [nameFocusTick, setNameFocusTick] = useState(0)
   const [assigneeFocusTick, setAssigneeFocusTick] = useState(0)
@@ -225,15 +223,16 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
 
   function toggleAssigneePopover(e) {
     e.stopPropagation()
-    setAssigneeName(''); setAssigneeRole('')
+    setAssigneeName(''); setAssigneeRole(''); setAssigneeDept('kinhdoanh')
     if (!assigneeOpen) setAssigneeFocusTick(t => t + 1)
     setAssigneeOpen(!assigneeOpen)
   }
+  /* Người mới chưa có since: máy chủ tự điền ngày nhận phụ trách; người cũ giữ nguyên object (since, dept) */
   function addAssignee() {
     const name = assigneeName.trim()
     const role = assigneeRole.trim()
     if (!name) { assigneeNameRef.current.focus(); return }
-    setAssignees(list => [...list, { name, role }])
+    setAssignees(list => [...list, { name, role, dept: assigneeDept }])
     setAssigneeName(''); setAssigneeRole('')
     assigneeNameRef.current.focus()
   }
@@ -294,9 +293,12 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     const scale = form.scale.trim()
     /* Tên đã gõ trong popover nhưng chưa bấm "Thêm" vẫn được lưu */
     const pendingName = assigneeName.trim()
-    const finalAssignees = pendingName ? [...assignees, { name: pendingName, role: assigneeRole.trim() }] : assignees.slice()
+    const finalAssignees = pendingName ? [...assignees, { name: pendingName, role: assigneeRole.trim(), dept: assigneeDept }] : assignees.slice()
     const pendingAdmin = adminName.trim()
-    ;[...admins, ...(pendingAdmin && admins.indexOf(pendingAdmin) < 0 ? [pendingAdmin] : [])].forEach(n => finalAssignees.push({ name: n, role: ADMIN_KD }))
+    /* Admin KD đã có giữ since cũ */
+    const adminSince = {}
+    ;(lead && lead.assignees || []).forEach(a => { if (a && a.role === ADMIN_KD && a.since && !adminSince[a.name]) adminSince[a.name] = a.since })
+    ;[...admins, ...(pendingAdmin && admins.indexOf(pendingAdmin) < 0 ? [pendingAdmin] : [])].forEach(n => finalAssignees.push(adminSince[n] ? { name: n, role: ADMIN_KD, since: adminSince[n] } : { name: n, role: ADMIN_KD }))
     onSave({
       name,
       _geo: geo,
@@ -366,7 +368,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
                 <div className="opts">
                   {LEAD_DEPT_OPTIONS.map(([v, label]) => (
                     <button key={v} type="button" role="radio" aria-checked={form.dept === v} className={form.dept === v ? 'on' : undefined}
-                      onClick={() => { set('dept', v); setDeptWarn(false); if (!managerTouched) { const h = deptHead_(v); if (h) set('manager', h) } }}>
+                      onClick={() => { set('dept', v); setDeptWarn(false) }}>
                       <i aria-hidden="true" />
                       <span><b>{label}</b><em>{v === 'du-an' ? 'Có Chủ đầu tư, người phụ trách, chức vụ, phòng ban bên CĐT' : 'Khách lẻ: nhà ở, căn hộ, nhà phố'}</em></span>
                     </button>
@@ -518,11 +520,11 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
 
               <section className="kd-lf-sec">
                 <h4><i>4</i>Phụ trách</h4>
-                {/* Phòng ban (KD) chọn ở đầu form (MarkUp 2026-11-19). Quản lý: mặc định trưởng phòng của phòng đã chọn (đổi phòng thì đổi theo), vẫn sửa tay được */}
+                {/* Phòng ban (KD) chọn ở đầu form (MarkUp 2026-11-19). Quản lý: mặc định người tạo, chọn trong danh sách công ty tự thêm hoặc gõ tay */}
                 <div style={grid2}>
                   <div className="kd-field"><label>Quản lý</label>
-                    <ShortlistSelect value={form.manager} onChange={v => { setManagerTouched(true); set('manager', v) }} free optKey="manager" placeholder="Trưởng phòng ban phụ trách"
-                      base={[...new Set(Object.keys(DEPT_UNIT).map(deptHead_).filter(Boolean))]} />
+                    <ShortlistSelect value={form.manager} onChange={v => set('manager', v)} free optKey="manager" placeholder="Trưởng phòng ban phụ trách"
+                      base={[]} />
                   </div>
                   {/* Người khởi tạo = chủ tài khoản đang đăng nhập (lead cũ giữ người đã tạo), không sửa */}
                   <div className="kd-field"><label>Người khởi tạo</label><input type="text" readOnly title="Chủ tài khoản tạo lead" value={form.creator} style={{ opacity: 0.85, cursor: 'default' }} /></div>
@@ -535,7 +537,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
                         {assignees.map((a, i) => (
                           <span className="kd-lm-assignee-chip" key={i}>
                             <span className="kd-aa-avatar">{lmInitials(a.name)}</span>
-                            {a.name}{a.role ? <span className="kd-aa-role">· {a.role}</span> : null}
+                            {a.name}{a.role || GROUP_LABEL[a.dept] ? <span className="kd-aa-role">· {[GROUP_LABEL[a.dept], a.role].filter(Boolean).join(' - ')}</span> : null}
                             <button type="button" className="kd-aa-remove" title="Xoá" onClick={() => setAssignees(list => list.filter((_, idx) => idx !== i))}>
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                             </button>
@@ -549,6 +551,10 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
                     <div className="kd-lm-assignee-popover" style={{ display: assigneeOpen ? 'flex' : 'none', top: 'auto', bottom: '100%', marginTop: 0, marginBottom: 6 }} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Enter') addAssignee() }}>
                       <input type="text" ref={assigneeNameRef} placeholder="Họ tên" value={assigneeName} onChange={e => setAssigneeName(e.target.value)} />
                       <input type="text" placeholder="Vai trò (VD: Sale phụ trách, Kỹ thuật...)" value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} />
+                      <select aria-label="Nhóm phụ trách" title="Nhóm phụ trách" value={assigneeDept} onChange={e => setAssigneeDept(e.target.value)}
+                        style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', fontSize: 12.5, fontFamily: 'inherit' }}>
+                        {OWNER_GROUPS.map(g => <option key={g.key} value={g.key}>{g.label}</option>)}
+                      </select>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                         <button type="button" className="kd-lm-assignee-btn" onClick={() => setAssigneeOpen(false)}>Đóng</button>
                         <button type="button" className="kd-lm-assignee-btn primary" onClick={addAssignee}>Thêm</button>

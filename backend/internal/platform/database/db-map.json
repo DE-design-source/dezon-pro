@@ -676,6 +676,7 @@
    "file_boq": "boq_file_name",
    "ma_da": "project_code",
    "ngay_chot": "won_at",
+   "ngay_doi_giai_doan": "stage_changed_at",
    "nguoi_tao": "created_by",
    "ngay_tao": "created_at",
    "cap_nhat": "updated_at"
@@ -696,6 +697,89 @@
    "nguoi_viet": "author_name",
    "nguoi_tao": "created_by",
    "ngay_tao": "created_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
+ "kd_cham_diem": {
+  "table": "sales_lead_scores",
+  "columns": {
+   "khach_hang_id": "lead_id",
+   "tieu_chi": "checks",
+   "lich_su": "history",
+   "nguoi_sua": "updated_by",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
+ "kd_lich_hen": {
+  "table": "sales_lead_appointments",
+  "columns": {
+   "id": "id",
+   "khach_hang_id": "lead_id",
+   "ngay": "appointment_date",
+   "gio_bat_dau": "start_time",
+   "gio_ket_thuc": "end_time",
+   "tieu_de": "title",
+   "hinh_thuc": "meeting_mode",
+   "dia_diem": "place",
+   "muc_tieu": "goal",
+   "thanh_vien": "members",
+   "chuan_bi": "prep_items",
+   "trang_thai": "status",
+   "nguoi_viet": "author_name",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
+ "kd_nhiem_vu_kh": {
+  "table": "sales_lead_tasks",
+  "columns": {
+   "id": "id",
+   "khach_hang_id": "lead_id",
+   "tieu_de": "title",
+   "han": "due_date",
+   "phu_trach": "assignees",
+   "ghi_chu": "note",
+   "xong": "is_done",
+   "ngay_xong": "done_at",
+   "nguon": "task_source",
+   "nguoi_viet": "author_name",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
+ "kd_goi_y": {
+  "table": "sales_lead_insights",
+  "columns": {
+   "id": "id",
+   "khach_hang_id": "lead_id",
+   "noi_dung": "content",
+   "cong_cu": "engine",
+   "mo_hinh": "model_name",
+   "nguon": "sources",
+   "canh_bao": "warning",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "generated_at"
   },
   "tenant": {
    "via": "lead_id",

@@ -26,6 +26,12 @@ type fakeRepo struct {
 	acts     []*omap.Map
 	staff    []*omap.Map
 	nextID   float64
+	// bảng con của migration 0053 (service_dashboard_test.go)
+	scores   map[float64]*omap.Map
+	appts    map[float64]*omap.Map
+	tasks    map[float64]*omap.Map
+	insights []*omap.Map
+	childID  float64
 }
 
 func newFake() *fakeRepo { return &fakeRepo{leads: map[float64]*omap.Map{}, nextID: 1} }

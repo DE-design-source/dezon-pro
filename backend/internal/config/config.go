@@ -74,6 +74,10 @@ type Config struct {
 	ChatMediaMaxFileMB  float64 // CHAT_MEDIA_MAX_FILE_MB: video + tệp tối đa (MB); trống / sai / <= 0 = 100; > 200 kẹp về 200
 	ChatMediaDailyMB    float64 // CHAT_MEDIA_DAILY_MB: dung lượng khai báo / người / 24 giờ (MB); trống / sai / <= 0 = 2048
 	ChatMediaURLTTLMin  float64 // CHAT_MEDIA_URL_TTL_MIN: hạn presigned GET (phút); trống / sai / <= 0 = 60; kẹp 5..720
+
+	// Phân tích khách hàng Kinh doanh bằng Gemini (internal/platform/gemini): GEMINI_API_KEY rỗng = dùng gợi ý theo quy tắc
+	GeminiAPIKey string // GEMINI_API_KEY: khoá Google AI Studio; bí mật, không ghi log
+	GeminiModel  string // GEMINI_MODEL, mặc định gemini-3.8-flash
 }
 
 // Giá trị mặc định lấy từ server Node.
@@ -83,6 +87,7 @@ const (
 	DefaultPurchaseWebhook = "https://open.larksuite.com/open-apis/bot/v2/hook/865751f9-d3e8-4e8e-9b4e-e0fa53ef4698"
 	DefaultSortCollation   = "en-US-x-icu"
 	DefaultUploadDir       = "uploads" // riêng bản Go: kho file trên đĩa
+	DefaultGeminiModel     = "gemini-3.8-flash"
 )
 
 func env(k, def string) string {
@@ -144,6 +149,8 @@ func Load() *Config {
 	c.ChatMediaMaxFileMB = mediaMB("CHAT_MEDIA_MAX_FILE_MB", 100)
 	c.ChatMediaDailyMB = positive(os.Getenv("CHAT_MEDIA_DAILY_MB"), 2048)
 	c.ChatMediaURLTTLMin = min(max(positive(os.Getenv("CHAT_MEDIA_URL_TTL_MIN"), 60), 5), 720)
+	c.GeminiAPIKey = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
+	c.GeminiModel = strings.TrimSpace(env("GEMINI_MODEL", DefaultGeminiModel))
 	return c
 }
 

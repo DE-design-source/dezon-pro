@@ -41,6 +41,7 @@ var TenantTables = map[string]bool{
 	"audit_log": true, "users": true, "sp_combo": true, "sp_yeu_thich": true, "cong_tac": true,
 	"de_xuat": true, "chi_tiet_de_xuat_ck": true, "chi_tiet_de_xuat_tt": true, "cong_tac_history": true,
 	"du_an_data": true, "cai_dat_cong_ty": true, "kd_khach_hang": true, "kd_cham_soc": true,
+	"kd_cham_diem": true, "kd_lich_hen": true, "kd_nhiem_vu_kh": true, "kd_goi_y": true,
 	"tk_du_an": true, "tk_thanh_vien": true, "tk_thau_phu": true, "tk_giai_doan": true, "tk_cong_viec": true, "tk_binh_luan": true,
 	"hr_don_vi": true, "hr_nhan_vien": true, "hr_kiem_nhiem": true,
 	"hr_ca": true, "hr_lich_tuan": true, "hr_cham_cong": true, "hr_don_tu": true,

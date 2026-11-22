@@ -1,5 +1,6 @@
 // Package sales: trang Kinh doanh (SiteFlow /kinh-doanh) - khách hàng tiềm năng (pipeline) + lịch sử chăm sóc.
-// Tính năng mới, chỉ bản Go: REST /api/v1/sales/... (không có hàm /api/:fn). Bảng: kd_khach_hang, kd_cham_soc (migration 0015).
+// Tính năng mới, chỉ bản Go: REST /api/v1/sales/... (không có hàm /api/:fn). Bảng: kd_khach_hang, kd_cham_soc (migration 0015);
+// trang khách hàng dạng dashboard: kd_cham_diem, kd_lich_hen, kd_nhiem_vu_kh, kd_goi_y (migration 0053).
 package sales
 
 import (
@@ -34,7 +35,9 @@ var (
 	depts       = set("dan-dung", "du-an")
 	kinds       = set("call", "meeting", "site", "zalo", "email", "quote", "note")
 	outcomes    = set("", "good", "neutral", "bad")
-	isoDate     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// assigneeDepts: nhóm của người phụ trách trên khối Phụ trách (Kinh doanh / CTV Kinh doanh / Concept / Thiết kế / Nhà thầu)
+	assigneeDepts = set("kinhdoanh", "ctv", "concept", "thietke", "nhathau")
+	isoDate       = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
 
 func set(xs ...string) map[string]bool {
@@ -55,6 +58,7 @@ type Deps struct {
 	Projects contracts.ProjectReader
 	Delivery contracts.DeliveryFromLead
 	Notifier contracts.Notifier // báo người vừa được giao phụ trách khách hàng; nil = không báo
+	AI       AIClient           // Gemini (GEMINI_API_KEY); nil = phân tích khách hàng theo quy tắc
 	Repo     Repository
 }
 
@@ -67,6 +71,7 @@ type Service struct {
 	projects contracts.ProjectReader
 	delivery contracts.DeliveryFromLead
 	notifier contracts.Notifier
+	ai       AIClient
 	db       *database.DB
 	now      func() time.Time
 }
@@ -77,7 +82,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, db: d.DB, now: time.Now}
+	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, db: d.DB, now: time.Now}
 }
 
 // tx: ghi khách hàng + tạo dự án triển khai trong cùng 1 transaction. Repo giả trong test không có DB -> chạy thẳng.
@@ -292,7 +297,7 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 	if !body.Has("name") {
 		return nil, apperr.BadRequest("Thiếu tên khách hàng")
 	}
-	row, err := s.fields(ctx, body)
+	row, err := s.fields(ctx, body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +320,7 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 	if wonStages[jsval.Str(row.Val("giai_doan"))] {
 		row.Set("ngay_chot", won)
 	}
-	row.Set("nguoi_tao", a.UID).Set("ngay_tao", created).Set("cap_nhat", now)
+	row.Set("nguoi_tao", a.UID).Set("ngay_tao", created).Set("cap_nhat", now).Set("ngay_doi_giai_doan", now)
 	out, q, err := s.saveAndDeliver(ctx, a, nil, func(ctx context.Context) (*omap.Map, error) { return s.repo.InsertLead(ctx, row) })
 	if err != nil {
 		return nil, err
@@ -336,7 +341,7 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 	if old == nil {
 		return nil, apperr.NotFound("Không tìm thấy khách hàng")
 	}
-	patch, err := s.fields(ctx, body)
+	patch, err := s.fields(ctx, body, old)
 	if err != nil {
 		return nil, err
 	}
@@ -347,6 +352,9 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 			patch.Set("ngay_chot", now)
 		} else if !isWon {
 			patch.Set("ngay_chot", nil)
+		}
+		if jsval.Str(g) != jsval.Str(old.Val("giai_doan")) {
+			patch.Set("ngay_doi_giai_doan", now) // "Đã ở giai đoạn này N ngày"
 		}
 	}
 	// sửa ngày tạo (yyyy-mm-dd, nút sửa ở Dự án quan tâm): 9:00 giờ VN ngày đó như khi tạo
@@ -590,8 +598,8 @@ func (s *Service) AddActivity(ctx context.Context, a *actor.Actor, id float64, b
 	return activityOut(out), nil
 }
 
-// fields: đọc + kiểm các khoá của giao diện có trong body -> patch theo tên cột trong code.
-func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
+// fields: đọc + kiểm các khoá của giao diện có trong body -> patch theo tên cột trong code. old = dòng đang có (nil khi tạo).
+func (s *Service) fields(ctx context.Context, b *omap.Map, old *omap.Map) (*omap.Map, error) {
 	p := omap.New()
 	text := map[string]string{"phone": "sdt", "email": "email", "address": "dia_chi", "source": "nguon",
 		"projectType": "loai_cong_trinh", "scale": "quy_mo", "concept": "concept", "notes": "ghi_chu",
@@ -654,17 +662,9 @@ func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
 		p.Set("hang_muc", cats)
 	}
 	if b.Has("assignees") {
-		list := []any{}
-		if arr, ok := b.Val("assignees").([]any); ok {
-			for _, x := range arr {
-				if m, ok := x.(*omap.Map); ok && str(m, "name") != "" && len(list) < 50 {
-					a := omap.Of("name", str(m, "name"), "role", str(m, "role"))
-					if u := str(m, "username"); u != "" {
-						a.Set("username", u) // tài khoản được giao (chọn từ GET /sales/staff); thiếu = chỉ có tên
-					}
-					list = append(list, a)
-				}
-			}
+		list, err := s.assignees(b.Val("assignees"), old)
+		if err != nil {
+			return nil, err
 		}
 		p.Set("phu_trach", list)
 	}
@@ -702,6 +702,79 @@ func (s *Service) fields(ctx context.Context, b *omap.Map) (*omap.Map, error) {
 	return p, nil
 }
 
+// sameAssignee: so người phụ trách mới với danh sách cũ - theo tên đăng nhập, không có thì theo tên.
+func sameAssignee(a, b *omap.Map) bool {
+	ua, ub := str(a, "username"), str(b, "username")
+	if ua != "" && ub != "" {
+		return ua == ub
+	}
+	return str(a, "name") == str(b, "name")
+}
+
+// assignees: body.assignees -> phu_trach [{name, role, username?, since?, dept?}]. Người đã có trong danh sách cũ (old.phu_trach)
+// mà giao diện không gửi since / dept -> giữ giá trị đã lưu; người mới không có since -> hôm nay (giờ VN). Không phải mảng -> 400.
+func (s *Service) assignees(v any, old *omap.Map) ([]any, error) {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, apperr.BadRequest("Danh sách người phụ trách (assignees) phải là mảng")
+	}
+	prev := []*omap.Map{}
+	if old != nil {
+		if xs, ok := old.Val("phu_trach").([]any); ok {
+			for _, x := range xs {
+				if m, ok := x.(*omap.Map); ok {
+					prev = append(prev, m)
+				}
+			}
+		}
+	}
+	today := s.now().In(vn).Format("2006-01-02")
+	list := []any{}
+	for _, x := range arr {
+		m, ok := x.(*omap.Map)
+		if !ok || str(m, "name") == "" || len(list) >= 50 {
+			continue
+		}
+		a := omap.Of("name", str(m, "name"), "role", str(m, "role"))
+		if u := str(m, "username"); u != "" {
+			a.Set("username", u) // tài khoản được giao (chọn từ GET /sales/staff); thiếu = chỉ có tên
+		}
+		var was *omap.Map
+		for _, p := range prev {
+			if sameAssignee(a, p) {
+				was = p
+				break
+			}
+		}
+		since := str(m, "since") // ngày nhận phụ trách ("Nhận từ 16/11/26")
+		if since != "" && !isDay(since) {
+			return nil, apperr.BadRequest("Ngày nhận phụ trách không hợp lệ")
+		}
+		if since == "" {
+			if was != nil {
+				since = str(was, "since")
+			} else {
+				since = today
+			}
+		}
+		if since != "" {
+			a.Set("since", since)
+		}
+		dept := str(m, "dept")
+		if !m.Has("dept") && was != nil {
+			dept = str(was, "dept")
+		}
+		if dept != "" {
+			if !assigneeDepts[dept] {
+				return nil, apperr.BadRequest("Nhóm phụ trách không hợp lệ")
+			}
+			a.Set("dept", dept)
+		}
+		list = append(list, a)
+	}
+	return list, nil
+}
+
 // dayOr: body[k] = yyyy-mm-dd -> 9:00 giờ VN ngày đó (ISO UTC); không có -> def.
 func dayOr(b *omap.Map, k, def string) (string, error) {
 	d := str(b, k)
@@ -713,6 +786,39 @@ func dayOr(b *omap.Map, k, def string) (string, error) {
 		return "", apperr.BadRequest("Ngày không hợp lệ: " + k)
 	}
 	return t.Add(9 * time.Hour).UTC().Format(time.RFC3339Nano), nil
+}
+
+// isDay: chuỗi yyyy-mm-dd là ngày có thật.
+func isDay(d string) bool {
+	if !isoDate.MatchString(d) {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", d)
+	return err == nil
+}
+
+// leadOr404: khách hàng thuộc công ty đang làm việc (repo tự lọc theo công ty) hoặc 404.
+func (s *Service) leadOr404(ctx context.Context, id any) (*omap.Map, error) {
+	l, err := s.repo.GetLead(ctx, jsval.ToNumber(id))
+	if err == nil && l == nil {
+		err = apperr.NotFound("Không tìm thấy khách hàng")
+	}
+	return l, err
+}
+
+// displayName: họ tên của người đang thao tác (thiếu thì tên đăng nhập) - ghi kèm dòng như nguoi_viet của kd_cham_soc.
+func (s *Service) displayName(ctx context.Context, a *actor.Actor) string {
+	if a == nil {
+		return ""
+	}
+	if s.users != nil && jsval.Truthy(a.UID) {
+		if u, err := s.users.GetByID(ctx, a.UID); err == nil && u != nil {
+			if n := jsval.Trim(jsval.Str(u.Val("ho_ten"))); n != "" {
+				return n
+			}
+		}
+	}
+	return a.U
 }
 
 func str(m *omap.Map, k string) string {
@@ -752,6 +858,7 @@ func leadOut(r *omap.Map, quote any) *omap.Map {
 		"assignees", orArr(r.Val("phu_trach")), "handoff", jsval.Or(r.Val("ban_giao"), nil), "boqFile", r.Val("file_boq"),
 		"maDA", jsval.Or(r.Val("ma_da"), ""), "quote", quote,
 		"createdAt", ngayVN(r.Val("ngay_tao")), "wonAt", ngayVN(r.Val("ngay_chot")), "updatedAt", r.Val("cap_nhat"),
+		"stageChangedAt", jsval.Or(r.Val("ngay_doi_giai_doan"), r.Val("cap_nhat")),
 	)
 }
 
