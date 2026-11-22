@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import * as api from '../../api/qsApi'
 import { getState, isAdminRole_ } from '../../state/store'
 import { qsToast } from '../common/dialogs'
+import { denyQs } from '../../state/qsAccess'
 
 /* Nhân sự phụ trách từng dự án, dùng chung cho cột "Phụ trách" (Danh sách dự án) và mục "Nhân sự dự án" (hộp Thông tin dự án):
    dữ liệu công ty '__cty' khoá daPhuTrach {mã bản nháp đầu của dự án: {ql, dp, th}} - mỗi vai trò 1 mảng tên đăng nhập:
@@ -43,6 +44,7 @@ export function ptRoles_(v) {
 }
 /* Giao danh sách nhân sự của 1 vai trò cho dự án (key = mã bản nháp đầu), ghi ngay */
 export async function setPhuTrach(key, list, role) {
+  if (denyQs('duan', 'edit')) return   // N21: QS > Dự án > Sửa
   const r = ptRoles_(snap.map[key])
   r[role || 'ql'] = list
   const n = { ...snap.map }

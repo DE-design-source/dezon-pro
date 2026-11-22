@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import './MuaHang.css'
 import { useTheme } from '../../hooks/useTheme'
@@ -7,6 +7,7 @@ import DeptStaff from '../../components/hr/DeptStaff'
 import WorkGate from '../../components/ui/WorkGate'
 import { MH_TABS } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 import PurchaseDashboard from './components/PurchaseDashboard'
 
 export default function MuaHang() {
@@ -16,8 +17,13 @@ export default function MuaHang() {
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/mua-hang')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module muahang)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/mua-hang')
+  const noViewKey = MH_TABS.filter(t => !can('muahang', t.key)).map(t => t.key).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
   useTabFallback(tabHidden, pageTab, MH_TABS.map(t => t.key), setPageTab)
+  const noTab = MH_TABS.every(t => !can('muahang', t.key))
 
   return (
     <div
@@ -43,13 +49,16 @@ export default function MuaHang() {
       </div>
 
       {/* Tổng quan: gom thông tin mua hàng của QS, Quản lý thiết kế, Quản lý dự án (cần đăng nhập; quyền từng nguồn xét trong api.js) */}
-      <div className="mh-scroll mh-scroll-dash" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
-        <WorkGate title="Mua hàng">
-          <PurchaseDashboard />
-        </WorkGate>
-      </div>
+      {noTab && <div className="mh-scroll"><div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem trang Mua hàng. Nhờ quản trị viên cấp quyền.</div></div>}
+      {can('muahang', 'main') && (
+        <div className="mh-scroll mh-scroll-dash" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
+          <WorkGate title="Mua hàng">
+            <PurchaseDashboard />
+          </WorkGate>
+        </div>
+      )}
 
-      {pageTab === 'nhansu' && (
+      {pageTab === 'nhansu' && can('muahang', 'nhansu') && (
         <div className="mh-scroll">
           <DeptStaff units={['muahang']} />
         </div>

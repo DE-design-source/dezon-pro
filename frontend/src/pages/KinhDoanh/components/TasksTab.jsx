@@ -30,6 +30,7 @@ const redeemBtnBase = { border: 'none', padding: 8, borderRadius: 8, fontSize: 1
 const redeemBtnOn = { ...redeemBtnBase, background: 'var(--sales)', color: '#fff', cursor: 'pointer' }
 const redeemBtnOff = { ...redeemBtnBase, background: 'var(--surface-alt)', color: 'var(--text-muted)', cursor: 'not-allowed' }
 
+/* N21: không có onOpenCreateTask (không có quyền Thêm) -> ẩn "Tạo nhiệm vụ"; không có onCheckSubtask (không có quyền Sửa) -> không tích được */
 export default function TasksTab({ steps, onCheckSubtask, wallet, onRedeem, onOpenCreateTask }) {
   const [ktab, setKtab] = useState('overview')
   const panel = (name, extra) => ({ display: ktab === name ? 'flex' : 'none', flexDirection: 'column', gap: 16, ...extra })
@@ -145,10 +146,10 @@ export default function TasksTab({ steps, onCheckSubtask, wallet, onRedeem, onOp
               <div style={{ width: pct + '%', height: '100%', borderRadius: 4, background: 'var(--sales)' }} />
             </div>
           </div>
-          <button className="kd-create-task-btn" title="Tạo nhiệm vụ mới" onClick={onOpenCreateTask}>
+          {onOpenCreateTask && <button className="kd-create-task-btn" title="Tạo nhiệm vụ mới" onClick={onOpenCreateTask}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Tạo nhiệm vụ
-          </button>
+          </button>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {steps.map((step, idx) => {
@@ -176,8 +177,8 @@ export default function TasksTab({ steps, onCheckSubtask, wallet, onRedeem, onOp
                   {step.status !== 'locked' && step.subtasks.map((s, si) => (
                     <div className="kd-subtask-row" key={si}>
                       <div
-                        className={`kd-subtask-chk${s.done ? ' checked' : ''}${isOpen ? '' : ' disabled'}`}
-                        onClick={isOpen ? () => onCheckSubtask(idx, si) : undefined}
+                        className={`kd-subtask-chk${s.done ? ' checked' : ''}${isOpen && onCheckSubtask ? '' : ' disabled'}`}
+                        onClick={isOpen && onCheckSubtask ? () => onCheckSubtask(idx, si) : undefined}
                       >
                         {s.done && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,12 9,17 20,6" /></svg>}
                       </div>

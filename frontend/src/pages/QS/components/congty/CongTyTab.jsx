@@ -27,7 +27,7 @@ export default function CongTyTab() {
   const vis = panelVisible('congty')
   const [st, setSt] = useState({ phase: 'idle', list: [], err: '' })
   const [reloadN, setReloadN] = useState(0)
-  const [form, setForm] = useState(null)   // {c} | null
+  const [form, setForm] = useState(null)   // {c, tab} | null
 
   useEffect(() => {
     if (!vis || !isSuper) return undefined
@@ -57,11 +57,11 @@ export default function CongTyTab() {
 
   // hộp sửa nằm ngoài phần vẽ lại danh sách (bản gốc gắn #ctOv vào body) nên không mất khi danh sách tải lại;
   // luôn là con thứ 3 của .qsa-root để React không gắn lại nó khi đổi giữa "Đang tải…" và danh sách
-  const formEl = form ? <CongTyForm c={form.c} onClose={() => setForm(null)} onSaved={reload} /> : null
+  const formEl = form ? <CongTyForm c={form.c} startTab={form.tab} onClose={() => setForm(null)} onSaved={reload} /> : null
   return (
     <div className="qsa-root">
       {st.phase === 'ready' ? <ListView list={st.list} viewAs={viewAs} onCreate={() => setForm({ c: null })}
-        onView={ctViewAs} onEdit={c => setForm({ c })} onDelete={ctDelete} /> : (
+        onView={ctViewAs} onEdit={(c, tab) => setForm({ c, tab })} onDelete={ctDelete} /> : (
         <div className="qsa-hd"><h2>Quản lý công ty</h2></div>
       )}
       {st.phase === 'ready' ? null : <div className="qsa-empty" style={{ padding: 26 }}>{st.phase === 'error' ? st.err : 'Đang tải…'}</div>}
@@ -81,7 +81,6 @@ function ListView({ list, viewAs, onCreate, onView, onEdit, onDelete }) {
     if (d !== null && d >= 0 && d <= 30) sapHet++
     tongUser += c.soUser || 0
   })
-  const viewing = viewAs ? (list.filter(c => String(c.id) === String(viewAs))[0] || {}).ten : ''
   return (
     <>
       <div className="qsa-hd">
@@ -89,10 +88,7 @@ function ListView({ list, viewAs, onCreate, onView, onEdit, onDelete }) {
         <span className="qsa-sp" />
         <button type="button" className="qsa-btn blue sm" onClick={onCreate}><QsIcon name="plus" size={14} /> Tạo công ty</button>
       </div>
-      {viewing ? (
-        <div className="qsco-viewbar"><QsIcon name="eye" size={15} /> Đang xem dữ liệu của <b>{viewing}</b>
-          <button type="button" className="qsa-btn ghost xs" onClick={() => onView('')}>Thoát chế độ xem</button></div>
-      ) : null}
+      {/* dải "Đang xem dữ liệu của ..." ở khung chung (components/layout/ViewAsBanner) */}
       <div className="qsco-stats">
         <Stat ic="building" v={list.length} l="Công ty" />
         <Stat cls="ok" ic="check" v={dangHD} l="Đang hoạt động" />
@@ -101,7 +97,7 @@ function ListView({ list, viewAs, onCreate, onView, onEdit, onDelete }) {
       </div>
       <div className="qsco-grid">
         {list.length ? list.map(c => (
-          <CtCard key={c.id} c={c} onView={() => onView(c.id)} onEdit={() => onEdit(c)} onDelete={() => onDelete(c)} />
+          <CtCard key={c.id} c={c} onView={() => onView(c.id)} onEdit={tab => onEdit(c, tab)} onDelete={() => onDelete(c)} />
         )) : <div className="qsa-empty" style={{ padding: 40, textAlign: 'center' }}>Chưa có công ty nào. Bấm <b>Tạo công ty</b> để bắt đầu.</div>}
       </div>
     </>
@@ -142,6 +138,7 @@ function CtCard({ c, onView, onEdit, onDelete }) {
           <div className="qsco-sub">{c.ma}{c.email ? (' · ' + c.email) : ''}{c.sdt ? (' · ' + c.sdt) : ''}</div>
         </div>
         <span className={`qsco-badge ${stt[0]}`}>{stt[1]}</span>
+        <button type="button" className="qsco-del" title="Xoá công ty và toàn bộ dữ liệu" aria-label="Xoá công ty" onClick={onDelete}><QsIcon name="trash" size={14} /></button>
       </div>
       {c.dungSpDezon ? (
         <div className="qsco-sharerow"><span className="qsco-sharetag" title="Được dùng kho sản phẩm của Dezon"><QsIcon name="layers" size={11} /> Kho SP Dezon</span></div>
@@ -155,7 +152,7 @@ function CtCard({ c, onView, onEdit, onDelete }) {
           <div className="qsco-mh"><span>Tính năng</span><b>{tn.length} / {CT_FEATURES.length}</b></div>
           <div className="qsco-bar"><i style={{ width: fpct + '%' }} /></div>
         </div>
-        <div className="qsco-metric"><div className="qsco-mh"><span>Hạn dùng</span></div>{hanTxt}</div>
+        <div className="qsco-metric"><div className="qsco-mh"><span>Hạn dùng</span>{hanTxt}</div></div>
       </div>
       <div className="qsco-chips">
         {CT_FEATURES.map(f => {
@@ -164,10 +161,9 @@ function CtCard({ c, onView, onEdit, onDelete }) {
         })}
       </div>
       <div className="qsco-card-f">
-        <button type="button" className="qsco-b" onClick={onView}><QsIcon name="eye" size={14} /> Xem dữ liệu</button>
-        <button type="button" className="qsco-b" onClick={onEdit}><QsIcon name="edit" size={14} /> Phân quyền</button>
-        <span style={{ flex: 1 }} />
-        <button type="button" className="qsco-b del" title="Xoá công ty và toàn bộ dữ liệu" onClick={onDelete}><QsIcon name="trash" size={14} /></button>
+        <button type="button" className="qsco-b" title="Xem dữ liệu của công ty này" onClick={onView}><QsIcon name="eye" size={13} /> Xem dữ liệu</button>
+        <button type="button" className="qsco-b" title="Sửa tên, logo, liên hệ, gói sử dụng" onClick={() => onEdit('info')}><QsIcon name="edit" size={13} /> Sửa</button>
+        <button type="button" className="qsco-b" title="Bật / tắt tính năng của công ty" onClick={() => onEdit('tn')}><QsIcon name="lock" size={13} /> Phân quyền</button>
       </div>
     </div>
   )

@@ -447,6 +447,18 @@ func TestDiffNode(t *testing.T) {
 			case "$forget":
 				svc.ForgetSession(a.Arg(0))
 				return nil, nil
+			// 5 hàm quản lý tài khoản: so hàm LÕI với Node, bỏ qua cửa ngõ Gated chỉ bản Go (users TestAdminGate /
+			// TestSpDuyetGate kiểm riêng) - như users TestDiffNode
+			case "adminCreateUser":
+				return usersSvc.AdminCreateUser(w.Ctx, w.Actor, a.Map(0))
+			case "adminUpdateUser":
+				return usersSvc.AdminUpdateUser(w.Ctx, w.Actor, a.ArgU(0), a.Map(1))
+			case "adminSetPassword":
+				return usersSvc.AdminSetPassword(w.Ctx, w.Actor, a.ArgU(0), a.ArgU(1))
+			case "adminSetActive":
+				return usersSvc.AdminSetActive(w.Ctx, w.Actor, a.ArgU(0), a.ArgU(1))
+			case "adminDeleteUser":
+				return usersSvc.AdminDeleteUser(w.Ctx, w.Actor, a.ArgU(0))
 			}
 			return reg.Call(w.Ctx, c.Fn, w.Actor, args...)
 		}

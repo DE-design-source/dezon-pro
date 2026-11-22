@@ -57,7 +57,7 @@ export default function SpCards({ layout, cols, rows, sel, skuCount, canDuyet, o
               <div className="qspl-pc-acts" onClick={e => e.stopPropagation()}>
                 {canDuyet && !p.spChung && <button type="button" className={`qspl-act ${p.daDuyet ? 'undo' : 'ok'}`} title={p.daDuyet ? 'Bỏ duyệt' : 'Duyệt sản phẩm này'} onClick={() => on.duyet(p)}><QsIcon name="check" size={15} /></button>}
                 {!p.spChung && <button type="button" className="qspl-act edit" title="Cập nhật sản phẩm" onClick={() => on.editP(p)}><QsIcon name="edit" size={15} /></button>}
-                <button type="button" className="qspl-pc-add" title="Ghi danh vào dự án" onClick={() => on.add(p)}><QsIcon name="plus" size={14} />Thêm</button>
+                <button type="button" className={`qspl-pc-add${p.daDuyet ? '' : ' off'}`} aria-disabled={!p.daDuyet} title={p.daDuyet ? 'Ghi danh vào dự án' : 'Sản phẩm chưa duyệt'} onClick={() => on.add(p)}><QsIcon name="plus" size={14} />Thêm</button>
               </div>
             </div>
           </div>

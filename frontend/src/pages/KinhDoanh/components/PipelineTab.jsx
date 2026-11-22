@@ -162,7 +162,9 @@ const viewBtnStyle = active => ({
   background: active ? 'var(--sales-tint)' : 'none', color: active ? 'var(--sales)' : 'var(--text-muted)', fontFamily: 'inherit',
 })
 
-export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onEdit, onAddAssignee, onRemoveAssignee }) {
+/* readOnly (N21: không có quyền Sửa ở Kinh doanh > Pipeline): không kéo thẻ / đổi giai đoạn / xếp ưu tiên chăm sóc / đổi số sao;
+   không có onDelete / onEdit: ẩn nút xoá / sửa */
+export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onEdit, onAddAssignee, onRemoveAssignee, readOnly }) {
   const [view, setView] = useState('kanban')
   /* Tìm nhanh khách hàng (SĐT, tên...) - áp cho cả Kanban và Danh sách */
   const [q, setQ] = useState('')
@@ -242,6 +244,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
     return c ? c * sort.dir : careCmp(a, b)
   })
   const careMode = sortKey === 'care'
+  const careDrag = careMode && !readOnly   // kéo dòng đổi thứ tự = sửa (lưu chung công ty)
   const clickHead = (key, def) => setSort(sort.key === key ? { key, dir: -sort.dir } : { key, dir: def })
   /* Thả dòng: đổi thứ tự các dòng đang hiện, giữ chỗ của khách bị ẩn do bộ lọc, rồi lưu hạng mới cho toàn bộ khách */
   function dropRow(targetId, after) {
@@ -415,7 +418,9 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
             </button>
             <span className="hint">
               {starSort ? 'Đang bật ưu tiên 5 sao trước (bộ lọc sao). ' : ''}
-              {careMode
+              {careMode && readOnly
+                ? 'Đang xếp theo thứ tự ưu tiên chăm sóc.'
+                : careMode
                 ? 'Kéo ⠿ ở đầu dòng để xếp khách cần chăm sóc lên trước. Khách mới (chưa xếp) hiện trên cùng.'
                 : 'Đang sắp xếp theo "' + ((LIST_HEAD_V.find(h => h[0] === sortKey) || [])[1] || '') + '" ' + (sort.dir === 1 ? '(tăng dần)' : '(giảm dần)') + ' - bấm tiêu đề cột để đổi.'}
             </span>
@@ -446,9 +451,9 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
               key={stageId}
               className={`kd-stage-col${hoverStage === stageId ? ' drop-hover' : ''}`}
               style={{ minWidth: 220, '--lane': headColor || 'var(--text-muted)', ...(isLostStage ? { opacity: 0.85 } : null) }}
-              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (hoverStage !== stageId) setHoverStage(stageId) }}
-              onDragLeave={() => setHoverStage(cur => (cur === stageId ? null : cur))}
-              onDrop={e => {
+              onDragOver={readOnly ? undefined : e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (hoverStage !== stageId) setHoverStage(stageId) }}
+              onDragLeave={readOnly ? undefined : () => setHoverStage(cur => (cur === stageId ? null : cur))}
+              onDrop={readOnly ? undefined : e => {
                 e.preventDefault()
                 setHoverStage(null)
                 setDraggingId(null)
@@ -460,7 +465,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: headColor || 'var(--text-muted)' }}>({items.length} dự án - {fmtTy(total)})</span>
               </div>
               <div className="kd-stage-body">
-                {!items.length && <div className="kd-stage-empty">Kéo thẻ vào đây</div>}
+                {!items.length && <div className="kd-stage-empty">{readOnly ? 'Chưa có khách' : 'Kéo thẻ vào đây'}</div>}
                 {items.map(l => (
                   <LeadCard
                     key={l.id} lead={l} projMode={isDA} dups={dupIdx[String(l.id)]}
@@ -471,7 +476,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
                     memberOpen={memberOpenFor === l.id}
                     onToggleMember={id => setMemberOpenFor(cur => (cur === id ? null : id))}
                     onCloseMember={() => setMemberOpenFor(null)}
-                    onAddAssignee={onAddAssignee} onRemoveAssignee={onRemoveAssignee}
+                    onAddAssignee={onAddAssignee} onRemoveAssignee={onRemoveAssignee} readOnly={readOnly}
                   />
                 ))}
               </div>
@@ -507,20 +512,20 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
           return (
             /* bấm dòng = mở trang chi tiết khách hàng; ô chọn giai đoạn và nút sửa không mở. Chế độ Ưu tiên chăm sóc: kéo dòng để đổi thứ tự */
             <div key={l.id} className={'kd-list-row' + dropCls + (String(dragRow) === String(l.id) ? ' dragging' : '')} role="button" tabIndex={0} title="Xem chi tiết khách hàng"
-              draggable={careMode}
-              onDragStart={careMode ? e => { e.dataTransfer.setData('text/x-kd-row', String(l.id)); e.dataTransfer.effectAllowed = 'move'; setDragRow(l.id) } : undefined}
-              onDragEnd={careMode ? () => { setDragRow(null); setDropAt(null) } : undefined}
-              onDragOver={careMode && dragRow != null ? e => {
+              draggable={careDrag}
+              onDragStart={careDrag ? e => { e.dataTransfer.setData('text/x-kd-row', String(l.id)); e.dataTransfer.effectAllowed = 'move'; setDragRow(l.id) } : undefined}
+              onDragEnd={careDrag ? () => { setDragRow(null); setDropAt(null) } : undefined}
+              onDragOver={careDrag && dragRow != null ? e => {
                 e.preventDefault(); e.dataTransfer.dropEffect = 'move'
                 const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2
                 if (!dropAt || String(dropAt.id) !== String(l.id) || dropAt.after !== after) setDropAt({ id: l.id, after })
               } : undefined}
-              onDrop={careMode && dragRow != null ? e => { e.preventDefault(); dropRow(l.id, dropAt ? dropAt.after : false) } : undefined}
+              onDrop={careDrag && dragRow != null ? e => { e.preventDefault(); dropRow(l.id, dropAt ? dropAt.after : false) } : undefined}
               onClick={() => onOpenDetail && onOpenDetail(l.id)}
               onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpenDetail && onOpenDetail(l.id) } }}
-              style={{ display: 'grid', gridTemplateColumns: LIST_COLS_V, gap: 10, alignItems: 'center', padding: '10px 4px', cursor: careMode ? 'grab' : 'pointer', ...(i < listLeads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
+              style={{ display: 'grid', gridTemplateColumns: LIST_COLS_V, gap: 10, alignItems: 'center', padding: '10px 4px', cursor: careDrag ? 'grab' : 'pointer', ...(i < listLeads.length - 1 ? { borderBottom: '1px solid var(--border)' } : null) }}>
               <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
-                {careMode ? <i className="kd-list-grip" title="Kéo để đổi thứ tự ưu tiên" aria-hidden="true">⠿</i> : null}{i + 1}
+                {careDrag ? <i className="kd-list-grip" title="Kéo để đổi thứ tự ưu tiên" aria-hidden="true">⠿</i> : null}{i + 1}
               </span>
               {isDA && (() => {
                 const inv = investorOf(l)
@@ -547,21 +552,21 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
               </span>
               <span title={l.type} style={{ fontSize: 12.5, color: 'var(--text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.type}</span>
               <span title={addr} style={{ fontSize: 12.5, fontWeight: addr ? 600 : 400, color: addr ? 'var(--text)' : 'var(--text-muted)', minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}>{addr || '—'}</span>
-              <span style={{ minWidth: 0 }}><RatingStars id={String(l.id)} small /></span>
+              <span style={{ minWidth: 0 }}><RatingStars id={String(l.id)} small readOnly={readOnly} /></span>
               {!isDA && <span style={{ padding: '3px 9px', borderRadius: 999, background: DEPT_TINT[l.dept], color: DEPT_COLOR[l.dept], fontSize: 10.5, fontWeight: 600, justifySelf: 'start' }}>{DEPT_SHORT[l.dept]}</span>}
               <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>
               <span style={{ padding: '3px 9px', borderRadius: 999, background: a ? a.bg : 'var(--sales-tint)', color: a ? a.color : 'var(--sales)', fontSize: 11, fontWeight: 600, justifySelf: 'start' }}>{STAGE_LABEL[l.stage]}</span>
               <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDay(l.createdAt) || '—'}</span>
               <select
-                value={l.stage} onChange={e => onMove(l.id, e.target.value)} onClick={e => e.stopPropagation()}
+                value={l.stage} onChange={e => onMove(l.id, e.target.value)} onClick={e => e.stopPropagation()} disabled={readOnly}
                 style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', fontSize: 11, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }}
               >
                 {STAGES.map(s => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
               </select>
-              <button type="button" className="kd-list-edit" title="Sửa thông tin khách hàng" aria-label={'Sửa ' + l.name}
-                onClick={e => { e.stopPropagation(); onEdit && onEdit(l.id) }}>
+              {onEdit ? <button type="button" className="kd-list-edit" title="Sửa thông tin khách hàng" aria-label={'Sửa ' + l.name}
+                onClick={e => { e.stopPropagation(); onEdit(l.id) }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
-              </button>
+              </button> : <span />}
             </div>
           )
         })}

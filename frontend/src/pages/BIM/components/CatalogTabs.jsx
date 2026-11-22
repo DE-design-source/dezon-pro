@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { INITIAL_PRODUCTS, INITIAL_MATERIALS_CATALOG } from '../../../data/bimData'
 import { Icon, SectionHead, SearchInput, StatusBadge } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 const LOCK_ICON = '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
 const GLOBE_ICON = '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'
@@ -16,6 +17,8 @@ function CatalogKpis({ total, active }) {
 }
 
 function AddButton({ label, onClick }) {
+  const { can } = useAccess()
+  if (!can('bim', 'main', 'create')) return null
   return <button className="bim-btn-dark" onClick={onClick}><Icon name="plus" stroke="#fff" sw={2.6} />{label}</button>
 }
 

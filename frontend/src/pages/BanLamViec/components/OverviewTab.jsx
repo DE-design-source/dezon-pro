@@ -128,7 +128,7 @@ export default function OverviewTab({ tasks, onToggleTask, onAddTask, onRequestL
       return (
         <Widget
           icon="list" tone="primary" title="Task hàng ngày" sub={`${doneCount}/${tasks.length} việc đã xong · không tính điểm`}
-          actions={<button className="blv-btn" onClick={onAddTask}><Icon name="plus" size={14} stroke={2.4} />Thêm việc</button>}
+          actions={onAddTask ? <button className="blv-btn" onClick={onAddTask}><Icon name="plus" size={14} stroke={2.4} />Thêm việc</button> : null}
         >
           <div className="blv-seg" role="tablist">
             {TASK_FILTERS.map(f => (
@@ -204,7 +204,7 @@ export default function OverviewTab({ tasks, onToggleTask, onAddTask, onRequestL
               <div><i className="pending" />Chờ duyệt<b>{LEAVE.pending} ngày</b></div>
             </div>
           </div>
-          <button className="blv-btn ghost block" onClick={onRequestLeave}><Icon name="calendar" size={14} />Xin nghỉ phép</button>
+          {onRequestLeave && <button className="blv-btn ghost block" onClick={onRequestLeave}><Icon name="calendar" size={14} />Xin nghỉ phép</button>}
         </Widget>
       )
     }

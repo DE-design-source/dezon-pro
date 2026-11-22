@@ -6,7 +6,7 @@ import { mhPaySum_ } from '../../lib/purchase'
 /* Khối "Đề xuất thanh toán mục tiêu" của một nhà cung cấp (port mhPayHtml_, PUB/muahang.js:288-327).
    arr = các đợt đã qua mhPayTinh_ ({pct, tien, ngay, gc, tay?}), tot = tổng đơn (gồm VAT) của NCC.
    Mọi phép tính nằm ở lib/purchase.js; component chỉ vẽ và báo lên:
-   onToggle(), onSet(i, field, value), onAdd(), onDel(i), onChia(n), onSend(); busy = đang gửi. */
+   onToggle(), onSet(i, field, value), onAdd(), onDel(i), onChia(n), onSend() (null = ẩn nút gửi, N21); busy = đang gửi. */
 export default function PaymentPlan({ arr, tot, open, busy, onToggle, onSet, onAdd, onDel, onChia, onSend }) {
   const s = mhPaySum_(arr, tot)
   const head = (
@@ -51,9 +51,9 @@ export default function PaymentPlan({ arr, tot, open, busy, onToggle, onSet, onA
           </span>
           <span>Tổng đề xuất: <b>{money(s.sumTien)} đ</b> / {money(tot)} đ</span>
         </div>
-        <button type="button" className="qs-po-send" disabled={busy} onClick={onSend}>
+        {onSend && <button type="button" className="qs-po-send" disabled={busy} onClick={onSend}>
           <Icon name="cart" size={14} />{busy ? 'Đang gửi…' : 'Gửi đề xuất thanh toán'}
-        </button>
+        </button>}
       </div>
     </>
   )

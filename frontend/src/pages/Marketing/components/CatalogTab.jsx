@@ -5,6 +5,7 @@ import { Ic } from './CampaignsTab'
 const COLS = '56px minmax(0,2.4fr) minmax(0,1fr) minmax(0,1.2fr)'
 
 /* Tab "Danh mục" (kiểu QS): module thanh công cụ (ô tìm + chip nhóm + số hạng mục) · mỗi nhóm 1 module bảng, hàng tiêu đề màu đậm */
+/* N21: không có onAddItem (không có quyền Thêm ở Marketing > Danh mục) -> ẩn nút thêm hạng mục */
 export default function CatalogTab({ visible, catalog, onAddItem }) {
   const [q, setQ] = useState('')
   const [nhom, setNhom] = useState('')
@@ -52,7 +53,7 @@ export default function CatalogTab({ visible, catalog, onAddItem }) {
               ))}
             </div>
             {/* thêm hạng mục vào nhóm (hỏi qua hộp prompt như bản HTML) */}
-            <button type="button" className="mk-add-row" onClick={() => onAddItem(g)}>+ Thêm hạng mục vào nhóm {g}</button>
+            {onAddItem && <button type="button" className="mk-add-row" onClick={() => onAddItem(g)}>+ Thêm hạng mục vào nhóm {g}</button>}
           </div>
         )
       })}

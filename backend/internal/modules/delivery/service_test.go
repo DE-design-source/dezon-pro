@@ -15,35 +15,15 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-type fakeUsers struct{ perms string }
-
-func (u fakeUsers) GetByID(ctx context.Context, id any) (*omap.Map, error) {
-	return omap.Of("perms", u.perms), nil
-}
-func (u fakeUsers) UserOut(row *omap.Map) *omap.Map { return row }
-func (u fakeUsers) PermsArr(v any) []any {
-	out := []any{}
-	for _, x := range regexp.MustCompile(`\s*,\s*`).Split(jsval.Str(v), -1) {
-		if x != "" {
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
 type noProjects struct{}
 
 func (noProjects) GetProject(ctx context.Context, ma any) (*omap.Map, error) { return nil, nil }
 
-// repo giả tối thiểu cho test quyền: chỉ Company + ListProjects được gọi
+// repo giả tối thiểu cho test quyền: chỉ ListProjects được gọi
 type permRepo struct {
 	Repository
-	tinhNang string
 }
 
-func (r permRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
-	return omap.Of("tinh_nang", r.tinhNang), nil
-}
 func (r permRepo) ListProjects(ctx context.Context, kind string) ([]*omap.Map, error) {
 	return nil, nil
 }
@@ -72,12 +52,85 @@ func TestQuyenTheoTrang(t *testing.T) {
 		{"super chưa xem như công ty", "super", "", "", "design", nil, 400},
 	}
 	for _, c := range cases {
-		s := New(Deps{Repo: permRepo{tinhNang: c.tinhNang}, Users: fakeUsers{c.perms}, UserFmt: fakeUsers{c.perms}})
+		s := New(Deps{Repo: permRepo{}, Access: legacyAccess{perms: c.perms, tinhNang: c.tinhNang}})
 		ctx := tenant.With(context.Background(), tenant.Ctx{UID: "u", Role: c.role, CongTyID: c.ct})
 		_, err := s.ListProjects(ctx, &actor.Actor{UID: "u", U: "an", R: c.role, CT: c.ct}, c.kind)
 		if got := status(err); got != c.want {
 			t.Errorf("%s: %d (%v), mong %d", c.name, got, err, c.want)
 		}
+	}
+	// chưa nối phân quyền: không ai ngoài super vào được
+	ctx := tenant.With(context.Background(), tenant.Ctx{UID: "u", Role: "admin", CongTyID: "ct"})
+	if _, err := New(Deps{Repo: permRepo{}}).ListProjects(ctx, &actor.Actor{UID: "u", R: "admin", CT: "ct"}, "design"); status(err) != 403 {
+		t.Errorf("thiếu Access phải 403: %v", err)
+	}
+}
+
+// Phân quyền 3 cấp (N21): dòng phân quyền riêng chỉ cho xem thietke -> xem được, tạo bị chặn; thi công không vào được.
+func TestQuyenTheoThaoTac(t *testing.T) {
+	g := omap.Of("thietke", omap.Of("*", []any{"view"}))
+	s := New(Deps{Repo: permRepo{}, Access: legacyAccess{perms: "thietke,thicong", grant: g}})
+	ctx := tenant.With(context.Background(), tenant.Ctx{UID: "u", Role: "user", CongTyID: "ct"})
+	a := &actor.Actor{UID: "u", U: "an", R: "user", CT: "ct"}
+	if _, err := s.ListProjects(ctx, a, "design"); err != nil {
+		t.Errorf("xem thiết kế: %v", err)
+	}
+	if _, err := s.ListProjects(ctx, a, "construction"); status(err) != 403 {
+		t.Errorf("thi công phải 403: %v", err)
+	}
+	if _, err := s.CreateProject(ctx, a, omap.Of("kind", "design", "name", "X")); status(err) != 403 {
+		t.Errorf("tạo khi chỉ có quyền xem phải 403: %v", err)
+	}
+}
+
+// Phân quyền 3 cấp (N21) theo tab, khớp DeliveryProvider của giao diện: Tiến độ cho đề mục / công việc / bình luận, Danh sách
+// dự án + Thiết lập cho thông tin / thành viên / thầu phụ, xoá thành viên / thầu phụ / dự án chỉ ở Danh sách dự án.
+func TestQuyenTheoTab(t *testing.T) {
+	ctx := tenant.With(context.Background(), tenant.Ctx{UID: "u", Role: "user", CongTyID: "ct"})
+	a := &actor.Actor{UID: "u", U: "an", R: "user", CT: "ct"}
+	all := []any{"view", "create", "edit", "delete", "export"}
+	for _, c := range []struct {
+		tab  string
+		acts []any
+		// thêm đề mục, sửa công việc, xoá công việc, thêm thành viên, bớt thành viên, sửa dự án, xoá dự án
+		addPhase, editTask, delTask, addMember, delMember, editProj, delProj bool
+	}{
+		{"tiendo", all, true, true, true, false, false, false, false},
+		{"list", all, false, false, false, true, true, true, true},
+		{"create", []any{"view", "create", "edit"}, false, false, false, true, false, true, false},
+		{"nhiemvu", []any{"view", "create", "edit", "delete"}, false, false, false, false, false, false, false},
+		{"tiendo", []any{"view", "edit"}, false, true, false, false, false, false, false},
+	} {
+		s := &Service{access: legacyAccess{grant: omap.Of("thietke", omap.Of(c.tab, c.acts))}}
+		for _, x := range []struct {
+			what, action string
+			tabs         []string
+			want         bool
+		}{
+			{"thêm đề mục", "create", tabsProgress, c.addPhase},
+			{"sửa công việc", "edit", tabsProgress, c.editTask},
+			{"xoá công việc", "delete", removeTabs["tk_cong_viec"], c.delTask},
+			{"thêm thành viên", "create", tabsSetup, c.addMember},
+			{"bớt thành viên", "delete", removeTabs["tk_thanh_vien"], c.delMember},
+			{"sửa dự án", "edit", tabsSetup, c.editProj},
+			{"xoá dự án", "delete", tabsList, c.delProj},
+		} {
+			err := s.allow(ctx, a, "design", x.action, x.tabs...)
+			if (err == nil) != x.want {
+				t.Errorf("%s %v: %s = %v, muốn %v", c.tab, c.acts, x.what, err, x.want)
+			}
+			if err != nil && err.Error() != "Tài khoản không có quyền "+actionVN[x.action]+" ở phần này" {
+				t.Errorf("%s: thông báo %q", x.what, err.Error())
+			}
+		}
+		if err := s.allow(ctx, a, "design", "view"); err != nil {
+			t.Errorf("%s: xem %v", c.tab, err)
+		}
+	}
+	// chưa phân quyền (perms thietke): mọi tab như cũ
+	s := &Service{access: legacyAccess{perms: "thietke"}}
+	if err := s.allow(ctx, a, "design", "delete", tabsList...); err != nil {
+		t.Errorf("cách cũ: %v", err)
 	}
 }
 
@@ -106,7 +159,7 @@ func TestDuAnTrienKhaiDB(t *testing.T) {
 		t.Fatalf("database thử cần ít nhất 2 công ty: %v", err)
 	}
 	as := func(ct any) (*Service, context.Context, *actor.Actor) {
-		return New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Projects: noProjects{}}),
+		return New(Deps{DB: db, Projects: noProjects{}, Access: legacyAccess{}}),
 			tenant.With(bg, tenant.Ctx{Role: "admin", CongTyID: ct}), &actor.Actor{U: "an", R: "admin", CT: ct}
 	}
 	sa, ctxA, aA := as(cts[0].Val("id"))
@@ -354,7 +407,7 @@ func TestBanGiaoTuKinhDoanhDB(t *testing.T) {
 		t.Fatalf("database thử cần ít nhất 1 công ty: %v", err)
 	}
 	ct := cts[0].Val("id")
-	s := New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Projects: noProjects{}})
+	s := New(Deps{DB: db, Projects: noProjects{}, Access: legacyAccess{}})
 	ctx, a := tenant.With(bg, tenant.Ctx{Role: "admin", CongTyID: ct}), &actor.Actor{U: "an", R: "admin", CT: ct}
 
 	newLead := func(ten string) *omap.Map {

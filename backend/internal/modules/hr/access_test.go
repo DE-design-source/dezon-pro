@@ -364,3 +364,64 @@ func TestNhatKyGiaoDienVaReset(t *testing.T) {
 		t.Errorf("không phải admin phải 403: %v", err)
 	}
 }
+
+// Phân quyền 3 cấp (N21) chồng lên vai trò HR: thao tác cần cả 2; Sơ đồ tổ chức kiểm vai trò theo Hồ sơ nhân sự, phân quyền
+// theo tab org; n21 nil (super / chưa nối Access) = không giới hạn.
+func TestN21TrongHR(t *testing.T) {
+	x := &access{role: "sysadmin", perms: DefaultPerms(), n21: map[string]map[string]bool{
+		"employees": {"view": true}, "org": {"view": true, "edit": true}, "payroll": {"view": true, "edit": true},
+	}}
+	cases := []struct {
+		module, action string
+		want           bool
+	}{
+		{"employees", "view", true},
+		{"employees", "edit", false},
+		{"payroll", "edit", true},
+		{"attendance", "view", false},
+	}
+	for _, c := range cases {
+		if got := x.can(c.module, c.action); got != c.want {
+			t.Errorf("can(%s, %s) = %v", c.module, c.action, got)
+		}
+	}
+	if err := x.need("employees", "edit"); err == nil || err.Error() != "Tài khoản chưa được cấp quyền này ở HR - nhờ quản trị viên cấp quyền" {
+		t.Errorf("need employees edit: %v", err)
+	}
+	if err := x.needAt("employees", "org", "edit"); err != nil {
+		t.Errorf("sơ đồ tổ chức: %v", err)
+	}
+	// vai trò thiếu quyền: báo theo vai trò dù phân quyền 3 cấp có
+	y := &access{role: "employee", perms: DefaultPerms(), n21: x.n21}
+	if err := y.needAt("employees", "org", "edit"); err == nil || err.Error() != "Vai trò HR của bạn không có quyền này" {
+		t.Errorf("vai trò employee: %v", err)
+	}
+	if perms := x.meOut().Val("perms").(*omap.Map); jsval.ToString(perms.Val("employees")) != "view" || jsval.ToString(perms.Val("payroll")) != "view,edit" {
+		t.Errorf("meOut = %v", perms)
+	}
+	z := &access{role: "sysadmin", perms: DefaultPerms()}
+	if !z.can("security", "edit") {
+		t.Error("n21 nil = không giới hạn")
+	}
+}
+
+// n21Of: quyền theo tab hr từ AccessChecker; chưa phân quyền (perms hr) = mọi tab; super / chưa nối Access = nil.
+func TestN21Of(t *testing.T) {
+	ctx := context.Background()
+	a := &actor.Actor{UID: "u", U: "an", R: "user", CT: "ct"}
+	s := New(Deps{Access: legacyAccess{perms: "hr"}})
+	m, err := s.n21Of(ctx, a)
+	if err != nil || len(m) != 8 || !m["org"]["edit"] || !m["admin"]["create"] {
+		t.Errorf("cách cũ: %v %v", m, err)
+	}
+	s = New(Deps{Access: legacyAccess{grant: omap.Of("hr", omap.Of("org", []any{"view", "edit"}))}})
+	if m, _ = s.n21Of(ctx, a); !m["org"]["edit"] || m["employees"]["view"] || m["org"]["delete"] {
+		t.Errorf("dòng riêng: %v", m)
+	}
+	if m, _ = s.n21Of(ctx, &actor.Actor{UID: "s", R: "super"}); m != nil {
+		t.Errorf("super: %v", m)
+	}
+	if m, _ = New(Deps{}).n21Of(ctx, a); m != nil {
+		t.Errorf("chưa nối Access: %v", m)
+	}
+}

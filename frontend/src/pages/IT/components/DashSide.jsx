@@ -18,7 +18,8 @@ const ic = d => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stro
 
 /* Cột trái Bảng điều khiển IT — cùng dáng cột trái Bảng điều khiển QS (DashSummary + QuickActions):
    thẻ 1 số lớn + thanh phân bổ + các dòng số · thẻ 2 thanh ngang theo hạng mục · thẻ 3 thao tác nhanh */
-export default function DashSide({ tickets, onCreate, onGoto }) {
+/* onCreate / tabs: thiếu quyền (N21) thì ẩn nút tương ứng ở Thao tác nhanh */
+export default function DashSide({ tickets, onCreate, onGoto, tabs = ['thietbi', 'nhansu'] }) {
   const total = tickets.length
   const open = tickets.filter(isOpenTicket)
   const done = total - open.length
@@ -101,9 +102,9 @@ export default function DashSide({ tickets, onCreate, onGoto }) {
           <h3>Thao tác nhanh</h3>
         </div>
         <div className="it-quick">
-          <button onClick={onCreate}>{ic(<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>)}Tạo yêu cầu</button>
-          <button onClick={() => onGoto('assets')}>{ic(<><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></>)}Thiết bị</button>
-          <button onClick={() => onGoto('nhansu')}>{ic(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>)}Cơ cấu phòng ban</button>
+          {onCreate && <button onClick={onCreate}>{ic(<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>)}Tạo yêu cầu</button>}
+          {tabs.includes('thietbi') && <button onClick={() => onGoto('assets')}>{ic(<><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></>)}Thiết bị</button>}
+          {tabs.includes('nhansu') && <button onClick={() => onGoto('nhansu')}>{ic(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>)}Cơ cấu phòng ban</button>}
         </div>
       </section>
     </aside>

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"qspro-backend/internal/shared/actor"
+	"qspro-backend/internal/shared/omap"
 )
 
 func TestDezonName(t *testing.T) {
@@ -25,20 +26,27 @@ func TestDezonName(t *testing.T) {
 
 func TestDezonAllowed(t *testing.T) {
 	for _, c := range []struct {
-		role  string
-		perms []any
-		want  bool
+		role, perms string
+		grant       *omap.Map
+		want        bool
 	}{
-		{"admin", nil, true},
-		{"super", []any{}, true},
-		{"staff", []any{"boc", "chat"}, true},
-		{"staff", []any{"boc", "chatx"}, false},
-		{"staff", nil, false},
-		{"", []any{"newsfeed"}, false},
+		{"admin", "", nil, true},
+		{"super", "", nil, true},
+		{"staff", "boc,chat", nil, true},
+		{"staff", "boc,chatx", nil, false},
+		{"staff", "", nil, false},
+		{"", "newsfeed", nil, false},
+		{"staff", "chat", omap.Of("newsfeed", omap.Of("*", []any{"view"})), false}, // dòng phân quyền riêng thay perms
+		{"staff", "", omap.Of("chat", omap.Of("main", []any{"view"})), true},
 	} {
-		if got := dezonAllowed(c.role, c.perms); got != c.want {
-			t.Errorf("dezonAllowed(%q, %v) = %v", c.role, c.perms, got)
+		s := New(Deps{Access: legacyAccess{perms: c.perms, grant: c.grant}})
+		got, err := s.dezonAllowed(context.Background(), &actor.Actor{UID: "u1", R: c.role, CT: "ct"})
+		if err != nil || got != c.want {
+			t.Errorf("dezonAllowed(%q, %q, %v) = %v %v", c.role, c.perms, c.grant, got, err)
 		}
+	}
+	if _, err := New(Deps{}).dezonAllowed(context.Background(), &actor.Actor{UID: "u1", R: "admin"}); err != errNoUsers {
+		t.Errorf("thiếu Access: %v", err)
 	}
 }
 

@@ -42,7 +42,8 @@ function DSec({ id, title, fold, onFold, children }) {
 /* Đặt lịch hẹn với khách (MarkUp 2026-11-16 17:20): kdOptions.appt {mã lead: [{id, date, time, place, content, by}]},
    hiện trong "Lịch chăm sóc sắp tới" cùng các mốc hẹn tiếp của tương tác */
 /* Thành viên của 1 lịch hẹn (MarkUp 2026-11-16 17:28): vòng tròn chữ tắt + nút "+" mở ô thêm người
-   (gợi ý: người phụ trách / quản lý / người tạo khách hàng, hoặc gõ tên khác). Bấm vòng tròn = bỏ người đó. */
+   (gợi ý: người phụ trách / quản lý / người tạo khách hàng, hoặc gõ tên khác). Bấm vòng tròn = bỏ người đó.
+   Không có onChange (không có quyền sửa, N21): chỉ xem. */
 function ApptMembers({ list, people, onChange }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -55,6 +56,7 @@ function ApptMembers({ list, people, onChange }) {
   }, [open])
   const add = n => { const t = String(n || '').trim(); if (t && list.indexOf(t) < 0) onChange(list.concat([t])); setQ('') }
   const goi = people.filter(p => list.indexOf(p) < 0 && (!q.trim() || p.toLowerCase().indexOf(q.trim().toLowerCase()) >= 0))
+  if (!onChange) return <span className="kd-cp-up-mem">{list.map(n => <span key={n} className="kd-cp-av sm" title={n}>{lmInitials(n)}</span>)}</span>
   return (
     <span className="kd-cp-up-mem" ref={box}>
       {list.map(n => (
@@ -179,17 +181,18 @@ function FlowStrip({ stageKey, children }) {
 /* Đánh giá tiềm năng 1-5 sao (lưu chung công ty: kdOptions.rating {mã lead: số sao}); bấm lại đúng số sao đang chọn = bỏ đánh giá.
    small: bản gọn trên thẻ Pipeline (không nhãn chữ, bấm không mở thẻ / không kéo thẻ) */
 const RATE_LABEL = ['', 'Rất thấp', 'Thấp', 'Trung bình', 'Cao', 'Rất cao']
-export function RatingStars({ id, small }) {
+/* readOnly: không có quyền sửa khách hàng (N21) -> chỉ hiện sao, bấm không đổi */
+export function RatingStars({ id, small, readOnly }) {
   const map = useKdMap('rating')
   const v = Number(map[id]) || 0
   const [hov, setHov] = useState(0)
-  const set = n => { const m = { ...map }; if (n === v) delete m[id]; else m[id] = n; saveKdOptions('rating', m) }
-  const show = hov || v
+  const set = n => { if (readOnly) return; const m = { ...map }; if (n === v) delete m[id]; else m[id] = n; saveKdOptions('rating', m) }
+  const show = (!readOnly && hov) || v
   return (
     <span className={'kd-cp-stars' + (small ? ' sm' : '')} onMouseLeave={() => setHov(0)} title={v ? 'Trạng thái giao tiếp: ' + RATE_LABEL[v] + ' (bấm lại để bỏ)' : 'Đánh giá trạng thái giao tiếp'}
       onClick={small ? e => e.stopPropagation() : undefined} draggable={small ? false : undefined} onDragStart={small ? e => { e.preventDefault(); e.stopPropagation() } : undefined}>
       {[1, 2, 3, 4, 5].map(n => (
-        <button key={n} type="button" className={n <= show ? 'on' : ''} onMouseEnter={() => setHov(n)} onClick={() => set(n)} aria-label={n + ' sao'}>
+        <button key={n} type="button" className={n <= show ? 'on' : ''} onMouseEnter={() => setHov(n)} onClick={() => set(n)} aria-label={n + ' sao'} disabled={readOnly} style={readOnly ? { cursor: 'default' } : undefined}>
           <svg width={small ? 13 : 16} height={small ? 13 : 16} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
         </button>
       ))}
@@ -200,7 +203,8 @@ export function RatingStars({ id, small }) {
 
 const Ic = ({ d, size = 15 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 
-export default function CustomerPage({ lead: l, interactions, onAddInteraction, onBack, onEdit, onMove, onSetCreated, me }) {
+/* readOnly (N21: không có quyền Sửa ở Kinh doanh > Pipeline): ẩn mọi nút sửa / chuyển giai đoạn / ghi tương tác / lịch hẹn */
+export default function CustomerPage({ lead: l, interactions, onAddInteraction, onBack, onEdit, onMove, onSetCreated, me, readOnly }) {
   const [suaNgay, setSuaNgay] = useState(false)   // đang sửa Ngày tạo
   const blank = () => ({ type: 'call', date: new Date().toISOString().slice(0, 10), title: '', content: '', outcome: 'good', next: '', nextNote: '' })
   const [f, setF] = useState(blank)
@@ -267,9 +271,9 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
       <section className="kd-cp-pt">
         <h4>Phụ trách
           {/* nút sửa ở mọi khung thông tin (MarkUp 2026-11-16 18:08) */}
-          <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa phụ trách" onClick={onEdit}>
+          {!readOnly && (<button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa phụ trách" onClick={onEdit}>
             <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
-          </button>
+          </button>)}
         </h4>
         <div className="kd-cp-people">
           {[['Phòng', DEPT_LABEL[l.dept]], ['Khởi tạo', l.creator], ['Quản lý', l.manager], ...(l.assignees || []).map(a => [a.role || 'Phụ trách', a.name])].filter(x => x[1]).map(([r, n], i) => (
@@ -294,7 +298,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
       {/* tiến trình pipeline */}
       <FlowStrip stageKey={l.stage}>
         {flow.map((s, i) => (
-          <button key={s} className={`kd-cp-step${i < cur ? ' done' : ''}${i === cur ? ' now' : ''}`} onClick={() => onMove(l.id, s)} title={`Chuyển sang "${STAGE_LABEL[s]}"`}>
+          <button key={s} className={`kd-cp-step${i < cur ? ' done' : ''}${i === cur ? ' now' : ''}`} onClick={readOnly ? undefined : () => onMove(l.id, s)} disabled={readOnly} title={readOnly ? STAGE_LABEL[s] : `Chuyển sang "${STAGE_LABEL[s]}"`}>
             <i>{i < cur ? '✓' : i + 1}</i><span>{STAGE_LABEL[s]}</span>
           </button>
         ))}
@@ -307,9 +311,9 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
         <aside className="kd-cp-side">
           <section>
             <h4>Thông tin liên hệ
-              <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin" onClick={onEdit}>
+              {!readOnly && (<button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin" onClick={onEdit}>
                 <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
-              </button>
+              </button>)}
               <button type="button" className={'kd-cp-edit kd-cp-expand' + (detail ? ' on' : '')} aria-expanded={detail} onClick={() => setDetail(!detail)}
                 title={detail ? 'Đóng bảng chi tiết' : 'Mở bảng chi tiết bên phải (tài liệu, đính kèm, ghi chú)'}>
                 <Ic d={detail ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} size={15} />
@@ -333,15 +337,15 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <dt>Tỉnh thành</dt><dd>{tinhThanh || '—'}</dd>
               <dt>Địa chỉ</dt><dd>{l.address || '—'}</dd>
               <dt>Nguồn</dt><dd>{l.source || '—'}</dd>
-              <dt>Trạng thái giao tiếp</dt><dd><RatingStars id={String(l.id)} /></dd>
+              <dt>Trạng thái giao tiếp</dt><dd><RatingStars id={String(l.id)} readOnly={readOnly} /></dd>
             </dl>
           </section>
           <section>
             <h4>Thông tin dự án
               {/* nút sửa ở mọi khung thông tin (MarkUp 2026-11-16 18:08) */}
-              <button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin dự án" onClick={onEdit}>
+              {!readOnly && (<button type="button" className="kd-cp-edit" title="Sửa thông tin khách hàng" aria-label="Sửa thông tin dự án" onClick={onEdit}>
                 <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} />
-              </button>
+              </button>)}
             </h4>
             <dl>
               <dt>Loại dự án</dt><dd>{l.projectType || l.type}</dd>
@@ -351,7 +355,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <dt>Hoàn công</dt><dd>{tl.end ? fmtD(tl.end) : '—'}</dd>
               <dt>Ngày tạo</dt>
               <dd className="kd-cp-ngay">
-                {suaNgay && onSetCreated ? (
+                {suaNgay && onSetCreated && !readOnly ? (
                   <>
                     <DatePicker value={l.createdAt || ''} max={todayIso()} ariaLabel="Ngày tạo" onChange={d => { if (d) onSetCreated(d); setSuaNgay(false) }} />
                     <button type="button" className="kd-cp-ngay-x" title="Huỷ" aria-label="Huỷ sửa ngày tạo" onClick={() => setSuaNgay(false)}>×</button>
@@ -359,7 +363,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
                 ) : (
                   <>
                     {fmtD(l.createdAt)}
-                    {onSetCreated && (
+                    {onSetCreated && !readOnly && (
                       <button type="button" className="kd-cp-ngay-btn" title="Sửa ngày tạo" aria-label="Sửa ngày tạo" onClick={() => setSuaNgay(true)}>
                         <Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={12} />
                       </button>
@@ -388,7 +392,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             <div className="kd-cp-card">
               <div className="kd-cp-detail-h"><h3>Chi tiết</h3>
                 {/* nút sửa ở đầu thẻ thay cho nút "Sửa / thêm tài liệu" dưới đáy (MarkUp 2026-11-16 19:27) */}
-                <button type="button" className="kd-cp-edit" title="Sửa / thêm tài liệu" aria-label="Sửa / thêm tài liệu" onClick={onEdit}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} /></button>
+                {!readOnly && (<button type="button" className="kd-cp-edit" title="Sửa / thêm tài liệu" aria-label="Sửa / thêm tài liệu" onClick={onEdit}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={14} /></button>)}
                 <button type="button" className="kd-cp-edit" title="Đóng cột Chi tiết" aria-label="Đóng cột Chi tiết" onClick={() => setDetail(false)}><Ic d="M18 6 6 18M6 6l12 12" size={14} /></button>
               </div>
               <DSec id="tai-lieu" title="Tài liệu & ghi chú" fold={fold} onFold={onFold}>
@@ -418,7 +422,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
             <div className="kd-cp-card kd-cp-upcoming">
               <div className="kd-cp-up-h"><h3>Lịch chăm sóc sắp tới</h3>
                 {/* nút sửa: bật chế độ sửa -> mỗi lịch hẹn có nút bút (mở hộp sửa) và nút xoá */}
-                {appts.length > 0 && (
+                {appts.length > 0 && !readOnly && (
                   <button type="button" className={'kd-cp-edit' + (upEdit ? ' on' : '')} aria-pressed={upEdit}
                     title={upEdit ? 'Xong' : 'Sửa lịch hẹn'} onClick={() => setUpEdit(v => !v)}>
                     <Ic d={upEdit ? 'M20 6 9 17l-5-5' : 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'} size={14} />
@@ -428,15 +432,15 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               {upcoming.map((u, i) => (
                 <div key={i} className={'kd-cp-up' + (u.appt ? ' appt' : '')}><span className="kd-cp-up-date">{fmtD(u.date)}</span>
                   {u.appt && <span className="kd-cp-up-tag">Lịch hẹn</span>}<span>{u.note}</span>
-                  {u.appt && <ApptMembers list={u.appt.members || []} people={people} onChange={m => setApptMembers(u.appt.id, m)} />}
-                  {u.appt && upEdit && <button type="button" className="kd-cp-up-x ed" title="Sửa lịch hẹn" onClick={() => setApptOpen(u.appt)}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={13} /></button>}
-                  {u.appt && upEdit && <button type="button" className="kd-cp-up-x" title="Xoá lịch hẹn" onClick={() => delAppt(u.appt.id)}>×</button>}
+                  {u.appt && <ApptMembers list={u.appt.members || []} people={people} onChange={readOnly ? undefined : m => setApptMembers(u.appt.id, m)} />}
+                  {u.appt && upEdit && !readOnly && <button type="button" className="kd-cp-up-x ed" title="Sửa lịch hẹn" onClick={() => setApptOpen(u.appt)}><Ic d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" size={13} /></button>}
+                  {u.appt && upEdit && !readOnly && <button type="button" className="kd-cp-up-x" title="Xoá lịch hẹn" onClick={() => delAppt(u.appt.id)}>×</button>}
                 </div>
               ))}
             </div>
           )}
 
-          {adding && (
+          {adding && !readOnly && (
             <div className="kd-cp-card kd-cp-form">
               <h3>Ghi nhận tương tác mới</h3>
               <div className="kd-cp-types">
@@ -461,8 +465,8 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           <div className="kd-cp-card">
             <div className="kd-cp-tl-head">
               <h3>Lịch sử chăm sóc</h3>
-              <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác</button>
-              <button className="kd-cp-btn" onClick={() => setApptOpen(true)} title="Hẹn gặp khách: thời gian, địa điểm, nội dung"><Ic d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" size={14} />Đặt lịch hẹn</button>
+              {!readOnly && <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác</button>}
+              {!readOnly && <button className="kd-cp-btn" onClick={() => setApptOpen(true)} title="Hẹn gặp khách: thời gian, địa điểm, nội dung"><Ic d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" size={14} />Đặt lịch hẹn</button>}
               <span style={{ flex: 1 }} />
               <div className="kd-cp-filter">
                 <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tất cả ({interactions.length})</button>
@@ -474,7 +478,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
                 <span className="ic"><Ic d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" size={22} /></span>
                 <b>Chưa có tương tác nào{filter !== 'all' ? ' thuộc loại này' : ''}</b>
                 <span>Ghi lại cuộc gọi, tin nhắn, buổi gặp… để cả nhóm theo dõi quá trình chăm sóc khách hàng.</span>
-                <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác đầu tiên</button>
+                {!readOnly && <button className="kd-cp-btn primary" onClick={() => setAdding(true)}><Ic d="M12 5v14M5 12h14" size={14} />Ghi nhận tương tác đầu tiên</button>}
               </div>
             )}
             <ol className="kd-cp-tl">
@@ -495,7 +499,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
           </div>
 
         </main>
-        {apptOpen && <ApptModal key={apptOpen === true ? 'new' : apptOpen.id} init={apptOpen === true ? null : apptOpen} onClose={() => setApptOpen(false)} onSave={saveAppt} />}
+        {apptOpen && !readOnly && <ApptModal key={apptOpen === true ? 'new' : apptOpen.id} init={apptOpen === true ? null : apptOpen} onClose={() => setApptOpen(false)} onSave={saveAppt} />}
       </div>
     </div>
   )

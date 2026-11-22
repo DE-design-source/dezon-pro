@@ -18,7 +18,14 @@ const (
 	msgNotFound   = "Không tìm thấy tài khoản"
 	msgLastAdmin  = "Phải còn ít nhất 1 admin đang hoạt động"
 	msgSelfDelete = "Không thể tự xóa tài khoản đang đăng nhập"
-	msgPermsCol   = `Chưa cài cột phân quyền. Hãy chạy "npm run migrate" rồi khởi động lại server.`
+	// Chỉ bản Go (2026-11-20): admin công ty chỉ quản lý nhân viên; tài khoản quản trị công ty do quản trị hệ thống (super) quản lý
+	msgAdminOnlySuper = "Chỉ quản trị hệ thống mới tạo / sửa được tài khoản quản trị công ty"
+	msgSelfRole       = "Không thể tự đổi vai trò của tài khoản đang đăng nhập"
+	// Chỉ bản Go (M14.6): duyệt sản phẩm theo phân cấp
+	msgGrantSpDuyet      = "Bạn chưa được quản trị hệ thống giao quyền duyệt sản phẩm nên không cấp được quyền duyệt cho nhân viên"
+	msgApprovalAdminOnly = "Chỉ giao quyền duyệt cho tài khoản quản trị công ty"
+	msgSuperOnly         = "Chỉ quản trị hệ thống"
+	msgPermsCol          = `Chưa cài cột phân quyền. Hãy chạy "npm run migrate" rồi khởi động lại server.`
 )
 
 // Thông báo lỗi của đường sửa email (chỉ bản Go, roadmap M14.1).

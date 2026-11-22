@@ -9,6 +9,7 @@ import { useQs } from '../../state/QsData'
 import * as api from '../../api/qsApi'
 import { mediaUrl } from '../../api/files'
 import { money } from '../../lib/format.js'
+import { spBocOk_ } from '../../lib/catalogFilters.js'
 import { coSpec_, nganhCuaSP_, prodDocs_ } from '../../lib/productFields.js'
 import { catCbKey_, pdImgs_, pdKeyItems_, pdSpecBlocks_ } from './catalog/catalogModel'
 import { putCombo } from './catalog/comboCache'
@@ -156,7 +157,7 @@ export default function ProductInfo({ product, width, onClose, onAdd, addSl, onD
 /* Khối "Sản phẩm đi kèm" của SP đang mở: số bộ, SL kèm mỗi dòng (sửa tạm, không lưu), "Thêm combo" */
 function PdCombo({ product, onAdd, toast, onDragProduct, onDragEnd }) {
   const k = catCbKey_(product)
-  const [st, setSt] = useState({ loading: !!k, list: [], error: '' })
+  const [st, setSt] = useState({ loading: !!k, list: [], error: '', an: 0 })
   const [bo, setBo] = useState(1)
   const [busy, setBusy] = useState(false)
 
@@ -166,17 +167,19 @@ function PdCombo({ product, onAdd, toast, onDragProduct, onDragEnd }) {
     api.getCombo(k, ctl.signal).then(list => {
       list = list || []
       putCombo(k, list)
-      setSt({ loading: false, list: list.map(x => ({ ...x })), error: '' })
+      // SP đi kèm chưa duyệt (M14.6): không hiện, không thêm vào bóc tách được
+      const ok = list.filter(spBocOk_)
+      setSt({ loading: false, list: ok.map(x => ({ ...x })), error: '', an: list.length - ok.length })
     }, e => {
       if (ctl.signal.aborted || (e && e.name === 'QsAbortError')) return
-      setSt({ loading: false, list: [], error: (e && e.message) || 'lỗi' })
+      setSt({ loading: false, list: [], error: (e && e.message) || 'lỗi', an: 0 })
     })
     return () => ctl.abort()
   }, [k])
 
   if (st.error) return <div className="qs-bdc-err qs-bdc-pdnote">Không tải được sản phẩm đi kèm: {st.error}</div>
   const list = st.list
-  if (!list.length) return null
+  if (!list.length) return st.an ? <div className="qs-bdc-pdnote qs-bdc-docs-empty">{st.an} sản phẩm đi kèm chưa được duyệt — chưa đưa vào bóc tách được.</div> : null
   const boN = Math.max(1, Math.min(999, Number(bo) || 1))
   const tong = list.reduce((a, x) => a + (Number(x.donGiaBan) || 0) * (Number(x.comboSL) || 1) * boN, 0)
   const setBoTo = v => setBo(Math.max(1, Math.min(999, Math.round(Number(String(v).replace(',', '.')) || 0) || 1)))
@@ -225,6 +228,7 @@ function PdCombo({ product, onAdd, toast, onDragProduct, onDragEnd }) {
           )
         })}
       </div>
+      {st.an > 0 && <div className="qs-bdc-docs-empty">Ẩn {st.an} sản phẩm đi kèm chưa duyệt</div>}
       <div className="qs-bdc-pcb-tot"><span>Tổng {boN > 1 ? boN + ' bộ' : 'combo'}</span><b>{money(tong)} đ</b></div>
       {onAdd && (
         <div className="qs-bdc-pcb-ft">

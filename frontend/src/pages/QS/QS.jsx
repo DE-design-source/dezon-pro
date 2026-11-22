@@ -24,13 +24,14 @@ import UpdateBanner from './components/common/UpdateBanner'
 import StatusView from './components/common/StatusView'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import { QsDataProvider } from './state/QsData'
-import { useQsStore, showTab, retryBoot } from './state/store'
+import { useQsStore, showTab, retryBoot, canTab as legacyCanTab } from './state/store'
+import { useQsCan } from './state/qsAccess'
 import { useQsSession } from './session/QsSession'
 import { API_BASE, apiConfigured, reportClientError } from './api/http'
 import DevSheetProbe from './state/DevSheetProbe'
 import { useFitLevel } from './components/common/useFitLevel'
 
-/* Tab chính, đúng thứ tự + mã tab của bản gốc (PUB/index.html:6580-6587); quyền theo canTab.
+/* Tab chính, đúng thứ tự + mã tab của bản gốc (PUB/index.html:6580-6587); quyền xem theo phân quyền N21 (state/qsAccess.js useQsCan).
    icon: chỉ hiện khi thanh đầu trang thiếu chỗ (tab chỉ còn biểu tượng, data-fit 2 trong QS.css) */
 const TABS = [
   { key: 'dash', label: 'Bảng điều khiển', icon: 'gauge' },
@@ -45,6 +46,8 @@ const NO_PCARD = { dash: 1, sanpham: 1, import: 1, dsduan: 1, dsncc: 1, dsntk: 1
 /* Công ty / Admin đã chuyển sang trang Cài đặt (QsSettingsPanels): tab của store còn trỏ tới đó thì /qs về tab đầu tiên được phép */
 const SETTINGS_TABS = { admin: 1, congty: 1 }
 const QB_TABS = { boc: 1, chiphi: 1, duan: 1, muahang: 1 }
+/* Thứ tự chọn tab thay thế khi tab đang mở không còn quyền xem */
+const FALLBACK_TABS = ['dash', 'boc', 'chiphi', 'export', 'muahang', 'duan', 'sanpham', 'import', 'dsduan', 'dsncc', 'dsntk']
 
 /* Hướng bố cục và khoảng cách của từng tab (giống style inline của các .qs-panel trong bản HTML) */
 const PANEL_LAYOUT = {
@@ -106,12 +109,18 @@ function QsRoot() {
   const auth = configured ? session.auth : 'unconfigured'
   const ready = auth === 'ready'
   const me = session.me
-  const can = t => !!me && session.canTab(t)
+  /* Quyền xem tab theo N21 (Module QS > Tab > Xem); showTab của store vẫn kiểm canTab cũ nên tab chỉ hiện khi cả hai cho phép */
+  const qsCan = useQsCan()
+  const can = t => !!me && qsCan(t, 'view') && legacyCanTab(t, me, session.congTy)
   // tab ẩn ở Cài đặt > Hiển thị (chỉ ẩn khỏi thanh tab); tab đang mở bị ẩn thì sang tab được phép + hiện đầu tiên
   const tabHidden = usePageTabsHidden('/qs')
   useTabFallback(tabHidden, tab, me ? TABS.filter(t => can(t.key)).map(t => t.key) : [], showTab)
 
   useEffect(() => { if (SETTINGS_TABS[tab]) showTab(session.firstAllowedTab() || 'dash') }, [tab, me])   // eslint-disable-line react-hooks/exhaustive-deps
+  /* Tab đang mở bị thu hồi quyền xem (N21) -> sang tab đầu tiên còn được xem; không còn tab nào thì vùng nội dung báo không có quyền */
+  const tabOk = !me || SETTINGS_TABS[tab] || can(tab)
+  const firstOk = me ? FALLBACK_TABS.find(t => can(t)) : null
+  useEffect(() => { if (!tabOk && firstOk) showTab(firstOk) }, [tabOk, firstOk])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const loading = configured && (auth === 'init' || auth === 'checking' || (ready && (boot === 'idle' || boot === 'loading')))
   /* Màu chính công ty (PUB/app.js:2512 đặt --blue); màu nhấn của QS clone là --dash-accent nên đặt cả biến này, chỉ trong .qs-page */
@@ -131,6 +140,7 @@ function QsRoot() {
   else if (ready && boot === 'error') body = <StatusView kind="error" message={bootError} onRetry={() => retryBoot()} />
   /* Đang xác thực / tải dữ liệu: 1 dòng "Đang tải…" trong vùng nội dung (bỏ màn chờ phủ kín kiểu intro, 2026-11-16) */
   else if (loading) body = <StatusView kind="loading" message={bootStep || 'Đang tải…'} />
+  else if (me && !tabOk && !firstOk) body = <StatusView kind="empty" icon="lock" title="Chưa được cấp quyền" message="Tài khoản chưa được cấp quyền xem phần nào của QS. Liên hệ quản trị công ty để được cấp quyền." />
   else if (me) {
     body = (
       <>

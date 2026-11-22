@@ -3,6 +3,7 @@ import { draftName_ } from '../../lib/dashModel.js'
 import { fmtDate } from '../../lib/format.js'
 import { pickProject, projInfoModal, removeProject, openProjDlg } from '../project/projectActions'
 import { useMainDrafts, setMainDraft } from './mainDraft'
+import { useQsCan } from '../../state/qsAccess'
 
 /* Một bản nháp trong thẻ dự án (port dòng .dh-draft, PUB/dash.js:214-227).
    Bấm biểu tượng hoặc mã = Thông tin dự án; bấm tên = mở bản nháp + sang Bóc tách (như "Dùng");
@@ -11,6 +12,7 @@ import { useMainDrafts, setMainDraft } from './mainDraft'
    groupMas = mã mọi bản nháp của dự án (có >= 2 bản thì hiện nút đặt bản chính, MarkUp 2026-11-19). */
 export default function DraftItem({ draft: d, index, active, groupMas }) {
   const mainMap = useMainDrafts()
+  const qsCan = useQsCan()   // N21: QS > Dự án > Sửa / Thêm / Xoá
   const isMain = !!mainMap[d.maDA]
   const canMain = Array.isArray(groupMas) && groupMas.length > 1
   const name = draftName_(d, index)
@@ -37,9 +39,9 @@ export default function DraftItem({ draft: d, index, active, groupMas }) {
       )}
       {/* nhóm nút sửa tên / nhân bản / xoá: ngay cạnh tên, hiện khi rê chuột vào dòng */}
       <div className="qs-dash-draft-tools">
-        <button type="button" className="qs-dash-draft-ic" title="Sửa tên bản nháp" onClick={() => openProjDlg('rename', d.maDA)}><Icon name="edit" size={13} /></button>
-        <button type="button" className="qs-dash-draft-ic" title="Nhân bản bản nháp" onClick={() => openProjDlg('dup', d.maDA)}><Icon name="copy" size={13} /></button>
-        <button type="button" className="qs-dash-draft-ic del" title="Xoá bản nháp" onClick={() => removeProject(d.maDA)}><Icon name="trash" size={13} /></button>
+        {qsCan('duan', 'edit') && <button type="button" className="qs-dash-draft-ic" title="Sửa tên bản nháp" onClick={() => openProjDlg('rename', d.maDA)}><Icon name="edit" size={13} /></button>}
+        {qsCan('duan', 'create') && <button type="button" className="qs-dash-draft-ic" title="Nhân bản bản nháp" onClick={() => openProjDlg('dup', d.maDA)}><Icon name="copy" size={13} /></button>}
+        {qsCan('duan', 'delete') && <button type="button" className="qs-dash-draft-ic del" title="Xoá bản nháp" onClick={() => removeProject(d.maDA)}><Icon name="trash" size={13} /></button>}
       </div>
       <div className="qs-dash-draft-acts">
         {active

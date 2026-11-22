@@ -6,7 +6,39 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { request, enc } from '../QS/api/http'
 import { useWorkSession } from '../../services/workSession'
+import { useAccess } from '../../services/accessService'
+import WorkGate from '../../components/ui/WorkGate'
 import { ORG_ICON } from '../../data/quanLyThietKeData'
+import { TK_TABS, DA_TABS } from '../../data/pageTabs'
+
+/* Phân quyền 3 cấp (N21): module trong danh mục quyền (backend access/catalog.json) của từng loại dự án; tab = khoá tab đầu trang */
+export const ACCESS_MODULE = { design: 'thietke', construction: 'thicong' }
+const TAB_LABELS = { design: TK_TABS, construction: DA_TABS }
+const ACTION_LABEL = { view: 'Xem', create: 'Tạo', edit: 'Sửa', delete: 'Xoá', approve: 'Duyệt', export: 'Xuất' }
+
+const gateBox = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg)' }
+const gateCard = { width: 360, maxWidth: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '26px 26px 22px', boxShadow: '0 12px 40px rgba(15,30,60,.12)', display: 'flex', flexDirection: 'column', gap: 12, color: 'var(--text)', boxSizing: 'border-box' }
+
+/* Cổng quyền của Quản lý thiết kế / Quản lý dự án: phân quyền chưa nạp xong (hoặc super) -> WorkGate cũ (canTab theo perms,
+   super cần "Xem như công ty"); nạp xong -> quyền thực N21: phải xem được ít nhất 1 tab của module */
+export function DeliveryGate({ kind, title, children }) {
+  const s = useWorkSession()
+  const a = useAccess()
+  const mod = ACCESS_MODULE[kind]
+  const n21 = a.ready && !!s.me && s.me.role !== 'super'
+  if (!n21) return <WorkGate tab={mod} title={title}>{children}</WorkGate>
+  if (!a.can(mod, '*', 'view')) {
+    return (
+      <WorkGate title={title}>
+        <div style={gateBox}><div style={gateCard}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Tài khoản chưa được cấp quyền vào phần này. Nhờ quản trị viên cấp quyền.</div>
+        </div></div>
+      </WorkGate>
+    )
+  }
+  return <WorkGate title={title}>{children}</WorkGate>
+}
 
 const P = id => '/delivery/projects/' + enc(id)
 
@@ -40,6 +72,26 @@ function writeCur(kind, id) { try { localStorage.setItem(curKey(kind), String(id
 
 export function DeliveryProvider({ kind, children }) {
   const { me } = useWorkSession()
+  const access = useAccess()
+  const mod = ACCESS_MODULE[kind]
+  /* Quyền của tab trang này: can('tiendo', 'edit'); need() = can, thiếu quyền thì báo.
+     Nhân sự dự án: thêm = Tạo ở Danh sách dự án hoặc Thiết lập; bớt = Xoá ở Danh sách dự án (Thiết lập không có thao tác Xoá) */
+  const can = (tab, action = 'view') => access.can(mod, tab, action)
+  const canAddMember = () => can('list', 'create') || can('create', 'create')
+  const canRemoveMember = () => can('list', 'delete')
+  function need(tab, action) {
+    if (can(tab, action)) return true
+    const t = (TAB_LABELS[kind] || []).find(x => x.key === tab)
+    alert(`Bạn chưa được cấp quyền ${ACTION_LABEL[action] || action} ở mục "${t ? t.label : tab}". Nhờ quản trị viên cấp quyền.`)
+    return false
+  }
+  /* Lệnh ghi chỉ gửi khi có quyền (giao diện đã ẩn nút; đây là chốt chặn cuối) */
+  const gated = (tab, action, fn) => (...args) => (need(tab, action) ? fn(...args) : Promise.resolve(null))
+  const gatedMembers = (ok, tab, action, fn) => (...args) => {
+    if (ok()) return fn(...args)
+    need(tab, action)
+    return Promise.resolve(null)
+  }
   const [projects, setProjects] = useState([])
   const [currentId, setCurrentId] = useState(() => readCur(kind))
   const [detail, setDetail] = useState(null)
@@ -87,23 +139,27 @@ export function DeliveryProvider({ kind, children }) {
   const value = {
     kind, meName, projects, currentId, detail: det,
     current: row && det ? { ...row, ...det.project } : row,
+    module: mod, can, need,
+    canAddMember: canAddMember(), canRemoveMember: canRemoveMember(),
+    canMembers: canAddMember() || canRemoveMember(),
     select: pid => setCurrentId(String(pid || '')),
-    updateProject: patch => run('PATCH', P(id), patch),
-    addMember: (pid, m) => run('POST', P(pid) + '/members', m),
-    removeMember: (pid, memberId) => run('DELETE', P(pid) + '/members/' + enc(memberId)),
-    addSubcontractor: s => run('POST', P(id) + '/subcontractors', s),
-    addPhase: ph => run('POST', P(id) + '/phases', ph),
-    updatePhase: (pid, ph) => run('PATCH', P(id) + '/phases/' + enc(pid), ph),
-    deletePhase: pid => run('DELETE', P(id) + '/phases/' + enc(pid)),
-    addTask: t => run('POST', P(id) + '/tasks', taskToServer(t)),
-    updateTask: (tid, t) => run('PATCH', P(id) + '/tasks/' + enc(tid), taskToServer(t)),
-    deleteTask: tid => run('DELETE', P(id) + '/tasks/' + enc(tid)),
-    addComment: (tid, text) => run('POST', P(id) + '/tasks/' + enc(tid) + '/comments', { text, who: meName }),
-    /* Nhiều lệnh liền nhau (áp mẫu tiến độ): không nạp lại sau từng lệnh */
-    batch: async fn => {
+    updateProject: gated('create', 'edit', patch => run('PATCH', P(id), patch)),
+    addMember: gatedMembers(canAddMember, 'list', 'create', (pid, m) => run('POST', P(pid) + '/members', m)),
+    removeMember: gatedMembers(canRemoveMember, 'list', 'delete', (pid, memberId) => run('DELETE', P(pid) + '/members/' + enc(memberId))),
+    addSubcontractor: gated('create', 'create', s => run('POST', P(id) + '/subcontractors', s)),
+    /* Tiến độ: thêm đề mục / công việc / bình luận = Tạo, xoá = Xoá, còn lại (sửa, kéo giãn, đơn mua hàng, xác nhận thu chi) = Sửa */
+    addPhase: gated('tiendo', 'create', ph => run('POST', P(id) + '/phases', ph)),
+    updatePhase: gated('tiendo', 'edit', (pid, ph) => run('PATCH', P(id) + '/phases/' + enc(pid), ph)),
+    deletePhase: gated('tiendo', 'delete', pid => run('DELETE', P(id) + '/phases/' + enc(pid))),
+    addTask: gated('tiendo', 'create', t => run('POST', P(id) + '/tasks', taskToServer(t))),
+    updateTask: gated('tiendo', 'edit', (tid, t) => run('PATCH', P(id) + '/tasks/' + enc(tid), taskToServer(t))),
+    deleteTask: gated('tiendo', 'delete', tid => run('DELETE', P(id) + '/tasks/' + enc(tid))),
+    addComment: gated('tiendo', 'create', (tid, text) => run('POST', P(id) + '/tasks/' + enc(tid) + '/comments', { text, who: meName })),
+    /* Nhiều lệnh liền nhau (áp mẫu tiến độ): không nạp lại sau từng lệnh; xoá đề mục / công việc cũ cần thêm quyền Xoá (GanttTab kiểm) */
+    batch: gated('tiendo', 'create', async fn => {
       try { await fn((method, path, body) => request(method, P(id) + path, body === undefined ? {} : { body })) } catch (e) { alert('Lỗi: ' + e.message) }
       await Promise.all([loadDetail(currentId), loadList()])
-    },
+    }),
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

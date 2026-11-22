@@ -22,6 +22,9 @@ import (
 type Deps struct {
 	DB  *database.DB
 	Cfg *config.Config
+	// Access: phân quyền 3 cấp (N21) - perms admin công ty cấp không vượt quyền của admin, cắt quyền nhân viên trước khi
+	// admin cấp bị xoá / hạ vai trò / chuyển công ty. nil = không kiểm.
+	Access contracts.AccessGranter
 }
 
 // Service: nghiệp vụ tài khoản.
@@ -30,6 +33,7 @@ type Service struct {
 	cfg       *config.Config
 	companies contracts.CompanyReader
 	sessions  contracts.SessionInvalidator
+	access    contracts.AccessGranter
 }
 
 var (
@@ -40,7 +44,7 @@ var (
 )
 
 // New tạo service.
-func New(d Deps) *Service { return &Service{repo: NewRepository(d.DB), cfg: d.Cfg} }
+func New(d Deps) *Service { return &Service{repo: NewRepository(d.DB), cfg: d.Cfg, access: d.Access} }
 
 // SetCompanyReader: users <- companies (getCongTy, A:340).
 func (s *Service) SetCompanyReader(c contracts.CompanyReader) { s.companies = c }

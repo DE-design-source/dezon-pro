@@ -126,55 +126,65 @@ export default function CompanyCard({ c, note, onSaved }) {
       <div className="qsa-card-h">
         <span className="qsa-card-ic"><QsIcon name="building" size={18} /></span>
         <h3>Thông tin công ty</h3>
-        <span className="qsa-hint">{c.ma ? 'Mã ' + c.ma : ''}</span>
-      </div>
-      <div className="qsa-card-b">
-        {note ? <p className="qsa-note">{note}</p> : null}
-        <div className="qsa-co">
-          <div className="qsco-f qsa-co-logo">
-            <label>Logo</label>
-            <div className="qsco-logo-wrap" onClick={logoPick}
-              onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={e => { e.preventDefault(); setDrag(false) }} onDrop={logoDrop}>
-              {logoBusy ? <div className="qsco-logo-box loading"><div className="qsco-logo-t">Đang tải logo lên…</div></div>
-                : f.logo ? (
-                  <div className={`qsco-logo-box has${drag ? ' drag' : ''}`}>
-                    <LogoImg src={mediaUrl(f.logo)} />
-                    <button type="button" className="qsco-logo-x" title="Xoá logo" onClick={e => { e.stopPropagation(); set('logo', '') }}>✕</button>
-                    <span className="qsco-logo-swap"><QsIcon name="edit" size={12} /> Đổi logo</span>
-                  </div>
-                ) : (
-                  <div className={`qsco-logo-box${drag ? ' drag' : ''}`}>
-                    <div className="qsco-logo-ic"><QsIcon name="camera" size={22} /></div>
-                    <div className="qsco-logo-t">Kéo/thả hoặc bấm để tải logo</div>
-                    <div className="qsco-logo-s">PNG nền trong suốt · tối đa 5MB</div>
-                  </div>
-                )}
-            </div>
-            <div className="qsco-upurl">
-              <span className="qsco-upurl-ic"><QsIcon name="link" size={13} /></span>
-              <input value={logoUrlIn} onChange={e => setLogoUrlIn(e.target.value)} placeholder="Hoặc dán link ảnh…"
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); logoAddUrl() } }} />
-              <button type="button" className="qsco-upurl-btn" onClick={logoAddUrl}>Dùng link</button>
-            </div>
-          </div>
-          <div className="qsco-form qsa-co-form">
-            <div className="qsco-f wide"><label>Tên công ty *</label>
-              <input value={f.ten} onChange={e => set('ten', e.target.value)} placeholder="VD: Nội thất An Phát" /></div>
-            <div className="qsco-f"><label>Email liên hệ</label>
-              <input type="email" value={f.email} onChange={e => set('email', e.target.value)} placeholder="ketoan@congty.vn" /></div>
-            <div className="qsco-f"><label>Điện thoại</label>
-              <input value={f.sdt} onChange={e => set('sdt', e.target.value)} placeholder="09xx xxx xxx" /></div>
-            <div className="qsco-f" data-f="han"><label>Hạn dùng</label>
-              <div className="qsa-co-han" title="Chỉ quản trị hệ thống gia hạn được (tab Công ty)"><HanDung han={c.hanDung} /></div></div>
-            <div className="qsco-f wide"><label>Màu chính</label>
-              <MauChinhField value={f.mau} onChange={v => set('mau', v)} /></div>
-          </div>
-        </div>
         <div className="qsa-co-ft">
           <button type="button" className="qsa-btn ghost sm" disabled={!dirty || busy} onClick={() => setF(pick(c))}>Hoàn tác</button>
           <button type="button" className="qsa-btn blue sm" disabled={!dirty || busy || logoBusy} onClick={save}>
             {busy ? 'Đang lưu…' : <><QsIcon name="check" size={14} /> Lưu thay đổi</>}
           </button>
+        </div>
+      </div>
+      <div className="qsa-card-b">
+        {note ? <p className="qsa-note">{note}</p> : null}
+        <div className="qsa-co2">
+        <div className="qsco-grp">
+          <div className="qsco-brand">
+            <div className="qsco-logo-col">
+              <div className="qsco-grp-t qsco-logo-h">Nhận diện</div>
+              <div className="qsco-logo-wrap" onClick={logoPick} title="Bấm hoặc kéo/thả ảnh vào đây"
+                onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={e => { e.preventDefault(); setDrag(false) }} onDrop={logoDrop}>
+                {logoBusy ? <div className="qsco-logo-box loading"><div className="qsco-logo-t">Đang tải…</div></div>
+                  : f.logo ? (
+                    <div className={`qsco-logo-box has${drag ? ' drag' : ''}`}>
+                      <LogoImg src={mediaUrl(f.logo)} />
+                      <button type="button" className="qsco-logo-x" title="Xoá logo" onClick={e => { e.stopPropagation(); set('logo', '') }}>✕</button>
+                      <span className="qsco-logo-swap"><QsIcon name="edit" size={12} /> Đổi</span>
+                    </div>
+                  ) : (
+                    <div className={`qsco-logo-box${drag ? ' drag' : ''}`}>
+                      <div className="qsco-logo-ic"><QsIcon name="camera" size={20} /></div>
+                      <div className="qsco-logo-t">Tải logo</div>
+                      <div className="qsco-logo-s">Kéo/thả ảnh PNG</div>
+                    </div>
+                  )}
+              </div>
+            </div>
+            <div className="qsco-form qsco-brand-r">
+              <div className="qsco-f wide"><label><span>Tên công ty<em className="qsco-req">*</em></span></label>
+                <input value={f.ten} onChange={e => set('ten', e.target.value)} placeholder="VD: Nội thất An Phát" /></div>
+              <div className="qsco-f"><label><span>Màu chính</span></label>
+                <MauChinhField value={f.mau} onChange={v => set('mau', v)} /></div>
+              <div className="qsco-f" data-f="han"><label><span>Hạn dùng</span></label>
+                <div className="qsa-co-han" title="Chỉ quản trị hệ thống gia hạn được (tab Công ty)">
+                  <HanDung han={c.hanDung} /><QsIcon name="lock" size={12} /></div></div>
+              <div className="qsco-f wide"><label><span>Link ảnh logo</span><i className="qsco-fhint">hoặc tải file ở ô bên trái</i></label>
+                <div className="qsco-upurl">
+                  <span className="qsco-upurl-ic"><QsIcon name="link" size={13} /></span>
+                  <input value={logoUrlIn} onChange={e => setLogoUrlIn(e.target.value)} placeholder="https://…/logo.png"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); logoAddUrl() } }} />
+                  <button type="button" className="qsco-upurl-btn" onClick={logoAddUrl}>Dùng link</button>
+                </div></div>
+            </div>
+          </div>
+        </div>
+        <div className="qsco-grp">
+          <div className="qsco-grp-t">Liên hệ</div>
+          <div className="qsco-form qsa-co-lh">
+            <div className="qsco-f"><label><span>Email liên hệ</span></label>
+              <input type="email" value={f.email} onChange={e => set('email', e.target.value)} placeholder="ketoan@congty.vn" /></div>
+            <div className="qsco-f"><label><span>Điện thoại</span></label>
+              <input value={f.sdt} onChange={e => set('sdt', e.target.value)} placeholder="09xx xxx xxx" /></div>
+          </div>
+        </div>
         </div>
       </div>
     </div>

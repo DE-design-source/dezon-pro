@@ -83,11 +83,27 @@ export function ctHasFeature_(tab, me, congTy) {
   return f.indexOf(tab) >= 0
 }
 export function isAdminRole_(me) { const r = (me || {}).role; return r === 'admin' || r === 'super' }
+/* Phân quyền 3 cấp (N21): services/accessService.js gắn hàm (me, tab) -> true / false theo quyền xem thực, null = chưa áp được
+   (chưa nạp, lỗi, super, tài khoản khác) -> canTab theo cách cũ. Gắn từ ngoài để store không import ngược accessService */
+let accessView = null
+export function setAccessView(fn) { accessView = fn }
+/* accessService gọi khi quyền thực nạp xong / đổi: tab QS đang mở không còn quyền xem thì sang tab được phép đầu tiên */
+export function accessChanged() {
+  setState(s => ({ accessVer: (s.accessVer || 0) + 1 }))
+  if (S.me && !canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
+}
+const tabAlias = tab => (tab === 'dsduan' || tab === 'dsntk' ? 'duan' : tab === 'dsncc' ? 'sanpham' : tab)
 export function canTab(tab, me = S.me, congTy = S.congTy) {
+  // N21: Danh sách dự án / Nhà cung cấp / Đơn vị thiết kế có quyền riêng trong bảng quyền; quyền cũ vẫn dùng chung tab (tabAlias)
+  if (tab !== 'congty' && tab !== 'admin' && accessView) {
+    const v = accessView(me, tab)
+    if (v !== null && v !== undefined) return v
+  }
+  return legacyCanTab(tab, me, congTy)
+}
+export function legacyCanTab(tab, me = S.me, congTy = S.congTy) {
   me = me || {}
-  if (tab === 'dsduan') tab = 'duan'          // trang Danh sách dự án dùng chung quyền tab Dự án
-  if (tab === 'dsncc') tab = 'sanpham'        // trang Nhà cung cấp dùng chung quyền Danh sách sản phẩm
-  if (tab === 'dsntk') tab = 'duan'           // trang Nhà thiết kế (KTS / studio của dự án) dùng chung quyền tab Dự án
+  tab = tabAlias(tab)   // dsduan / dsntk: trang Danh sách dự án, Nhà thiết kế dùng chung quyền tab Dự án; dsncc: Nhà cung cấp theo Danh sách sản phẩm
   if (tab === 'congty') return me.role === 'super'
   if (tab === 'admin') return me.role === 'admin' || me.role === 'super'
   if (!ctHasFeature_(tab, me, congTy)) return false
@@ -95,7 +111,7 @@ export function canTab(tab, me = S.me, congTy = S.congTy) {
   return (me.perms || []).indexOf(tab) >= 0
 }
 export function firstAllowedTab_(me = S.me, congTy = S.congTy) {
-  if (isAdminRole_(me)) return 'boc'
+  if (isAdminRole_(me) && (!accessView || accessView(me, 'boc') !== false)) return 'boc'
   for (let i = 0; i < PERM_TABS.length; i++) if (canTab(PERM_TABS[i][0], me, congTy)) return PERM_TABS[i][0]
   return null
 }

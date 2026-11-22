@@ -12,6 +12,7 @@ import (
 	"qspro-backend/internal/modules/users/userstest"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	"qspro-backend/internal/shared/goonly"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
 )
@@ -182,11 +183,29 @@ func TestDiffNode(t *testing.T) {
 		return func(c userstest.Case, w userstest.Who, args []any) (any, error) {
 			switch c.Fn {
 			case "$getUserById":
-				return svc.GetByID(w.Ctx, args[0])
+				u, err := svc.GetByID(w.Ctx, args[0])
+				if u != nil { // cột chỉ bản Go (migration 0051, M14.6): Node không có
+					return goonly.Strip(u, "duoc_duyet_sp"), err
+				}
+				return u, err
 			case "$audit":
 				a := rpc.Args(args)
 				svc.Audit(w.Ctx, actor.FromMap(a.Map(0)), a.Str(1), a.Str(2), a.ArgU(3))
 				return nil, nil
+			}
+			// 5 hàm quản lý tài khoản: so hàm LÕI với Node, bỏ qua cửa ngõ Gated chỉ bản Go (TestAdminGate kiểm riêng)
+			ra := rpc.Args(args)
+			switch c.Fn {
+			case "adminCreateUser":
+				return svc.AdminCreateUser(w.Ctx, w.Actor, ra.Map(0))
+			case "adminUpdateUser":
+				return svc.AdminUpdateUser(w.Ctx, w.Actor, ra.ArgU(0), ra.Map(1))
+			case "adminSetPassword":
+				return svc.AdminSetPassword(w.Ctx, w.Actor, ra.ArgU(0), ra.ArgU(1))
+			case "adminSetActive":
+				return svc.AdminSetActive(w.Ctx, w.Actor, ra.ArgU(0), ra.ArgU(1))
+			case "adminDeleteUser":
+				return svc.AdminDeleteUser(w.Ctx, w.Actor, ra.ArgU(0))
 			}
 			return reg.Call(w.Ctx, c.Fn, w.Actor, args...)
 		}
@@ -208,7 +227,8 @@ func TestRoutes(t *testing.T) {
 	(&Service{}).RegisterRoutes(e.Group("/api/v1"))
 	want := map[string]bool{"GET /api/v1/users": true, "POST /api/v1/users": true, "PATCH /api/v1/users/:id": true,
 		"PUT /api/v1/users/:id/password": true, "PUT /api/v1/users/:id/active": true, "DELETE /api/v1/users/:id": true,
-		"GET /api/v1/audit-log": true, "PATCH /api/v1/auth/me": true}
+		"GET /api/v1/audit-log": true, "PATCH /api/v1/auth/me": true,
+		"GET /api/v1/users/product-approvers": true, "PUT /api/v1/users/:id/product-approval": true} // chỉ bản Go M14.6
 	for _, r := range e.Routes() {
 		k := r.Method + " " + r.Path
 		if !want[k] {

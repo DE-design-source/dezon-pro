@@ -19,12 +19,13 @@ html[data-theme="dark"] .qsco-viewbar b{color:var(--finance);}
 .qsco-stat b{display:block; font-size:19px; font-weight:650; color:var(--text); line-height:1.15;}
 .qsco-stat i{font-style:normal; font-size:11px; color:var(--text-muted); font-weight:500;}
 html[data-theme="dark"] .qsco-stat.warn .qsco-stat-ic{color:var(--finance);}
-.qsco-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:14px;}
+.qsco-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(345px, 1fr)); gap:14px;}
 .qsco-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; transition:border-color .15s, box-shadow .15s;}
 .qsco-card:hover{border-color:var(--dash-accent-border); box-shadow:0 6px 20px rgba(20,40,80,.08);}
 .qsco-card.off{opacity:.72;}
 .qsco-card-h{display:flex; align-items:center; gap:11px; padding:14px 15px; border-bottom:1px solid var(--border);}
-.qsco-lg{width:40px; height:40px; object-fit:contain; border:1px solid var(--border); border-radius:8px; background:#fafbfc; flex:none;}
+/* Logo giữ đúng tỉ lệ ảnh: cao cố định, rộng theo ảnh (tối đa 96px), không khung / nền trắng bao quanh */
+.qsco-lg{display:block; height:40px; width:auto; max-width:96px; min-width:20px; object-fit:contain; border-radius:6px; flex:none;}
 .qsco-ini{width:40px; height:40px; border-radius:8px; background:var(--surface-alt); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex:none;}
 .qsco-card-t{flex:1; min-width:0;}
 .qsco-nm{font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -41,6 +42,7 @@ html[data-theme="dark"] .qsco-sharetag{color:var(--qs);}
 .qsco-mh{display:flex; justify-content:space-between; align-items:baseline; font-size:11px; color:var(--text-muted); margin-bottom:5px;}
 .qsco-mh b{font-size:12px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums;}
 .qsco-mh b.full{color:var(--danger);}
+.qsco-mh:last-child{margin-bottom:0;}
 .qsco-bar{height:5px; background:var(--surface-alt); border-radius:3px; overflow:hidden;}
 .qsco-bar i{display:block; height:100%; background:var(--dash-accent); border-radius:3px; transition:width .3s;}
 .qsco-bar i.full{background:#e5484d;}
@@ -54,49 +56,134 @@ html[data-theme="dark"] .qsco-sharetag{color:var(--qs);}
 .qsco-card-f{display:flex; align-items:center; gap:7px; padding:11px 15px; border-top:1px solid var(--border); background:var(--dash-soft); margin-top:auto;}
 .qsco-b{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:8px; padding:7px 11px; font:inherit; font-size:12px; font-weight:550; cursor:pointer;}
 .qsco-b:hover{border-color:var(--dash-accent); color:var(--dash-accent); background:var(--dash-accent-tint);}
-.qsco-b.del{padding:7px 9px; color:var(--text-muted);}
-.qsco-b.del:hover{border-color:#e5484d; color:#fff; background:#e5484d;}
+/* Nút chân thẻ rộng theo chữ, không cắt chữ; thẻ hẹp thì xuống hàng thay vì tràn */
+.qsco-card-f{gap:5px; padding-left:12px; padding-right:12px;}
+.qsco-card-f .qsco-b{flex:1 1 auto; min-width:0; justify-content:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:6px 8px; gap:4px;}
+.qsco-card-f .qsco-b svg{flex:none;}
+/* Thẻ hẹp (màn nhỏ / phóng to): bỏ biểu tượng trong 3 nút chân thẻ để chữ không tràn */
+.qsco-card{container-type:inline-size;}
+@container (max-width: 380px){ .qsco-card-f .qsco-b svg{display:none;} }
+/* Nút xoá: biểu tượng nhỏ góc trên phải thẻ, tách xa các nút thao tác thường để khó bấm nhầm */
+.qsco-del{flex:none; width:28px; height:28px; margin-right:-4px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all .12s;}
+.qsco-del:hover{color:var(--danger); background:var(--danger-tint); border-color:var(--danger);}
+.qsco-del:focus-visible{outline:2px solid var(--danger); outline-offset:1px;}
 
-/* ---------- Hộp Tạo / Sửa công ty ---------- */
-.qsa-dlg.qsco-dlg{width:640px;}
-.qsco-tabs{display:flex; gap:4px; border-bottom:1px solid var(--border); margin:2px 0 16px;}
-.qsco-tab{border:none; border-bottom:2px solid transparent; background:transparent; padding:9px 14px; font:inherit; font-size:12.5px; font-weight:550; color:var(--text-muted); cursor:pointer; margin-bottom:-1px;}
-.qsco-tab:hover{color:var(--text);}
-.qsco-tab.on{color:var(--dash-accent); border-bottom-color:var(--dash-accent); font-weight:600;}
-.qsco-form{display:grid; grid-template-columns:1fr 1fr; gap:12px 14px;}
-.qsco-f{display:flex; flex-direction:column; gap:4px; min-width:0;}
+/* ---------- Hộp Tạo / Sửa công ty: cột bước + xem trước | nội dung ---------- */
+.qsa-ov:has(> .qsco-dlg){padding:20px 16px; align-items:safe center;}
+.qsa-dlg.qsco-dlg{width:1080px; height:min(680px, calc(100vh - 40px)); padding:16px 0 0; display:flex; flex-direction:column;}
+.qsco-dlg .qsa-dlg-h{padding:0 20px 12px; margin-bottom:0;}
+.qsco-wz{display:grid; grid-template-columns:290px minmax(0, 1fr); flex:1 1 auto; min-height:0;}
+.qsco-wz-side{background:var(--dash-soft); border-right:1px solid var(--border); padding:16px 16px; display:flex; flex-direction:column; gap:16px; overflow-y:auto;}
+.qsco-wz-main{padding:22px 32px 18px; min-width:0; overflow-y:auto;}
+
+/* Các bước */
+.qsco-steps{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; position:relative;}
+.qsco-step{width:100%; display:flex; align-items:center; gap:12px; border:1px solid transparent; background:transparent; border-radius:10px; padding:8px 12px; font:inherit; text-align:left; cursor:pointer; color:var(--text); transition:background .15s, border-color .15s;}
+.qsco-step:hover{background:var(--surface);}
+.qsco-step.on{background:var(--surface); border-color:var(--border); box-shadow:0 2px 8px rgba(20,40,80,.06);}
+.qsco-step-n{flex:none; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:var(--surface); border:1.5px solid var(--border); color:var(--text-muted); transition:all .15s;}
+.qsco-step.on .qsco-step-n{background:var(--dash-accent); border-color:var(--dash-accent); color:#fff; box-shadow:0 0 0 4px var(--dash-accent-tint);}
+.qsco-step.done .qsco-step-n{background:var(--success-tint); border-color:var(--success); color:var(--success);}
+.qsco-step-t{min-width:0;}
+.qsco-step-t b{display:block; font-size:12.5px; font-weight:600; line-height:1.3;}
+.qsco-step-t i{display:block; font-style:normal; font-size:11px; color:var(--text-muted); line-height:1.35; margin-top:1px;}
+.qsco-step:not(.on) .qsco-step-t b{color:var(--text-muted);}
+.qsco-step.done .qsco-step-t b{color:var(--text);}
+
+/* Xem trước thẻ công ty */
+.qsco-pv{margin-top:0;}
+.qsco-pv-l{display:flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; font-weight:650; color:var(--text-muted); margin:0 2px 7px;}
+.qsco-pv-card{--pv-accent:var(--dash-accent); position:relative; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 13px 13px; overflow:hidden; display:flex; flex-direction:column; gap:8px; box-shadow:0 4px 14px rgba(20,40,80,.06);}
+.qsco-pv-strip{position:absolute; left:0; top:0; right:0; height:4px; background:var(--pv-accent); box-shadow:inset 0 -1px 0 rgba(0,0,0,.06);}
+.qsco-pv-h{display:flex; align-items:center; gap:10px;}
+.qsco-pv-h .qsco-ini{width:36px; height:36px;}
+.qsco-pv-h .qsco-lg{height:36px; max-width:88px;}
+.qsco-pv-h .qsco-ini{background:var(--pv-accent); color:var(--pv-on, #fff); box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);}
+.qsco-nm.ph{color:var(--text-muted); font-weight:500; font-style:italic;}
+.qsco-pv-card > .qsco-badge{align-self:flex-start;}
+.qsco-pv-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; white-space:nowrap; font-size:11px; color:var(--text-muted);}
+.qsco-pv-row b{font-size:12px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums;}
+.qsco-pv-card .qsco-bar i{background:var(--pv-accent);}
+.qsco-pv-card .qsco-sharetag{align-self:flex-start;}
+.qsco-pv-row > span:first-child{flex:none;}
+.qsco-pv-row .qsco-han{overflow:hidden; text-overflow:ellipsis;}
+
+/* Tiêu đề + nhóm trường */
+.qsco-sec-h{margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--border);}
+.qsco-sec-h h4{margin:0; font-size:16px; font-weight:650; color:var(--text); letter-spacing:-.01em;}
+.qsco-sec-h p{margin:3px 0 0; font-size:12.5px; color:var(--text-muted);}
+.qsco-grp + .qsco-grp{margin-top:18px; padding-top:16px; border-top:1px dashed var(--border);}
+.qsco-grp-t{font-size:13px; font-weight:650; color:var(--text); margin-bottom:10px;}
+.qsco-form{display:grid; grid-template-columns:1fr 1fr; gap:16px 20px;}
+.qsco-f{display:flex; flex-direction:column; gap:5px; min-width:0;}
 .qsco-f.wide{grid-column:1/-1;}
-.qsco-f > label{font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); font-weight:650;}
-.qsco-f input, .qsco-f select{border:1px solid var(--border); border-radius:8px; padding:8px 10px; font:inherit; font-size:12.5px; background:var(--surface); color:var(--text); width:100%;}
-.qsco-f input:focus, .qsco-f select:focus{border-color:var(--dash-accent); box-shadow:0 0 0 2.5px var(--dash-accent-tint); outline:none;}
+.qsco-f > label{display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:12px; color:var(--text); font-weight:600;}
+.qsco-feat.bad{border-color:var(--danger);}
+.qsco-req{font-style:normal; color:var(--danger); margin-left:3px;}
+.qsco-fhint{font-style:normal; font-size:11px; font-weight:400; color:var(--text-muted); white-space:nowrap;}
+.qsco-f input, .qsco-f select{height:38px; border:1px solid var(--border); border-radius:9px; padding:0 11px; font:inherit; font-size:13px; background:var(--surface); color:var(--text); width:100%; transition:border-color .15s, box-shadow .15s;}
+.qsco-f input:hover{border-color:var(--dash-accent-border);}
+.qsco-f input:focus, .qsco-f select:focus{border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint); outline:none;}
+.qsco-f textarea{border:1px solid var(--border); border-radius:9px; padding:9px 11px; font:inherit; font-size:13px; line-height:1.5; background:var(--surface); color:var(--text); width:100%; min-height:110px; resize:vertical; transition:border-color .15s, box-shadow .15s;}
+.qsco-f textarea:hover{border-color:var(--dash-accent-border);}
+.qsco-f textarea:focus{border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint); outline:none;}
 .qsco-f input[readonly]{background:var(--surface-alt); color:var(--text-muted);}
-.qsco-hint{font-style:normal; font-weight:400; color:var(--text-muted); text-transform:none; letter-spacing:0;}
-.qsco-note{margin:0 0 14px; font-size:12.5px; color:var(--text-muted); line-height:1.6;}
-.qsco-note b{color:var(--text);}
+.qsco-f input.qsa-mau-pick{height:36px;}
+
+/* Thương hiệu: logo vuông + link ảnh, màu chính */
+.qsco-brand{display:grid; grid-template-columns:184px minmax(0, 1fr); gap:24px; align-items:stretch;}
+.qsco-brand-r{min-width:0;}
+/* Ô logo cao bằng khối trường bên phải: mép trên = ô Tên công ty, mép dưới = ô Link ảnh logo */
+.qsco-logo-col{display:flex; flex-direction:column; gap:5px;}
+.qsco-grp-t.qsco-logo-h{margin:0; line-height:18px;}
+.qsco-logo-col .qsco-logo-wrap{flex:1; display:flex;}
+.qsco-logo-col .qsco-logo-box{flex:1; height:auto; min-height:150px;}
+.qsco-brand .qsa-mau-row{gap:6px;}
+.qsco-brand .qsco-f input.qsa-mau-pick{width:38px; height:38px;}
+.qsco-brand .qsco-f input.qsa-mau-hex{flex:1 1 auto; width:auto; min-width:0;}
+.qsco-brand .qsa-mau-row .qsa-btn{flex:none; height:38px; padding:0 10px; border-radius:9px;}
+.qsco-brand .qsa-f-hint{display:none;}
+.qsco-brand .qsa-f-warn{font-size:11px;}
 .qsco-logo-wrap{cursor:pointer;}
-.qsco-logo-box{position:relative; height:120px; border:1.5px dashed var(--border); border-radius:10px; background:var(--dash-soft); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; transition:border-color .15s, background .15s;}
+.qsco-logo-box{position:relative; height:150px; border:1.5px dashed var(--border); border-radius:12px; background:var(--dash-soft); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; text-align:center; padding:8px; transition:border-color .15s, background .15s;}
 .qsco-logo-wrap:hover .qsco-logo-box{border-color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qsco-logo-box.drag{border-color:var(--dash-accent); border-style:solid; background:var(--dash-accent-tint); box-shadow:0 0 0 3px var(--dash-accent-border) inset;}
 .qsco-logo-box.loading{border-style:solid; border-color:var(--dash-accent); background:var(--dash-accent-tint);}
-.qsco-logo-ic{color:var(--text-muted); transition:color .15s;}
+.qsco-logo-ic{width:42px; height:42px; border-radius:50%; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--text-muted); transition:color .15s;}
 .qsco-logo-wrap:hover .qsco-logo-ic, .qsco-logo-wrap:hover .qsco-logo-t{color:var(--dash-accent);}
 .qsco-logo-t{font-size:12.5px; font-weight:600; color:var(--text);}
-.qsco-logo-s{font-size:11px; color:var(--text-muted);}
-.qsco-logo-box.has{border-style:solid; border-color:var(--border); background:#fff;}
-.qsco-logo-box.has img{max-height:92px; max-width:80%; object-fit:contain;}
-.qsco-logo-x{position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; border:none; background:rgba(15,23,42,.6); color:#fff; font-size:11px; cursor:pointer; opacity:0; transition:opacity .15s;}
+.qsco-logo-s{font-size:10.5px; color:var(--text-muted);}
+.qsco-logo-box.has{border-style:solid; border-color:var(--border); background:var(--surface); padding:10px;}
+.qsco-logo-box.has img{position:absolute; inset:10px; width:calc(100% - 20px); height:calc(100% - 20px); object-fit:contain;}
+.qsco-logo-x{position:absolute; top:7px; right:7px; width:24px; height:24px; border-radius:50%; border:none; background:rgba(15,23,42,.6); color:#fff; font-size:11px; cursor:pointer; opacity:0; transition:opacity .15s;}
 .qsco-logo-box.has:hover .qsco-logo-x{opacity:1;}
 .qsco-logo-x:hover{background:#e5484d;}
-.qsco-logo-swap{position:absolute; left:50%; bottom:8px; transform:translateX(-50%) translateY(6px); display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#fff; background:rgba(15,23,42,.7); border-radius:99px; padding:3px 10px; opacity:0; transition:opacity .15s, transform .15s;}
+.qsco-logo-swap{position:absolute; left:50%; bottom:7px; transform:translateX(-50%) translateY(6px); display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#fff; background:rgba(15,23,42,.7); border-radius:99px; padding:3px 10px; opacity:0; transition:opacity .15s, transform .15s;}
 .qsco-logo-box.has:hover .qsco-logo-swap{opacity:1; transform:translateX(-50%) translateY(0);}
-.qsco-upurl{display:flex; align-items:center; margin-top:8px; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface);}
-.qsco-upurl:focus-within{border-color:var(--dash-accent); box-shadow:0 0 0 2.5px var(--dash-accent-tint);}
-.qsco-upurl-ic{display:flex; align-items:center; padding:0 0 0 10px; color:var(--text-muted); flex:none;}
-.qsco-f .qsco-upurl input{flex:1; border:none; background:transparent; padding:8px 10px; font-size:12px; min-width:0; box-shadow:none;}
-.qsco-upurl-btn{flex:none; align-self:stretch; border:none; border-left:1px solid var(--border); background:var(--dash-soft); color:var(--dash-accent); font:inherit; font-size:12px; font-weight:600; padding:0 12px; cursor:pointer;}
+.qsco-upurl{display:flex; align-items:center; height:38px; border:1px solid var(--border); border-radius:9px; overflow:hidden; background:var(--surface);}
+.qsco-upurl:focus-within{border-color:var(--dash-accent); box-shadow:0 0 0 3px var(--dash-accent-tint);}
+.qsco-upurl-ic{display:flex; align-items:center; padding:0 0 0 11px; color:var(--text-muted); flex:none;}
+.qsco-f .qsco-upurl input{flex:1; height:100%; border:none; background:transparent; padding:0 10px; font-size:12.5px; min-width:0; box-shadow:none;}
+.qsco-upurl-btn{flex:none; align-self:stretch; border:none; border-left:1px solid var(--border); background:var(--dash-soft); color:var(--dash-accent); font:inherit; font-size:12px; font-weight:600; padding:0 13px; cursor:pointer;}
 .qsco-upurl-btn:hover{background:var(--dash-accent); color:#fff;}
-.qsco-share{margin-top:14px;}
-.qsco-sw{position:relative; display:flex; align-items:flex-start; gap:11px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer;}
+
+/* Nút chọn nhanh, nút phân đoạn */
+.qsco-chipset{display:flex; flex-wrap:nowrap; gap:4px; margin-top:3px;}
+.qsco-chip{border:1px solid var(--border); background:var(--surface); color:var(--text-muted); border-radius:99px; padding:2px 8px; font:inherit; font-size:10.5px; font-weight:550; cursor:pointer; white-space:nowrap; transition:all .12s;}
+.qsco-chip:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
+.qsco-chip.on{background:var(--dash-accent-tint); border-color:var(--dash-accent); color:var(--dash-accent); font-weight:650;}
+.qsco-seg{display:flex; height:38px; padding:3px; gap:3px; background:var(--surface-alt); border:1px solid var(--border); border-radius:9px;}
+.qsco-seg-b{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:none; border-radius:7px; background:transparent; color:var(--text-muted); font:inherit; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;}
+.qsco-seg-b.on{background:var(--surface); color:var(--text); box-shadow:0 0 0 1px var(--border), 0 1px 3px rgba(0,0,0,.1);}
+html[data-theme="dark"] .qsco-seg-b.on{background:var(--dash-accent-tint); box-shadow:inset 0 0 0 1px var(--dash-accent-border);}
+.qsco-seg-b:focus-visible, .qsco-chip:focus-visible, .qsco-step:focus-visible, .qsco-all:focus-visible{outline:2px solid var(--dash-accent); outline-offset:2px;}
+.qsco-dot{width:7px; height:7px; border-radius:50%; background:var(--border);}
+.qsco-seg-b.on .qsco-dot{background:var(--success);}
+.qsco-seg-b.off.on .qsco-dot{background:var(--danger);}
+
+/* Kho SP Dezon */
+.qsco-share{margin:0 0 14px;}
+.qsco-sw{position:relative; display:flex; align-items:flex-start; gap:12px; border:1px solid var(--border); border-radius:12px; padding:11px 14px; cursor:pointer; transition:border-color .15s, background .15s;}
 .qsco-sw:hover{border-color:var(--dash-accent-border);}
 .qsco-sw.on{border-color:var(--dash-accent); background:var(--dash-accent-tint);}
 .qsco-sw input{position:absolute; opacity:0; pointer-events:none;}
@@ -104,24 +191,64 @@ html[data-theme="dark"] .qsco-sharetag{color:var(--qs);}
 .qsco-sw-b::after{content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .15s;}
 .qsco-sw.on .qsco-sw-b{background:var(--dash-accent);}
 .qsco-sw.on .qsco-sw-b::after{transform:translateX(14px);}
+.qsco-sw input:focus-visible + .qsco-sw-b{outline:2px solid var(--dash-accent); outline-offset:2px;}
 .qsco-sw-t b{display:block; font-size:13px; font-weight:600; color:var(--text);}
 .qsco-sw-t i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.5;}
-.qsco-feat{margin-top:14px; border:1px solid var(--border); border-radius:10px; overflow:hidden;}
-.qsco-feat-h{display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--dash-soft); border-bottom:1px solid var(--border); font-size:12px; font-weight:600; color:var(--text);}
-.qsco-all{margin-left:auto; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); border-radius:6px; padding:3px 9px; font:inherit; font-size:11px; cursor:pointer;}
+
+/* Tính năng */
+.qsco-feat{margin-top:0; border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+.qsco-feat-h{display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--dash-soft); border-bottom:1px solid var(--border); font-size:12.5px; font-weight:600; color:var(--text);}
+.qsco-cnt{font-size:11px; font-weight:650; color:var(--dash-accent); background:var(--dash-accent-tint); border-radius:99px; padding:1px 8px; font-variant-numeric:tabular-nums;}
+.qsco-cnt.zero{color:var(--danger); background:var(--danger-tint);}
+.qsco-all{margin-left:auto; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); border-radius:7px; padding:4px 10px; font:inherit; font-size:11.5px; font-weight:550; cursor:pointer;}
 .qsco-all:hover{border-color:var(--dash-accent); color:var(--dash-accent);}
-.qsco-all + .qsco-all{margin-left:5px;}
-.qsco-feat-b{padding:12px 14px; display:grid; grid-template-columns:1fr 1fr; gap:8px;}
-.qsco-fchk{display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:8px; padding:8px 11px; font-size:12.5px; color:var(--text); cursor:pointer;}
+.qsco-feat-b{padding:14px; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:9px;}
+.qsco-fchk{position:relative; display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:9px; padding:9px 11px; font-size:12.5px; white-space:nowrap; color:var(--text); cursor:pointer; transition:border-color .12s, background .12s; min-width:0;}
 .qsco-fchk:hover{border-color:var(--dash-accent-border);}
 .qsco-fchk.on{border-color:var(--dash-accent); background:var(--dash-accent-tint); font-weight:600;}
-.qsco-fchk input{accent-color:var(--dash-accent);}
+.qsco-fchk input{position:absolute; opacity:0; pointer-events:none;}
+.qsco-fchk-t{min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.qsco-fchk-box{flex:none; width:17px; height:17px; border-radius:5px; border:1.5px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; color:#fff; transition:all .12s;}
+.qsco-fchk.on .qsco-fchk-box{background:var(--dash-accent); border-color:var(--dash-accent);}
+.qsco-fchk input:focus-visible + .qsco-fchk-box{outline:2px solid var(--dash-accent); outline-offset:2px;}
+
+/* Tài khoản quản trị */
+.qsco-callout{display:flex; gap:10px; align-items:flex-start; border:1px solid var(--dash-accent-border); background:var(--dash-accent-tint); border-radius:12px; padding:11px 14px; margin-bottom:18px; font-size:12.5px; line-height:1.55; color:var(--text);}
+.qsco-callout-ic{flex:none; width:28px; height:28px; border-radius:8px; background:var(--surface); color:var(--dash-accent); display:flex; align-items:center; justify-content:center;}
+.qsco-pass{position:relative;}
+.qsco-f .qsco-pass input{padding-right:38px;}
+.qsco-pass-b{position:absolute; right:4px; top:50%; transform:translateY(-50%); width:30px; height:28px; border:none; border-radius:7px; background:transparent; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center;}
+.qsco-pass-b:hover{background:var(--surface-alt); color:var(--text);}
+
 .qsco-uhead{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:12.5px; color:var(--text);}
 .qsco-uhead button{margin-left:auto;}
-.qsco-f-btn{display:flex; justify-content:flex-end; gap:9px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border);}
 
+/* Chân hộp */
+.qsco-f-btn{display:flex; align-items:center; gap:9px; padding:14px 24px; border-top:1px solid var(--border); background:var(--surface); border-radius:0 0 16px 16px;}
+.qsco-f-step{font-size:12px; color:var(--text-muted); font-weight:550; white-space:nowrap;}
+.qsco-f-sp{flex:1;}
+
+@media (max-width: 1100px){
+  .qsa-dlg.qsco-dlg{width:960px;}
+  .qsco-wz{grid-template-columns:250px minmax(0, 1fr);}
+  .qsco-wz-main{padding:20px 24px 12px;}
+}
 @media (max-width: 900px){
-  .qsco-form, .qsco-feat-b{grid-template-columns:1fr;}
+  .qsa-dlg.qsco-dlg{height:auto;}
+  .qsco-wz{grid-template-columns:1fr;}
+  .qsco-wz-main, .qsco-wz-side{overflow:visible;}
+  .qsco-wz-side{border-right:none; border-bottom:1px solid var(--border); padding:10px 12px;}
+  .qsco-steps{flex-direction:row; overflow-x:auto; padding-bottom:6px;}
+  .qsco-steps > li{flex:1; min-width:150px;}
+  .qsco-step-t i, .qsco-pv{display:none;}
+  .qsco-wz-main{padding:16px 16px 6px;}
+}
+@media (max-width: 640px){
+  .qsco-form, .qsco-brand{grid-template-columns:1fr;}
+  .qsco-feat-b{grid-template-columns:1fr 1fr;}
+  .qsco-logo-box{height:120px;}
+  .qsco-f-btn{flex-wrap:wrap; padding:12px 16px;}
+  .qsco-f-step{order:-1; flex-basis:100%;}
 }
 
 /* ---------- Thẻ Nhắc gia hạn (ExpiryCard.jsx, M17.3 - giả định) ---------- */
@@ -139,3 +266,33 @@ html[data-theme="dark"] .qsco-sharetag{color:var(--qs);}
 .qsex-st.warn{background:var(--finance-tint); color:var(--finance);}
 .qsex-st.err{background:var(--danger-tint); color:var(--danger);}
 .qsex-err{margin-top:10px; font-size:12.5px; color:var(--danger); background:var(--danger-tint); border-radius:8px; padding:8px 12px;}
+
+/* Ô lỗi (bấm Tiếp tục khi còn thiếu): chỉ viền đỏ, đặt cuối file để thắng :hover / :focus ở trên */
+.qsco-f.bad input, .qsco-f.bad input:hover, .qsco-f.bad input:focus, .qsco-f.bad .qsco-upurl{border-color:var(--danger);}
+.qsco-f.bad input:focus{box-shadow:0 0 0 3px var(--danger-tint);}
+.qsco-logo-wrap.bad .qsco-logo-box, .qsco-logo-wrap.bad:hover .qsco-logo-box{border-color:var(--danger); background:var(--danger-tint);}
+
+/* Tab Người dùng của hộp Sửa công ty: danh sách gọn, bấm dòng xem đủ quyền */
+.qsco-ulist{border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+.qsco-urow + .qsco-urow{border-top:1px solid var(--border);}
+.qsco-urow.off{opacity:.65;}
+.qsco-urow-h{width:100%; display:grid; grid-template-columns:30px minmax(0, 1.4fr) auto minmax(0, 1.5fr) auto 14px; align-items:center; gap:12px; padding:9px 14px; border:none; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.qsco-urow-h:hover, .qsco-urow.open .qsco-urow-h{background:var(--dash-accent-tint);}
+.qsco-urow-h:focus-visible{outline:2px solid var(--dash-accent); outline-offset:-2px;}
+.qsco-uav{width:30px; height:30px; border-radius:50%; background:var(--dash-accent-tint); color:var(--dash-accent); display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700;}
+.qsco-uav.adm{background:var(--qs-tint); color:#7c3aed;}
+html[data-theme="dark"] .qsco-uav.adm{color:var(--qs);}
+.qsco-un{min-width:0;}
+.qsco-un b{display:block; font-size:12.5px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsco-un i{display:block; font-style:normal; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsco-urow-h .qsa-role{white-space:nowrap;}
+.qsco-up{display:flex; align-items:center; gap:4px; min-width:0; overflow:hidden; white-space:nowrap;}
+.qsco-up .qsa-permchip{margin:0; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsco-ucar{color:var(--text-muted);}
+.qsco-urow-b{display:flex; flex-wrap:wrap; gap:5px; padding:10px 14px 12px 56px; background:var(--dash-soft); border-top:1px dashed var(--border);}
+.qsco-urow-b .qsa-permchip{margin:0;}
+@media (max-width: 640px){
+  .qsco-urow-h{grid-template-columns:30px minmax(0, 1fr) auto 14px;}
+  .qsco-urow-h .qsa-role, .qsco-up{display:none;}
+  .qsco-urow-b{padding-left:14px;}
+}

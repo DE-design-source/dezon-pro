@@ -14,6 +14,7 @@ import { statCache, loadStats_ } from '../project/projectStats'
 import { useNccInfo } from '../supplier/SupplierInfo'
 import '../project/gallery.css'
 import './designer.css'
+import { denyQs } from '../../state/qsAccess'
 
 /* Hồ sơ nhà thiết kế tạo tay (nút "Tạo hồ sơ"): dữ liệu công ty 'ntkInfo' = [{id, loai: 'kts'|'studio', ten, anh (ảnh đại diện / logo),
    các trường của HS_GROUPS, phongCach[], loaiCT[], phanKhuc[], danhGia (1-5), gioiThieu}] (api.getProjData / setProjData với mã '__cty', như nccInfo) */
@@ -25,6 +26,7 @@ function useNtkInfo() {
     api.getProjData('__cty').then(d => { ntkCache = Array.isArray(d && d.ntkInfo) ? d.ntkInfo : []; setList(ntkCache) }, () => {})
   }, [])
   async function save(next) {
+    if (denyQs('dsntk', 'edit')) return false   // N21: Đơn vị thiết kế dùng quyền QS > Dự án
     const old = ntkCache || []
     ntkCache = next; setList(next)
     try { await api.setProjData('__cty', 'ntkInfo', next); return true } catch (e) { ntkCache = old; setList(old); toast('Lỗi lưu hồ sơ: ' + ((e && e.message) || e)); return false }

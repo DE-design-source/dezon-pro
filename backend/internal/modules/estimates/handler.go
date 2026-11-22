@@ -25,26 +25,27 @@ var (
 )
 
 // RegisterRPC: 7 hàm /api/:fn của công tác (index.js:54-59, 78). Mọi hàm chỉ cần đăng nhập;
-// ctSave / ctUpdate / ctDelete / ctDuyet / ctFav thuộc ACTOR_FNS (index.js:126) nên nhận actor.
+// ctSave / ctUpdate / ctDelete / ctDuyet / ctFav thuộc ACTOR_FNS (index.js:126) nên nhận actor. Hàm ghi (trừ ctDuyet: duyệt
+// theo quyền sản phẩm M14.6, ngoài ma trận) bọc accRPC (N21, access_gate.go).
 func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("ctList", rpc.Login, func(ctx context.Context, _ *actor.Actor, _ rpc.Args) (any, error) {
 		return s.CtList(ctx)
 	})
-	reg.Register("ctSave", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("ctSave", rpc.Login, s.accRPC("create", "QS > Danh sách sản phẩm", accCT, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtSaveGated(ctx, a, args.ArgU(0))
-	})
-	reg.Register("ctUpdate", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("ctUpdate", rpc.Login, s.accRPC("edit", "QS > Danh sách sản phẩm", accCT, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtUpdateGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
-	reg.Register("ctDelete", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("ctDelete", rpc.Login, s.accRPC("delete", "QS > Danh sách sản phẩm", accCT, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtDeleteGated(ctx, a, args.ArgU(0))
-	})
+	}))
 	reg.Register("ctDuyet", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtDuyetGated(ctx, a, args.ArgU(0), args.ArgU(1))
 	})
-	reg.Register("ctFav", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("ctFav", rpc.Login, s.accRPC("edit", "QS", accQS, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtFavGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("ctHistory", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.CtGetHistory(ctx, args.ArgU(0))
 	})
@@ -67,11 +68,11 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		response.Result(c, r, err)
 	})
 	// thân là 1 object công tác hoặc mảng object (như tham số data của ctSave)
-	g.POST("", func(c *gin.Context) {
+	g.POST("", s.accMW("create", "QS > Danh sách sản phẩm", accCT), func(c *gin.Context) {
 		r, err := s.CtSaveGated(c.Request.Context(), actor.FromGin(c), middleware.Body(c))
 		response.Result(c, r, err)
 	})
-	g.PATCH("/:id", func(c *gin.Context) {
+	g.PATCH("/:id", s.accMW("edit", "QS > Danh sách sản phẩm", accCT), func(c *gin.Context) {
 		body, err := validator.Body(c)
 		if err != nil {
 			response.Error(c, err)
@@ -80,7 +81,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.CtUpdateGated(c.Request.Context(), actor.FromGin(c), c.Param("id"), body)
 		response.Result(c, r, err)
 	})
-	g.POST("/delete", func(c *gin.Context) {
+	g.POST("/delete", s.accMW("delete", "QS > Danh sách sản phẩm", accCT), func(c *gin.Context) {
 		b := readBatch(middleware.BodyMap(c), "")
 		r, err := s.CtDeleteGated(c.Request.Context(), actor.FromGin(c), b.IDs)
 		response.Result(c, r, err)
@@ -90,12 +91,12 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.CtDuyetGated(c.Request.Context(), actor.FromGin(c), b.IDs, b.Flag)
 		response.Result(c, r, err)
 	})
-	g.POST("/favorites", func(c *gin.Context) {
+	g.POST("/favorites", s.accMW("edit", "QS", accQS), func(c *gin.Context) {
 		b := readBatch(middleware.BodyMap(c), "on")
 		r, err := s.CtFavGated(c.Request.Context(), actor.FromGin(c), b.IDs, b.Flag)
 		response.Result(c, r, err)
 	})
-	g.POST("/import/parse", func(c *gin.Context) {
+	g.POST("/import/parse", s.accMW("create", "QS > Nhập dữ liệu", accCT), func(c *gin.Context) {
 		b := middleware.BodyMap(c)
 		r, err := s.CtImportParse(c.Request.Context(), actor.FromGin(c), b.Val("base64"), b.Val("ext"))
 		response.Result(c, r, err)
@@ -108,7 +109,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 
 // RegisterRoot: route lẻ POST /export/cong-tac (index.js:728-743).
 func (s *Service) RegisterRoot(root *gin.RouterGroup) {
-	root.POST("/export/cong-tac", s.exportCongTac)
+	root.POST("/export/cong-tac", s.accMW("export", "QS", accQS), s.exportCongTac)
 }
 
 // ETag yếu của Express cho res.send(Buffer).

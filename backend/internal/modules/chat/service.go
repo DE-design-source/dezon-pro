@@ -69,10 +69,11 @@ type Deps struct {
 	// Phải là nil interface thật, không phải con trỏ nil bọc trong interface.
 	Media MediaStore
 	Scan  MediaScanner // nil = logScanner (chưa quét virus, coi như sạch)
-	// Users / UserFmt: đọc tài khoản Dezon Pro cho POST /chat/auth/dezon (module users); nil = route đó trả 500.
-	Users   contracts.UserReader
-	UserFmt contracts.UserFormatter
-	Now     func() time.Time
+	// Users: đọc tài khoản Dezon Pro cho POST /chat/auth/dezon (module users); Access: quyền vào Chat theo phân quyền 3 cấp
+	// (N21, module access). Thiếu 1 trong 2 = route đó trả 500.
+	Users  contracts.UserReader
+	Access contracts.AccessChecker
+	Now    func() time.Time
 }
 
 // Service: nghiệp vụ chat.
@@ -83,8 +84,8 @@ type Service struct {
 	push PushSender
 	now  func() time.Time
 
-	users   contracts.UserReader    // đăng nhập bằng tài khoản Dezon Pro (service_dezon.go)
-	userFmt contracts.UserFormatter // PermsArr của users.perms
+	users  contracts.UserReader    // đăng nhập bằng tài khoản Dezon Pro (service_dezon.go)
+	access contracts.AccessChecker // quyền vào Chat (service_dezon.go)
 
 	media         MediaStore   // nil = tắt tệp
 	scan          MediaScanner // không nil khi media != nil
@@ -180,7 +181,7 @@ func New(d Deps) *Service {
 		refreshDays = 30
 	}
 	s := &Service{
-		db: d.DB, sms: d.SMS, mail: d.Mail, push: d.Push, now: now, users: d.Users, userFmt: d.UserFmt,
+		db: d.DB, sms: d.SMS, mail: d.Mail, push: d.Push, now: now, users: d.Users, access: d.Access,
 		jwtKey:     []byte(secret),
 		otpKey:     []byte(hmacHex([]byte(secret), "qspro-chat-otp")),
 		accessTTL:  time.Duration(accessMin * float64(time.Minute)),

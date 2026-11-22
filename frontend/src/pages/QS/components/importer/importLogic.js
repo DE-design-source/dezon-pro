@@ -3,6 +3,7 @@
    đồng bộ danh sách "vừa nhập" sau khi sửa (impSyncSession_). Spec ngành là tham số specs = {VS_SPEC, SON_SPEC, CT_SPEC, DL_SPEC}. */
 import * as api from '../../api/qsApi'
 import { getState, subscribe, reloadProducts, reloadLines } from '../../state/store'
+import { denyQs } from '../../state/qsAccess'
 import { qsToast, qsConfirm, qsAlert } from '../common/dialogs'
 import { coSpec_, specNganh_, groupsOfNganh_, flat_, IMP_TRUC, impGon_ } from '../../lib/productFields'
 import { tkNum_ } from '../../lib/format'
@@ -196,6 +197,7 @@ export function impTrungSP_(it, products) {
 }
 
 export async function pendingCommit_() {
+  if (denyQs('import', 'create')) return            // N21: QS > Nhập dữ liệu > Thêm
   const st = impGet()
   if (st.committing) return                          // đang lưu -> bỏ qua lần bấm thứ 2
   const ds = (st.pending || []).slice(); if (!ds.length) { toast('Chưa có sản phẩm nào chờ lưu'); return }

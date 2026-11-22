@@ -56,6 +56,7 @@ const DEPT_FLOW = [
 function SetupGeneral({ onGoto }) {
   const dv = useDelivery()
   const cur = dv.current
+  const canEdit = dv.can('create', 'edit') // phân quyền N21: không có quyền Sửa -> chỉ xem
   const [form, setForm] = useState(EMPTY_SETUP)
   const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
 
@@ -113,14 +114,14 @@ function SetupGeneral({ onGoto }) {
         <div className="tk-divider" style={{ margin: '4px 0 18px' }} />
         <h4 className="tk-section-title" style={{ marginBottom: 14 }}>Thông tin quan trọng</h4>
         <div className="tk-field-grid">
-          <div className="tk-field"><label>Ngày khởi công</label><input type="text" placeholder="dd/mm/yyyy" value={form.startDate} onChange={setField('startDate')} /></div>
-          <div className="tk-field"><label>Ngày hoàn công (dự kiến)</label><input type="text" placeholder="dd/mm/yyyy" value={form.handoverDate} onChange={setField('handoverDate')} /></div>
+          <div className="tk-field"><label>Ngày khởi công</label><input type="text" placeholder="dd/mm/yyyy" value={form.startDate} onChange={setField('startDate')} readOnly={!canEdit} /></div>
+          <div className="tk-field"><label>Ngày hoàn công (dự kiến)</label><input type="text" placeholder="dd/mm/yyyy" value={form.handoverDate} onChange={setField('handoverDate')} readOnly={!canEdit} /></div>
         </div>
         <div className="tk-field-grid">
-          <div className="tk-field"><label>Giá trị hợp đồng</label><input type="text" placeholder="VD: 8.500.000.000" value={form.contractValue} onChange={setField('contractValue')} /></div>
-          <div className="tk-field"><label>Ngân sách được duyệt</label><input type="text" placeholder="VD: 2.500.000.000" value={form.approvedBudget} onChange={setField('approvedBudget')} /></div>
+          <div className="tk-field"><label>Giá trị hợp đồng</label><input type="text" placeholder="VD: 8.500.000.000" value={form.contractValue} onChange={setField('contractValue')} readOnly={!canEdit} /></div>
+          <div className="tk-field"><label>Ngân sách được duyệt</label><input type="text" placeholder="VD: 2.500.000.000" value={form.approvedBudget} onChange={setField('approvedBudget')} readOnly={!canEdit} /></div>
         </div>
-        <div className="tk-field"><label>Ghi chú</label><textarea rows={3} placeholder="Yêu cầu đặc biệt từ khách hàng, lưu ý về mặt bằng..." value={form.note} onChange={setField('note')} /></div>
+        <div className="tk-field"><label>Ghi chú</label><textarea rows={3} placeholder="Yêu cầu đặc biệt từ khách hàng, lưu ý về mặt bằng..." value={form.note} onChange={setField('note')} readOnly={!canEdit} /></div>
 
         <div className="tk-divider" style={{ margin: '20px 0 18px' }} />
         <h4 className="tk-section-title" style={{ marginBottom: 4 }}>Sau khi lưu, dữ liệu vận hành sẽ được khởi tạo tới</h4>
@@ -137,7 +138,7 @@ function SetupGeneral({ onGoto }) {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <button className="tk-btn-ghost" onClick={handleCancel}>Huỷ</button>
-        <button className="tk-btn-project" style={{ padding: '10px 20px', fontWeight: 700 }} onClick={handleSave}>Lưu thiết lập &amp; bắt đầu thi công</button>
+        {canEdit && <button className="tk-btn-project" style={{ padding: '10px 20px', fontWeight: 700 }} onClick={handleSave}>Lưu thiết lập &amp; bắt đầu thi công</button>}
       </div>
     </>
   )
@@ -151,6 +152,7 @@ function Subcontractors() {
   /* Thầu phụ của dự án đang chọn (máy chủ), mới thêm lên đầu như bản cũ; trạng thái lạ → 'pending' để không vỡ giao diện */
   const subs = ((dv.detail && dv.detail.subcontractors) || []).slice().reverse()
     .map(s => ({ ...s, value: subValueText(s.valueVnd), status: SUB_STATUS_LABEL[s.status] ? s.status : 'pending' }))
+  const canCreate = dv.can('create', 'create')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_SUB)
   const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
@@ -177,10 +179,10 @@ function Subcontractors() {
           <h3 style={{ fontSize: 14.5, fontWeight: 700 }}>Thầu phụ</h3>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý các nhà thầu phụ tham gia thi công dự án.</p>
         </div>
-        <button className="tk-btn-project" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontWeight: 600 }} onClick={() => setModalOpen(true)}>
+        {canCreate && <button className="tk-btn-project" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontWeight: 600 }} onClick={() => setModalOpen(true)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Thêm thầu phụ
-        </button>
+        </button>}
       </div>
 
       <div className="tk-card" style={{ padding: '6px 20px 16px', overflowX: 'auto' }}>
@@ -208,7 +210,7 @@ function Subcontractors() {
         </table>
       </div>
 
-      {modalOpen && (
+      {modalOpen && canCreate && (
         <div className="tk-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
           <div className="tk-modal-box">
             <h3>Thêm thầu phụ</h3>
@@ -230,14 +232,14 @@ function Subcontractors() {
 }
 
 /* ---------------- Sơ đồ tổ chức ---------------- */
-function OrgNode({ item, rowKey, idx, project, dragState, onDragStart, onDragEnd, onDrop }) {
+function OrgNode({ item, rowKey, idx, project, editable, dragState, onDragStart, onDragEnd, onDrop }) {
   const isChildren = rowKey === 'children'
   const key = `${rowKey}-${idx}`
   const [over, setOver] = useState(false)
   return (
     <div
       className="tk-flow-node tk-org-node"
-      draggable="true"
+      draggable={editable ? 'true' : 'false'}
       style={{
         flex: isChildren ? '1' : 'none',
         ...(isChildren ? { minWidth: 150 } : { width: 170 }),
@@ -269,6 +271,7 @@ function OrgNode({ item, rowKey, idx, project, dragState, onDragStart, onDragEnd
 function OrgChart({ project, onGoto }) {
   const { addDept } = useMembers()
   const dv = useDelivery()
+  const canEdit = dv.can('create', 'edit')
   const [init] = useState(() => orgFromServer(dv.detail && dv.detail.project.orgChart, INITIAL_ORG_PARALLEL, INITIAL_ORG_CHILDREN))
   const [parallel, setParallel] = useState(init.parallel)
   const [children, setChildren] = useState(init.children)
@@ -341,7 +344,7 @@ function OrgChart({ project, onGoto }) {
     if (confirm(`Xoá bộ phận "${item.label}"?`)) setRow(prev => prev.filter(x => x !== item))
   }
 
-  const nodeProps = { project, dragState: dragSrc, onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop }
+  const nodeProps = { project, editable: canEdit, dragState: dragSrc, onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop }
 
   return (
     <div className="tk-card" style={{ padding: '26px 24px 30px' }}>
@@ -350,23 +353,25 @@ function OrgChart({ project, onGoto }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, maxWidth: 560 }}>Bổ nhiệm nhân sự phụ trách cho từng vai trò trong quy trình thiết kế. Kéo-thả các thẻ để sắp xếp lại trong cùng một hàng, hoặc thả vào biểu tượng thùng rác để xoá bộ phận tuỳ biến.</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
-          <div
-            className={`tk-org-trash${trashOver ? ' over' : ''}`}
-            title="Kéo thẻ vào đây để xoá bộ phận"
-            onDragOver={e => { if (!dragSrc.current) return; e.preventDefault(); setTrashOver(true) }}
-            onDragLeave={() => setTrashOver(false)}
-            onDrop={handleTrashDrop}
-          >
-            <Svg size={17} html={ICONS.trash} />
-          </div>
-          <button
-            className="tk-btn-project"
-            style={{ padding: '0 18px', height: 38, borderRadius: 10, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', flex: 'none', display: 'flex', alignItems: 'center' }}
-            onClick={() => {
-              /* Sơ đồ đã lưu lên máy chủ sau mỗi thay đổi; quay về danh sách như bản HTML */
-              onGoto('list')
-            }}
-          >Lưu sơ đồ tổ chức</button>
+          {canEdit && <>
+            <div
+              className={`tk-org-trash${trashOver ? ' over' : ''}`}
+              title="Kéo thẻ vào đây để xoá bộ phận"
+              onDragOver={e => { if (!dragSrc.current) return; e.preventDefault(); setTrashOver(true) }}
+              onDragLeave={() => setTrashOver(false)}
+              onDrop={handleTrashDrop}
+            >
+              <Svg size={17} html={ICONS.trash} />
+            </div>
+            <button
+              className="tk-btn-project"
+              style={{ padding: '0 18px', height: 38, borderRadius: 10, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', flex: 'none', display: 'flex', alignItems: 'center' }}
+              onClick={() => {
+                /* Sơ đồ đã lưu lên máy chủ sau mỗi thay đổi; quay về danh sách như bản HTML */
+                onGoto('list')
+              }}
+            >Lưu sơ đồ tổ chức</button>
+          </>}
         </div>
       </div>
 
@@ -374,7 +379,7 @@ function OrgChart({ project, onGoto }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 4 }}>
           {parallel.map((item, i) => <OrgNode key={item.dept} item={item} rowKey="parallel" idx={i} {...nodeProps} />)}
         </div>
-        <button className="tk-dashed-btn" style={{ marginTop: 6 }} onClick={() => addOrgDept('parallel')}>+ Thêm bộ phận song song</button>
+        {canEdit && <button className="tk-dashed-btn" style={{ marginTop: 6 }} onClick={() => addOrgDept('parallel')}>+ Thêm bộ phận song song</button>}
 
         <div style={{ marginTop: 10 }}>
           <div className="tk-flow-node" style={{ flexDirection: 'column', alignItems: 'center', cursor: 'default' }}>
@@ -393,7 +398,7 @@ function OrgChart({ project, onGoto }) {
         <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', width: '100%', maxWidth: 900, gap: 20 }}>
           {children.map((item, i) => <OrgNode key={item.dept} item={item} rowKey="children" idx={i} {...nodeProps} />)}
         </div>
-        <button className="tk-dashed-btn" style={{ marginTop: 14 }} onClick={() => addOrgDept('children')}>+ Thêm bộ phận trực thuộc</button>
+        {canEdit && <button className="tk-dashed-btn" style={{ marginTop: 14 }} onClick={() => addOrgDept('children')}>+ Thêm bộ phận trực thuộc</button>}
       </div>
     </div>
   )
@@ -467,7 +472,7 @@ function ProjectDetail({ onGoto }) {
                 <FlowNodeMembers project={project} dept={n.dept} />
                 {n.to
                   ? <Link to={n.to} className="tk-flow-link" style={{ color: `var(--${n.color})` }}>{n.link}</Link>
-                  : <span className="tk-flow-link" style={{ color: `var(--${n.color})` }} onClick={() => onGoto(n.goto)}>{n.link}</span>}
+                  : dv.can(n.goto) && <span className="tk-flow-link" style={{ color: `var(--${n.color})` }} onClick={() => onGoto(n.goto)}>{n.link}</span>}
                 <FlowNodePopover project={project} dept={n.dept} />
               </div>
             ))}

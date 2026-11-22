@@ -5,6 +5,7 @@ const checkIcon = (size, stroke) => <svg width={size} height={size} viewBox="0 0
 const lockIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
 
 /* Tab con "Nhiệm vụ": các bước chiến dịch + nhiệm vụ nhỏ (renderTaskSteps) */
+/* N21: không có onOpenCreateTask / onCheckSubtask (không có quyền Thêm / Sửa ở Marketing > Nhiệm vụ) -> ẩn nút / không tích được */
 export default function MissionPanel({ visible, steps, onCheckSubtask, onOpenCreateTask }) {
   const earned = steps.reduce((s, st) => s + stepEarnedM(st), 0)
   const pct = Math.round(earned / M_TOTAL_MAX * 100)
@@ -23,10 +24,10 @@ export default function MissionPanel({ visible, steps, onCheckSubtask, onOpenCre
           <div className="mono" style={{ fontFamily: MK_FONT, fontWeight: 800, fontSize: 22, color: 'var(--gold)' }}>{earned.toLocaleString('vi-VN')} <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>/ {M_TOTAL_MAX.toLocaleString('vi-VN')} điểm</span></div>
           <div style={{ width: 200, height: 7, borderRadius: 4, background: 'var(--surface-alt)', marginTop: 6 }}><div style={{ width: pct + '%', height: '100%', borderRadius: 4, background: 'var(--marketing)' }} /></div>
         </div>
-        <button className="mk-create-task-btn" title="Tạo nhiệm vụ mới" onClick={onOpenCreateTask}>
+        {onOpenCreateTask && <button className="mk-create-task-btn" title="Tạo nhiệm vụ mới" onClick={onOpenCreateTask}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Tạo nhiệm vụ
-        </button>
+        </button>}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -51,8 +52,8 @@ export default function MissionPanel({ visible, steps, onCheckSubtask, onOpenCre
                 {step.status !== 'locked' && step.subtasks.map((s, si) => (
                   <div className="mk-subtask-row" key={si}>
                     <div
-                      className={`mk-subtask-chk${s.done ? ' checked' : ''}${isOpen ? '' : ' disabled'}`}
-                      onClick={isOpen ? () => onCheckSubtask(idx, si) : undefined}
+                      className={`mk-subtask-chk${s.done ? ' checked' : ''}${isOpen && onCheckSubtask ? '' : ' disabled'}`}
+                      onClick={isOpen && onCheckSubtask ? () => onCheckSubtask(idx, si) : undefined}
                     >
                       {s.done ? checkIcon(12, 'currentColor') : null}
                     </div>

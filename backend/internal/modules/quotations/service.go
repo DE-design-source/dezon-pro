@@ -28,10 +28,12 @@ type Deps struct {
 	Files    contracts.FileReader
 	Repo     Repository
 	HTTP     *http.Client
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 type Service struct {
-	db       *database.DB // D-13: mở transaction cho SaveCover; nil (repo giả trong test unit) -> chạy thẳng
+	access   contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
+	db       *database.DB            // D-13: mở transaction cho SaveCover; nil (repo giả trong test unit) -> chạy thẳng
 	repo     Repository
 	lines    contracts.LineReader
 	projects contracts.ProjectReader
@@ -41,7 +43,7 @@ type Service struct {
 }
 
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, repo: d.Repo, lines: d.Lines, projects: d.Projects, media: d.Media, files: d.Files, http: d.HTTP}
+	s := &Service{access: d.Access, db: d.DB, repo: d.Repo, lines: d.Lines, projects: d.Projects, media: d.Media, files: d.Files, http: d.HTTP}
 	if s.repo == nil {
 		s.repo = newPgRepo(d.DB)
 	}

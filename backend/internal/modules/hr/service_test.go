@@ -15,20 +15,34 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-type fakeUsers struct{ perms string }
-
-func (u fakeUsers) GetByID(ctx context.Context, id any) (*omap.Map, error) {
-	return omap.Of("perms", u.perms), nil
-}
-func (u fakeUsers) UserOut(row *omap.Map) *omap.Map { return row }
-func (u fakeUsers) PermsArr(v any) []any {
-	out := []any{}
-	for _, x := range regexp.MustCompile(`\s*,\s*`).Split(jsval.Str(v), -1) {
-		if x != "" {
-			out = append(out, x)
+// Quyền vào trang HR theo phân quyền 3 cấp (N21), không cần database: allow chỉ hỏi AccessChecker.
+func TestAllowPhanQuyen(t *testing.T) {
+	cases := []struct {
+		name, role, perms, tinhNang string
+		grant                       *omap.Map
+		want                        int
+	}{
+		{"nhân viên có hr", "user", "hr", "", nil, 0},
+		{"nhân viên thiếu hr", "user", "kinhdoanh", "", nil, 403},
+		{"admin", "admin", "", "", nil, 0},
+		{"admin, công ty thiếu tính năng", "admin", "", "boc", nil, 403},
+		{"dòng riêng chỉ có Kinh doanh", "user", "hr", "", omap.Of("kinhdoanh", omap.Of("*", []any{"view"})), 403},
+		{"dòng riêng có 1 tab HR", "user", "", "", omap.Of("hr", omap.Of("attendance", []any{"view"})), 0},
+	}
+	for _, c := range cases {
+		ctx := tenant.With(context.Background(), tenant.Ctx{Role: c.role, CongTyID: "ct"})
+		s := New(Deps{Access: legacyAccess{perms: c.perms, tinhNang: c.tinhNang, grant: c.grant}})
+		if got := status(s.allow(ctx, &actor.Actor{UID: "u", U: "an", R: c.role, CT: "ct"})); got != c.want {
+			t.Errorf("%s: %d, mong %d", c.name, got, c.want)
 		}
 	}
-	return out
+	ctx := tenant.With(context.Background(), tenant.Ctx{Role: "admin", CongTyID: "ct"})
+	if got := status(New(Deps{}).allow(ctx, &actor.Actor{UID: "u", R: "admin", CT: "ct"})); got != 403 {
+		t.Errorf("thiếu Access phải 403: %d", got)
+	}
+	if err := New(Deps{}).allow(ctx, &actor.Actor{UID: "u", R: "super", CT: "ct"}); err != nil {
+		t.Errorf("super: %v", err)
+	}
 }
 
 func status(err error) int {
@@ -69,7 +83,7 @@ func testDB(t *testing.T) (*database.DB, []any) {
 
 func svcAs(db *database.DB, role, perms string, ct any) (*Service, context.Context, *actor.Actor) {
 	ctx := tenant.With(context.Background(), tenant.Ctx{Role: role, CongTyID: ct})
-	return New(Deps{DB: db, Users: fakeUsers{perms}, UserFmt: fakeUsers{perms}}), ctx, &actor.Actor{U: "an", R: role, CT: ct}
+	return New(Deps{DB: db, Access: legacyAccess{perms: perms}}), ctx, &actor.Actor{U: "an", R: role, CT: ct}
 }
 
 func emps(st any) map[string]*omap.Map {

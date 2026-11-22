@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './Marketing.css'
 import { useTheme } from '../../hooks/useTheme'
 import { CATALOG, CAMPAIGNS, MAIN_TABS, M_STEPS } from '../../data/marketingData'
@@ -13,6 +13,7 @@ import CampaignModal from './components/CampaignModal'
 import CreateTaskModal from './components/CreateTaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
+import { useAccess } from '../../services/accessService'
 
 const plusIcon = (size, stroke = 'currentColor') => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -70,9 +71,19 @@ export default function Marketing() {
   const [aiResizing, setAiResizing] = useState(false)
 
   const tabLabel = id => (tabs.find(t => t.id === id) || { label: id }).label
-  // tab ẩn ở Cài đặt > Hiển thị (lưu trên máy; khác "Chỉnh sửa menu" chỉ ẩn trong phiên); tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/marketing')
-  useTabFallback(tabHidden, panel, tabs.filter(t => !t.hidden).map(t => t.id), id => setPanel(id))
+  /* Phân quyền 3 cấp (N21): tab xem được + nút Thêm / Sửa / Xuất theo quyền Marketing > tab > thao tác.
+     Tab tuỳ chỉnh (thêm bằng "Chỉnh sửa menu", chỉ trong phiên) không thuộc danh mục quyền nên luôn hiện. */
+  const acc = useAccess()
+  const mk = (t, a) => acc.can('marketing', t, a)
+  const tabOk = id => !MAIN_TABS.some(t => t.id === id) || mk(id, 'view')
+  const denied = MAIN_TABS.map(t => t.id).filter(id => !mk(id, 'view'))
+  const noTab = acc.ready && denied.length === MAIN_TABS.length && !tabs.some(t => t.custom && !t.hidden)
+  const show = id => panel === id && tabOk(id)
+  // tab ẩn ở Cài đặt > Hiển thị (lưu trên máy; khác "Chỉnh sửa menu" chỉ ẩn trong phiên) hoặc không có quyền xem; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  const tabHiddenUser = usePageTabsHidden('/marketing')
+  const deniedKey = denied.join(',')
+  const tabHidden = useMemo(() => (deniedKey ? [...tabHiddenUser, ...deniedKey.split(',')] : tabHiddenUser), [tabHiddenUser, deniedKey])
+  useTabFallback(tabHidden, panel === 'campaignDetail' ? 'campaigns' : panel, tabs.filter(t => !t.hidden).map(t => t.id), id => setPanel(id))
 
   /* ===================== Chuyển tab chính ===================== */
   function goToTab(name) { setPanel(name) }
@@ -149,6 +160,7 @@ export default function Marketing() {
     setCampaigns(prev => [...prev, newCamp])
     setQuoteCampaignId(newCamp.id)
     setCampModal(m => ({ ...m, open: false }))
+    if (!mk('quote', 'view')) { goToTab('campaigns'); return }
     goToTab('quote')
     rerenderQuote()
   }
@@ -224,10 +236,10 @@ export default function Marketing() {
             <span>{editingTabs ? 'Xong' : 'Chỉnh sửa menu'}</span>
           </button>
         </div>
-        <button onClick={() => setCampModal(m => ({ open: true, seq: m.seq + 1 }))} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', background: 'var(--marketing)', color: '#fff', padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit' }}>
+        {mk('campaigns', 'create') && <button onClick={() => setCampModal(m => ({ open: true, seq: m.seq + 1 }))} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', background: 'var(--marketing)', color: '#fff', padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit' }}>
           {plusIcon(14, '#fff')}
           Tạo chiến dịch
-        </button>
+        </button>}
         <button title="Chuyển giao diện sáng/tối" onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           {theme === 'dark'
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -237,11 +249,18 @@ export default function Marketing() {
 
       {/* ---------- Các panel (đều giữ mount, bật/tắt bằng display như bản HTML) ---------- */}
       <div style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
-        <CampaignsTab visible={panel === 'campaigns'} catalog={catalog} campaigns={campaigns} onOpenDetail={openCampaignDetail} />
-        <CampaignDetail visible={panel === 'campaignDetail'} catalog={catalog} camp={detailCamp} onBack={() => goToTab('campaigns')} onViewQuote={viewQuoteFromDetail} />
-        <CatalogTab visible={panel === 'catalog'} catalog={catalog} onAddItem={addCatalogItem} />
+        {noTab && (
+          <div style={{ background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 14, padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            Tài khoản chưa được cấp quyền xem tab nào của Marketing. Nhờ quản trị viên cấp quyền.
+          </div>
+        )}
+        <CampaignsTab visible={show('campaigns')} catalog={catalog} campaigns={campaigns} onOpenDetail={openCampaignDetail} />
+        <CampaignDetail visible={panel === 'campaignDetail' && tabOk('campaigns')} catalog={catalog} camp={detailCamp} onBack={() => goToTab('campaigns')}
+          onViewQuote={mk('quote', 'view') ? viewQuoteFromDetail : undefined} canEdit={mk('campaigns', 'edit')} />
+        <CatalogTab visible={show('catalog')} catalog={catalog} onAddItem={mk('catalog', 'create') ? addCatalogItem : undefined} />
         <QuoteTab
-          visible={panel === 'quote'}
+          visible={show('quote')}
+          canExport={mk('quote', 'export')}
           catalog={catalog}
           campaigns={campaigns}
           quoteCampaignId={quoteCampaignId}
@@ -249,13 +268,13 @@ export default function Marketing() {
           onSelectCampaign={id => { setQuoteCampaignId(id); rerenderQuote() }}
         />
         <TasksTab
-          visible={panel === 'tasks'}
+          visible={show('tasks')}
           steps={steps}
-          onCheckSubtask={checkSubtask}
-          onOpenCreateTask={() => setTaskModal(m => ({ open: true, seq: m.seq + 1 }))}
+          onCheckSubtask={mk('tasks', 'edit') ? checkSubtask : undefined}
+          onOpenCreateTask={mk('tasks', 'create') ? () => setTaskModal(m => ({ open: true, seq: m.seq + 1 })) : undefined}
         />
-        <div style={{ display: panel === 'staff' ? 'block' : 'none' }}><DeptStaff units={['marketing']} /></div>
-        <AdsSpendTab visible={panel === 'ads'} />
+        <div style={{ display: show('staff') ? 'block' : 'none' }}><DeptStaff units={['marketing']} /></div>
+        <AdsSpendTab visible={show('ads')} perm={{ create: mk('ads', 'create'), edit: mk('ads', 'edit'), delete: mk('ads', 'delete'), export: mk('ads', 'export') }} />
         {/* Tab tuỳ chỉnh do người dùng thêm — nội dung giữ tên lúc tạo, kể cả khi tab được đổi tên sau đó */}
         {tabs.filter(t => t.custom).map(t => (
           <div key={t.id} style={{ display: panel === t.id ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>

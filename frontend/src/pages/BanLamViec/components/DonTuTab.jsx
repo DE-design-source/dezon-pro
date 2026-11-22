@@ -55,9 +55,11 @@ function RequestDetail({ request: r, onBack, onCancel }) {
             <button className="blv-btn ghost" disabled={reminded} onClick={() => setReminded(true)}>
               <Icon name={reminded ? 'check' : 'bell'} size={14} />{reminded ? 'Đã nhắc duyệt' : 'Nhắc duyệt'}
             </button>
-            <button className="blv-btn ghost danger" onClick={() => { if (confirm('Huỷ đơn này?')) onCancel(r.id) }}>
-              <Icon name="x" size={14} />Huỷ đơn
-            </button>
+            {onCancel && (
+              <button className="blv-btn ghost danger" onClick={() => { if (confirm('Huỷ đơn này?')) onCancel(r.id) }}>
+                <Icon name="x" size={14} />Huỷ đơn
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -140,7 +142,7 @@ export default function DonTuTab({ requests, onPickType, onCancelRequest, openId
 
   return (
     <>
-      <div className="blv-card">
+      {onPickType && <div className="blv-card">
         <div className="blv-card-head">
           <div>
             <h3>Tạo đơn mới</h3>
@@ -172,7 +174,7 @@ export default function DonTuTab({ requests, onPickType, onCancelRequest, openId
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="blv-card">
         <div className="blv-card-head">

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useQs } from '../state/QsData'
+import { useQsCan } from '../state/qsAccess'
 import { useLinesSheet } from '../state/useLinesSheet'
 import { histOf, setHist, setState, isTmp, DEFAULT_NODE, histPushView } from '../state/store'
 import { useTicks, tickClick_, tickSet_, tickClear_ } from '../state/tickSel'
@@ -43,6 +44,7 @@ import ColFilterPop from './breakdown/sheet/ColFilterPop'
 import LinePicker from './breakdown/sheet/LinePicker'
 import GachPop from './breakdown/sheet/GachPop'
 import { laGach_ } from '../lib/gach.js'
+import { spBocOk_, SP_CHUA_DUYET_BOC } from '../lib/catalogFilters.js'
 import BulkBar from './breakdown/sheet/BulkBar'
 import { LineUpdatePop, PriceSyncModal, LnPickPop, RecentPop, HistoryDock } from './breakdown/sheet/SyncPops'
 import './breakdown/sheet/sheet.css'
@@ -77,6 +79,9 @@ export default function BreakdownTab() {
   const { cur, lines, products, node, setNode, setHmNode, mutate, navigate, toast, confirm } = qs
   const visible = qs.panelVisible('boc')
   const isPT = node === '3.1'
+  /* Phân quyền N21: QS > Bóc tách > Thêm / Sửa / Xoá / Xuất (ghi dòng còn được chặn ở state/qsGuard.js) */
+  const qsCan = useQsCan()
+  const canC = qsCan('boc', 'create'), canE = qsCan('boc', 'edit'), canD = qsCan('boc', 'delete'), canX = qsCan('boc', 'export')
   /* Đề mục 3.1: thư viện + bước chọn + panel công tác của Phần thô cắm vào khung Bóc tách; đầu bảng dùng tổng Phần thô
      (renderPTLibrary phantho.js:1226-1295, ptShowDetail_ 1908-1932, ptTotalsBar_ 2331-2338, tkCount 2287) */
   const ptCount = usePtLibCount()
@@ -196,12 +201,12 @@ export default function BreakdownTab() {
     cellNumber: lineNumber,
     entryText: tkEntryText,
     colLetter,
-    editable: tkSheetSua_,
+    editable: canE ? tkSheetSua_ : () => false,
     isNumeric: k => !!TK_SO[k],
     isFav: r => { const p = spOfLine_(r, products); return !!(p && p.yeuThich) },
     priceKeys: TK_PRICE_KEYS,
     rowNumWidth: TK_RN_W,   // ô góc vuông: cột số 1-2-3 rộng = hàng chữ A-B-C cao (QS.css .qs-tk-grid .qs-bd-letters)
-  }), [products])
+  }), [products, canE])
   const flatten = useCallback((gs, pred) => tkFlatten(gs, pred, sort), [sort])
   const dispFlat = useMemo(() => tkFlatten(groups, basePred, sort), [groups, basePred, sort])
   const dispItems = dispFlat.filter(e => e.type === 'item')
@@ -276,6 +281,7 @@ export default function BreakdownTab() {
     const floor = g ? (g.id === CHUA_PHAN_TANG ? '' : g.id) : targetFloor
     const sl = dragProduct ? dragSl.current : null
     endDragProduct()
+    if (p && !spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return }   // M14.6: SP chưa duyệt không vào bóc tách
     if (p) addProduct(p, { tang: floor, sl: sl || undefined })
   }
   /* sl: số lượng đi kèm khi kéo SP con của combo từ panel chi tiết (comboSL) */
@@ -379,13 +385,13 @@ export default function BreakdownTab() {
       return (
         <span className="qs-tk-tencell">
           <span className="qs-tk-tentext">{info.live != null ? info.live : (l.ten || '')}</span>
-          {d && (
+          {d && canE && (
             <button className="qs-tk-lnupd" title={lnDiffTip_(d)} onMouseDown={ev => ev.stopPropagation()}
               onClick={ev => setPop({ kind: 'lnupd', anchor: ev.currentTarget, line: l })}>
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v5h-5" /></svg>
             </button>
           )}
-          {plain && (
+          {plain && canE && (
             <button className="qs-tk-pickb" title="Chọn sản phẩm từ danh mục" onMouseDown={ev => ev.stopPropagation()}
               onClick={ev => setPop({ kind: 'pick', anchor: ev.currentTarget, line: l })}>⌕</button>
           )}
@@ -393,7 +399,7 @@ export default function BreakdownTab() {
       )
     }
     /* Dòng gạch: nút quy đổi m² / hao hụt / hộp ở ô Số lượng (GachPop) */
-    if (c.key === 'soLuong' && laGach_(l)) {
+    if (c.key === 'soLuong' && laGach_(l) && canE) {
       const g = l.extra && l.extra.gach
       return (
         <span className="qs-tk-slcell">
@@ -403,7 +409,7 @@ export default function BreakdownTab() {
         </span>
       )
     }
-    if (c.key === 'lnPct' && plain) {   // nút ▾ chỉ ở Bảng thường như bản gốc
+    if (c.key === 'lnPct' && plain && canE) {   // nút ▾ chỉ ở Bảng thường như bản gốc
       return (
         <span className="qs-tk-lncell">
           <span>{info.live != null ? info.live : lineText(l, 'lnPct')}</span>
@@ -640,14 +646,14 @@ export default function BreakdownTab() {
       <Icon name="refresh" size={18} />{giaLech.length ? <span className="qs-bd-tb-badge">{giaLech.length}</span> : null}
     </button>
   )
-  const extraTools = <>{recentTool}{giaTool}</>
+  const extraTools = <>{recentTool}{canE && giaTool}</>
   /* Bảng thường: khối "Công cụ bảng" gọn (tkToolsSync_ boc.js:1632-1648) thay cho thanh công cụ bảng tính.
      Nút Bộ lọc / Yêu thích của bản gốc thuộc cột sản phẩm bên trái (CatalogPanel) nên không lặp lại ở đây. */
   const plainTools = (a, st) => (
     <div className="qs-tk-toolbox">
       {/* nhãn "Công cụ bảng" đã bỏ: các nút công cụ đứng đầu khối, nút Thêm tầng / phòng + Thêm hạng mục ở góc phải (st.addTools) */}
       {/* vị trí số 1: nút cập nhật giá theo danh mục (nhóm riêng, có vạch ngăn) */}
-      {!catTools && <><span className="qs-tk-tgrp">{giaTool}</span><span className="qs-tk-tsep" /></>}
+      {!catTools && canE && <><span className="qs-tk-tgrp">{giaTool}</span><span className="qs-tk-tsep" /></>}
       <span className="qs-tk-tgrp">
         <button className={`qs-bd-tb-btn${rowEdit ? ' on' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => setRowEdit(v => !v)}
           title={rowEdit ? 'Ẩn cột nút xoá / kéo dòng ở mép phải' : 'Hiện cột nút xoá / kéo dòng ở mép phải'}>
@@ -679,7 +685,7 @@ export default function BreakdownTab() {
     </div>
   )
   /* Bảng thường: nút xoá dòng ở mép phải (renderActGutter boc.js:830-841), xoá 1 dòng không hỏi như delLine */
-  const rowAction = e => (
+  const rowAction = e => (!canD ? null :
     <button className="qs-tk-agx" title="Xoá dòng này" aria-label="Xoá dòng này" onMouseDown={ev => ev.stopPropagation()} onClick={() => mutate.deleteLines([e.r.lineId])}>
       <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
     </button>
@@ -729,7 +735,7 @@ export default function BreakdownTab() {
   const catHistory = (
     <>
       <span className="qs-bd-hchip">
-      {giaTool}
+      {canE && giaTool}
       {quickTool && (
         <button className={`qs-bd-tb-btn badged${quickTool.on ? ' on' : ''}`} title={quickTool.title} onMouseDown={e => e.preventDefault()} onClick={quickTool.onClick}>
           <Icon name="sliders" size={18} /><span className="qs-bd-tb-badge">{quickTool.count}</span>
@@ -752,7 +758,7 @@ export default function BreakdownTab() {
           <>
             <CatalogPanel
               width={catalogW} headTools={isPT ? ptHeadTools : catHistory}
-              onAdd={(product, opts) => addProduct(product, opts || {})}
+              onAdd={(product, opts) => addProduct(product, opts || {})} noAdd={!canC}
               onOpen={(product, opts) => { setDetail(product); setDetailSl((opts && opts.sl) || null) }}
               activeId={detail ? String(detail.recordId || detail.ma) : null}
               dragId={dragProduct ? String(dragProduct.recordId || dragProduct.ma) : null}
@@ -774,7 +780,7 @@ export default function BreakdownTab() {
           </>
         )}
         {catalogOpen && detail && (
-          <ProductInfo product={detail} width={catalogW} addSl={detailSl} onClose={() => setDetail(null)} onAdd={(product, opts) => addProduct(product, opts || {})}
+          <ProductInfo product={detail} width={catalogW} addSl={detailSl} onClose={() => setDetail(null)} onAdd={canC ? (product, opts) => addProduct(product, opts || {}) : undefined}
             onDragProduct={onDragProduct} onDragEnd={endDragProduct} />
         )}
         {catalogOpen && histDock && (
@@ -829,7 +835,7 @@ export default function BreakdownTab() {
                 favorites={NO_FAVS}
                 targetName={targetFloor} onTarget={id => setTargetId(id)}
                 groupNames={floorNames}
-                onAddGroup={addGroup} onAddRow={() => {}} onAddBlank={addBlank}
+                onAddGroup={addGroup} onAddRow={() => {}} onAddBlank={addBlank} addNode={canC ? null : false}
                 full={full} onFull={() => setFull(f => !f)}
                 dropMark={dropMark}
                 flash={flash}
@@ -838,12 +844,12 @@ export default function BreakdownTab() {
                 fileName={`boc-tach-${cur ? cur.maDA : ''}`}
                 printTitle={((cur && cur.ten) || '') + ' — ' + (nodeName(node) || 'Bóc tách')}
                 columns={columns} flatten={flatten} extraPred={basePred} initialSel={INITIAL_SEL} rowClass={rowClass}
-                adapter={adapter} wrapKey="wrap" hideTools={catTools ? ['import', 'csv', 'cols', 'history', ...(quickTool ? ['quick'] : [])] : ['import', 'csv', 'cols']} extraTools={catTools ? null : recentTool} leadTools={plain || !catTools ? <>{!catTools && giaTool}{plain && rowEditBtn}</> : null} quickTool={quickTool}
+                adapter={adapter} wrapKey="wrap" hideTools={[...(catTools ? ['import', 'csv', 'cols', 'history', ...(quickTool ? ['quick'] : [])] : ['import', 'csv', 'cols']), ...(canX ? [] : ['export'])]} extraTools={catTools ? null : recentTool} leadTools={plain || !catTools ? <>{!catTools && giaTool}{plain && rowEditBtn}</> : null} quickTool={quickTool}
                 onRenameGroup={(g, name) => { if (g.id !== CHUA_PHAN_TANG) act.renameFloor(g.id, name) }}
                 onInsertRow={e => (e.type === 'item' ? act.insertRowBelow(e.r.lineId, node, sheetF) : A.addToFloor(e.g))}
                 onDuplicate={ids => act.dupRows(ids)}
                 onSort={(key, dir, label) => { setSort({ key, dir }); toast('Sắp xếp ' + (dir === 'asc' ? 'A → Z' : 'Z → A') + ' theo "' + label + '"') }}
-                onDownload={() => act.exportXlsx(tkXlsxBody(dispFlat, visibleCols, 'BÓC TÁCH — ' + (nodeName(node) || 'Bóc tách').toUpperCase() + ' — ' + ((cur && (cur.ten || cur.maDA)) || '')))}
+                onDownload={() => canX && act.exportXlsx(tkXlsxBody(dispFlat, visibleCols, 'BÓC TÁCH — ' + (nodeName(node) || 'Bóc tách').toUpperCase() + ' — ' + ((cur && (cur.ten || cur.maDA)) || '')))}
                 onReplaceAll={(q, rep) => act.replaceAll(q, rep, node)}
                 onCellContext={ctx => setPop({ kind: 'ctx', at: { x: ctx.ev.clientX, y: ctx.ev.clientY }, entry: ctx.entry, col: ctx.col, ids: ctx.ids,
                   text: ctx.entry && ctx.col ? tkEntryText(ctx.entry, ctx.col.key) : '' })}
@@ -852,7 +858,7 @@ export default function BreakdownTab() {
                 onColResize={setColW} onColMove={moveCol} footerInTools rowAction={plain && rowEdit ? rowAction : undefined} fitCols emptyReplace={emptyReplace} plainFmt
                 renderCell={renderCell}
                 onColMenu={(key, ev) => setPop({ kind: 'flt', anchor: ev.currentTarget, key })} colMarks={colMarks}
-                rowDrag={rowDrag} rowHeights={rowH} onRowHeight={onRowHeight} frozenRows={frzRows}
+                rowDrag={canE ? rowDrag : undefined} rowHeights={rowH} onRowHeight={onRowHeight} frozenRows={frzRows}
                 onViewMode={opt => {
                   /* Xem tối ưu (bật): bỏ chiều cao hàng / bề rộng cột tự đặt -> hàng cao theo nội dung, cột cân theo khung + dữ liệu.
                      Tắt: bảng tự thu gọn hàng (SheetBody compact) để thấy được giá */

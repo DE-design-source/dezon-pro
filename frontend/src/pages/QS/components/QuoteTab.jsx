@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useQs } from '../state/QsData'
+import { useQsCan } from '../state/qsAccess'
 import { useQsStore } from '../state/store'
 import { giaLechList_ } from '../lib/bocSync.js'
 import { coverCosts } from '../lib/quote.js'
@@ -31,6 +32,9 @@ export default function QuoteTab() {
   const [pop, setPop] = useState(null)
   const xRef = useRef(null)
   const visible = panelVisible('export')
+  /* Phân quyền N21: QS > Xuất báo giá > Sửa (chế độ Chỉnh sửa, Chốt) / Xuất (Excel, PDF / In); quoteActions chặn thêm ở từng hàm ghi */
+  const qsCan = useQsCan()
+  const canE = qsCan('export', 'edit'), canX = qsCan('export', 'export')
   const seq = visibleSeq('export')
   const maDA = cur ? cur.maDA : ''
 
@@ -91,12 +95,13 @@ export default function QuoteTab() {
     </>
   )
 
-  if (q.bgView !== 'edit') {
+  const xuat = canX ? onExport : null
+  if (q.bgView !== 'edit' || !canE) {
     return (
       <>
         <div className={`qsq-x${q.bgFull ? ' full' : ''}`} key="doc" ref={xRef}>
-          <QuoteSide m={m} pages={pages.length} tk={tk} projects={projects} onExport={onExport} onHist={() => setPop({ kind: 'hist' })} />
-          <QuotePreview pages={pages} mau={m.mau} chu={bgChu_(m.ctx.bgCfg)} vat={cur.vat} onExport={onExport} />
+          <QuoteSide m={m} pages={pages.length} tk={tk} projects={projects} onExport={xuat} onHist={() => setPop({ kind: 'hist' })} canEdit={canE} />
+          <QuotePreview pages={pages} mau={m.mau} chu={bgChu_(m.ctx.bgCfg)} vat={cur.vat} onExport={xuat} />
         </div>
         {modals}
       </>
@@ -107,7 +112,7 @@ export default function QuoteTab() {
       <div className="qsq-segrow" key="edit"><ModeSeg /></div>
       <CoverEditor ctx={m.ctx} comp={coverCosts(m.ctx)} coverMau={q.coverMau} />
       <AreaTable projData={projData} />
-      <DetailEditor ctx={m.ctx} tk={tk} nganh={m.ui.nganh} onExport={onExport} exporting={q.exporting} />
+      <DetailEditor ctx={m.ctx} tk={tk} nganh={m.ui.nganh} onExport={xuat} exporting={q.exporting} />
       {modals}
     </>
   )

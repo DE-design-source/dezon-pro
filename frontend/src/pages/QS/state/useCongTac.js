@@ -5,6 +5,15 @@
    useCongTac() -> {congTac, status, error, ctLoad(quiet, fresh), ctReload(), ctFav(ids,on), ctDuyet(ids,on), ctDelete(ids), ctSave(data), ctUpdate(id,patch), ctHistory(id)} */
 import * as api from '../api/qsApi'
 import { getState, setState, useQsStore, ctLoad } from './store'
+import { qsCan } from './qsAccess'
+
+/* Phân quyền N21: thư viện công tác thuộc QS > Danh sách sản phẩm (thêm từ Nhập dữ liệu theo QS > Nhập dữ liệu > Thêm);
+   duyệt công tác giữ quy tắc cũ. Bị chặn -> ném lỗi tiếng Việt (nơi gọi đã báo lỗi) */
+const VN = { create: 'Thêm', edit: 'Sửa', delete: 'Xoá' }
+function ctGate(action) {
+  const tab = action === 'create' && getState().tab === 'import' ? 'import' : 'sanpham'
+  if (!qsCan(tab, action)) throw new Error('Bạn chưa được cấp quyền ' + VN[action] + ' ở QS > ' + (tab === 'import' ? 'Nhập dữ liệu' : 'Danh sách sản phẩm'))
+}
 
 /* server trả {ok, errors} chứ không ném lỗi -> tự kiểm (batKq_) */
 export function batKq_(r, n, viec) {
@@ -36,6 +45,7 @@ async function ctDuyet(ids, on) {
   return n
 }
 async function ctDelete(ids) {
+  ctGate('delete')
   ids = arr(ids)
   const n = batKq_(await api.ctDelete(ids), ids.length, 'xoá')
   await ctReload()
@@ -43,12 +53,14 @@ async function ctDelete(ids) {
 }
 /* Lưu mới 1 hoặc nhiều công tác: trả {ok, rows} của server */
 async function ctSave(data) {
+  ctGate('create')
   const r = await api.ctSave(data)
   await ctReload()
   return r
 }
 /* Sửa 1 công tác: thay bản trong cache bằng bản server trả (duyệt luôn bị reset phía server) */
 async function ctUpdate(id, patch) {
+  ctGate('edit')
   const out = await api.ctUpdate(id, patch)
   if (out) setState(s => ({ congTac: s.congTac.map(c => (c.id === id ? { ...c, ...out } : c)) }))
   return out

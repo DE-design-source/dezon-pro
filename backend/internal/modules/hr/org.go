@@ -15,7 +15,10 @@ import (
 // deleteMembers -> members (thêm / sửa kiêm nhiệm) -> deleteUnits. Sau cùng kiểm cây đơn vị không có vòng và
 // tổng kiêm nhiệm của mỗi người <= 90%. Lỗi ở bước nào thì không ghi gì.
 func (s *Service) SaveOrg(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	x, err := s.gateAll(ctx, a, "employees", "edit")
+	x, err := s.gate(ctx, a, "", "")
+	if err == nil {
+		err = x.needAt("employees", "org", "edit") // Sơ đồ tổ chức: vai trò HR theo Hồ sơ nhân sự, phân quyền 3 cấp theo tab org
+	}
 	if err != nil {
 		return nil, err
 	}

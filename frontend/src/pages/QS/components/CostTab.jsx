@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useQs } from '../state/QsData'
+import { useQsCan } from '../state/qsAccess'
 import { useLinesSheet } from '../state/useLinesSheet'
 import SheetBody from './breakdown/SheetBody'
 import { useTkCols, setColW } from './breakdown/sheet/tkCols'
@@ -48,6 +49,9 @@ export default function CostTab() {
   const qs = useQs()
   const { cur, lines, products, projects, projData, setProjData, hmNode, setHmNode, mutate, toast, confirm, ask, navigate, selectProject, status } = qs
   const visible = qs.panelVisible(TAB)
+  /* Phân quyền N21: QS > Chi phí > Sửa / Xuất / Xoá dòng; thêm dòng theo QS > Bóc tách (state/qsGuard.js, lineTab) */
+  const qsCan = useQsCan()
+  const canE = qsCan(TAB, 'edit'), canX = qsCan(TAB, 'export')
   const seq = qs.visibleSeq(TAB)
   const facade = useLinesSheet({ hm: hmNode })
   const colSet = useColSet('cp')
@@ -112,7 +116,10 @@ export default function CostTab() {
   const columns = useMemo(() => sheetColumns(colSet.order, colSet.cols, tkCols.w, sort.key, sort.dir), [colSet, tkCols.w, sort])
   const hiddenCols = useMemo(() => new Set(CP_KEYS.filter(k => !colSet.cols[k])), [colSet.cols])
   const onHiddenCols = useCallback(set => { const m = {}; CP_KEYS.forEach(k => { m[k] = !set.has(k) }); setColsMap('cp', m) }, [])
-  const adapter = useMemo(() => lineAdapter(r => { const p = spOfLine_(r, products); return !!(p && p.yeuThich) }), [products])
+  const adapter = useMemo(() => {
+    const a = lineAdapter(r => { const p = spOfLine_(r, products); return !!(p && p.yeuThich) })
+    return canE ? a : { ...a, editable: () => false }
+  }, [products, canE])
   const flatOf = useCallback(pred => (rows.length ? cpFlatten(pred ? rows.filter(l => pred(l, '')) : rows, by, firstKey, closed, minBien, plain) : []), [rows, by, firstKey, closed, minBien, plain])
   const flatten = useCallback((gs, pred) => flatOf(pred), [flatOf])
   const tickSet = useMemo(() => new Set(ticks), [ticks])
@@ -217,10 +224,10 @@ export default function CostTab() {
         onMouseDown={e => e.preventDefault()} onClick={() => setPop(p => (p && p.kind === 'recent' ? null : { kind: 'recent', anchor: recentBtn.current }))}>
         <Icon name="clock" size={18} />
       </button>
-      <button className="qs-bd-tb-btn badged" title={giaLech.length ? (giaLech.length + ' dòng đang lệch giá so với Danh sách sản phẩm — bấm để cập nhật') : 'Cập nhật giá dòng theo Danh sách sản phẩm (đang khớp hết)'}
+      {canE && <button className="qs-bd-tb-btn badged" title={giaLech.length ? (giaLech.length + ' dòng đang lệch giá so với Danh sách sản phẩm — bấm để cập nhật') : 'Cập nhật giá dòng theo Danh sách sản phẩm (đang khớp hết)'}
         onMouseDown={e => e.preventDefault()} onClick={openGiaSync}>
         <Icon name="refresh" size={18} />{giaLech.length ? <span className="qs-bd-tb-badge">{giaLech.length}</span> : null}
-      </button>
+      </button>}
     </>
   )
   const flashTo = id => setFlash(f => ({ rowId: id, text: null, mark: true, n: (f ? f.n : 0) + 1 }))
@@ -348,15 +355,15 @@ export default function CostTab() {
               <span className="qs-cp-seg-l">Gom theo</span>
               {BY.map(x => <button key={x[0] || 'none'} className={by === x[0] ? 'on' : ''} onClick={() => setBy(x[0])}>{x[1]}</button>)}
             </div>
-            <button className="qs-ct-btn outline" title="Tính lại giá bán để đạt biên lợi nhuận mong muốn" onClick={bienMucTieu}><Icon name="target" size={14} />Biên mục tiêu…</button>
+            {canE && <button className="qs-ct-btn outline" title="Tính lại giá bán để đạt biên lợi nhuận mong muốn" onClick={bienMucTieu}><Icon name="target" size={14} />Biên mục tiêu…</button>}
             {soNhap > 1 && <button className="qs-ct-btn outline" title="So tổng tiền các bản nháp của dự án này" onClick={openCmp}><Icon name="layers" size={14} />So sánh {soNhap} bản nháp</button>}
-            <button className="qs-ct-btn" disabled={xls} title="Bảng đang xem (đúng cột, lọc, cách gom) ra file Excel" onClick={xuatExcel}><Icon name="download" size={14} />Xuất Excel</button>
+            {canX && <button className="qs-ct-btn" disabled={xls} title="Bảng đang xem (đúng cột, lọc, cách gom) ra file Excel" onClick={xuatExcel}><Icon name="download" size={14} />Xuất Excel</button>}
           </div>
           {!colsOnBar && <div className="qs-ct-filters-cols">{colFrame(false)}</div>}
           </>}
         </div>
 
-        {lnBulkOn && (
+        {lnBulkOn && canE && (
           <div className="qs-card qs-cp-lnq">
             <span className="qs-cp-lnq-l"><Icon name="gauge" size={13} /> Đặt nhanh lợi nhuận</span>
             <div className="qs-cp-lnq-b">
@@ -382,11 +389,11 @@ export default function CostTab() {
             printTitle={(cur.ten || cur.maDA) + ' — Chi phí'}
             columns={columns} flatten={flatten} initialSel={INITIAL_SEL} rowClass={rowClass} onToggleGroupOverride={toggleGroup}
             footer={false}
-            adapter={adapter} wrapKey="wrap" hideTools={['import', 'csv']} extraTools={extraTools}
+            adapter={adapter} wrapKey="wrap" hideTools={canX ? ['import', 'csv'] : ['import', 'csv', 'export']} extraTools={extraTools}
             onInsertRow={e => (e.type === 'item' ? bocAct.insertRowBelow(e.r.lineId, e.r.nhom || hmNode || qs.node, '') : null)}
             onDuplicate={ids => bocAct.dupRows(ids)}
             onSort={(key, dir, label) => { setSort({ key, dir }); toast('Sắp xếp ' + (dir === 'asc' ? 'A → Z' : 'Z → A') + ' theo "' + label + '"') }}
-            onDownload={xuatExcel}
+            onDownload={() => canX && xuatExcel()}
             onSelItems={ids => setSelIds(ids)}
             onApplyEdits={(info, cells) => applyCells(info, cells, plain)}
             onReplaceAll={(fq, rep) => replaceAll(fq, rep, rows, keys)}
@@ -395,7 +402,7 @@ export default function CostTab() {
             onDeleteRows={ids => (ids.length ? mutate.deleteLines(ids, { confirm: true }) : toast('Chọn ô ở các dòng cần xoá'))}
             onColResize={setColW} onColMove={(from, to, before) => { if (from !== 'stt' && to !== 'stt') moveCol('cp', from, to, before) }}
             onColMenu={key => { if (key !== 'stt') cycleSort(key) }} colMarks={colMarks}
-            rowDrag={rowDrag} plainFmt={false}
+            rowDrag={canE ? rowDrag : undefined} plainFmt={false}
             renderCell={renderCell}
             gridClass={`qs-tk-grid qs-cp-grid${plain ? ' qs-tk-plain' : ''}`} emptyNode={emptyNode}
             colCount={{ shown: keys.length, total: CP_KEYS.length }}

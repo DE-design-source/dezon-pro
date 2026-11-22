@@ -15,6 +15,7 @@ import QrApprove from './components/QrApprove'
 import { loadKdRequests, saveKdRequests } from '../../services/kdRequestService'
 import { jumpToMessage, setOpenConversation, takeOpenTarget, useChat } from './state/chatStore'
 import { JOIN_TOKEN_KEY, joinTokenFromPath } from './state/chatLogic'
+import { useAccess } from '../../services/accessService'
 
 /* Token link mời chờ tham gia (phiên chat chưa sẵn sàng: chờ tự đăng nhập bằng tài khoản Dezon Pro rồi quay lại) - sessionStorage của tab */
 function pendingJoin(v) {
@@ -60,7 +61,25 @@ function idFromHash(hash) {
   return m ? Number(m[1]) : null
 }
 
+/* Phân quyền 3 cấp (N21): chỉ chặn ở mức trang (module chat, tab main) */
 export default function Chat() {
+  const { can } = useAccess()
+  if (!can('chat', 'main')) {
+    return (
+      <div className="ch-page">
+        <div className="ch-main">
+          <div className="ch-empty">
+            <div className="ch-empty-title">Không có quyền truy cập</div>
+            <div className="ch-empty-text">Tài khoản chưa được cấp quyền dùng Chat. Nhờ quản trị viên cấp quyền.</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  return <ChatPage />
+}
+
+function ChatPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const chat = useChat()

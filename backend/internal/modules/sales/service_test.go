@@ -30,9 +30,6 @@ type fakeRepo struct {
 
 func newFake() *fakeRepo { return &fakeRepo{leads: map[float64]*omap.Map{}, nextID: 1} }
 
-func (f *fakeRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
-	return omap.Of("tinh_nang", f.tinhNang), nil
-}
 func (f *fakeRepo) ListLeads(ctx context.Context) ([]*omap.Map, error) {
 	out := []*omap.Map{}
 	for i := float64(1); i < f.nextID; i++ {
@@ -126,7 +123,7 @@ func (d *fakeDelivery) DetachFromLead(ctx context.Context, leadID any, kind stri
 }
 
 func newSvc(f *fakeRepo, perms string) *Service {
-	s := New(Deps{Repo: f, Users: fakeUsers{perms}, UserFmt: fakeUsers{perms},
+	s := New(Deps{Repo: f, Users: fakeUsers{perms}, UserFmt: fakeUsers{perms}, Access: legacyAccess{perms: perms, tinhNang: f.tinhNang},
 		Lines:    fakeLines{"DA-1": {omap.Of("thanhTienBan", 1000.0, "thanhTienVon", 600.0), omap.Of("thanhTienBan", 500.0, "thanhTienVon", 300.0)}},
 		Projects: fakeProjects{"DA-1": true}})
 	s.now = func() time.Time { return time.Date(2026, 10, 28, 20, 0, 0, 0, time.UTC) } // 29/10 giờ VN
@@ -171,6 +168,54 @@ func TestQuyen(t *testing.T) {
 		if got := status(err); got != c.want {
 			t.Errorf("%s: status %d (%v), mong %d", c.name, got, err, c.want)
 		}
+	}
+}
+
+// Phân quyền 3 cấp (N21): nhân viên có dòng phân quyền riêng chỉ cho xem Kinh doanh -> đọc được, tạo / sửa / xoá bị chặn;
+// chưa nối Access -> chỉ super vào được.
+func TestQuyenTheoThaoTac(t *testing.T) {
+	f := newFake()
+	s := newSvc(f, "kinhdoanh")
+	s.access = legacyAccess{perms: "kinhdoanh", grant: omap.Of("kinhdoanh", omap.Of("pipeline", []any{"view"}))}
+	ctx, a := ctxAs("user", "ct-1")
+	if _, err := s.ListLeads(ctx, a); err != nil {
+		t.Errorf("xem: %v", err)
+	}
+	if _, err := s.CreateLead(ctx, a, omap.Of("name", "A")); status(err) != 403 || err.Error() != "Tài khoản không có quyền thêm khách hàng ở Kinh doanh" {
+		t.Errorf("tạo khi chỉ có quyền xem phải 403: %v", err)
+	}
+	// ghi khách hàng theo tab: Pipeline hoặc bảng con Dự án (thêm thẻ / chuyển cột); xoá chỉ ở Pipeline; tab khác không tính
+	for _, c := range []struct {
+		tab               string
+		acts              []any
+		create, edit, del bool
+	}{
+		{"pipeline", []any{"view", "create", "edit", "delete"}, true, true, true},
+		{"design-board", []any{"view", "create", "edit", "delete"}, true, true, false},
+		{"construction-board", []any{"view", "edit"}, false, true, false},
+		{"tasks", []any{"view", "create", "edit", "delete"}, false, false, false},
+	} {
+		s.access = legacyAccess{grant: omap.Of("kinhdoanh", omap.Of(c.tab, c.acts))}
+		if err := s.allow(ctx, a, "create", tabsLeadWrite...); (err == nil) != c.create {
+			t.Errorf("%s: tạo %v", c.tab, err)
+		}
+		if err := s.allow(ctx, a, "edit", tabsLeadWrite...); (err == nil) != c.edit {
+			t.Errorf("%s: sửa %v", c.tab, err)
+		}
+		if err := s.allow(ctx, a, "delete", tabsLeadDelete...); (err == nil) != c.del {
+			t.Errorf("%s: xoá %v", c.tab, err)
+		}
+		if err := s.allow(ctx, a, "view"); err != nil {
+			t.Errorf("%s: xem %v", c.tab, err)
+		}
+	}
+	s.access = nil
+	if _, err := s.ListLeads(ctx, a); status(err) != 403 {
+		t.Errorf("thiếu Access phải 403: %v", err)
+	}
+	sctx, sa := ctxAs("super", "ct-1")
+	if _, err := s.ListLeads(sctx, sa); err != nil {
+		t.Errorf("super: %v", err)
 	}
 }
 
@@ -397,7 +442,7 @@ func TestCachLyCongTyDB(t *testing.T) {
 	svcOf := func(ct any) (*Service, context.Context, *actor.Actor) {
 		ctx, a := ctxAs("admin", ct)
 		a.UID, ctx = nil, tenant.With(context.Background(), tenant.Ctx{Role: "admin", CongTyID: ct})
-		return New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Lines: fakeLines{}, Projects: fakeProjects{}}), ctx, a
+		return New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Lines: fakeLines{}, Projects: fakeProjects{}, Access: legacyAccess{}}), ctx, a
 	}
 	sa, ctxA, aA := svcOf(cts[0].Val("id"))
 	sb, ctxB, aB := svcOf(cts[1].Val("id"))

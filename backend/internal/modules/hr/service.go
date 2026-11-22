@@ -6,7 +6,6 @@ package hr
 import (
 	"context"
 	"regexp"
-	"strings"
 	"time"
 
 	"qspro-backend/internal/config"
@@ -19,7 +18,7 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-// Tab = khoá quyền trong users.perms và cong_ty.tinh_nang (giao diện: WORK_TABS).
+// Tab = khoá module trong phân quyền 3 cấp (= khoá cũ trong users.perms và cong_ty.tinh_nang; giao diện: WORK_TABS).
 const Tab = "hr"
 
 var (
@@ -45,27 +44,27 @@ const (
 
 // Deps: do internal/server/routes.go truyền vào.
 type Deps struct {
-	DB      *database.DB
-	Cfg     *config.Config
-	Users   contracts.UserReader
-	UserFmt contracts.UserFormatter
+	DB     *database.DB
+	Cfg    *config.Config
+	Access contracts.AccessChecker // phân quyền 3 cấp (N21): quyền vào trang HR; nil = không ai ngoài super được vào
 }
 
 // Service: nghiệp vụ HR.
 type Service struct {
-	db      *database.DB
-	users   contracts.UserReader
-	userFmt contracts.UserFormatter
-	now     func() time.Time
-	prod    bool // NODE_ENV=production: tắt ResetData
+	db     *database.DB
+	access contracts.AccessChecker
+	now    func() time.Time
+	prod   bool // NODE_ENV=production: tắt ResetData
 }
 
 // New tạo service.
 func New(d Deps) *Service {
-	return &Service{db: d.DB, users: d.Users, userFmt: d.UserFmt, now: time.Now, prod: d.Cfg != nil && d.Cfg.NodeEnv == "production"}
+	return &Service{db: d.DB, access: d.Access, now: time.Now, prod: d.Cfg != nil && d.Cfg.NodeEnv == "production"}
 }
 
-// allow: giống canTab('hr') của giao diện (xem sales.allow).
+// allow: super phải "xem như" 1 công ty; còn lại hỏi phân quyền 3 cấp (N21, contracts.AccessChecker) quyền xem trang HR
+// (tab bất kỳ của module hr). Chưa có dòng phân quyền = như cũ (canTab('hr') của giao diện, xem sales.allow). Quyền chi tiết
+// trong HR vẫn theo ma trận vai trò HR riêng (gate).
 func (s *Service) allow(ctx context.Context, a *actor.Actor) error {
 	if a == nil {
 		return apperr.E(401, "Chưa đăng nhập", "NOAUTH")
@@ -80,43 +79,16 @@ func (s *Service) allow(ctx context.Context, a *actor.Actor) error {
 	if a.IsSuper() {
 		return nil
 	}
-	// NoScope: bảng companies không thuộc TenantTables; điều kiện id = công ty đang làm việc ghi ngay trong filter
-	cts, err := s.db.Select(ctx, "cong_ty", database.SelectOpt{Select: "tinh_nang", Filter: database.Eq("id", t), Limit: 1, NoScope: true})
-	if err != nil {
-		return err
-	}
-	if len(cts) > 0 && !coTinhNang(cts[0].Val("tinh_nang"), Tab) {
-		return apperr.Forbidden("Công ty chưa được cấp tính năng HR")
+	if s.access != nil {
+		ok, err := s.access.Can(ctx, a, Tab, "", "view")
+		if err != nil || ok {
+			return err
+		}
 	}
 	if a.IsAdmin() {
-		return nil
-	}
-	u, err := s.users.GetByID(ctx, a.UID)
-	if err != nil {
-		return err
-	}
-	if u != nil {
-		for _, p := range s.userFmt.PermsArr(u.Val("perms")) {
-			if p == Tab {
-				return nil
-			}
-		}
+		return apperr.Forbidden("Công ty chưa được cấp tính năng HR")
 	}
 	return apperr.Forbidden("Tài khoản không có quyền vào HR")
-}
-
-// coTinhNang = ctHasFeature_: danh sách tính năng rỗng = được mọi tab.
-func coTinhNang(v any, tab string) bool {
-	co := false
-	for _, x := range strings.Split(jsval.Str(v), ",") {
-		if x = jsval.Trim(x); x != "" {
-			if x == tab {
-				return true
-			}
-			co = true
-		}
-	}
-	return !co
 }
 
 func (s *Service) nowISO() string { return s.now().UTC().Format(time.RFC3339Nano) }

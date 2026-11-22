@@ -1,0 +1,839 @@
+{
+ "actions": [
+  {
+   "key": "view",
+   "label": "Xem"
+  },
+  {
+   "key": "create",
+   "label": "Tạo"
+  },
+  {
+   "key": "edit",
+   "label": "Sửa"
+  },
+  {
+   "key": "delete",
+   "label": "Xoá"
+  },
+  {
+   "key": "approve",
+   "label": "Duyệt"
+  },
+  {
+   "key": "export",
+   "label": "Xuất"
+  }
+ ],
+ "modules": [
+  {
+   "key": "newsfeed",
+   "label": "Newsfeed",
+   "tabs": [
+    {
+     "key": "tintuc",
+     "label": "Tin tức",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "nhiemvu",
+     "label": "Nhiệm vụ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "chat",
+   "label": "Chat",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Chat",
+     "actions": [
+      "view",
+      "create",
+      "delete"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "marketing",
+   "label": "Marketing",
+   "tabs": [
+    {
+     "key": "campaigns",
+     "label": "Chiến dịch",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "catalog",
+     "label": "Danh mục",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "quote",
+     "label": "Báo giá",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "tasks",
+     "label": "Nhiệm vụ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "staff",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    },
+    {
+     "key": "ads",
+     "label": "Chi tiêu quảng cáo",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "kinhdoanh",
+   "label": "Kinh doanh",
+   "tabs": [
+    {
+     "key": "overview",
+     "label": "Tổng quan",
+     "actions": [
+      "view",
+      "export"
+     ]
+    },
+    {
+     "key": "pipeline",
+     "label": "Pipeline khách hàng",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "design-board",
+     "label": "Dự án (Thiết kế)",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "construction-board",
+     "label": "Dự án (Thi công)",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "tasks",
+     "label": "Nhiệm vụ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "thietke",
+   "label": "Quản lý thiết kế",
+   "tabs": [
+    {
+     "key": "list",
+     "label": "Danh sách dự án",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "create",
+     "label": "Thiết lập thiết kế",
+     "actions": [
+      "view",
+      "create",
+      "edit"
+     ]
+    },
+    {
+     "key": "tiendo",
+     "label": "Tiến độ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhiemvu",
+     "label": "Nhiệm vụ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "thicong",
+   "label": "Quản lý dự án",
+   "tabs": [
+    {
+     "key": "list",
+     "label": "Danh sách dự án",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "create",
+     "label": "Thiết lập thi công",
+     "actions": [
+      "view",
+      "create",
+      "edit"
+     ]
+    },
+    {
+     "key": "tiendo",
+     "label": "Tiến độ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhiemvu",
+     "label": "Nhiệm vụ",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "hr",
+   "label": "HR",
+   "tabs": [
+    {
+     "key": "employees",
+     "label": "Hồ sơ nhân sự",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "org",
+     "label": "Sơ đồ tổ chức",
+     "actions": [
+      "view",
+      "edit",
+      "export"
+     ]
+    },
+    {
+     "key": "attendance",
+     "label": "Chấm công & phép",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "payroll",
+     "label": "Lương & bảo hiểm",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "recruit",
+     "label": "Tuyển dụng",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "performance",
+     "label": "Hiệu suất & đào tạo",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "security",
+     "label": "Phân quyền & bảo mật",
+     "actions": [
+      "view",
+      "edit",
+      "export"
+     ]
+    },
+    {
+     "key": "admin",
+     "label": "Hành chính",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "taichinh",
+   "label": "Tài chính",
+   "tabs": [
+    {
+     "key": "hanhchinh",
+     "label": "Hành chính",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Nhân sự",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "duan",
+     "label": "Dự án",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "kinhdoanh",
+     "label": "Kinh doanh",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "marketing",
+     "label": "Marketing",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "cocau",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "qs",
+   "label": "QS",
+   "tabs": [
+    {
+     "key": "dash",
+     "label": "Bảng điều khiển",
+     "actions": [
+      "view",
+      "export"
+     ]
+    },
+    {
+     "key": "boc",
+     "label": "Bóc tách",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "chiphi",
+     "label": "Chi phí",
+     "actions": [
+      "view",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "export",
+     "label": "Xuất báo giá",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "muahang",
+     "label": "Mua hàng",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "duan",
+     "label": "Dự án",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "sanpham",
+     "label": "Danh sách sản phẩm",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "import",
+     "label": "Nhập dữ liệu",
+     "actions": [
+      "view",
+      "create"
+     ]
+    },
+    {
+     "key": "dsduan",
+     "label": "Danh sách dự án",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "dsncc",
+     "label": "Nhà cung cấp",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "dsntk",
+     "label": "Đơn vị thiết kế",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "bim",
+   "label": "BIM",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Tổng quan",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "muahang",
+   "label": "Mua hàng",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Bảng điều khiển",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "sanxuat",
+   "label": "Sản xuất",
+   "tabs": [
+    {
+     "key": "tongquan",
+     "label": "Tổng quan",
+     "actions": [
+      "view",
+      "export"
+     ]
+    },
+    {
+     "key": "donsx",
+     "label": "Đơn sản xuất",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "quytrinh",
+     "label": "Quy trình",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    },
+    {
+     "key": "khovattu",
+     "label": "Kho vật tư",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhancong",
+     "label": "Nhân công",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "maymoc",
+     "label": "Máy móc",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "it",
+   "label": "IT",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Bảng điều khiển",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+     ]
+    },
+    {
+     "key": "thietbi",
+     "label": "Thiết bị & tài sản",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "rd",
+   "label": "R&D",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Tổng quan",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "export"
+     ]
+    },
+    {
+     "key": "nhansu",
+     "label": "Cơ cấu phòng ban",
+     "actions": [
+      "view",
+      "edit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "banlamviec",
+   "label": "Bàn làm việc",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Bàn làm việc",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "lich",
+   "label": "Lịch",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Lịch",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "wiki",
+   "label": "Wiki",
+   "tabs": [
+    {
+     "key": "main",
+     "label": "Wiki",
+     "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete"
+     ]
+    }
+   ]
+  }
+ ]
+}

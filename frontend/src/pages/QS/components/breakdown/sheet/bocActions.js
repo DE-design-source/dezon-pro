@@ -5,15 +5,16 @@
    setVat app.js:1950-1958 · addCustomGroup / delCustomGroup 1597-1612 · btXlsx_ bangtinh.js:928-939 · luuLoi_ sanpham.js:362-366. */
 import * as api from '../../../api/qsApi'
 import { downloadPost } from '../../../api/files'
-import {
-  getState, setState, addLine, updateLine, moveLine, reloadLines, updateProject, syncProj, newTmpId, isTmp, lineOf_,
-} from '../../../state/store'
+import { getState, setState, reloadLines, syncProj, newTmpId, isTmp, lineOf_ } from '../../../state/store'
+import { addLine, updateLine, moveLine, updateProject } from '../../../state/qsGuard'
+import { denyQs, lineTab } from '../../../state/qsAccess'
 import { projDataSet_ } from '../../../state/projData'
 import { qsToast as toast, qsConfirm, qsAsk } from '../../common/dialogs'
 import { addProdSame_, addProdBuild_, addProdSl_, addProdFloor_, giaDongTuSP_, tkFieldsFor_ } from '../../../lib/calc.js'
 import { nodeName, customGroups } from '../../../lib/tree.js'
 import { FR_FIELDS, tkSheetCo_, tkSheetLbl_ } from '../../../lib/columns.js'
 import { floorsList, CHUA_PHAN_TANG } from '../../../lib/sheetModel.js'
+import { spBocOk_, SP_CHUA_DUYET_BOC } from '../../../lib/catalogFilters.js'
 
 const cur = () => getState().cur
 let luuLoiAt = 0
@@ -31,6 +32,7 @@ const sheetExtra = (sheet, node) => ((sheet && tkSheetCo_(node)) ? { sheet } : n
 export async function addProdObj(p, opts = {}) {
   const S = getState()
   if (!S.cur) { toast('Chưa chọn dự án — bấm Tạo dự án +'); return null }
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return null }   // M14.6: SP chưa duyệt không vào bóc tách
   const sl = addProdSl_(opts.sl)
   const floor = addProdFloor_(opts.floor, '')
   const node = opts.node || S.node
@@ -54,12 +56,15 @@ export async function addProdObj(p, opts = {}) {
 /* Thêm cả combo: SP chính + các SP đi kèm (qbPickCombo_ boc.js:406-420, pdAddCombo_) */
 export async function addCombo(p, opts = {}) {
   if (!getState().cur) { toast('Chưa chọn dự án'); return }
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return }
   let list = []
   try { list = (await api.getCombo(String(p.recordId || p.ma))) || [] } catch (e) { list = [] }
+  const ok = list.filter(spBocOk_), bo = list.length - ok.length   // SP đi kèm chưa duyệt: bỏ qua, báo số đã bỏ
   await addProdObj(p, { ...opts, sl: 1 })
-  for (let k = 0; k < list.length; k++) await addProdObj(list[k], { ...opts, sl: Number(list[k].comboSL) || 1 })
-  toast(list.length ? ('Đã thêm combo "' + p.ten + '": sản phẩm chính + ' + list.length + ' sản phẩm đi kèm')
-    : ('Đã thêm "' + p.ten + '" — combo chưa khai báo sản phẩm đi kèm'))
+  for (let k = 0; k < ok.length; k++) await addProdObj(ok[k], { ...opts, sl: Number(ok[k].comboSL) || 1 })
+  const boTxt = bo ? (' · bỏ qua ' + bo + ' sản phẩm đi kèm chưa duyệt') : ''
+  toast((ok.length ? ('Đã thêm combo "' + p.ten + '": sản phẩm chính + ' + ok.length + ' sản phẩm đi kèm')
+    : ('Đã thêm "' + p.ten + '"' + (bo ? '' : ' — combo chưa khai báo sản phẩm đi kèm'))) + boTxt)
 }
 
 /* "Thêm hạng mục": 1 dòng trống vào tầng (addItemToFloor) */
@@ -185,6 +190,7 @@ export async function renameFloor(g, name) {
 /* VAT dự án (setVat): VAT Phần thô đi theo VAT dự án */
 export function setVat(v) {
   v = Number(v) || 0; const c = cur(); if (!c) return
+  if (denyQs(lineTab('edit', 'duan'), 'edit')) return
   syncProj({ ...c, vat: v })
   projDataSet_('ptVat', v)
   api.updateProject(c.maDA, { vat: v }).then(p => { if (p) { syncProj({ ...p, vat: v }) } })
@@ -195,6 +201,7 @@ export function setVat(v) {
    Báo giá cộng VAT theo % của từng hạng mục (lib/quote.js vatOf_ / bgVatParts_) */
 export function setVatHm(code, v) {
   const c = cur(); if (!c || !code) return
+  if (denyQs(lineTab('edit', 'duan'), 'edit')) return
   const m = { ...((getState().projData || {}).vatHm || {}) }
   const s = String(v == null ? '' : v).trim().replace(',', '.')
   const n = Number(s)
@@ -204,6 +211,7 @@ export function setVatHm(code, v) {
 
 /* ---- Chọn / tạo sản phẩm cho 1 dòng ---- */
 export async function pickProduct(lineId, p) {
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return }
   const g = giaDongTuSP_(p, getState().products)
   await updateLine(lineId, { ten: p.ten, thuongHieu: p.thuongHieu, ncc: p.ncc, maSP: p.ma, kichThuoc: p.kichThuoc, moTa: p.moTa, dvt: p.dvt || 'Cái',
     donGiaVon: g.donGiaVon, donGiaBan: g.donGiaBan, hinhAnh: p.hinhAnh, loai: p.hangMuc, chietKhau: g.chietKhau })
@@ -222,7 +230,9 @@ export async function createProductFromLine(lineId, form) {
     if (p) setState(s => ({ products: [...s.products, p] }))
     await updateLine(lineId, { ten, thuongHieu: payload.thuongHieu, ncc: payload.ncc, maSP: payload.ma, moTa: payload.moTa,
       kichThuoc: payload.kichThuoc, dvt: payload.dvt, donGiaVon: gia, donGiaBan: gia, hinhAnh: payload.hinhAnh })
-    toast('Đã lưu "' + ten + '" vào danh mục và điền vào dòng')
+    // SP mới tạo chưa duyệt (M14.6): dòng vẫn được điền, nhưng SP chỉ hiện ở danh mục Bóc tách sau khi duyệt
+    toast(p && spBocOk_(p) ? ('Đã lưu "' + ten + '" vào danh mục và điền vào dòng')
+      : 'Đã tạo sản phẩm — chờ duyệt mới hiện trong danh mục Bóc tách')
     return true
   } catch (e) {
     const msg = String((e && e.message) || '')

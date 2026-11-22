@@ -7,6 +7,10 @@
    ptMoveItem_ 2354-2367 · ptSelDel_ 1403-1411 · ptBulkEditRun_ 1460-1475 · ptFillDown_ 1516-1525 · ctFav_ 663-669 · ptExportXlsx sanpham.js:1309-1323 */
 import { getState } from '../../state/store'
 import { projDataSet_ } from '../../state/projData'
+import { denyQs, lineTab } from '../../state/qsAccess'
+
+/* Phân quyền N21: sửa bảng Phần thô theo thao tác Sửa của tab đang mở (thường QS > Bóc tách), tải Excel theo Xuất */
+const noEdit = () => denyQs(lineTab('edit'), 'edit')
 import { congTacActions } from '../../state/useCongTac'
 import { qsToast as toast, qsConfirm } from '../common/dialogs'
 import { downloadPost } from '../../api/files'
@@ -57,7 +61,7 @@ const clone = a => JSON.parse(JSON.stringify(a || []))
    như bản gốc dựng lại lưới (lịch sử của Jspreadsheet mất theo). */
 export function ptPersist(arr, keepHist) {
   const { maDA, ptVat } = ptNow()
-  if (!maDA) return
+  if (!maDA || noEdit()) return
   let v = Number(ptVat); if (!isFinite(v)) v = 0
   try { localStorage.setItem(ptKey(maDA), JSON.stringify(arr)); localStorage.setItem(ptKey(maDA) + '_vat', String(v)) } catch (e) { /* bỏ qua */ }
   projDataSet_('phanTho', arr); projDataSet_('ptVat', v)
@@ -66,7 +70,7 @@ export function ptPersist(arr, keepHist) {
 /* % VAT của bảng Phần thô (ô VAT trên thanh tiêu đề Bóc tách, như các đề mục khác) */
 export function ptSetVat(val) {
   const { maDA } = ptNow()
-  if (!maDA) return
+  if (!maDA || noEdit()) return
   let v = Number(String(val == null ? '' : val).replace(',', '.'))
   if (!isFinite(v) || v < 0) v = 0
   if (v > 100) v = 100
@@ -302,6 +306,7 @@ export function ptUndo(dir) {
 
 /* ═══ Thông tin công tác (panel chi tiết) ═══ dùng chung cả công ty (projData ptInfo lưu '__cty') */
 export function ptInfoSave(a, o, ptInfoKey) {
+  if (noEdit()) return
   const k = ptInfoKey(String(a[0]))
   const U = { ...ptInfoUser_(getState().projData) }
   if (!o.model && !o.anh && !o.ts && !o.gc && !o.pv && !o.tl) delete U[k]; else U[k] = o
@@ -322,6 +327,7 @@ export async function ctFavToggle(ctr) {
 /* Nút Excel của thanh bảng tính Phần thô = tải danh sách công tác (ptExportXlsx(false) -> spPTList_): bản gốc lọc theo ô tìm,
    bộ lọc công tác và khung nhìn của Danh sách SP (S._spFilters / #spSearch / S._ptView, dùng chung với tab đó) */
 export async function ptExportXlsx(tpl) {
+  if (denyQs(lineTab('export'), 'export')) return
   const U = getU()
   const rows = ptXlsRows_(spPTList_(spPTAllSp_(tpl, ptOvrAll_()), U.q, U.f, getP().view, ptNow().phanTho))
   if (!rows.length) { toast('Không có công tác nào để tải'); return }

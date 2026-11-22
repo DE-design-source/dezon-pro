@@ -13,7 +13,8 @@
      fmt -> projData.btFmt.
    Hoàn tác (D12): chỉ vá trường + đổi chỗ, theo dự án, tối đa 100 bước; thêm / xoá dòng không hoàn tác được. */
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { useQsStore, getState, updateLine, addLine, deleteLines, moveLine, reorderLines, histOf, setHist, lineOf_, toast, DEFAULT_NODE, histRunAddDel } from './store'
+import { useQsStore, getState, histOf, setHist, lineOf_, toast, DEFAULT_NODE } from './store'
+import { updateLine, addLine, deleteLines, moveLine, reorderLines, histRunAddDel } from './qsGuard'
 import { projDataSet_ } from './projData'
 import { tkFieldsFor_, editProfit_ } from '../lib/calc.js'
 import { nodeName } from '../lib/tree.js'

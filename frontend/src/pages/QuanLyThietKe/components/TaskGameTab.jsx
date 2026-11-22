@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { INITIAL_STEPS, LEADERBOARD, REWARDS, initials, medal } from '../../../data/quanLyThietKeData'
+import { useDelivery } from '../delivery'
 
 const GAME_TABS = [
   { key: 'overview', label: 'Tổng quan' },
@@ -87,6 +88,10 @@ function CreateTaskModal({ steps, onClose, onSubmit }) {
 }
 
 export default function TaskGameTab({ gtab, onGtabChange }) {
+  /* Phân quyền N21 (tab Nhiệm vụ): Tạo nhiệm vụ = create, đánh dấu hoàn thành = edit */
+  const dv = useDelivery()
+  const canCreate = dv.can('nhiemvu', 'create')
+  const canEdit = dv.can('nhiemvu', 'edit')
   const [steps, setSteps] = useState(INITIAL_STEPS)
   const [wallet, setWallet] = useState(1240)
   const [modalOpen, setModalOpen] = useState(false)
@@ -230,10 +235,10 @@ export default function TaskGameTab({ gtab, onGtabChange }) {
               <div style={{ width: `${missionPct}%`, height: '100%', borderRadius: 4, background: 'var(--game)' }} />
             </div>
           </div>
-          <button className="tk-create-task-btn" title="Tạo nhiệm vụ mới" onClick={() => setModalOpen(true)}>
+          {canCreate && <button className="tk-create-task-btn" title="Tạo nhiệm vụ mới" onClick={() => setModalOpen(true)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Tạo nhiệm vụ
-          </button>
+          </button>}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -266,8 +271,8 @@ export default function TaskGameTab({ gtab, onGtabChange }) {
                   {step.status !== 'locked' && step.subtasks.map((s, si) => (
                     <div key={si} className="tk-subtask-row">
                       <div
-                        className={`tk-subtask-chk${s.done ? ' checked' : ''}${isOpen ? '' : ' disabled'}`}
-                        onClick={isOpen ? () => checkSubtask(idx, si) : undefined}
+                        className={`tk-subtask-chk${s.done ? ' checked' : ''}${isOpen && canEdit ? '' : ' disabled'}`}
+                        onClick={isOpen && canEdit ? () => checkSubtask(idx, si) : undefined}
                       >
                         {s.done && <Svg size={12} sw={3} html={CHECK_ICON} />}
                       </div>
@@ -351,7 +356,7 @@ export default function TaskGameTab({ gtab, onGtabChange }) {
         </div>
       </div>
 
-      {modalOpen && <CreateTaskModal steps={steps} onClose={() => setModalOpen(false)} onSubmit={createTask} />}
+      {modalOpen && canCreate && <CreateTaskModal steps={steps} onClose={() => setModalOpen(false)} onSubmit={createTask} />}
     </>
   )
 }

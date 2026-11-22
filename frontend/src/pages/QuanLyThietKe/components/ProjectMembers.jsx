@@ -32,6 +32,9 @@ export function MembersProvider({ children }) {
     nameOf: project => (dv.projects.find(p => String(p.id) === String(project)) || {}).name || '',
     addMember: (project, member) => dv.addMember(project, member),
     removeMember: (project, idx) => { const m = membersOf(project)[idx]; if (m) dv.removeMember(project, m.id) },
+    canAdd: dv.canAddMember, // phân quyền N21: thêm = Tạo ở Danh sách dự án hoặc Thiết lập
+    canRemove: dv.canRemoveMember, // bớt = Xoá ở Danh sách dự án
+    canEdit: dv.canMembers, // mở được ô nhân sự (thêm hoặc bớt)
     addDept: () => {}, // bộ phận mới nằm trong sơ đồ tổ chức (lưu máy chủ) nên tự có trong danh sách sau khi lưu
     openPop,
     togglePop: (project, anchor) =>
@@ -63,7 +66,7 @@ function AvatarStack({ members, max }) {
 }
 
 export function ProjectMemberPopover({ project, presetDept }) {
-  const { depts, deptLabel, membersOf, nameOf, addMember, removeMember, closePop } = useMembers()
+  const { depts, deptLabel, membersOf, nameOf, addMember, removeMember, closePop, canAdd, canRemove } = useMembers()
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [dept, setDept] = useState(presetDept || depts[0].value)
@@ -84,18 +87,20 @@ export function ProjectMemberPopover({ project, presetDept }) {
           <span key={i} className="tk-pjm-chip">
             <span className="tk-pjm-avatar" style={{ background: avatarColor(m.name), marginRight: 0 }}>{initials(m.name)}</span>
             {m.name} <span style={{ opacity: 0.7 }}>· {deptLabel[m.dept] || 'Ban chỉ huy công trường'}</span>
-            <span style={{ cursor: 'pointer', color: 'var(--text-muted)', marginLeft: 2 }} onClick={() => removeMember(project, i)}>✕</span>
+            {canRemove && <span style={{ cursor: 'pointer', color: 'var(--text-muted)', marginLeft: 2 }} onClick={() => removeMember(project, i)}>✕</span>}
           </span>
         )) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Chưa có nhân sự</span>}
       </div>
-      <input type="text" placeholder="Họ tên" value={name} onChange={e => setName(e.target.value)} />
-      <input type="text" placeholder="Vai trò (VD: Kỹ sư, Đội thi công...)" value={role} onChange={e => setRole(e.target.value)} />
-      <select value={dept} onChange={e => setDept(e.target.value)}>
-        {depts.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-      </select>
+      {canAdd && <>
+        <input type="text" placeholder="Họ tên" value={name} onChange={e => setName(e.target.value)} />
+        <input type="text" placeholder="Vai trò (VD: Kỹ sư, Đội thi công...)" value={role} onChange={e => setRole(e.target.value)} />
+        <select value={dept} onChange={e => setDept(e.target.value)}>
+          {depts.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+        </select>
+      </>}
       <div className="tk-pjm-actions">
         <button className="tk-pjm-btn" onClick={closePop}>Đóng</button>
-        <button className="tk-pjm-btn primary" onClick={handleAdd}>Thêm nhân sự</button>
+        {canAdd && <button className="tk-pjm-btn primary" onClick={handleAdd}>Thêm nhân sự</button>}
       </div>
     </div>
   )
@@ -103,18 +108,18 @@ export function ProjectMemberPopover({ project, presetDept }) {
 
 /* Ô "Nhân sự" trong danh sách dự án & header chi tiết dự án */
 export function MemberCell({ project }) {
-  const { membersOf, openPop, togglePop } = useMembers()
+  const { membersOf, openPop, togglePop, canEdit } = useMembers()
   const isOpen = openPop && openPop.project === project && openPop.anchor === 'header'
   return (
     <div className="tk-member-cell">
       <AvatarStack members={membersOf(project)} max={3} />
-      <button
+      {canEdit && <button
         className="tk-pjm-add-btn"
         title="Thêm nhân sự"
         onClick={e => { e.stopPropagation(); togglePop(project, 'header') }}
       >
         <PlusIcon size={10} />
-      </button>
+      </button>}
       {isOpen && <ProjectMemberPopover project={project} presetDept={null} />}
     </div>
   )
@@ -122,19 +127,19 @@ export function MemberCell({ project }) {
 
 /* Avatar nhân sự theo phòng ban trên sơ đồ — popover được render riêng ở cuối node */
 export function FlowNodeMembers({ project, dept, style }) {
-  const { membersOf, deptLabel, togglePop } = useMembers()
+  const { membersOf, deptLabel, togglePop, canEdit } = useMembers()
   const all = membersOf(project)
   const members = AUTO_INCLUDE_DEPTS.includes(dept) ? all : all.filter(m => m.dept === dept)
   return (
     <div className="tk-flow-node-members" draggable="false" style={style}>
       <AvatarStack members={members} max={4} />
-      <button
+      {canEdit && <button
         className="tk-pjm-add-btn"
         title={`Thêm nhân sự vào ${deptLabel[dept] || dept}`}
         onClick={e => { e.stopPropagation(); togglePop(project, dept) }}
       >
         <PlusIcon size={9} />
-      </button>
+      </button>}
     </div>
   )
 }

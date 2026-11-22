@@ -1,4 +1,5 @@
 import PageShell from '../../components/layout/PageShell'
+import { useAccess } from '../../services/accessService'
 
 const tasks = [
   { name: 'Khởi động dự án', owner: 'Nguyễn A', start: '01/10', end: '05/10', pct: 100 },
@@ -27,7 +28,16 @@ function Bar({ pct }) {
   )
 }
 
+/* Phân quyền N21: xem Tiến độ của Quản lý dự án hoặc Bàn làm việc (giống quyền route /gantt trong data/navigation.js) */
 export default function Gantt() {
+  const { can } = useAccess()
+  if (!can('thicong', 'tiendo') && !can('banlamviec', 'main')) {
+    return (
+      <PageShell title="Gantt Chart" subtitle="Biểu đồ tiến độ dự án">
+        <div style={{ ...card, color: '#6b7280', fontSize: 14 }}>Tài khoản chưa được cấp quyền xem phần này. Nhờ quản trị viên cấp quyền.</div>
+      </PageShell>
+    )
+  }
   return (
     <PageShell title="Gantt Chart" subtitle="Biểu đồ tiến độ dự án">
       <div style={card}>

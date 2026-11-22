@@ -6,6 +6,7 @@ import ProductEditModal from '../edit/ProductEditModal'
 import ProductsPtMode from '../pt/index.jsx'
 import { useQs } from '../../../state/QsData'
 import { useQsStore, isAdminRole_, setState as setStore, getState } from '../../../state/store'
+import { useQsCan, denyQs, lineTab } from '../../../state/qsAccess'
 import { isAbort } from '../../../api/http'
 import * as api from '../../../api/qsApi'
 import { mediaUrl } from '../../../api/files'
@@ -74,8 +75,12 @@ export default function ProductList() {
   const ngCols = spColsNg_(ng)
   const sc = spColScope_(node)
   const isAdmin = isAdminRole_(me)
-  const canEdit = U.perm ? !!U.perm.edit : true
-  const canDuyet = U.perm ? !!U.perm.duyet : true
+  /* Phân quyền N21: QS > Danh sách sản phẩm > Thêm / Sửa / Xoá / Xuất (cùng quyền sửa cũ /product-permissions); duyệt SP theo M14.6 */
+  const qsCan = useQsCan()
+  const canEdit = (U.perm ? !!U.perm.edit : true) && qsCan('sanpham', 'edit')
+  const canAdd = qsCan('sanpham', 'create'), canDel = qsCan('sanpham', 'delete'), canX = qsCan('sanpham', 'export')
+  // Duyệt SẢN PHẨM theo phân cấp (M14.6): chỉ khi /product-approval-rights cho phép; chưa tải / lỗi = không được (fail closed)
+  const canDuyet = !!(U.perm && U.perm.duyetSp)
 
   const [panelHidden, setPanelHidden] = useState(spPanelHidden_)
   const [folded, setFolded] = useState(foldCols_)
@@ -104,7 +109,7 @@ export default function ProductList() {
   useEffect(() => {
     if (!visible) return undefined
     const ctl = new AbortController()
-    spLoadPerm_(ctl.signal).then(perm => setU({ perm }), e => { if (!isAbort(e)) setU({ perm: { edit: true, duyet: true } }) })
+    spLoadPerm_(ctl.signal).then(perm => setU({ perm }), e => { if (!isAbort(e)) setU({ perm: { edit: true, duyet: true, duyetSp: false, giaoDuyet: false } }) })
     return () => ctl.abort()
   }, [visible, seq])
 
@@ -473,11 +478,13 @@ export default function ProductList() {
     toast(on ? 'Sửa nhanh: gõ thẳng vào ô, rời ô là tự lưu' : 'Đã tắt chế độ sửa nhanh')
   }
   async function exportXlsx(keysIn) {
+    if (denyQs('sanpham', 'export')) return
     const keys = keysIn || (selKeys.length ? selKeys : full.map(spKey_).filter(Boolean))
     setXlsBusy(true)
     try { await spExportXlsx(keys) } finally { setXlsBusy(false) }
   }
   function editP(p, mode) {
+    if (denyQs('sanpham', mode === 'copy' || mode === 'variant' || mode === 'nbt' ? 'create' : 'edit')) return
     if (!p.ma) { toast('Sản phẩm chưa có mã — không cập nhật được'); return }
     setDlg({ kind: 'edit', p, mode: mode || 'edit' })
   }
@@ -513,6 +520,7 @@ export default function ProductList() {
   const [prog, setProg] = useState(null)
   const chay = async (t, fn) => { try { return await fn((i, n) => setProg({ t, i, n })) } finally { setProg(null) } }
   async function bulkDelete() {
+    if (denyQs('sanpham', 'delete')) return
     if (isAdmin) { if (await chay('Đang xoá sản phẩm', cb => spBulkDelete(selProds(), nSel, cb))) clearSel() }
     else if (await spBulkRequest(selKeys.filter(k => U.sel[k]))) clearSel()
   }
@@ -531,7 +539,7 @@ export default function ProductList() {
     duyet: p => spDuyet(p, !p.daDuyet),
     editP: p => editP(p),
     copy: (e, p) => { e.stopPropagation(); setPop({ kind: 'copy', anchor: e.currentTarget, p }) },
-    del: p => spDelete(p),
+    del: p => { if (!denyQs('sanpham', 'delete')) spDelete(p) },
     cbToggle, cbIsOpen: p => !!U.cbOpen[spKey_(p)], btToggle,
     colMenu: (c, a) => setPop(p => (p && p.kind === 'colmenu' && p.col.k === c.k ? null : { kind: 'colmenu', anchor: a, col: c })),
   }
@@ -674,12 +682,12 @@ export default function ProductList() {
                     {U.edit ? DONE_IC : EDIT_IC}<span className="t">{U.edit ? 'Xong' : 'Edit'}</span>
                   </button>
                 )}
-                <button type="button" className="qsc-btn qspl-sm" disabled={xlsBusy} onClick={() => exportXlsx()}
+                {canX && <button type="button" className="qsc-btn qspl-sm" disabled={xlsBusy} onClick={() => exportXlsx()}
                   title={nSel ? ('Tải ' + nSel + ' sản phẩm đã chọn ra Excel') : 'Tải toàn bộ danh sách đang lọc ra Excel'}>
                   {XLS_IC}<span className="t">{xlsLbl}</span>
-                </button>
+                </button>}
                 </div>
-                <button type="button" className="qspl-addbtn" title="Thêm sản phẩm" aria-label="Thêm sản phẩm" onClick={() => navigate('import')}><QsIcon name="plus" size={20} stroke={2.6} /></button>
+                {canAdd && <button type="button" className="qspl-addbtn" title="Thêm sản phẩm" aria-label="Thêm sản phẩm" onClick={() => navigate('import')}><QsIcon name="plus" size={20} stroke={2.6} /></button>}
               </div>
         </div>
       )}
@@ -771,7 +779,7 @@ export default function ProductList() {
               {specErr && <div className="qspl-note err">{specErr}: cột thông số của Thiết bị vệ sinh, Sơn nước, Công tắc - ổ cắm, Điện lạnh, Gạch ốp lát không hiện được.</div>}
               {showLayout === 'table' ? (
                 <SpTable cols={visCols} rows={pr.rows} w={w} sel={U.sel} edit={U.edit} sort={U.sort} wrapW={wrapW}
-                  skuCount={p => spSkuCount_(skuMap, p)} canEdit={canEdit} canDuyet={canDuyet} isAdmin={isAdmin} on={tableOn} />
+                  skuCount={p => spSkuCount_(skuMap, p)} canEdit={canEdit} canDuyet={canDuyet} isAdmin={isAdmin && canDel} on={tableOn} />
               ) : (
                 <SpCards layout={showLayout} cols={visCols} rows={pr.rows} sel={U.sel}
                   skuCount={p => spSkuCount_(skuMap, p)} canDuyet={canDuyet} on={tableOn} />
@@ -805,12 +813,12 @@ export default function ProductList() {
           <div className="qspl-bbar">
             <div className="qspl-bb-count"><b>{nSel}</b><span>sản phẩm đã chọn</span><button type="button" className="qspl-bb-x" title="Bỏ chọn (Esc)" onClick={clearSel}>✕</button></div>
             <div className="qspl-bb-sep" />
-            <button type="button" className="qspl-bb-b primary" onClick={bulkToProject}><QsIcon name="plus" size={15} /> Thêm vào dự án</button>
+            {qsCan(lineTab('create'), 'create') && <button type="button" className="qspl-bb-b primary" onClick={bulkToProject}><QsIcon name="plus" size={15} /> Thêm vào dự án</button>}
             <button type="button" className="qspl-bb-b" onClick={() => spFavBulk(selProds(), 1)} title="Lưu vào danh sách yêu thích"><QsIcon name="star" size={15} /> Yêu thích</button>
             {canDuyet && <button type="button" className="qspl-bb-b" onClick={() => spDuyetBulk(selNhom(), 1)} title="Đánh dấu Đã duyệt"><QsIcon name="check" size={15} /> Duyệt</button>}
-            <button type="button" className="qspl-bb-b" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbedit' ? null : { kind: 'bbedit', anchor: a })) }} title="Đổi một trường cho tất cả dòng đã chọn">
+            {canEdit && <button type="button" className="qspl-bb-b" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbedit' ? null : { kind: 'bbedit', anchor: a })) }} title="Đổi một trường cho tất cả dòng đã chọn">
               <QsIcon name="edit" size={15} /> Sửa hàng loạt <i className="car">▾</i>
-            </button>
+            </button>}
             <div className="qspl-bb-sep" />
             <button type="button" className="qspl-bb-ic" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbmore' ? null : { kind: 'bbmore', anchor: a })) }} title="Thao tác khác">⋯</button>
           </div>
@@ -849,7 +857,7 @@ export default function ProductList() {
       )}
       {pop && pop.kind === 'bbmore' && nSel > 0 && (
         <MorePop anchor={pop.anchor} n={nSel} canDuyet={canDuyet} isAdmin={isAdmin} onClose={() => setPop(null)}
-          onXlsx={() => exportXlsx(selKeys)} onUnduyet={() => spDuyetBulk(selNhom(), 0)} onUnfav={() => spFavBulk(selProds(), 0)} onDelete={bulkDelete} />
+          onXlsx={canX ? () => exportXlsx(selKeys) : null} onUnduyet={() => spDuyetBulk(selNhom(), 0)} onUnfav={() => spFavBulk(selProds(), 0)} onDelete={canDel ? bulkDelete : null} />
       )}
       {pop && pop.kind === 'copy' && (
         <CopyMenu anchor={pop.anchor} p={pop.p} onClose={() => setPop(null)}

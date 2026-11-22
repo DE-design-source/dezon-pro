@@ -19,6 +19,7 @@ import { useQsSession } from '../session/QsSession'
 import { qsAlert } from './common/dialogs'
 import { larkLbl_, larkCls_ } from './admin/adminUtil'
 import * as api from '../api/qsApi'
+import { useQsCan, denyQs } from '../state/qsAccess'
 import { isAbort } from '../api/http'
 import { downloadPost } from '../api/files'
 import { money, pad2, fmtDate, spNorm_ } from '../lib/format'
@@ -49,6 +50,10 @@ export default function PurchaseTab() {
   const ma = cur ? cur.maDA : ''
   const visible = panelVisible(TAB)
   const visN = visibleSeq(TAB)
+  /* Phân quyền N21: QS > Mua hàng > Thêm (gửi đơn / đề xuất, thêm dòng) / Sửa (%, VAT, chuyển bước đơn) / Xuất (Excel đơn) */
+  const qsCan = useQsCan()
+  const canC = qsCan(TAB, 'create'), canE = qsCan(TAB, 'edit'), canX = qsCan(TAB, 'export')
+  const deny = a => denyQs(TAB, a)
 
   const { info, sel, payOpen } = useMhMemo()
   const [need, setNeed] = useState({})
@@ -146,7 +151,7 @@ export default function PurchaseTab() {
      thao tác sửa thì tính lại trên dữ liệu thật trước (payEdit) rồi mới lưu. */
   const payView = (ncc, tot) => mhPayTinh_(JSON.parse(JSON.stringify(payAll()[ncc] || mhPayDefault_())), tot)
   const payEdit = (ncc, tot) => mhPayTinh_(payOf(ncc), tot)
-  const paySave = () => { const a = payAll(); setProjData('mhPay', a); payLsSet_(mhPayKey_(ma), a); setPayTick(t => t + 1) }
+  const paySave = () => { if (deny('edit')) return; const a = payAll(); setProjData('mhPay', a); payLsSet_(mhPayKey_(ma), a); setPayTick(t => t + 1) }
 
   if (!cur) {
     return (
@@ -161,7 +166,7 @@ export default function PurchaseTab() {
   const vatPct = Number(cur.vat) || 0
   /* phần sửa tay theo NCC (nút Edit trên thẻ): hàng thêm tay nằm trong nhóm -> tính vào tổng / thanh toán / đơn gửi */
   const mhEx = (projData && projData.mhExtra) || {}
-  const exSave = (ncc, patch) => setProjData('mhExtra', { ...mhEx, [ncc]: { ...mhExOf_(mhEx, ncc), ...patch } })
+  const exSave = (ncc, patch) => !deny('edit') && setProjData('mhExtra', { ...mhEx, [ncc]: { ...mhExOf_(mhEx, ncc), ...patch } })
   const groups = mhGroups_(mlines).map(g => mhWithEx_(g, mhEx))
   /* VAT riêng từng NCC (mhExtra[ncc].vat, ô VAT trên thẻ NCC); chưa đặt thì theo VAT dự án */
   const vatOf = g => { const v = mhExOf_(mhEx, g.ncc).vat; return v != null && v !== '' ? Number(v) || 0 : vatPct }
@@ -236,6 +241,7 @@ export default function PurchaseTab() {
 
   /* VAT của dự án (pgSetVat_ -> setVat, PUB/app.js:1950-1958): VAT phần thô đi theo */
   const setVat = async v => {
+    if (deny('edit')) return
     v = Number(v) || 0
     mutate.syncProj({ ...cur, vat: v })
     setProjData('ptVat', v)
@@ -271,17 +277,18 @@ export default function PurchaseTab() {
     setBusyK(key, false)
   }
   const send = g => {
-    if (!validate()) return
+    if (deny('create') || !validate()) return
     sendOrders([g], 'send:' + g.ncc, '✔ Đã gửi yêu cầu mua hàng tới "' + g.ncc + '"')
   }
   const sendBulk = () => {
+    if (deny('create')) return
     const chon = groups.filter(g => mhOn_(sel, g.ncc))
     if (!chon.length) { toast('Chưa chọn nhà cung cấp nào'); return }
     if (!validate()) return
     sendOrders(chon, 'bulk', '✔ Đã gửi yêu cầu hàng loạt tới ' + chon.length + ' nhà cung cấp')
   }
   const sendDx = async g => {
-    if (!validate()) return
+    if (deny('create') || !validate()) return
     g = mhNoEx_(g)   // đề xuất chiết khấu chỉ cho dòng bóc tách, không gồm hàng thêm tay
     if (!await confirm(mhDxConfirm_(g))) return
     const key = 'dx:' + g.ncc
@@ -294,7 +301,7 @@ export default function PurchaseTab() {
     setBusyK(key, false)
   }
   const sendPay = async g => {
-    if (!validate()) return
+    if (deny('create') || !validate()) return
     const r = mhPayPayload_(base(), g, vatOf(g), payOf(g.ncc))
     if (r.msg) { toast(r.msg); return }
     if (r.lech && !await confirm('Tổng đề xuất (' + money(r.sum) + ' đ) chưa khớp giá trị đơn (' + money(r.tot) + ' đ). Vẫn gửi?')) return
@@ -310,6 +317,7 @@ export default function PurchaseTab() {
 
   /* ---------- Đơn đã gửi: chuyển bước / Excel (mhDonBuoc_ / mhDonXls_) ---------- */
   const donBuoc = async (d, st) => {
+    if (deny('edit')) return
     if (!await confirm('Chuyển đơn ' + d.maDon + ' (' + d.ncc + ') sang "' + st + '"?')) return
     const key = 'buoc:' + d.maDon
     setBusyK(key, true)
@@ -321,6 +329,7 @@ export default function PurchaseTab() {
     setBusyK(key, false)
   }
   const donXls = async d => {
+    if (deny('export')) return
     const key = 'xls:' + d.maDon
     setBusyK(key, true)
     try {
@@ -416,8 +425,8 @@ export default function PurchaseTab() {
               onPayAdd={() => { const tot = mhTot_(g.items, vatOf(g)); mhPayAdd_(payEdit(g.ncc, tot), tot); paySave() }}
               onPayDel={i => { const arr = payEdit(g.ncc, mhTot_(g.items, vatOf(g))); if (arr.length <= 1) { toast('Cần ít nhất 1 đợt'); return } arr.splice(i, 1); paySave() }}
               onPayChia={k => { payAll()[g.ncc] = mhPayChia_(mhTot_(g.items, vatOf(g)), k); paySave() }}
-              onPaySend={() => sendPay(g)} busy={busy}
-              onSend={() => send(g)} onSendDx={() => sendDx(g)} onMh={setMh} onAddRow={() => setAddFor(g)}
+              onPaySend={() => sendPay(g)} busy={busy} canSend={canC}
+              onSend={() => send(g)} onSendDx={() => sendDx(g)} onMh={setMh} onAddRow={canC ? () => setAddFor(g) : null}
               ex={mhExOf_(mhEx, g.ncc)} onEx={p => exSave(g.ncc, p)} />
           ))}
           {!groups.length && (
@@ -453,9 +462,9 @@ export default function PurchaseTab() {
               <label><span>Ghi chú</span><textarea rows={2} value={info.ghiChu || ''} onChange={e => setInfo('ghiChu', e.target.value)} placeholder="Ghi chú cho đơn…" /></label>
             </div>
             <div className="qs-po-grand"><span>Tổng cộng (VAT)</span><b>{money(head.grand)}</b></div>
-            <button type="button" className="qs-po-send wide" disabled={!groups.length || !!busy.bulk} onClick={sendBulk}>
+            {canC && <button type="button" className="qs-po-send wide" disabled={!groups.length || !!busy.bulk} onClick={sendBulk}>
               <Icon name="cart" size={14} />{busy.bulk ? 'Đang gửi…' : 'Gửi ' + head.nccChon + ' đơn đã chọn'}
-            </button>
+            </button>}
           </div>
 
           <div className="qs-card qs-po-box">
@@ -477,8 +486,8 @@ export default function PurchaseTab() {
                       {d.nguoiDuyet ? <span className="qs-po-duyet">{(d.trangThai === 'Từ chối' ? 'Từ chối bởi ' : 'Duyệt bởi ') + d.nguoiDuyet + (d.ngayDuyet ? ' · ' + fmtDateTime_(d.ngayDuyet) : '')}</span> : null}
                     </div>
                     <div className="qs-po-order-act">
-                      {buoc && <button type="button" className="qs-qt-btn" disabled={!!busy['buoc:' + d.maDon]} onClick={() => donBuoc(d, buoc)}><Icon name="check" size={12} />{buoc}</button>}
-                      <button type="button" className="qs-qt-btn" disabled={!!busy['xls:' + d.maDon]} onClick={() => donXls(d)}><Icon name="download" size={12} />Excel</button>
+                      {buoc && canE && <button type="button" className="qs-qt-btn" disabled={!!busy['buoc:' + d.maDon]} onClick={() => donBuoc(d, buoc)}><Icon name="check" size={12} />{buoc}</button>}
+                      {canX && <button type="button" className="qs-qt-btn" disabled={!!busy['xls:' + d.maDon]} onClick={() => donXls(d)}><Icon name="download" size={12} />Excel</button>}
                     </div>
                   </div>
                 )
@@ -556,7 +565,7 @@ function VatSelfInput({ onPick }) {
    Nút Edit (phòng mua hàng): bật chế độ sửa thẻ - thêm hàng tay (tên · ĐVT · SL · đơn giá · ghi chú; cộng vào tổng + gửi kèm đơn),
    thêm / đổi tên / xoá cột tự đặt (nhập chữ từng dòng; gửi kèm đơn trong ô khu vực), ghi chú riêng cho NCC. Lưu ở projData.mhExtra[ncc] (ex / onEx). */
 function SupplierCard({ g, gi, vatPct, projVat, onVat, on, dons, onToggle, onProd, onDisc, onDiscAll, onDx, onDxAll, pay, payOpen, onPayToggle,
-  onPaySet, onPayAdd, onPayDel, onPayChia, onPaySend, busy, onSend, onSendDx, ex, onEx, onMh, onAddRow }) {
+  onPaySet, onPayAdd, onPayDel, onPayChia, onPaySend, busy, onSend, onSendDx, ex, onEx, onMh, onAddRow, canSend = true }) {
   const ncc = g.ncc, items = g.items
   const [edit, setEdit] = useState(false)
   const [vatPop, setVatPop] = useState(null)   // danh sách xổ % VAT (10 / 8 / 5 / 0)
@@ -689,7 +698,7 @@ function SupplierCard({ g, gi, vatPct, projVat, onVat, on, dons, onToggle, onPro
           )}
         </tbody>
         <tfoot>
-          <tr><td colSpan={nAll} className="qs-po-addrow"><button type="button" onClick={onAddRow}><Icon name="plus" size={13} /> Thêm dòng</button></td></tr>
+          {onAddRow && <tr><td colSpan={nAll} className="qs-po-addrow"><button type="button" onClick={onAddRow}><Icon name="plus" size={13} /> Thêm dòng</button></td></tr>}
           <tr><td colSpan={nAll - 3} className="r">Tổng (chưa VAT)</td><td className="r">{money(sub)}</td><td colSpan={2} /></tr>
           {/* VAT riêng của NCC: ô tự nhập % + nút ▾ xổ danh sách 10 / 8 / 5 / 0%; chưa đặt = theo VAT dự án */}
           <tr className="vat">
@@ -732,15 +741,15 @@ function SupplierCard({ g, gi, vatPct, projVat, onVat, on, dons, onToggle, onPro
         </div>
       )}
       <PaymentPlan arr={pay.arr} tot={pay.tot} open={payOpen} busy={!!busy['pay:' + ncc]} onToggle={onPayToggle}
-        onSet={onPaySet} onAdd={onPayAdd} onDel={onPayDel} onChia={onPayChia} onSend={onPaySend} />
+        onSet={onPaySet} onAdd={onPayAdd} onDel={onPayDel} onChia={onPayChia} onSend={canSend ? onPaySend : null} />
       <div className="qs-po-card-foot">
-        {mhDxSum_(items) > 0 && (
+        {canSend && mhDxSum_(items) > 0 && (
           <button type="button" className="qs-po-amber" disabled={!!busy['dx:' + ncc]} title="Gửi mức chiết khấu phòng mua hàng đề xuất cho nhà cung cấp" onClick={onSendDx}>
             <Icon name="gauge" size={15} />{busy['dx:' + ncc] ? 'Đang gửi…' : 'Gửi yêu cầu chiết khấu đề xuất'}
           </button>
         )}
         <span style={{ flex: 1 }} />
-        <button type="button" className="qs-po-send" disabled={!!busy['send:' + ncc]} onClick={onSend}><Icon name="cart" size={14} />{busy['send:' + ncc] ? 'Đang gửi…' : 'Gửi mua hàng NCC này'}</button>
+        {canSend && <button type="button" className="qs-po-send" disabled={!!busy['send:' + ncc]} onClick={onSend}><Icon name="cart" size={14} />{busy['send:' + ncc] ? 'Đang gửi…' : 'Gửi mua hàng NCC này'}</button>}
       </div>
     </div>
   )

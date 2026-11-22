@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './TaiChinh.css'
 import { useTheme } from '../../hooks/useTheme'
 import { FIN_CATEGORIES, FIN_PROJECTS, FIN_RANGES } from '../../data/taiChinhData'
@@ -8,6 +8,7 @@ import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { TC_COCAU } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 
 export default function TaiChinh() {
   const { theme, toggleTheme } = useTheme()
@@ -24,7 +25,12 @@ export default function TaiChinh() {
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/tai-chinh')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module taichinh: danh mục chi phí + cocau)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/tai-chinh')
+  const noViewKey = FIN_CATEGORIES.map(c => c.key).concat(TC_COCAU).filter(k => !can('taichinh', k)).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
+  const noTab = !!noViewKey && noViewKey.split(',').length === FIN_CATEGORIES.length + 1
   useTabFallback(tabHidden, pageTab === 'nhansu' ? TC_COCAU : category, FIN_CATEGORIES.map(c => c.key).concat(TC_COCAU),
     k => { if (k === TC_COCAU) setPageTab('nhansu'); else { setCategory(k); setPageTab('main') } })
 
@@ -55,7 +61,8 @@ export default function TaiChinh() {
       </div>
 
 
-      <div className="tc-scroll" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
+      {noTab && <div className="tc-scroll"><span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem trang Tài chính. Nhờ quản trị viên cấp quyền.</span></div>}
+      <div className="tc-scroll" style={pageTab === 'nhansu' || !can('taichinh', category) ? { display: 'none' } : undefined}>
         <div className="tc-filter-bar">
           <div className="tc-filter-group">
             <span className="tc-filter-label">Dự án:</span>
@@ -94,7 +101,7 @@ export default function TaiChinh() {
         </div>
       </div>
 
-      {pageTab === 'nhansu' && (
+      {pageTab === 'nhansu' && can('taichinh', TC_COCAU) && (
         <div className="tc-scroll">
           <DeptStaff units={['tckt']} />
         </div>

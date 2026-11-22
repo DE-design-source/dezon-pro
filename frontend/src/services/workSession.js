@@ -10,6 +10,8 @@ import { cacheClear } from '../pages/QS/state/bootCache'
 import * as qsApi from '../pages/QS/api/qsApi'
 import * as qsStore from '../pages/QS/state/store'
 import { loadSysDefaults } from './systemDefaultsService'
+// vòng import với accessService chỉ dùng lúc gọi hàm (không dùng khi nạp module)
+import { viewFor, subscribeAccess, accessSnap } from './accessService'
 
 let S = { auth: apiConfigured() ? 'checking' : 'unconfigured', me: null, congTy: null, error: '' }
 const subs = new Set()
@@ -128,9 +130,15 @@ export async function saveProfile(fields) {
 }
 export const changePassword = (oldPw, newPw) => qsApi.changePassword(oldPw, newPw)
 
-/* Giống canTab của QS (state/store.js): tính năng công ty (rỗng = mọi tab), admin/super được hết, nhân viên cần perms.
-   Super chỉ thấy dữ liệu khi đang "xem như" 1 công ty (hoặc có công ty) */
+/* Quyền xem 1 phần nghiệp vụ (khoá module kinhdoanh / thietke / thicong / hr..., hoặc khoá tab QS).
+   Phân quyền 3 cấp (N21) đã nạp xong -> theo quyền thực (accessService.viewFor); chưa nạp / lỗi / super -> legacyCanTab */
 export function canTab(tab, me = S.me, congTy = S.congTy) {
+  const v = viewFor(me, tab, 'page')
+  return v === null ? legacyCanTab(tab, me, congTy) : v
+}
+/* Cách cũ, giống canTab của QS (state/store.js): tính năng công ty (rỗng = mọi tab), admin/super được hết, nhân viên cần perms.
+   Super chỉ thấy dữ liệu khi đang "xem như" 1 công ty (hoặc có công ty) */
+export function legacyCanTab(tab, me = S.me, congTy = S.congTy) {
   if (!me) return false
   if (me.role === 'super') return !!readViewAs() || !!me.congTyId
   const f = (congTy && congTy.tinhNang) || []
@@ -142,13 +150,21 @@ export function canTab(tab, me = S.me, congTy = S.congTy) {
 /* Tính năng công ty (CT_FEATURES = tab QS + trang nghiệp vụ): công ty tắt thì không ai thấy; các trang còn lại (PAGE_TABS) không bị khoá theo công ty */
 const FEATURE_KEYS = new Set(qsStore.PERM_TABS.concat(qsStore.WORK_TABS).map(x => x[0]))
 /* Quyền HIỆN 1 trang trên thanh bên / vào được route (data/navigation.js perm). Super thấy mọi trang
-   (trang dữ liệu vẫn cần "Xem như công ty", WorkGate kiểm canTab). perm 'qs' = được ít nhất 1 tab QS. Mảng = được 1 trong số đó */
+   (trang dữ liệu vẫn cần "Xem như công ty", WorkGate kiểm canTab). perm 'qs' = được ít nhất 1 tab QS. Mảng = được 1 trong số đó.
+   Phân quyền 3 cấp (N21) đã nạp xong -> được xem ít nhất 1 tab của module (perm = khoá module); chưa nạp / lỗi -> legacyCanPage */
 export function canPage(perm, me = S.me, congTy = S.congTy) {
   if (!me) return false
   if (!perm) return true
   if (Array.isArray(perm)) return perm.some(p => canPage(p, me, congTy))
+  const v = viewFor(me, perm, 'page')
+  return v === null ? legacyCanPage(perm, me, congTy) : v
+}
+export function legacyCanPage(perm, me = S.me, congTy = S.congTy) {
+  if (!me) return false
+  if (!perm) return true
+  if (Array.isArray(perm)) return perm.some(p => legacyCanPage(p, me, congTy))
   if (me.role === 'super') return true
-  if (perm === 'qs') return qsStore.PERM_TABS.some(x => qsStore.canTab(x[0], me, congTy))
+  if (perm === 'qs') return qsStore.PERM_TABS.some(x => qsStore.legacyCanTab(x[0], me, congTy))
   const f = (congTy && congTy.tinhNang) || []
   if (FEATURE_KEYS.has(perm) && f.length && f.indexOf(perm) < 0) return false
   if (me.role === 'admin') return true
@@ -159,6 +175,7 @@ const subscribe = f => { subs.add(f); start(); return () => subs.delete(f) }
 const snap = () => S
 export function useWorkSession() {
   const s = useSyncExternalStore(subscribe, snap)
+  useSyncExternalStore(subscribeAccess, accessSnap)   // vẽ lại khi quyền thực (N21) nạp xong / đổi
   return {
     ...s, canTab: tab => canTab(tab, s.me, s.congTy), canPage: perm => canPage(perm, s.me, s.congTy),
     login, logout, retry, saveProfile, changePassword,

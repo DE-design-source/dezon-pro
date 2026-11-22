@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import './IT.css'
 import { useTheme } from '../../hooks/useTheme'
@@ -11,6 +11,7 @@ import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { IT_TABS } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 import TicketList from './components/TicketList'
 import DashSide from './components/DashSide'
 import CreateTicketModal from './components/CreateTicketModal'
@@ -41,8 +42,13 @@ export default function IT() {
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | thietbi | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/it')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module it)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/it')
+  const noViewKey = IT_TABS.filter(t => !can('it', t.key)).map(t => t.key).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
   useTabFallback(tabHidden, pageTab, IT_TABS.map(t => t.key), setPageTab)
+  const noTab = IT_TABS.every(t => !can('it', t.key))
 
   const [tickets, setTicketsState] = useState([])
   const ticketsRef = useRef([])
@@ -51,7 +57,9 @@ export default function IT() {
     ticketsRef.current = v
     setTicketsState(v)
   }, [])
-  const [canManage, setCanManage] = useState(false)
+  const [canManageSrv, setCanManage] = useState(false)
+  const canManage = canManageSrv && can('it', 'main', 'edit') // máy chủ (phòng IT) + N21 Sửa ở Bảng điều khiển
+  const canCreate = can('it', 'main', 'create')
   const [load, setLoad] = useState({ state: 'loading', error: '' }) // loading | ready | error
   const [staff, setStaff] = useState([])
   const [createOpen, setCreateOpen] = useState(false)
@@ -140,7 +148,7 @@ export default function IT() {
     pending.current[t.id] = p
   }
 
-  const readOnly = () => { showToast('Chỉ phòng IT cập nhật được tiến độ'); setBoardRev(n => n + 1) }
+  const readOnly = () => { showToast(canManageSrv ? 'Tài khoản chưa được cấp quyền sửa yêu cầu IT' : 'Chỉ phòng IT cập nhật được tiến độ'); setBoardRev(n => n + 1) }
 
   // Công việc thay đổi -> trạng thái + tiến độ yêu cầu theo bảng; giao diện đổi ngay, gửi máy chủ sau SAVE_DELAY
   function changeTasks(fn) {
@@ -243,7 +251,8 @@ export default function IT() {
         </button>
       </div>
 
-      <div className="it-scroll it-scroll-dash" style={pageTab !== 'main' || boardTicket ? { display: 'none' } : undefined}>
+      {noTab && <div className="it-scroll"><div className="it-state">Tài khoản chưa được cấp quyền xem trang IT. Nhờ quản trị viên cấp quyền.</div></div>}
+      <div className="it-scroll it-scroll-dash" style={pageTab !== 'main' || !can('it', 'main') || boardTicket ? { display: 'none' } : undefined}>
         {load.state === 'loading' && <div className="it-state">Đang tải danh sách yêu cầu…</div>}
         {load.state === 'error' && (
           <div className="it-state err">
@@ -254,28 +263,28 @@ export default function IT() {
         {/* Bảng điều khiển: cột trái thẻ tóm tắt + thao tác nhanh, cột phải danh sách yêu cầu (cùng bố cục Bảng điều khiển QS) */}
         {load.state === 'ready' && (
           <div className="it-dash">
-            <DashSide tickets={tickets} onCreate={() => setCreateOpen(true)} onGoto={gotoSection} />
+            <DashSide tickets={tickets} onCreate={canCreate ? () => setCreateOpen(true) : undefined} onGoto={gotoSection} tabs={IT_TABS.map(t => t.key).filter(k => can('it', k))} />
             <div className="it-content it-dash-main">
-              <TicketList tickets={tickets} title={canManage ? 'Danh sách yêu cầu' : 'Yêu cầu của tôi'} highlightId={newId} onOpen={openTicket} onCreate={() => setCreateOpen(true)} />
+              <TicketList tickets={tickets} title={canManageSrv ? 'Danh sách yêu cầu' : 'Yêu cầu của tôi'} highlightId={newId} onOpen={openTicket} onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
             </div>
           </div>
         )}
       </div>
 
       {/* Thiết bị & tài sản CNTT: module riêng (tab trên thanh tiêu đề), không hiện ở Bảng điều khiển */}
-      {pageTab === 'thietbi' && !boardTicket && (
+      {pageTab === 'thietbi' && can('it', 'thietbi') && !boardTicket && (
         <div className="it-scroll">
-          <AssetsTab canManage={canManage} />
+          <AssetsTab canManage={canManageSrv} canCreate={can('it', 'thietbi', 'create')} canEdit={can('it', 'thietbi', 'edit')} canDelete={can('it', 'thietbi', 'delete')} />
         </div>
       )}
 
-      {pageTab === 'nhansu' && (
+      {pageTab === 'nhansu' && can('it', 'nhansu') && (
         <div className="it-scroll">
           <DeptStaff units={['it']} />
         </div>
       )}
 
-      {boardTicket && (
+      {boardTicket && can('it', 'main') && (
         <FlowBoard
           key={boardTicket.id + ':' + boardRev}
           open

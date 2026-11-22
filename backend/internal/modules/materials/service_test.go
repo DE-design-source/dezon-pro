@@ -19,6 +19,7 @@ import (
 	"qspro-backend/internal/platform/database"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	apperr "qspro-backend/internal/shared/errors"
 	"qspro-backend/internal/shared/goonly"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
@@ -230,6 +231,16 @@ func callFn(ctx context.Context, s *Service, reg *rpc.Registry, a *actor.Actor, 
 		return s.GetCatalogSheets(ctx)
 	case "$buildCatalog":
 		return s.BuildCatalog(ctx)
+	case "setSpDuyet":
+		// so cửa ngõ spPerms_ của Node + hàm lõi; cửa ngõ phân cấp chỉ bản Go (M14.6) kiểm riêng ở TestSpApprovalRights
+		_, duyet, _, err := s.SpPerms(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		if !duyet {
+			return nil, apperr.New(msgKhongDuyet)
+		}
+		return s.SetSpDuyet(ctx, a, argAt(args, 0), argAt(args, 1) != false)
 	case "$uploadFileBuf":
 		var buf []byte
 		if n, ok := argAt(args, 0).(float64); ok {
@@ -480,7 +491,8 @@ func TestRESTRoutes(t *testing.T) {
 		"GET /products/:key/history", "POST /product-approvals", "POST /product-favorites", "GET /product-permissions",
 		"POST /uploads/images", "POST /uploads/files-base64", "POST /product-imports/parse", "POST /product-imports/commit",
 		"POST /product-delete-requests", "GET /product-delete-requests", "POST /product-delete-requests/:id/resolve",
-		"POST /products/:key/private-copy"} { // route chỉ bản Go M10.1
+		"POST /products/:key/private-copy", // route chỉ bản Go M10.1
+		"GET /product-approval-rights"} {   // route chỉ bản Go M14.6
 		method, path, _ := strings.Cut(k, " ")
 		want[method+" /api/v1"+path] = true
 	}
@@ -916,8 +928,12 @@ func TestCopySharedProductRoute(t *testing.T) {
 	r := &pcRepo{sel: func(string, string, bool) []*omap.Map { return nil }}
 	s, reg := newSvc(r, nil)
 	gr := reg.GoRoutes()
-	if len(gr) != 1 || gr[0].Name != "copySharedProduct" || gr[0].Method != "POST" || gr[0].Path != "/products/:key/private-copy" || gr[0].Perm != rpc.Login {
+	if len(gr) != 2 || gr[0].Name != "copySharedProduct" || gr[0].Method != "POST" || gr[0].Path != "/products/:key/private-copy" || gr[0].Perm != rpc.Login {
 		t.Fatalf("route chỉ bản Go: %+v", gr)
+	}
+	// M14.6: quyền duyệt theo phân cấp
+	if gr[1].Name != "spApprovalRights" || gr[1].Method != "GET" || gr[1].Path != "/product-approval-rights" || gr[1].Perm != rpc.Login {
+		t.Errorf("route chỉ bản Go M14.6: %+v", gr[1])
 	}
 	if _, ok := reg.PermOf("copySharedProduct"); ok {
 		t.Error("route chỉ bản Go không được thành hàm /api/:fn")

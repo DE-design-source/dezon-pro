@@ -175,7 +175,11 @@ const thangCong = (k, n) => { const d = new Date(+k.slice(0, 4), +k.slice(5, 7) 
 /* bộ lọc thời gian: Tháng (chuyển tháng trước / sau) · Tuần này · 7 ngày qua · Tuỳ chọn (từ - đến) · Mọi lúc (ngày đã có số) */
 const KY_DS = [['thang', 'Tháng'], ['tuan', 'Tuần này'], ['7n', '7 ngày qua'], ['tuy', 'Tuỳ chọn'], ['tat', 'Mọi lúc']]
 
-export default function AdsSpendTab({ visible }) {
+/* perm (N21, quyền Marketing > Chi tiêu quảng cáo): {create, edit, delete, export}; thiếu = không được.
+   Gõ số / nhập nhanh: create hoặc edit. Công cụ quản trị: thêm kênh / nhập CSV = create, đổi tên / đổi chỗ / giao kênh = edit,
+   bỏ kênh / xoá số = delete. Xuất CSV = export. */
+export default function AdsSpendTab({ visible, perm }) {
+  const P = perm || {}
   const [data, setDataS] = useState(() => napLs() || { kenh: KENH_MAC.slice(), ngay: [] })
   const [ky, setKy] = useState('thang')          // kiểu kỳ đang xem (KY_DS)
   const [thang, setThangS] = useState(thangNay)  // tháng của kỳ 'thang'
@@ -280,6 +284,8 @@ export default function AdsSpendTab({ visible }) {
   const kenhCua = data.kenh.map((k, i) => i).filter(i => ptDs_(pt, data.kenh[i]).some(u => u.toLowerCase() === ai))
   const kenhThay = trang === 'nhap' ? kenhCua : data.kenh.map((k, i) => i)
   const ql = quanTri && trang === 'tong'        // công cụ quản trị (giao kênh, thêm / đổi tên / bỏ kênh, nhập CSV, xoá số)
+  const qlC = ql && !!P.create, qlE = ql && !!P.edit, qlD = ql && !!P.delete
+  const nhap = !!(P.create || P.edit)          // gõ số chi tiêu
   /* người được xem cột Tổng ngày (xemTong, vd chỉ quản lý); quản trị luôn xem được */
   const xemTong = ptDs_({ t: data.xemTong }, 't')
   // cột Tổng ngày: Tổng quan = quản trị + người được giao xem; Trang nhập = luôn có (tổng các kênh của chính người đó)
@@ -316,6 +322,7 @@ export default function AdsSpendTab({ visible }) {
   }
   /* sửa 1 ô (ngày d, kênh i); ô trống = xoá số */
   function datO(d, i, text) {
+    if (!nhap) return
     const n = docSo(text)
     const ngay = data.ngay.slice(); let k = ngay.findIndex(x => x.d === d)
     if (k < 0) { if (n == null) return; ngay.push({ d, v: data.kenh.map(() => null) }); ngay.sort((a, b) => (a.d < b.d ? -1 : 1)); k = ngay.findIndex(x => x.d === d) }
@@ -334,6 +341,7 @@ export default function AdsSpendTab({ visible }) {
   /* nhập nhanh: 1 ngày, nhiều kênh một lần (Trang nhập) */
   const [nhanh, setNhanh] = useState(() => ({ d: isoNgay(new Date()), so: {} }))
   function luuNhanh() {
+    if (!nhap) return
     const ks = Object.keys(nhanh.so)
     if (!ks.length) { setLoi('Chưa nhập số nào để lưu'); return }
     const ngay = data.ngay.slice(); let k = ngay.findIndex(x => x.d === nhanh.d)
@@ -442,7 +450,7 @@ export default function AdsSpendTab({ visible }) {
 
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}
-      onDragOver={e => e.preventDefault()} onDrop={e => { if (e.dataTransfer.files[0]) { e.preventDefault(); nhapFile(e.dataTransfer.files[0]) } }}>
+      onDragOver={e => e.preventDefault()} onDrop={e => { if (qlC && e.dataTransfer.files[0]) { e.preventDefault(); nhapFile(e.dataTransfer.files[0]) } }}>
       {/* thanh trên: trang con (quản trị) · nhập / xuất file (bộ lọc thời gian nằm ở đầu bảng nhập) */}
       <div className="mk-ads-bar">
         {quanTri ? (
@@ -461,9 +469,9 @@ export default function AdsSpendTab({ visible }) {
         )}
         <span style={{ flex: 1 }} />
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => { nhapFile(e.target.files[0]); e.target.value = '' }} />
-        {ql && <button type="button" className="mk-ads-btn" title="Nhập file CSV (cột đầu Ngày dd/mm/yyyy, mỗi cột sau 1 kênh) - gộp vào bảng" onClick={() => fileRef.current && fileRef.current.click()}>Nhập CSV</button>}
-        <button type="button" className="mk-ads-btn" title="Tải bảng về file CSV cùng cấu trúc" onClick={xuatCsv} disabled={!data.ngay.length}>Xuất CSV</button>
-        {ql && <button type="button" className="mk-ads-btn" title="Xoá toàn bộ số đã nhập (giữ danh sách kênh)" onClick={() => { if (window.confirm('Xoá toàn bộ số chi tiêu đã nhập?')) setData({ ...data, ngay: [] }) }} disabled={!data.ngay.length}>Xoá số</button>}
+        {qlC && <button type="button" className="mk-ads-btn" title="Nhập file CSV (cột đầu Ngày dd/mm/yyyy, mỗi cột sau 1 kênh) - gộp vào bảng" onClick={() => fileRef.current && fileRef.current.click()}>Nhập CSV</button>}
+        {P.export && <button type="button" className="mk-ads-btn" title="Tải bảng về file CSV cùng cấu trúc" onClick={xuatCsv} disabled={!data.ngay.length}>Xuất CSV</button>}
+        {qlD && <button type="button" className="mk-ads-btn" title="Xoá toàn bộ số đã nhập (giữ danh sách kênh)" onClick={() => { if (window.confirm('Xoá toàn bộ số chi tiêu đã nhập?')) setData({ ...data, ngay: [] }) }} disabled={!data.ngay.length}>Xoá số</button>}
       </div>
       {loi && <em className="mk-ads-err" onClick={() => setLoi('')}>{loi}</em>}
       {/* nhân sự: chỉ thấy kênh được giao */}
@@ -473,7 +481,7 @@ export default function AdsSpendTab({ visible }) {
           : (quanTri && ai !== toi ? tenNguoi(ai) + ' chưa được giao kênh nào.' : 'Bạn chưa được giao kênh quảng cáo nào. ' + (quanTri ? 'Giao kênh ở dòng "Phụ trách" của trang Tổng quan.' : 'Nhờ quản trị giao kênh cho bạn.'))}</div>
       )}
       {/* Trang nhập: nhập nhanh 1 ngày cho mọi kênh của mình */}
-      {trang === 'nhap' && kenhCua.length > 0 && (
+      {trang === 'nhap' && kenhCua.length > 0 && nhap && (
         <div className="mk-ads-card mk-ads-nhanh">
           <div className="mk-ads-h"><b>Nhập nhanh</b><span>Chọn ngày, gõ số từng kênh rồi bấm Lưu (ô trống = giữ nguyên)</span></div>
           <div className="mk-ads-nhanh-b">
@@ -505,7 +513,7 @@ export default function AdsSpendTab({ visible }) {
       {/* hiệu quả kênh (đặt trên bảng nhập, MarkUp 2026-11-17): chi tiêu ghép với lead tiếp nhận ở tab Kinh doanh theo nguồn = tên kênh */}
       {thayHq && <AdsLeadDash
         visible={visible}
-        access={quanTri && online ? (
+        access={quanTri && online && P.edit ? (
           <div className="mk-ads-pt mk-ld-acc" title="Người được xem báo cáo này. Quản trị và quản lý (người được xem cột Tổng ngày) luôn xem được.">
             {xemHq.map(u => (
               <button type="button" key={u} className="av" style={{ background: avMau(u) }} title={tenNguoi(u) + ' - bấm để bỏ quyền xem báo cáo'}
@@ -567,21 +575,21 @@ export default function AdsSpendTab({ visible }) {
                 {thayTong && <th className="num kenh k tong">{trang === 'nhap' ? 'Tổng của tôi' : 'Tổng ngày'}</th>}
                 {kenhThay.map(i => { const k = data.kenh[i]; return (
                   <th key={k} className={'num kenh k' + (keo.tu === i ? ' keo' : '') + (keo.tu >= 0 && keo.toi === i && keo.tu !== i ? (keo.tu < i ? ' dich-r' : ' dich-l') : '')}
-                    draggable={ql || undefined}
-                    title={ql ? 'Kéo sang trái / phải để đổi chỗ kênh' : undefined}
-                    onDragStart={ql ? e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', k); setKeo({ tu: i, toi: i }) } : undefined}
-                    onDragOver={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; if (keo.toi !== i) setKeo({ ...keo, toi: i }) } : undefined}
-                    onDrop={ql ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); doiChoKenh(keo.tu, i); setKeo({ tu: -1, toi: -1 }) } : undefined}
-                    onDragEnd={ql ? () => setKeo({ tu: -1, toi: -1 }) : undefined}>
-                    {ql && <i className="keo-ic" aria-hidden="true">⠿</i>}
-                    {ql ? <span title="Bấm để đổi tên kênh" onClick={() => doiTenKenh(i)}>{k}</span> : <span>{k}</span>}
-                    {ql && <button type="button" title={'Bỏ kênh ' + k} onClick={() => boKenh(i)}>×</button>}
+                    draggable={qlE || undefined}
+                    title={qlE ? 'Kéo sang trái / phải để đổi chỗ kênh' : undefined}
+                    onDragStart={qlE ? e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', k); setKeo({ tu: i, toi: i }) } : undefined}
+                    onDragOver={qlE ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; if (keo.toi !== i) setKeo({ ...keo, toi: i }) } : undefined}
+                    onDrop={qlE ? e => { if (keo.tu < 0) return; e.preventDefault(); e.stopPropagation(); doiChoKenh(keo.tu, i); setKeo({ tu: -1, toi: -1 }) } : undefined}
+                    onDragEnd={qlE ? () => setKeo({ tu: -1, toi: -1 }) : undefined}>
+                    {qlE && <i className="keo-ic" aria-hidden="true">⠿</i>}
+                    {qlE ? <span title="Bấm để đổi tên kênh" onClick={() => doiTenKenh(i)}>{k}</span> : <span>{k}</span>}
+                    {qlD && <button type="button" title={'Bỏ kênh ' + k} onClick={() => boKenh(i)}>×</button>}
                   </th>
                 ) })}
                 <th className="them" />
               </tr>
               {/* quản trị giao mỗi kênh cho 1 nhân sự (người đó chỉ thấy kênh của mình) */}
-              {ql && online && (
+              {qlE && online && (
                 <tr className="pt">
                   <th>Phụ trách</th>
                   {/* cột Tổng ngày: giao người được xem (vd chỉ quản lý); chưa giao = chỉ quản trị xem */}
@@ -620,7 +628,7 @@ export default function AdsSpendTab({ visible }) {
                   {thayTong && <td className="num b k tong">{x.tong ? fmt(x.tong) : '—'}</td>}
                   {kenhThay.map(i => { const k = data.kenh[i]; return (
                     <td key={k} className="num o k">
-                      <input key={x.d + '|' + k + '|' + (x.v[i] == null ? '' : x.v[i])} defaultValue={soHien(x.v[i])} placeholder="–" inputMode="numeric" aria-label={k + ' ngày ' + x.d}
+                      <input key={x.d + '|' + k + '|' + (x.v[i] == null ? '' : x.v[i])} defaultValue={soHien(x.v[i])} placeholder="–" inputMode="numeric" aria-label={k + ' ngày ' + x.d} readOnly={!nhap}
                         onBlur={e => { if (e.target.value !== soHien(x.v[i])) datO(x.d, i, e.target.value) }}
                         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} />
                     </td>
@@ -633,8 +641,8 @@ export default function AdsSpendTab({ visible }) {
             <tfoot><tr><td>Tổng</td>{thayTong && <td className="num b k tong">{fmt(v.tong)}</td>}{kenhThay.map(i => <td key={data.kenh[i]} className="num k">{fmt(v.tkI[i])}</td>)}<td /></tr></tfoot>
           </table>
         </div>
-        {ql && <button type="button" className="mk-ads-themk" style={themX != null ? { left: themX, right: 'auto' } : undefined} title="Thêm kênh (cột) mới" aria-label="Thêm kênh" onClick={() => { setThemMo(o => !o); setThemQ('') }}>+</button>}
-        {ql && themMo && (() => {
+        {qlC && <button type="button" className="mk-ads-themk" style={themX != null ? { left: themX, right: 'auto' } : undefined} title="Thêm kênh (cột) mới" aria-label="Thêm kênh" onClick={() => { setThemMo(o => !o); setThemQ('') }}>+</button>}
+        {qlC && themMo && (() => {
           const q = themQ.trim()
           const ql_ = q.toLowerCase()
           const nguon = [...LEAD_SOURCES, ...kdNguon.filter(x => LEAD_SOURCES.indexOf(x) < 0)]

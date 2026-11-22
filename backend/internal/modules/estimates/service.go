@@ -27,14 +27,16 @@ type Deps struct {
 	Perms   contracts.ProductPerms
 	Auditor contracts.Auditor
 	Repo    Repository
+	Access  contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 // Service: nghiệp vụ công tác.
 type Service struct {
-	repo  Repository
-	cfg   *config.Config
-	perms contracts.ProductPerms
-	audit contracts.Auditor
+	access contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
+	repo   Repository
+	cfg    *config.Config
+	perms  contracts.ProductPerms
+	audit  contracts.Auditor
 }
 
 // New tạo service.
@@ -43,7 +45,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = NewRepository(d.DB)
 	}
-	return &Service{repo: repo, cfg: d.Cfg, perms: d.Perms, audit: d.Auditor}
+	return &Service{access: d.Access, repo: repo, cfg: d.Cfg, perms: d.Perms, audit: d.Auditor}
 }
 
 /*** ===== ĐỔI DÒNG DB <-> OBJECT ===== ***/

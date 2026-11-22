@@ -12,7 +12,7 @@ import (
 	"qspro-backend/internal/shared/validator"
 )
 
-// RegisterRPC: 8 hàm /api/:fn của module. Chỉ setProjData thuộc ACTOR_FNS (index.js:118).
+// RegisterRPC: 8 hàm /api/:fn của module. Chỉ setProjData thuộc ACTOR_FNS (index.js:118). Hàm ghi bọc accRPC (N21, access_gate.go).
 func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("bootstrap", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.Bootstrap(ctx, args.ArgU(0))
@@ -20,24 +20,24 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("getProjects", rpc.Login, func(ctx context.Context, _ *actor.Actor, _ rpc.Args) (any, error) {
 		return s.GetProjects(ctx)
 	})
-	reg.Register("createProject", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("createProject", rpc.Login, s.accRPC("create", "QS > Dự án", accProjCreate, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.CreateProject(ctx, args.ArgU(0))
-	})
-	reg.Register("updateProject", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("updateProject", rpc.Login, s.accRPC("edit", "QS", accProjEdit, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.UpdateProject(ctx, args.ArgU(0), args.ArgU(1))
-	})
-	reg.Register("deleteProject", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("deleteProject", rpc.Login, s.accRPC("delete", "QS > Dự án", accProjTab, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.DeleteProject(ctx, args.ArgU(0))
-	})
-	reg.Register("duplicateProject", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("duplicateProject", rpc.Login, s.accRPC("create", "QS > Dự án", accProjCreate, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.DuplicateProject(ctx, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("getProjData", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetProjData(ctx, args.ArgU(0))
 	})
-	reg.Register("setProjData", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("setProjData", rpc.Login, s.accRPC("edit", "QS", accProjData, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetProjData(ctx, a, args.ArgU(0), args.ArgU(1), args.ArgU(2))
-	})
+	}))
 	// Route chỉ bản Go (migration 0037): yêu cầu sửa thông tin dự án; quyền duyệt kiểm trong service (admin / super / da_duyet)
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "requestProjectEdit", Method: "POST", Path: "/projects/:id/edit-requests", Perm: rpc.Login,
 		Tag: "Dự án", Summary: "Sửa thông tin dự án: người duyệt lưu thẳng, người khác gửi yêu cầu chờ duyệt",
@@ -67,19 +67,19 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.GetProjects(c.Request.Context())
 		response.Result(c, r, err)
 	})
-	g.POST("", func(c *gin.Context) {
+	g.POST("", s.accMW("create", "QS > Dự án", accProjCreate), func(c *gin.Context) {
 		r, err := s.CreateProject(c.Request.Context(), middleware.Body(c))
 		response.Result(c, r, err)
 	})
-	g.PATCH("/:id", func(c *gin.Context) {
+	g.PATCH("/:id", s.accMW("edit", "QS", accProjEdit), func(c *gin.Context) {
 		r, err := s.UpdateProject(c.Request.Context(), c.Param("id"), middleware.Body(c))
 		response.Result(c, r, err)
 	})
-	g.DELETE("/:id", func(c *gin.Context) {
+	g.DELETE("/:id", s.accMW("delete", "QS > Dự án", accProjTab), func(c *gin.Context) {
 		r, err := s.DeleteProject(c.Request.Context(), c.Param("id"))
 		response.Result(c, r, err)
 	})
-	g.POST("/:id/duplicate", func(c *gin.Context) {
+	g.POST("/:id/duplicate", s.accMW("create", "QS > Dự án", accProjCreate), func(c *gin.Context) {
 		r, err := s.DuplicateProject(c.Request.Context(), c.Param("id"), middleware.Body(c))
 		response.Result(c, r, err)
 	})
@@ -88,7 +88,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		response.Result(c, r, err)
 	})
 	// Yêu cầu sửa thông tin dự án: body {fields, lyDo}; người duyệt -> sửa thẳng ({applied, project}), người khác -> phiếu ({pending, id})
-	g.POST("/:id/edit-requests", func(c *gin.Context) {
+	g.POST("/:id/edit-requests", s.accMW("edit", "QS > Dự án", accProjTab), func(c *gin.Context) {
 		b := middleware.BodyMap(c)
 		r, err := s.RequestProjectEdit(c.Request.Context(), actor.FromGin(c), c.Param("id"), b.Val("fields"), b.Val("lyDo"))
 		response.Result(c, r, err)
@@ -103,7 +103,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.ResolveProjectEditRequest(c.Request.Context(), actor.FromGin(c), c.Param("rid"), b.Val("approve"), b.Val("lyDo"))
 		response.Result(c, r, err)
 	})
-	g.PUT("/:id/data/:khoa", func(c *gin.Context) {
+	g.PUT("/:id/data/:khoa", s.accMW("edit", "QS", accProjData), func(c *gin.Context) {
 		b := readSetDataBody(c)
 		r, err := s.SetProjData(c.Request.Context(), actor.FromGin(c), c.Param("id"), c.Param("khoa"), b.GiaTri)
 		response.Result(c, r, err)

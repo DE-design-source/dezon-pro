@@ -3,7 +3,8 @@ import { MK_FONT, kpiCard, kpiLabel, kpiGrid } from './CampaignsTab'
 import QuoteBlock from './QuoteBlock'
 
 /* Trang chi tiết chiến dịch (nguyên trang) — openCampaignDetail của bản HTML */
-export default function CampaignDetail({ visible, catalog, camp, onBack, onViewQuote }) {
+/* N21: canEdit = quyền Sửa ở Marketing > Chiến dịch; không có onViewQuote (không xem được Báo giá) -> ẩn nút */
+export default function CampaignDetail({ visible, catalog, camp, onBack, onViewQuote, canEdit }) {
   const months = camp ? monthsBetween(camp.start, camp.end) : 1
   return (
     <div style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
@@ -21,12 +22,12 @@ export default function CampaignDetail({ visible, catalog, camp, onBack, onViewQ
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{camp && (camp.type + ' · ' + camp.client)}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
-          <button
+          {canEdit && <button
             type="button"
             onClick={() => alert('Mở form chỉnh sửa chiến dịch "' + (camp || {}).name + '" (demo).')}
             style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-          >Chỉnh sửa</button>
-          <button type="button" onClick={onViewQuote} style={{ border: 'none', background: 'var(--marketing)', color: '#fff', padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Xem báo giá</button>
+          >Chỉnh sửa</button>}
+          {onViewQuote && <button type="button" onClick={onViewQuote} style={{ border: 'none', background: 'var(--marketing)', color: '#fff', padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Xem báo giá</button>}
         </div>
       </div>
 

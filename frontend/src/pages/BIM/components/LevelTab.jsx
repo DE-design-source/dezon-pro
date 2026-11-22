@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { fmtNum } from '../../../data/bimData'
 import { Icon, SectionHead, StatusBadge, useFlash } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 export default function LevelTab({ levels, onCreateLevel }) {
+  const { can } = useAccess()
   const [overlay, setOverlay] = useState(false)
   const [detecting, detect] = useFlash(800)
 
@@ -15,7 +17,7 @@ export default function LevelTab({ levels, onCreateLevel }) {
         <button className="bim-btn-dark" style={{ flex: 1 }} onClick={() => detect()}>
           {detecting ? 'Đang dò Level...' : <><Icon name="scan" size={15} stroke="#fff" />Dò Level</>}
         </button>
-        <button className="bim-btn-ghost" style={{ flex: 1 }} onClick={onCreateLevel}><Icon name="plus" size={15} sw={2.4} />Tạo từ selection</button>
+        {can('bim', 'main', 'create') && <button className="bim-btn-ghost" style={{ flex: 1 }} onClick={onCreateLevel}><Icon name="plus" size={15} sw={2.4} />Tạo từ selection</button>}
       </div>
       <div className="bim-card" style={{ padding: 4 }}>
         {[...levels].reverse().map(l => (

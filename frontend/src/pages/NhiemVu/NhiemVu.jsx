@@ -1,4 +1,5 @@
 import PageShell from '../../components/layout/PageShell'
+import { useAccess } from '../../services/accessService'
 
 const PRIORITY = {
   Cao: { bg: '#fee2e2', color: '#dc2626' },
@@ -50,7 +51,16 @@ const cardStyle = {
   boxShadow: '0 1px 3px rgba(0,0,0,.07)',
 }
 
+/* Phân quyền N21: xem Bàn làm việc hoặc Lịch (giống quyền route /nhiem-vu trong data/navigation.js) */
 export default function NhiemVu() {
+  const { can } = useAccess()
+  if (!can('banlamviec', 'main') && !can('lich', 'main')) {
+    return (
+      <PageShell title="Nhiệm vụ" subtitle="Quản lý việc cần làm">
+        <div style={{ ...cardStyle, marginTop: 0, color: '#6b7280', fontSize: 14 }}>Tài khoản chưa được cấp quyền xem phần này. Nhờ quản trị viên cấp quyền.</div>
+      </PageShell>
+    )
+  }
   return (
     <PageShell title="Nhiệm vụ" subtitle="Quản lý việc cần làm">
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>

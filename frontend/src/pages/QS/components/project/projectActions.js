@@ -6,9 +6,9 @@
 import { useSyncExternalStore } from 'react'
 import * as api from '../../api/qsApi'
 import { uploadRaw } from '../../api/files'
-import {
-  getState, selectProject, showTab, reloadProjects, createProject, updateProject, deleteProject, duplicateProject,
-} from '../../state/store'
+import { getState, selectProject, showTab, reloadProjects } from '../../state/store'
+import { createProject, updateProject, deleteProject, duplicateProject } from '../../state/qsGuard'
+import { denyQs } from '../../state/qsAccess'
 import { qsToast as toast, qsConfirm, qsAsk } from '../common/dialogs'
 import { projectGroups, projGroupOf_, currentGroup, addDraftPayload_, dezonHost_, dezonUrl_ } from '../../lib/dashModel.js'
 
@@ -16,7 +16,10 @@ import { projectGroups, projGroupOf_, currentGroup, addDraftPayload_, dezonHost_
 let dlg = null
 const subs = new Set()
 function emit(v) { dlg = v; subs.forEach(fn => fn()) }
-export function openProjDlg(kind, maDA) { emit({ kind, maDA: maDA || '', id: Date.now() }) }
+/* Phân quyền N21 (QS > Dự án): tạo / nhân bản = Thêm, đổi tên = Sửa; bị chặn thì báo và không mở hộp thoại */
+const DLG_ACT = { create: 'create', dup: 'create', rename: 'edit' }
+const noDuan = a => denyQs('duan', a)
+export function openProjDlg(kind, maDA) { if (DLG_ACT[kind] && noDuan(DLG_ACT[kind])) return; emit({ kind, maDA: maDA || '', id: Date.now() }) }
 export function closeProjDlg(kind) { if (dlg && (!kind || dlg.kind === kind)) emit(null) }
 export function useProjDlg() {
   return useSyncExternalStore(fn => { subs.add(fn); return () => subs.delete(fn) }, () => dlg, () => dlg)
@@ -39,6 +42,7 @@ export async function projInfoModal(maDA) {
 
 /* Chip link bài dự án trên dezon.vn */
 export async function dezonSet_(maDA) {
+  if (noDuan('edit')) return
   maDA = String(maDA || '')
   const S = getState()
   const p = (S.projects || []).filter(x => x.maDA === maDA)[0] || ((S.cur && S.cur.maDA === maDA) ? S.cur : null)
@@ -59,6 +63,7 @@ export async function dezonSet_(maDA) {
 
 /* Thêm 1 bản nháp cho dự án có bản nháp mã key (nút "Thêm bản nháp" trên thẻ dự án) */
 export async function addDraft(key) {
+  if (noDuan('create')) return
   const g = projGroupOf_(getState().projects, key)
   if (!g) { toast('Không tìm thấy dự án này — bấm F5 tải lại trang'); return }
   try {
@@ -69,6 +74,7 @@ export async function addDraft(key) {
 
 /* Thêm bản nháp cho dự án đang mở (trong hộp Thông tin dự án) */
 export async function addDraftForCur() {
+  if (noDuan('create')) return
   const S = getState()
   const gr = currentGroup(S.projects, S.cur); if (!gr) return
   try {
@@ -79,6 +85,7 @@ export async function addDraftForCur() {
 
 /* Xoá 1 bản nháp */
 export async function removeProject(maDA) {
+  if (noDuan('delete')) return
   if (!(await qsConfirm('Xoá bản nháp này?'))) return
   try { await deleteProject(maDA) } catch (e) { if (!isAuth(e)) toast('Lỗi xoá bản nháp: ' + errMsg(e)); return }
   closeProjDlg()
@@ -87,6 +94,7 @@ export async function removeProject(maDA) {
 
 /* Xoá NHANH cả dự án (mọi bản nháp): nút thùng rác ở góc thẻ dự án */
 export async function removeProjectGroup(key) {
+  if (noDuan('delete')) return
   const g = projGroupOf_(getState().projects, key)
   if (!g) { toast('Không tìm thấy dự án này — bấm F5 tải lại trang'); return }
   const n = g.drafts.length
@@ -105,6 +113,7 @@ export async function removeProjectGroup(key) {
 
 /* Đổi tên bản nháp (hộp Đổi tên: tên trống = bỏ tên tuỳ chỉnh) -> true nếu đã lưu */
 export async function renameDraftSave(maDA, name) {
+  if (noDuan('edit')) return false
   try {
     await updateProject(maDA, { tenBanNhap: name })
     toast('Đã đổi tên bản nháp')
@@ -114,12 +123,14 @@ export async function renameDraftSave(maDA, name) {
 
 /* Nhân bản bản nháp; mở luôn bản mới. Ném lỗi để hộp Nhân bản bật lại nút */
 export async function duplicateDraft(maDA, opts) {
+  if (noDuan('create')) return
   await duplicateProject(maDA, opts)
   toast('Đã nhân bản (' + ((getState().lines || []).length) + ' hạng mục)')
 }
 
 /* Hộp "Tạo dự án mới": form {name, client, phone, address, link, vat} -> true nếu đã tạo */
 export async function createFromForm(form) {
+  if (noDuan('create')) return false
   const ten = String(form.name || '').trim()
   if (!ten) { toast('Nhập tên dự án'); return false }
   const link = String(form.link || '').trim()
@@ -136,6 +147,7 @@ export async function createFromForm(form) {
 /* Hỏi form "Tạo dự án mới" (#mCreate, doCreate app.js:450-461) rồi tạo + mở luôn dự án. Trả Project, huỷ / lỗi -> null.
    Dùng ở ô chọn dự án của Danh sách sản phẩm (ProjPanel) và khối Ghi danh vào dự án của Nhập dữ liệu. */
 export async function askCreateProject() {
+  if (noDuan('create')) return
   const r = await qsAsk({
     title: 'Tạo dự án mới', ok: 'Lưu dự án', required: false,   // chỉ Tên bắt buộc, kiểm ngay dưới
     fields: [
@@ -175,6 +187,7 @@ const formFields_ = f => {
   }
 }
 export async function importProjectForm(f, opts) {
+  if (noDuan('create')) return
   const d = formFields_(f)
   if (!d.ten) { toast('Nhập tên dự án'); return null }
   try {
@@ -188,6 +201,7 @@ export async function importProjectForm(f, opts) {
 
 /* Đính file BOQ (PDF / Excel) vào dữ liệu 'boqFiles' của dự án vừa tạo (cùng dạng tab BOQ của trang chi tiết) */
 export async function attachBoqFiles(maDA, files) {
+  if (noDuan('edit')) return
   const added = []
   for (const x of files) {
     try { const r = await uploadRaw(x); if (r && r.url) added.push({ url: r.url, name: x.name, at: new Date().toISOString() }) } catch (e) { toast('Tải "' + x.name + '" lỗi: ' + errMsg(e)) }
@@ -199,6 +213,7 @@ export async function attachBoqFiles(maDA, files) {
 /* Trang chi tiết "Sửa thông tin" (migration 0037): người duyệt lưu thẳng, người khác gửi yêu cầu chờ duyệt.
    -> kết quả của máy chủ ({applied, project} | {pending, id}) hoặc null nếu lỗi / không đổi gì */
 export async function editProjectForm(p, f, lyDo) {
+  if (noDuan('edit')) return
   const d = formFields_(f)
   if (!d.ten) { toast('Nhập tên dự án'); return null }
   try {
@@ -222,6 +237,7 @@ export async function resolveProjectEdit(id, approve, lyDo) {
 /* Lưu thông tin dự án -> áp cho MỌI bản nháp cùng nhóm. kienTrucSu (cột chỉ bản Go, migration 0036) chỉ gửi khi khác giá trị
    đang có, như hienTrang ở saveDraftInfo */
 export async function saveProjectShared(f) {
+  if (noDuan('edit')) return false
   const shared = { ten: f.ten, khachHang: f.khachHang, sdt: f.sdt, diaChi: f.diaChi, linkDezon: String(f.linkDezon || '').trim() }
   const cu0 = getState().cur
   if (f.kienTrucSu != null && String(f.kienTrucSu).trim() !== String((cu0 && cu0.kienTrucSu) || '')) shared.kienTrucSu = String(f.kienTrucSu).trim()
@@ -241,6 +257,7 @@ export async function saveProjectShared(f) {
 /* Lưu thông tin của riêng bản nháp đang mở. hienTrang (M8.3, cột chỉ bản Go) chỉ gửi khi khác giá trị đang có (cu = dự án
    lúc mở form): máy chủ chỉ ghi cột này khi có khoá, nên lưu bản nháp không đụng tới nó khi người dùng không sửa. */
 export async function saveDraftInfo(f, cu) {
+  if (noDuan('edit')) return false
   const S = getState(); if (!S.cur) return false
   const data = {
     tenBanNhap: f.tenBanNhap, trangThai: f.trangThai, vat: Number(f.vat) || 0, maBaoGia: f.maBaoGia, quyMo: f.quyMo,
@@ -251,6 +268,7 @@ export async function saveDraftInfo(f, cu) {
 }
 
 export async function saveProgress(v) {
+  if (noDuan('edit')) return
   const S = getState(); if (!S.cur) return
   v = Number(v) || 0
   try { await updateProject(S.cur.maDA, { tienDo: v }); toast('Đã cập nhật tiến độ ' + v + '%') } catch (e) { if (!isAuth(e)) toast('Lỗi: ' + errMsg(e)) }

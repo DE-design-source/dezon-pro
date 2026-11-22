@@ -34,9 +34,8 @@ var _ contracts.DeliveryFromLead = (*Service)(nil)
 type Deps struct {
 	DB       *database.DB
 	Cfg      *config.Config
-	Users    contracts.UserReader
-	UserFmt  contracts.UserFormatter
 	Projects contracts.ProjectReader
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21); nil = không ai ngoài super được vào
 	Repo     Repository
 }
 
@@ -44,9 +43,8 @@ type Deps struct {
 type Service struct {
 	repo     Repository
 	db       *database.DB
-	users    contracts.UserReader
-	userFmt  contracts.UserFormatter
 	projects contracts.ProjectReader
+	access   contracts.AccessChecker
 	now      func() time.Time
 }
 
@@ -56,7 +54,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	return &Service{repo: repo, db: d.DB, users: d.Users, userFmt: d.UserFmt, projects: d.Projects, now: time.Now}
+	return &Service{repo: repo, db: d.DB, projects: d.Projects, access: d.Access, now: time.Now}
 }
 
 func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -68,8 +66,25 @@ func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) er
 
 func (s *Service) nowISO() string { return s.now().UTC().Format(time.RFC3339Nano) }
 
-// allow: giống canTab(tab) của giao diện (xem sales.allow): super phải "xem như" công ty, tính năng công ty, admin, perms.
-func (s *Service) allow(ctx context.Context, a *actor.Actor, kind string) error {
+// Tab của trang (module thietke / thicong) ghi được phần nào - phân quyền 3 cấp N21, khớp DeliveryProvider của giao diện
+// (pages/QuanLyThietKe/delivery.jsx):
+//   - thông tin dự án, thầu phụ: Thiết lập (create) hoặc Danh sách dự án (list); xoá dự án / thầu phụ: Danh sách dự án;
+//   - thành viên: thêm = Tạo ở Danh sách dự án hoặc Thiết lập, bớt = Xoá ở Danh sách dự án;
+//   - đề mục, công việc, bình luận: Tiến độ (thêm = Tạo, sửa = Sửa, xoá = Xoá).
+var (
+	tabsSetup    = []string{"create", "list"}
+	tabsList     = []string{"list"}
+	tabsProgress = []string{"tiendo"}
+	// removeTabs: bảng con -> tab được xoá dòng của nó
+	removeTabs = map[string][]string{"tk_thanh_vien": tabsList, "tk_thau_phu": tabsList, "tk_giai_doan": tabsProgress,
+		"tk_cong_viec": tabsProgress}
+	actionVN = map[string]string{"view": "xem", "create": "thêm", "edit": "sửa", "delete": "xoá"}
+)
+
+// allow: super phải "xem như" công ty; còn lại hỏi phân quyền 3 cấp (N21, contracts.AccessChecker) thao tác action ở
+// module tab (thietke / thicong) - ở 1 trong tabs, không truyền = tab bất kỳ (đọc). Chưa có dòng phân quyền = như cũ
+// (canTab của giao diện: tính năng công ty, admin được, nhân viên cần perms - mọi tab của trang).
+func (s *Service) allow(ctx context.Context, a *actor.Actor, kind, action string, tabs ...string) error {
 	tab, ok := tabOf[kind]
 	if !ok {
 		return apperr.BadRequest("Loại dự án không hợp lệ (design / construction)")
@@ -87,51 +102,39 @@ func (s *Service) allow(ctx context.Context, a *actor.Actor, kind string) error 
 	if a.IsSuper() {
 		return nil
 	}
-	ct, err := s.repo.Company(ctx, t)
-	if err != nil {
-		return err
-	}
-	if ct != nil && !coTinhNang(ct.Val("tinh_nang"), tab) {
-		return apperr.Forbidden("Công ty chưa được cấp tính năng này")
-	}
-	if a.IsAdmin() {
-		return nil
-	}
-	u, err := s.users.GetByID(ctx, a.UID)
-	if err != nil {
-		return err
-	}
-	if u != nil {
-		for _, p := range s.userFmt.PermsArr(u.Val("perms")) {
-			if p == tab {
-				return nil
+	if s.access != nil {
+		if len(tabs) == 0 {
+			tabs = []string{""}
+		}
+		for _, t := range tabs {
+			ok, err := s.access.Can(ctx, a, tab, t, action)
+			if err != nil || ok {
+				return err
 			}
 		}
+		if tabs[0] != "" { // vào được trang nhưng thiếu thao tác ở tab ghi
+			if ok, err := s.access.Can(ctx, a, tab, "", "view"); err != nil || ok {
+				if err != nil {
+					return err
+				}
+				return apperr.Forbidden("Tài khoản không có quyền " + actionVN[action] + " ở phần này")
+			}
+		}
+	}
+	if a.IsAdmin() {
+		return apperr.Forbidden("Công ty chưa được cấp tính năng này")
 	}
 	return apperr.Forbidden("Tài khoản không có quyền vào phần này")
 }
 
-// coTinhNang = ctHasFeature_: danh sách tính năng rỗng = được mọi tab.
-func coTinhNang(v any, tab string) bool {
-	co := false
-	for _, x := range strings.Split(jsval.Str(v), ",") {
-		if x = jsval.Trim(x); x != "" {
-			if x == tab {
-				return true
-			}
-			co = true
-		}
-	}
-	return !co
-}
-
-// project: dự án theo id (có phạm vi công ty) + kiểm quyền theo loại của nó.
-func (s *Service) project(ctx context.Context, a *actor.Actor, id float64) (*omap.Map, error) {
+// project: dự án theo id (có phạm vi công ty) + kiểm quyền thao tác action theo loại của nó (ở 1 trong tabs; không truyền =
+// tab bất kỳ).
+func (s *Service) project(ctx context.Context, a *actor.Actor, id float64, action string, tabs ...string) (*omap.Map, error) {
 	if a == nil {
 		return nil, apperr.E(401, "Chưa đăng nhập", "NOAUTH")
 	}
 	if !jsval.Truthy(tenant.TenantID(ctx)) {
-		return nil, s.allow(ctx, a, "design") // cùng thông báo "chọn công ty" / "chưa gắn công ty"
+		return nil, s.allow(ctx, a, "design", action, tabs...) // cùng thông báo "chọn công ty" / "chưa gắn công ty"
 	}
 	p, err := s.repo.GetProject(ctx, id)
 	if err != nil {
@@ -140,7 +143,7 @@ func (s *Service) project(ctx context.Context, a *actor.Actor, id float64) (*oma
 	if p == nil {
 		return nil, apperr.NotFound("Không tìm thấy dự án")
 	}
-	if err := s.allow(ctx, a, jsval.Str(p.Val("loai"))); err != nil {
+	if err := s.allow(ctx, a, jsval.Str(p.Val("loai")), action, tabs...); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -151,7 +154,7 @@ func (s *Service) project(ctx context.Context, a *actor.Actor, id float64) (*oma
 // ListProjects: dự án của 1 trang, kèm tiến độ (trung bình % công việc thường), số công việc và thành viên.
 func (s *Service) ListProjects(ctx context.Context, a *actor.Actor, kind any) (any, error) {
 	k := jsval.Str(kind)
-	if err := s.allow(ctx, a, k); err != nil {
+	if err := s.allow(ctx, a, k, "view"); err != nil {
 		return nil, err
 	}
 	rows, err := s.repo.ListProjects(ctx, k)
@@ -207,7 +210,7 @@ func (s *Service) ListProjects(ctx context.Context, a *actor.Actor, kind any) (a
 // CreateProject: tạo tay (không từ Kinh doanh). body.kind bắt buộc.
 func (s *Service) CreateProject(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
 	k := str(body, "kind")
-	if err := s.allow(ctx, a, k); err != nil {
+	if err := s.allow(ctx, a, k, "create", tabsSetup...); err != nil {
 		return nil, err
 	}
 	if !body.Has("name") {
@@ -231,7 +234,7 @@ func (s *Service) CreateProject(ctx context.Context, a *actor.Actor, body *omap.
 
 // GetProject: toàn bộ dự án cho trang chi tiết - thành viên, thầu phụ, giai đoạn (kèm công việc), bình luận theo công việc.
 func (s *Service) GetProject(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	p, err := s.project(ctx, a, id)
+	p, err := s.project(ctx, a, id, "view")
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +283,7 @@ func (s *Service) GetProject(ctx context.Context, a *actor.Actor, id float64) (a
 
 // UpdateProject: sửa thông tin dự án (chỉ khoá gửi lên).
 func (s *Service) UpdateProject(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "edit", tabsSetup...); err != nil {
 		return nil, err
 	}
 	patch, err := s.projectFields(ctx, body)
@@ -300,7 +303,7 @@ func (s *Service) UpdateProject(ctx context.Context, a *actor.Actor, id float64,
 
 // DeleteProject: xoá dự án và mọi thứ bên trong (khoá ngoại cascade).
 func (s *Service) DeleteProject(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "delete", tabsList...); err != nil {
 		return nil, err
 	}
 	if _, err := s.repo.Remove(ctx, "tk_du_an", id, 0); err != nil {
@@ -534,7 +537,7 @@ func (s *Service) projectFields(ctx context.Context, b *omap.Map) (*omap.Map, er
 // ---------- thành viên, thầu phụ ----------
 
 func (s *Service) AddMember(ctx context.Context, a *actor.Actor, id float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "create", tabsSetup...); err != nil {
 		return nil, err
 	}
 	name := str(b, "name")
@@ -553,7 +556,7 @@ func (s *Service) AddMember(ctx context.Context, a *actor.Actor, id float64, b *
 }
 
 func (s *Service) AddSubcontractor(ctx context.Context, a *actor.Actor, id float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "create", tabsSetup...); err != nil {
 		return nil, err
 	}
 	if str(b, "name") == "" {
@@ -574,7 +577,7 @@ func (s *Service) AddSubcontractor(ctx context.Context, a *actor.Actor, id float
 }
 
 func (s *Service) UpdateSubcontractor(ctx context.Context, a *actor.Actor, id, item float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "edit", tabsSetup...); err != nil {
 		return nil, err
 	}
 	patch, err := subFields(b)
@@ -620,7 +623,7 @@ func subFields(b *omap.Map) (*omap.Map, error) {
 
 // RemoveItem: xoá thành viên / thầu phụ / giai đoạn / công việc của dự án (dòng phải thuộc đúng dự án).
 func (s *Service) RemoveItem(ctx context.Context, a *actor.Actor, table string, id, item float64) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "delete", removeTabs[table]...); err != nil {
 		return nil, err
 	}
 	if table == "tk_giai_doan" {
@@ -678,7 +681,7 @@ func (s *Service) ensureCorePhases(ctx context.Context, project float64) error {
 }
 
 func (s *Service) AddPhase(ctx context.Context, a *actor.Actor, id float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "create", tabsProgress...); err != nil {
 		return nil, err
 	}
 	if str(b, "name") == "" {
@@ -696,7 +699,7 @@ func (s *Service) AddPhase(ctx context.Context, a *actor.Actor, id float64, b *o
 }
 
 func (s *Service) UpdatePhase(ctx context.Context, a *actor.Actor, id, item float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "edit", tabsProgress...); err != nil {
 		return nil, err
 	}
 	patch := phaseFields(b)
@@ -737,7 +740,7 @@ func phaseFields(b *omap.Map) *omap.Map {
 }
 
 func (s *Service) AddTask(ctx context.Context, a *actor.Actor, id float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "create", tabsProgress...); err != nil {
 		return nil, err
 	}
 	for _, k := range []string{"name", "phaseId", "start", "end"} {
@@ -758,7 +761,7 @@ func (s *Service) AddTask(ctx context.Context, a *actor.Actor, id float64, b *om
 }
 
 func (s *Service) UpdateTask(ctx context.Context, a *actor.Actor, id, item float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "edit", tabsProgress...); err != nil {
 		return nil, err
 	}
 	old, err := s.repo.Get(ctx, "tk_cong_viec", id, item)
@@ -894,7 +897,7 @@ func (s *Service) taskFields(ctx context.Context, project float64, b *omap.Map, 
 
 // AddComment: bình luận vào công việc của dự án.
 func (s *Service) AddComment(ctx context.Context, a *actor.Actor, id, task float64, b *omap.Map) (any, error) {
-	if _, err := s.project(ctx, a, id); err != nil {
+	if _, err := s.project(ctx, a, id, "create", tabsProgress...); err != nil {
 		return nil, err
 	}
 	t, err := s.repo.Get(ctx, "tk_cong_viec", id, task)

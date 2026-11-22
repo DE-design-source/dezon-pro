@@ -32,10 +32,12 @@ type Deps struct {
 	Auditor          contracts.Auditor
 	Repo             Repository
 	HTTP             *http.Client
+	Access           contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 // Service: nghiệp vụ mua hàng.
 type Service struct {
+	access  contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
 	repo    Repository
 	db      *database.DB // transaction (D-13); nil khi test unit dùng repo giả
 	cfg     *config.Config
@@ -59,7 +61,7 @@ func New(d Deps) *Service {
 		// fetch của Node không đặt hạn riêng; undici tự cắt sau 300 giây chờ header
 		hc = &http.Client{Timeout: 300 * time.Second}
 	}
-	return &Service{repo: repo, db: d.DB, cfg: d.Cfg, pn: d.PurchaseNotifier, notify: d.Notifier, users: d.Users,
+	return &Service{access: d.Access, repo: repo, db: d.DB, cfg: d.Cfg, pn: d.PurchaseNotifier, notify: d.Notifier, users: d.Users,
 		auditor: d.Auditor, http: hc, now: time.Now, rnd: rand.Float64}
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './SanXuat.css'
 import { useTheme } from '../../hooks/useTheme'
 import { SX_TABS, INITIAL_ORDERS, INITIAL_MATERIALS, ME } from '../../data/sanXuatData'
@@ -13,13 +13,19 @@ import DetailModal from './components/DetailModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 
 export default function SanXuat() {
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState('tongquan')
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/san-xuat')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module sanxuat)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/san-xuat')
+  const noViewKey = SX_TABS.filter(t => !can('sanxuat', t.key)).map(t => t.key).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
   useTabFallback(tabHidden, tab, SX_TABS.map(t => t.key), setTab)
+  const noTab = SX_TABS.every(t => !can('sanxuat', t.key))
   const [orders, setOrders] = useState(INITIAL_ORDERS)
   const [orderSeq, setOrderSeq] = useState(7)
   const [materials, setMaterials] = useState(INITIAL_MATERIALS)
@@ -40,6 +46,7 @@ export default function SanXuat() {
     setCreateOpen(false)
   }
   function moveOrder(code, stageKey) {
+    if (!can('sanxuat', 'quytrinh', 'edit')) return
     setOrders(prev => prev.map(o => {
       if (o.code !== code || o.stage === stageKey) return o
       return stageKey === 'hoanThanh' ? { ...o, stage: stageKey, progress: 100, late: false } : { ...o, stage: stageKey }
@@ -53,7 +60,7 @@ export default function SanXuat() {
     setStockMode(null)
   }
 
-  const panel = key => `sx-panel${tab === key ? ' active' : ''}`
+  const panel = key => `sx-panel${tab === key && can('sanxuat', key) ? ' active' : ''}`
   const detailOrder = orders.find(o => o.code === detail.code) || null
 
   return (
@@ -71,10 +78,12 @@ export default function SanXuat() {
             <button key={t.key} className={`sx-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
-        <button className="sx-add-btn" onClick={() => setCreateOpen(true)}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          Tạo đơn sản xuất
-        </button>
+        {can('sanxuat', 'donsx', 'create') && (
+          <button className="sx-add-btn" onClick={() => setCreateOpen(true)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Tạo đơn sản xuất
+          </button>
+        )}
         <button className="sx-theme-toggle" title="Chuyển giao diện sáng/tối" onClick={toggleTheme}>
           {theme === 'dark'
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -84,12 +93,13 @@ export default function SanXuat() {
 
       {/* Các tab luôn được mount (ẩn bằng class .active) để giữ bộ lọc đang chọn, giống bản HTML */}
       <div className="sx-scroll">
+        {noTab && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem trang Sản xuất. Nhờ quản trị viên cấp quyền.</div>}
         <div className={panel('tongquan')}><OverviewTab orders={orders} /></div>
         <div className={panel('donsx')}><OrdersTab orders={orders} /></div>
         <div className={panel('quytrinh')} style={{ minHeight: 0 }}>
           <KanbanTab orders={orders} onMoveOrder={moveOrder} onOpenOrder={code => setDetail({ code, open: true })} />
         </div>
-        <div className={panel('khovattu')}><MaterialsTab materials={materials} onStock={setStockMode} /></div>
+        <div className={panel('khovattu')}><MaterialsTab materials={materials} onStock={can('sanxuat', 'khovattu', 'edit') ? setStockMode : null} /></div>
         <div className={panel('nhancong')}><WorkersTab /></div>
         <div className={panel('maymoc')}><EquipmentTab /></div>
         <div className={panel('nhansu')}><DeptStaff units={['xuong']} /></div>

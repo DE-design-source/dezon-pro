@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PageShell from '../../components/layout/PageShell'
+import { useAccess } from '../../services/accessService'
 
 const summary = [
   { label: 'Ngày công',   value: '18' },
@@ -10,6 +11,10 @@ const summary = [
 export default function ChamCongMobile() {
   const [checkedIn, setCheckedIn] = useState(false)
   const [checkedOut, setCheckedOut] = useState(false)
+  /* Phân quyền N21: xem = HR > Chấm công & phép > Xem; chấm vào / ra = thêm Tạo */
+  const a = useAccess()
+  const canPunch = a.can('hr', 'attendance', 'view') && a.can('hr', 'attendance', 'create')
+  const loadingAccess = !canPunch && !a.ready && !a.error
   const now = new Date()
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const dateStr = now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -23,7 +28,12 @@ export default function ChamCongMobile() {
           <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 8 }}>{dateStr}</div>
           <div style={{ fontSize: 52, fontWeight: 700, color: '#1f2937', letterSpacing: 2, fontVariantNumeric: 'tabular-nums' }}>{timeStr}</div>
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 28 }}>
+          {!canPunch && (
+            <div style={{ marginTop: 28, fontSize: 14, color: '#6b7280' }}>
+              {loadingAccess ? 'Đang tải phân quyền…' : 'Chưa được cấp quyền chấm công'}
+            </div>
+          )}
+          {canPunch && <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 28 }}>
             <button
               onClick={() => setCheckedIn(true)}
               disabled={checkedIn}
@@ -50,7 +60,7 @@ export default function ChamCongMobile() {
             >
               {checkedOut ? '✓ Đã chấm ra' : 'Chấm ra'}
             </button>
-          </div>
+          </div>}
         </div>
 
         {/* Monthly Summary */}

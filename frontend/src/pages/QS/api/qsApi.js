@@ -72,6 +72,11 @@ export const getProductHistory = (maSP, signal) => get('/products/' + enc(maSP) 
 export const setSpDuyet = (keys, approve, signal) => post('/product-approvals', { keys: keys || [], approve: yes(approve) }, signal)
 export const setYeuThich = (keys, on, signal) => post('/product-favorites', { keys: keys || [], on: yes(on) }, signal)
 export const spMyPerms = signal => get('/product-permissions', null, signal)
+// Duyệt sản phẩm theo phân cấp (M14.6, chỉ bản Go): quyền của tài khoản đang đăng nhập {duyet, giaoDuyet};
+// danh sách admin được giao duyệt [{id, duocDuyetSp}]; super bật / tắt quyền duyệt của 1 tài khoản admin
+export const getSpApprovalRights = signal => get('/product-approval-rights', null, signal)
+export const listProductApprovers = signal => get('/users/product-approvers', null, signal)
+export const setProductApproval = (id, on, signal) => put('/users/' + enc(id) + '/product-approval', { on: truthy(on) }, signal)
 export const requestDeleteProducts = (items, lyDo, signal) => post('/product-delete-requests', withLyDo({ items: items || [] }, lyDo), signal)
 export const uploadImage = (base64, fileName, signal) => post('/uploads/images', { base64, fileName }, signal)
 export const uploadFile = (base64, fileName, signal) => post('/uploads/files-base64', { base64, fileName }, signal)
@@ -106,8 +111,8 @@ export const getDeXuatList = (maDA, signal) => get('/projects/' + enc(maDA) + '/
 export const getDeXuat = (ma, signal) => get('/proposals/' + enc(ma), null, signal)
 /* Route chỉ bản Go (M13.1): phiếu của chính mình; admin / super: mọi phiếu của công ty */
 export const getMyDeXuat = (code, signal) => get('/my-proposals/' + enc(code), null, signal)
-export const listDeXuat = (loai, signal) => get('/proposals', loai ? { loai } : null, signal)
-export const resolveDeXuat = (ma, approve, signal) => post('/proposals/' + enc(ma) + '/resolve', { approve: truthy(approve) }, signal)
+export const listDeXuat = (loai, signal, ct) => request('GET', '/proposals', { query: loai ? { loai } : null, signal, viewAs: ct })
+export const resolveDeXuat = (ma, approve, signal, ct) => request('POST', '/proposals/' + enc(ma) + '/resolve', { body: { approve: truthy(approve) }, signal, viewAs: ct })
 
 /* ---- Admin ---- */
 export const adminListUsers = signal => get('/users', null, signal)
@@ -116,13 +121,13 @@ export const adminUpdateUser = (id, fields, signal) => patch('/users/' + enc(id)
 export const adminSetPassword = (id, newPassword, signal) => put('/users/' + enc(id) + '/password', { newPassword }, signal)
 export const adminSetActive = (id, active, signal) => put('/users/' + enc(id) + '/active', { active: truthy(active) }, signal)
 export const adminDeleteUser = (id, signal) => del('/users/' + enc(id), signal)
-export const getAuditLog = (n, signal) => get('/audit-log', { limit: n }, signal)
-export const listDeleteRequests = signal => get('/product-delete-requests', null, signal)
-export const resolveDeleteRequest = (id, approve, lyDo, signal) =>
-  post('/product-delete-requests/' + enc(id) + '/resolve', withLyDo({ approve: truthy(approve) }, approve ? '' : lyDo), signal)
-export const listPurchaseRequests = signal => get('/purchase-orders', null, signal)
+export const getAuditLog = (n, signal, ct) => request('GET', '/audit-log', { query: { limit: n }, signal, viewAs: ct })
+export const listDeleteRequests = (signal, ct) => request('GET', '/product-delete-requests', { signal, viewAs: ct })
+export const resolveDeleteRequest = (id, approve, lyDo, signal, ct) =>
+  request('POST', '/product-delete-requests/' + enc(id) + '/resolve', { body: withLyDo({ approve: truthy(approve) }, approve ? '' : lyDo), signal, viewAs: ct })
+export const listPurchaseRequests = (signal, ct) => request('GET', '/purchase-orders', { signal, viewAs: ct })
 export const getPurchaseOrder = (code, signal) => get('/purchase-orders/' + enc(code), null, signal)
-export const resolvePurchaseRequest = (code, approve, signal) => post('/purchase-orders/' + enc(code) + '/resolve', { approve: truthy(approve) }, signal)
+export const resolvePurchaseRequest = (code, approve, signal, ct) => request('POST', '/purchase-orders/' + enc(code) + '/resolve', { body: { approve: truthy(approve) }, signal, viewAs: ct })
 
 /* ---- Công ty (super) ---- */
 export const listCongTy = signal => get('/companies', null, signal)
@@ -131,6 +136,15 @@ export const updateCongTy = (id, d, signal) => patch('/companies/' + enc(id), d 
 export const deleteCongTy = (id, signal) => del('/companies/' + enc(id), signal)
 export const listCongTyUsers = (id, signal) => get('/companies/' + enc(id) + '/users', null, signal)
 export const createCongTyUser = (id, d, signal) => post('/companies/' + enc(id) + '/users', d || {}, signal)
+
+/* ---- Phân quyền 3 cấp (N21, chỉ bản Go; services/accessService.js) ----
+   grants = {"<module>": {"<tab>" | "*": ["view","create","edit","delete","approve","export"]}}; null = bỏ phân quyền riêng (về cách cũ) */
+export const getAccessCatalog = signal => get('/access/catalog', null, signal)
+export const getMyAccess = signal => get('/access/me', null, signal)
+export const getCompanyAccess = (id, signal) => get('/companies/' + enc(id) + '/access', null, signal)
+export const setCompanyAccess = (id, grants, signal) => put('/companies/' + enc(id) + '/access', { grants: grants == null ? null : grants }, signal)
+export const getUserAccess = (id, signal) => get('/users/' + enc(id) + '/access', null, signal)
+export const setUserAccess = (id, grants, signal) => put('/users/' + enc(id) + '/access', { grants: grants == null ? null : grants }, signal)
 
 /* ---- Báo cáo (super) ---- */
 export const baoCaoNhapSP = (opts, signal) => post('/reports/new-products', opts || {}, signal)

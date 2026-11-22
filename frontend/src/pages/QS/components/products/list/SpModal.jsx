@@ -140,11 +140,11 @@ export default function SpModal({ product, specs, specErr, canEdit, onClose, onE
               </button>
             )}
             <span className="qspl-multi-wrap">
-              <button type="button" className={`qsc-btn${multi ? ' on' : ''}`} title="Chọn nhiều dự án để ghi danh sản phẩm này một lần" onClick={() => setMulti(m => !m)}>
+              <button type="button" className={`qsc-btn${multi ? ' on' : ''}`} disabled={!p.daDuyet} title={p.daDuyet ? 'Chọn nhiều dự án để ghi danh sản phẩm này một lần' : 'Sản phẩm chưa duyệt'} onClick={() => setMulti(m => !m)}>
                 <QsIcon name="layers" size={14} /> Ghi danh vào nhiều dự án
               </button>
             </span>
-            <button type="button" className="qsc-btn blue" onClick={() => spAddToProject(p)}><QsIcon name="plus" size={15} /> Thêm vào dự án</button>
+            <button type="button" className="qsc-btn blue" disabled={!p.daDuyet} title={p.daDuyet ? undefined : 'Sản phẩm chưa duyệt'} onClick={() => spAddToProject(p)}><QsIcon name="plus" size={15} /> Thêm vào dự án</button>
           </div>
         </div>
       </div>

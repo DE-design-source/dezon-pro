@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Pop, { PopHead } from './Pop'
 import { qsToast as toast } from '../../common/dialogs'
 import { lineProd_ } from '../../../lib/productFields.js'
-import { spVarKey_ } from '../../../lib/catalogFilters.js'
+import { spVarKey_, spBocOk_ } from '../../../lib/catalogFilters.js'
 import { giaDongTuSP_ } from '../../../lib/calc.js'
 import { spNorm_ } from '../../../lib/format.js'
 import { GACH_DV, gachDv_, gachHop_, gachTinh_, gachSL_, gachHeSo_ } from '../../../lib/gach.js'
@@ -21,7 +21,8 @@ export default function GachPop({ anchor, line, products, onApply, onClose }) {
   const sibs = useMemo(() => {
     if (!p0) return []
     const k = spVarKey_(p0), seen = {}
-    return (products || []).filter(x => spVarKey_(x) === k && ktOf(x) && !seen[spNorm_(ktOf(x))] && (seen[spNorm_(ktOf(x))] = 1))
+    // khổ của biến thể khác: chỉ SP đã duyệt (M14.6); SP của chính dòng luôn giữ
+    return (products || []).filter(x => (x === p0 || spBocOk_(x)) && spVarKey_(x) === k && ktOf(x) && !seen[spNorm_(ktOf(x))] && (seen[spNorm_(ktOf(x))] = 1))
   }, [p0, products])
   const g0 = (line.extra && line.extra.gach) || {}
   const dv0 = gachDv_(line.dvt)

@@ -1,7 +1,7 @@
 // Package it: trang IT (SiteFlow /it) - yêu cầu hỗ trợ (helpdesk, bảng quy trình xử lý từng yêu cầu) + thiết bị & tài sản CNTT.
 // Tính năng mới, chỉ bản Go: REST /api/v1/it/... (không có hàm /api/:fn). Bảng: it_yeu_cau, it_thiet_bi (migration 0048).
 // Quyền: ai đăng nhập (có công ty) cũng tạo được yêu cầu (nút Báo lỗi ở mọi trang) và xem yêu cầu mình gửi;
-// xem / xử lý mọi yêu cầu, quản lý thiết bị cần quyền trang IT (perms "it") hoặc admin.
+// xem / xử lý mọi yêu cầu, quản lý thiết bị theo phân quyền 3 cấp (N21; chưa có dòng phân quyền = perms "it" hoặc admin).
 package it
 
 import (
@@ -57,8 +57,9 @@ type Deps struct {
 	Cfg      *config.Config
 	Users    contracts.UserReader
 	UserFmt  contracts.UserFormatter
-	Notifier contracts.Notifier // báo người được giao / phòng IT khi có yêu cầu mới; nil = không báo
-	Uploader contracts.Uploader // lưu ảnh đính kèm (UPLOAD_DIR, /files/it/...)
+	Notifier contracts.Notifier      // báo người được giao / phòng IT khi có yêu cầu mới; nil = không báo
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21); nil = chỉ super quản lý được
+	Uploader contracts.Uploader      // lưu ảnh đính kèm (UPLOAD_DIR, /files/it/...)
 	Repo     Repository
 }
 
@@ -69,6 +70,7 @@ type Service struct {
 	userFmt  contracts.UserFormatter
 	notifier contracts.Notifier
 	uploader contracts.Uploader
+	access   contracts.AccessChecker
 	now      func() time.Time
 }
 
@@ -78,7 +80,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, notifier: d.Notifier, uploader: d.Uploader, now: time.Now}
+	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, notifier: d.Notifier, uploader: d.Uploader, access: d.Access, now: time.Now}
 }
 
 /* ---------------- Quyền ---------------- */
@@ -97,16 +99,16 @@ func member(ctx context.Context, a *actor.Actor) error {
 	return nil
 }
 
-// isIT: được xem / xử lý mọi yêu cầu và quản lý thiết bị: admin / super, hoặc nhân viên được cấp trang IT.
-func (s *Service) isIT(ctx context.Context, a *actor.Actor) (bool, error) {
-	if a.IsAdmin() {
+// isIT: thao tác action ở tab của trang IT (main = yêu cầu hỗ trợ, thietbi = thiết bị) theo phân quyền 3 cấp (N21,
+// contracts.AccessChecker); super luôn được. Chưa có dòng phân quyền = như cũ: admin, hoặc nhân viên được cấp trang IT.
+func (s *Service) isIT(ctx context.Context, a *actor.Actor, tab, action string) (bool, error) {
+	if a.IsSuper() {
 		return true, nil
 	}
-	u, err := s.users.GetByID(ctx, a.UID)
-	if err != nil || u == nil {
-		return false, err
+	if s.access == nil {
+		return false, nil
 	}
-	return hasPerm(s.userFmt.PermsArr(u.Val("perms")), Tab), nil
+	return s.access.Can(ctx, a, Tab, tab, action)
 }
 
 func hasPerm(perms []any, tab string) bool {
@@ -118,11 +120,11 @@ func hasPerm(perms []any, tab string) bool {
 	return false
 }
 
-func (s *Service) allowIT(ctx context.Context, a *actor.Actor) error {
+func (s *Service) allowIT(ctx context.Context, a *actor.Actor, tab, action string) error {
 	if err := member(ctx, a); err != nil {
 		return err
 	}
-	ok, err := s.isIT(ctx, a)
+	ok, err := s.isIT(ctx, a, tab, action)
 	if err != nil {
 		return err
 	}
@@ -140,7 +142,7 @@ func (s *Service) ListTickets(ctx context.Context, a *actor.Actor, mine bool) (a
 	if err := member(ctx, a); err != nil {
 		return nil, err
 	}
-	canManage, err := s.isIT(ctx, a)
+	canManage, err := s.isIT(ctx, a, "main", "view")
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +198,7 @@ func (s *Service) CreateTicket(ctx context.Context, a *actor.Actor, body *omap.M
 
 // UpdateTicket: sửa một phần (chỉ khoá gửi lên): bảng xử lý (tasks / stages / status / progress), đã tiếp nhận, thông tin.
 func (s *Service) UpdateTicket(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allowIT(ctx, a); err != nil {
+	if err := s.allowIT(ctx, a, "main", "edit"); err != nil {
 		return nil, err
 	}
 	old, err := s.repo.GetTicket(ctx, id)
@@ -267,6 +269,12 @@ func (s *Service) DeleteTicket(ctx context.Context, a *actor.Actor, id float64) 
 	}
 	if !a.IsAdmin() {
 		return nil, apperr.Forbidden("Chỉ quản trị được xoá yêu cầu")
+	}
+	if ok, err := s.isIT(ctx, a, "main", "delete"); err != nil || !ok {
+		if err == nil {
+			err = apperr.Forbidden("Tài khoản không có quyền xoá yêu cầu IT")
+		}
+		return nil, err
 	}
 	n, err := s.repo.DeleteTicket(ctx, id)
 	if err != nil {
@@ -624,7 +632,7 @@ func (s *Service) ListStaff(ctx context.Context, a *actor.Actor) (any, error) {
 /* ---------------- Thiết bị & tài sản ---------------- */
 
 func (s *Service) ListAssets(ctx context.Context, a *actor.Actor) (any, error) {
-	if err := s.allowIT(ctx, a); err != nil {
+	if err := s.allowIT(ctx, a, "thietbi", "view"); err != nil {
 		return nil, err
 	}
 	rows, err := s.repo.ListAssets(ctx)
@@ -639,7 +647,7 @@ func (s *Service) ListAssets(ctx context.Context, a *actor.Actor) (any, error) {
 }
 
 func (s *Service) CreateAsset(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	if err := s.allowIT(ctx, a); err != nil {
+	if err := s.allowIT(ctx, a, "thietbi", "create"); err != nil {
 		return nil, err
 	}
 	row, err := assetFields(body, true)
@@ -656,7 +664,7 @@ func (s *Service) CreateAsset(ctx context.Context, a *actor.Actor, body *omap.Ma
 }
 
 func (s *Service) UpdateAsset(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allowIT(ctx, a); err != nil {
+	if err := s.allowIT(ctx, a, "thietbi", "edit"); err != nil {
 		return nil, err
 	}
 	patch, err := assetFields(body, false)
@@ -675,7 +683,7 @@ func (s *Service) UpdateAsset(ctx context.Context, a *actor.Actor, id float64, b
 }
 
 func (s *Service) DeleteAsset(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allowIT(ctx, a); err != nil {
+	if err := s.allowIT(ctx, a, "thietbi", "delete"); err != nil {
 		return nil, err
 	}
 	n, err := s.repo.DeleteAsset(ctx, id)

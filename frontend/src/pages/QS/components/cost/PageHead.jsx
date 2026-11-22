@@ -11,6 +11,7 @@ import { money, pad2 } from '../../lib/format.js'
 import { hmLac_, hmSaiNganh_, hmSaiFields_ } from '../../lib/totals.js'
 import * as api from '../../api/qsApi'
 import { setState, getState } from '../../state/store'
+import { denyQs } from '../../state/qsAccess'
 import { qsToast, qsConfirm } from '../common/dialogs'
 
 /* Một ô số liệu của dải tổng (pgStat_ PUB/chiphi.js:33) */
@@ -147,6 +148,7 @@ export function SaiNote({ lines, products }) {
   async function fix() {
     const list = hmSaiNganh_(getState().lines, getState().products)
     if (!list.length) return
+    if (denyQs('chiphi', 'edit')) return
     if (!await qsConfirm('Chuyển ' + list.length + ' dòng về đúng hạng mục theo ngành hàng của sản phẩm?')) return
     setBusy(true)
     let ok = 0, loi = ''

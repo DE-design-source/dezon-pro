@@ -5,8 +5,10 @@ import { WIKI } from '../../data/wikiData'
 import WikiTree from './components/WikiTree'
 import ArticleView from './components/ArticleView'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
+import { useAccess } from '../../services/accessService'
 
 export default function Wiki() {
+  const { can } = useAccess()
   const { theme, toggleTheme } = useTheme()
   const [slug, setSlug] = useState('intro')
   const [search, setSearch] = useState('')
@@ -37,6 +39,11 @@ export default function Wiki() {
   }
 
   const headingRef = id => el => { if (el) headingEls.current[id] = el; else delete headingEls.current[id] }
+
+  // phân quyền 3 cấp (N21, module wiki, tab main)
+  if (!can('wiki', 'main')) {
+    return <div className="wk-page"><div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem Wiki. Nhờ quản trị viên cấp quyền.</div></div>
+  }
 
   return (
     <div

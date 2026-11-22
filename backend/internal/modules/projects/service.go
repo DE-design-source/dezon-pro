@@ -31,10 +31,12 @@ type Deps struct {
 	Notifier contracts.Notifier
 	Admins   contracts.AdminLister
 	Repo     Repository
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 // Service: nghiệp vụ dự án.
 type Service struct {
+	access   contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
 	repo     Repository
 	db       *database.DB // transaction (D-13); nil khi chạy repo giả
 	cfg      *config.Config
@@ -57,7 +59,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = NewRepository(d.DB)
 	}
-	s := &Service{repo: repo, db: d.DB, cfg: d.Cfg, catalog: d.Catalog, lines: d.Lines, users: d.Users, userFmt: d.UserFmt,
+	s := &Service{access: d.Access, repo: repo, db: d.DB, cfg: d.Cfg, catalog: d.Catalog, lines: d.Lines, users: d.Users, userFmt: d.UserFmt,
 		notifier: d.Notifier, admins: d.Admins, now: jsval.NowISO, random: rand.Float64}
 	s.genMa = func() string { return genMaDA(time.Now(), s.random()) }
 	return s

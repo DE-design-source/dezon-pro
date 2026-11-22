@@ -14,7 +14,8 @@ const fmtScale = s => (/^\d+([.,]\d+)?$/.test(String(s).trim()) ? String(s).trim
 /* onMove giữ trong chữ ký cho caller cũ (đã bỏ ô chọn giai đoạn trên thẻ: màu kanban đã cho biết giai đoạn) */
 /* projMode (lọc Phòng KD Dự Án, MarkUp 2026-11-19): dòng 1 = Tên dự án, dòng 2 = Chủ đầu tư,
    dòng 3 = Người phụ trách bên CĐT (= tên khách) · chức vụ (kdOptions.cdtContact) */
-export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee }) {
+/* readOnly (N21: không có quyền Sửa): không kéo thẻ, không đổi người phụ trách / số sao; không có onDelete: ẩn nút xoá */
+export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStart, onDragEnd, onOpen, onDelete, onMove, memberOpen, onToggleMember, onCloseMember, onAddAssignee, onRemoveAssignee, readOnly }) {
   const stageId = l.stage
   const accent = stageAccent(stageId)
   const isLostStage = stageId === 'truot-thau' || stageId === 'spam' || stageId === 'khong-tham-gia'
@@ -38,9 +39,9 @@ export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStar
   return (
     <div
       className={`kd-lead-card${dragging ? ' dragging' : ''}${memberOpen ? ' pop-open' : ''}`}
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('text/plain', l.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(l.id) }}
-      onDragEnd={onDragEnd}
+      draggable={!readOnly}
+      onDragStart={readOnly ? undefined : e => { e.dataTransfer.setData('text/plain', l.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(l.id) }}
+      onDragEnd={readOnly ? undefined : onDragEnd}
       onClick={() => onOpen(l.id)}
       style={{
         cursor: 'pointer', minHeight: 200,   /* bỏ ô chọn giai đoạn: 236 -> 200; minHeight (không cố định height): cỡ chữ lớn / thêm dòng tỉnh thành không bị cắt chữ (MarkUp 2026-11-16 16:41) */ boxSizing: 'border-box', overflow: memberOpen ? 'visible' : 'hidden', position: 'relative', zIndex: memberOpen ? 30 : undefined,   // mở hộp người phụ trách: không cắt hộp, nổi trên thẻ khác
@@ -51,9 +52,9 @@ export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStar
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <div title={projMode ? (projName ? 'Dự án: ' + projName + ' - Khách: ' : 'Chưa có tên dự án - Khách: ') + l.name : l.name} style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, minHeight: 34, flex: 1, minWidth: 0, ...clamp2 }}>{title}</div>
-        <button title="Xoá" onClick={e => { e.stopPropagation(); onDelete(l.id) }} style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex', flex: 'none' }}>
+        {onDelete && <button title="Xoá" onClick={e => { e.stopPropagation(); onDelete(l.id) }} style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex', flex: 'none' }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-.9 14a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
-        </button>
+        </button>}
       </div>
       {projMode ? (
         <>
@@ -88,10 +89,10 @@ export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStar
         {h && h.status === 'self-quoted' && <span style={{ ...pill, color: 'var(--sales)', background: 'var(--sales-tint)' }}>KD tự đề xuất</span>}
       </div>
       </>)}
-      <CardMembers lead={l} open={memberOpen} onToggle={onToggleMember} onClose={onCloseMember} onAdd={onAddAssignee} onRemove={onRemoveAssignee} />
+      <CardMembers lead={l} open={memberOpen} onToggle={onToggleMember} onClose={onCloseMember} onAdd={readOnly ? undefined : onAddAssignee} onRemove={onRemoveAssignee} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
         <span className="mono" style={{ fontSize: 12.5, color: 'var(--sales)', fontWeight: 700 }}>{fmtTy(l.value)}</span>
-        <RatingStars id={String(l.id)} small />
+        <RatingStars id={String(l.id)} small readOnly={readOnly} />
       </div>
       {/* địa chỉ công trình: đậm, to (thông tin quan trọng khi chọn thầu); tỉnh · địa chỉ chi tiết */}
       <div title={noiTitle} style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flex: 'none', minHeight: 19, lineHeight: 1.5, fontSize: 12.5, fontWeight: 700, color: noi || addr ? 'var(--text)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>

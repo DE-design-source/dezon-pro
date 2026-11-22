@@ -21,6 +21,9 @@ type Repository interface {
 	// UserByEmailInCompanyExcept (chỉ bản Go, M14.1): tài khoản KHÁC exceptID trong công ty congTyID (nil = không thuộc
 	// công ty nào) có email trùng (không phân biệt hoa thường); noScope; không có -> nil.
 	UserByEmailInCompanyExcept(ctx context.Context, email string, congTyID, exceptID any) (*omap.Map, error)
+	// CompanyAdmins (chỉ bản Go, M14.6): id + duoc_duyet_sp của tài khoản role admin, CÓ phạm vi công ty của ctx
+	// (super không xem công ty nào -> mọi công ty), order created_at.asc, limit 500.
+	CompanyAdmins(ctx context.Context) ([]*omap.Map, error)
 	InsertUser(ctx context.Context, row *omap.Map) ([]*omap.Map, error)
 	UpdateUser(ctx context.Context, id any, patch *omap.Map) ([]*omap.Map, error)
 	DeleteUser(ctx context.Context, id any) error
