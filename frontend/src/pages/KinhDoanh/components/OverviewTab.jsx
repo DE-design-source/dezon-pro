@@ -4,10 +4,10 @@ import {
   OV_TREND_CHART_OPTIONS, OV_FUNNEL_CHART_OPTIONS,
   LEAD_SOURCES,
 } from '../../../data/kinhDoanhData'
-import { FONT_STACK, fmtTy } from '../utils'
+import { FONT_STACK, fmtTy, startOfWeek } from '../utils'
 import { DeptFilter, TimeFilter } from './Filters'
 import OverviewGrid from './OverviewGrid'
-import { useKdOptions } from './ShortlistSelect'
+import { useKdOptions, useKdMap } from './ShortlistSelect'
 import { ovTrendData, TrendLine, TrendBar, FunnelBars, FunnelColumns, FunnelDonut } from './OverviewCharts'
 
 /* ===================== Tab Tổng quan (Overview dashboard) ===================== */
@@ -56,6 +56,23 @@ function ovComputeStats(leads) {
 const srcOf_ = l => String(l.source || '').trim() || 'Khác'
 const WON_ = { 'chot-hd': 1, 'thiet-ke': 1, 'thi-cong': 1 }
 
+/* Thẻ "Khách hàng theo tỉnh thành": kỳ đếm = khách TẠO trong tuần / tháng / năm này (theo giờ máy), hoặc tất cả */
+const PROV_PERIODS = [['week', 'Tuần'], ['month', 'Tháng'], ['year', 'Năm'], ['all', 'Tất cả']]
+const PROV_NONE = 'Chưa có tỉnh thành'
+const PROV_TOP = 12
+function loadProvPeriod() {
+  try { const v = localStorage.getItem('siteflow-ov-prov-period'); return PROV_PERIODS.some(p => p[0] === v) ? v : 'month' } catch { return 'month' }
+}
+const isoDay_ = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+/* [từ ngày, đến ngày] dạng yyyy-mm-dd của kỳ đang xem; null = tất cả */
+function provRange(period) {
+  const now = new Date()
+  if (period === 'week') { const mon = startOfWeek(now); const sun = new Date(mon); sun.setDate(sun.getDate() + 6); return [isoDay_(mon), isoDay_(sun)] }
+  if (period === 'month') return [isoDay_(new Date(now.getFullYear(), now.getMonth(), 1)), isoDay_(new Date(now.getFullYear(), now.getMonth() + 1, 0))]
+  if (period === 'year') return [now.getFullYear() + '-01-01', now.getFullYear() + '-12-31']
+  return null
+}
+
 export default function OverviewTab({ allLeads, leads: leadsDept, dept, onDeptChange, timeFilter, onTimeFilterChange }) {
   /* Bộ lọc nguồn khách hàng (riêng tab Tổng quan): 'all' hoặc tên nguồn; áp cho ô số, phễu, doanh số, cơ hội sắp chốt.
      Thẻ "Nguồn khách hàng" luôn tính mọi nguồn (theo phòng ban + thời gian) để so sánh, nguồn đang lọc được tô đậm */
@@ -66,6 +83,10 @@ export default function OverviewTab({ allLeads, leads: leadsDept, dept, onDeptCh
   const allLeadsSrc = source === 'all' ? allLeads : allLeads.filter(l => srcOf_(l) === source)
   const [ovPeriod, setOvPeriod] = useState(loadPeriod)
   const [ovChartType, setOvChartType] = useState(loadChartType)
+  const [provPeriod, setProvPeriodRaw] = useState(loadProvPeriod)
+  const setProvPeriod = v => { setProvPeriodRaw(v); try { localStorage.setItem('siteflow-ov-prov-period', v) } catch { /* bỏ qua */ } }
+  const geoMap = useKdMap('geo')
+  const provOf = l => { const g = geoMap[String(l.id)] || {}; return String(g.tinh || g.kv || '').trim() || PROV_NONE }
 
   function changePeriod(key) {
     setOvPeriod(key)
@@ -107,6 +128,18 @@ export default function OverviewTab({ allLeads, leads: leadsDept, dept, onDeptCh
         </div>
       )
     }
+    if (id === 'provinces') {
+      return (
+        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', flex: 'none' }}>
+          {PROV_PERIODS.map(([key, label]) => (
+            <button
+              key={key} type="button" draggable={false} onClick={() => setProvPeriod(key)}
+              style={{ border: 'none', cursor: 'pointer', padding: '6px 11px', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', background: provPeriod === key ? 'var(--primary-tint)' : 'none', color: provPeriod === key ? 'var(--primary)' : 'var(--text-muted)' }}
+            >{label}</button>
+          ))}
+        </div>
+      )
+    }
     if (id === 'funnel') return <ChartTypeSelect value={ovChartType.funnel} options={OV_FUNNEL_CHART_OPTIONS} onChange={v => changeChartType('funnel', v)} />
     return null
   }
@@ -120,6 +153,34 @@ export default function OverviewTab({ allLeads, leads: leadsDept, dept, onDeptCh
       if (ovChartType.funnel === 'columns') return <FunnelColumns leads={leads} />
       if (ovChartType.funnel === 'donut') return <FunnelDonut leads={leads} />
       return <FunnelBars leads={leads} />
+    }
+    if (id === 'provinces') {
+      /* đếm khách tạo trong kỳ theo tỉnh (cùng bộ lọc nguồn / phòng ban / thời gian ở đầu trang); 12 tỉnh nhiều nhất, còn lại gộp "Tỉnh khác" */
+      const r = provRange(provPeriod)
+      const inP = r ? leads.filter(l => { const d = String(l.createdAt || '').slice(0, 10); return d && d >= r[0] && d <= r[1] }) : leads
+      const m = new Map()
+      inP.forEach(l => { const k = provOf(l); m.set(k, (m.get(k) || 0) + 1) })
+      let rows = [...m.entries()].map(([k, n]) => ({ k, n })).sort((a, b) => (a.k === PROV_NONE) - (b.k === PROV_NONE) || b.n - a.n || a.k.localeCompare(b.k, 'vi'))
+      const named = rows.filter(x => x.k !== PROV_NONE), none = rows.find(x => x.k === PROV_NONE)
+      if (named.length > PROV_TOP) {
+        const rest = named.slice(PROV_TOP)
+        rows = [...named.slice(0, PROV_TOP), { k: 'Tỉnh khác (' + rest.length + ')', n: rest.reduce((t, x) => t + x.n, 0), other: true, title: rest.map(x => x.k + ': ' + x.n).join(', ') }, ...(none ? [none] : [])]
+      }
+      const max = rows.reduce((mx, x) => Math.max(mx, x.n), 0) || 1
+      const label = (PROV_PERIODS.find(p => p[0] === provPeriod) || [, ''])[1].toLowerCase()
+      if (!inP.length) return <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '12px 0' }}>{provPeriod === 'all' ? 'Chưa có khách hàng nào.' : 'Chưa có khách hàng nào được tạo trong ' + label + ' này.'}</div>
+      return (
+        <div className="kd-prov">
+          <div className="kd-prov-sum">{inP.length} khách {provPeriod === 'all' ? '' : 'tạo trong ' + label + ' này '}· {named.length} tỉnh thành</div>
+          {rows.map(x => (
+            <div key={x.k} className={'kd-prov-r' + (x.k === PROV_NONE ? ' none' : '') + (x.other ? ' other' : '')} title={x.title || x.k + ': ' + x.n + ' khách'}>
+              <span className="nm">{x.k}</span>
+              <span className="bar"><em style={{ width: Math.max(2, x.n / max * 100) + '%' }} /></span>
+              <span className="mono n">{x.n}</span>
+            </div>
+          ))}
+        </div>
+      )
     }
     if (id === 'sources') {
       /* mỗi nguồn: số cơ hội, giá trị pipeline, tỷ lệ chốt; thanh dài theo nguồn nhiều cơ hội nhất; bấm dòng = lọc theo nguồn đó */

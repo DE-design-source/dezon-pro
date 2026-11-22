@@ -1039,3 +1039,16 @@ html[data-theme="dark"] .kd-req, html[data-theme="dark"] .kd-lf-errmsg, html[dat
 .kd-lf-boq-acts a:hover, .kd-lf-boq-acts button:hover{text-decoration:underline;}
 .kd-lf-boq-acts button.danger{color:#D92D20;}
 .kd-lf-boq-acts em{font-style:normal; color:var(--text-muted);}
+/* Pipeline: cụm nút biểu tượng (thời gian, sao, nhân sự, giá trị, địa chỉ) đứng liền nhau */
+.kd-pl-bar > .kd-pl-icons{display:flex; align-items:center; gap:6px; flex-shrink:0;}
+/* Tổng quan - thẻ "Khách hàng theo tỉnh thành": thanh ngang theo số khách */
+.kd-prov{display:flex; flex-direction:column; gap:7px;}
+.kd-prov-sum{font-size:12px; color:var(--text-muted); margin-bottom:4px;}
+.kd-prov-r{display:grid; grid-template-columns:minmax(110px, 28%) minmax(0,1fr) 44px; align-items:center; gap:12px; font-size:12.5px;}
+.kd-prov-r .nm{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kd-prov-r .bar{height:10px; border-radius:99px; background:var(--surface-alt); overflow:hidden;}
+.kd-prov-r .bar em{display:block; height:100%; border-radius:99px; background:var(--sales);}
+.kd-prov-r .n{text-align:right; font-weight:700;}
+.kd-prov-r.other .bar em{background:color-mix(in srgb, var(--sales) 55%, var(--surface));}
+.kd-prov-r.none .nm{font-weight:500; color:var(--text-muted); font-style:italic;}
+.kd-prov-r.none .bar em{background:var(--text-muted); opacity:.45;}

@@ -42,6 +42,14 @@ type Repository interface {
 	InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error)
 	PruneInsights(ctx context.Context, leadID float64, keep int) error
 
+	// đổi tên người phụ trách theo họ tên mới của tài khoản (service_rename.go): mọi dòng của công ty đang làm việc,
+	// chỉ các cột chứa tên người; ids rỗng = mọi dòng (không khoá), có ids = chỉ các dòng đó và KHOÁ chúng (FOR UPDATE, gọi trong Tx).
+	// Accounts gồm cả tài khoản đã khoá (để nhận ra tên trùng)
+	LeadPeople(ctx context.Context, ids []float64) ([]*omap.Map, error)
+	TaskPeople(ctx context.Context, ids []float64) ([]*omap.Map, error)
+	AppointmentPeople(ctx context.Context, ids []float64) ([]*omap.Map, error)
+	Accounts(ctx context.Context) ([]*omap.Map, error)
+
 	// cài đặt công ty (cai_dat_cong_ty, thuộc TenantTables: tự lọc / tự gắn công ty đang làm việc), vd khoá kdAiConfig
 	GetSetting(ctx context.Context, key string) (*omap.Map, error)
 	SaveSetting(ctx context.Context, key string, row *omap.Map) error
@@ -172,6 +180,35 @@ func (r *pgRepo) PruneInsights(ctx context.Context, leadID float64, keep int) er
 	}
 	_, err = r.db.Remove(ctx, "kd_goi_y", database.Eq("khach_hang_id", leadID)+"&id=in.("+strings.Join(ids, ",")+")")
 	return err
+}
+
+func (r *pgRepo) LeadPeople(ctx context.Context, ids []float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_khach_hang", peopleOpt("id,phu_trach,quan_ly,nguoi_tao_ten", ids))
+}
+
+func (r *pgRepo) TaskPeople(ctx context.Context, ids []float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_nhiem_vu_kh", peopleOpt("id,phu_trach", ids))
+}
+
+func (r *pgRepo) AppointmentPeople(ctx context.Context, ids []float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_lich_hen", peopleOpt("id,thanh_vien", ids))
+}
+
+// peopleOpt: có ids -> chỉ các dòng đó, khoá theo thứ tự id (2 lần đổi tên cùng lúc không khoá chéo nhau)
+func peopleOpt(cols string, ids []float64) database.SelectOpt {
+	o := database.SelectOpt{Select: cols, Order: "id.asc"}
+	if len(ids) > 0 {
+		s := make([]string, len(ids))
+		for i, id := range ids {
+			s[i] = jsval.Str(id)
+		}
+		o.Filter, o.Lock = "id=in.("+strings.Join(s, ",")+")", true
+	}
+	return o
+}
+
+func (r *pgRepo) Accounts(ctx context.Context) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "users", database.SelectOpt{Select: "id,username,ho_ten", Order: "id.asc"})
 }
 
 func (r *pgRepo) GetSetting(ctx context.Context, key string) (*omap.Map, error) {

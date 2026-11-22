@@ -65,6 +65,7 @@ type SelectOpt struct {
 	Order   string // "cot.desc,cot2.asc.nullslast"
 	Limit   int    // 0 = không giới hạn
 	NoScope bool   // true = KHÔNG tự lọc theo công ty
+	Lock    bool   // true = khoá các dòng đọc được (FOR UPDATE) tới hết DB.Tx đang chạy; không dùng cho bảng tách lõi + vệ tinh
 }
 
 // Opt: tuỳ chọn của Insert / Update / Remove.
@@ -467,6 +468,12 @@ func (d *DB) Select(ctx context.Context, tbl string, opt ...SelectOpt) (rows []*
 	sql := jagg + "(select " + outList("GET", t, o.Select, "_t") + " from " + q(t.en) + " _t" + where + makeOrder("GET", t, order, d.collation())
 	if o.Limit != 0 {
 		sql += " limit " + strconv.Itoa(o.Limit)
+	}
+	if o.Lock {
+		if t.split {
+			return nil, dbError("GET", t.vi, 400, "PGRST100", "Không khoá được dòng của bảng tách: "+t.vi, "", "")
+		}
+		sql += " for update of _t"
 	}
 	sql += ") x"
 	return d.run(ctx, "GET", t, sql, params)

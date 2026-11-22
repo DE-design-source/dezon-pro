@@ -272,3 +272,6 @@ html[data-theme="dark"] .cd-asg-pop{box-shadow:0 14px 32px rgba(0,0,0,.45);}
 .cd-mem-x:disabled{opacity:.5; cursor:wait;}
 .cd-mem-x:focus-visible{outline:2px solid var(--cd-orange); outline-offset:1px;}
 html[data-theme="dark"] .cd-mem-x:hover:not(:disabled){background:rgba(180,35,24,.22); color:#F97066;}
+/* Đầu trang: dòng "Phụ trách: A, B, C" dưới tên Quản lý - dài thì cắt "…" (rê chuột xem đủ) */
+.cd-h-owner-t{min-width:0;}
+.cd-h-owner-t > span:last-child, .cd-h-owner-t b{max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}

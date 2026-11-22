@@ -92,6 +92,8 @@ export const OV_ITEM_DEFS = {
   'funnel': { kind: 'widget', x: 6, y: 4, w: 6, h: 5, minW: 3, minH: 3, title: 'Phễu bán hàng (Sales Funnel)' },
   'upcoming': { kind: 'widget', x: 0, y: 9, w: 6, h: 5, minW: 3, minH: 2, title: 'Cơ hội sắp chốt' },
   'sources': { kind: 'widget', x: 6, y: 9, w: 6, h: 5, minW: 3, minH: 3, title: 'Nguồn khách hàng' },
+  /* Khách hàng theo tỉnh thành (MarkUp 2026-11-22): đếm khách tạo trong tuần / tháng / năm này theo tỉnh (kdOptions.geo) */
+  'provinces': { kind: 'widget', x: 0, y: 14, w: 12, h: 6, minW: 4, minH: 3, title: 'Khách hàng theo tỉnh thành' },
 }
 export const OV_ITEM_ORDER = Object.keys(OV_ITEM_DEFS)
 export const OV_LAYOUT_KEY = 'siteflow-overview-layout-v3'

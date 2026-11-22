@@ -8,7 +8,7 @@ import './care.css'
 /* Khối "Danh sách Task" của khách hàng: việc cần làm có hạn, người làm, ghi chú; tick = xong (gạch ngang).
    Lưu database (/sales/leads/:id/tasks). Khối AI "Tạo task" báo qua emitLeadChange(..., 'tasks'). */
 
-let staffP = null   // tài khoản công ty (tên hiển thị -> tên đăng nhập), nạp 1 lần
+let staffP = null   // tài khoản công ty (tên hiển thị -> tên đăng nhập), nạp lại mỗi lần mở form task
 const staffMap = () => {
   if (!staffP) staffP = listStaff().then(list => {
     const m = {}
@@ -74,6 +74,8 @@ export default function CdTasks({ lead, me, people }) {
       e => { setErr('Lỗi tải task: ' + ((e && e.message) || e)); setLoaded(true) })
   }, [leadId])
   useEffect(() => { setTasks([]); setLoaded(false); setEdit(null); load() }, [load])
+  // mở form task -> nạp lại tài khoản (họ tên có thể vừa đổi ở Cài đặt > Tài khoản)
+  useEffect(() => { if (edit) { staffP = null; staffMap() } }, [edit])
   // sự kiện do chính khối này phát (đã tự tải lại) thì bỏ qua, tránh GET 2 lần; sự kiện từ khối khác (AI "Tạo task") vẫn tải lại
   const selfEmit = useRef(false)
   useLeadChange(leadId, ['tasks'], () => { if (!selfEmit.current) load() })

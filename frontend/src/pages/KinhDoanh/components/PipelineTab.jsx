@@ -100,11 +100,31 @@ function MultiFilter({ icon, allLabel, options, value, onChange, iconOnly }) {
 }
 const ADMIN_KD = 'Admin Kinh doanh'
 const srcKey = l => String(l.source || '').trim() || NONE
-const rawStaffOf = l => [...new Set((l.assignees || []).filter(a => a && a.name && a.role !== ADMIN_KD).map(a => String(a.name).trim()).filter(Boolean))]
-function optsOf(list, keysOf, noneLabel) {
+const staffAsg = l => (l.assignees || []).filter(a => a && a.name && a.role !== ADMIN_KD && String(a.name).trim())
+const lc = x => String(x || '').trim().toLowerCase()
+/* Danh sách tài khoản -> tra cứu: byU (username thường -> tài khoản), byName (họ tên / tên đăng nhập thường -> username; trùng nhiều tài khoản -> null) */
+function staffIndex(list) {
+  const byU = new Map(), byName = new Map(), nameCnt = new Map()
+  ;(list || []).forEach(u => { if (u && lc(u.username)) byU.set(lc(u.username), { username: String(u.username).trim(), name: String(u.name || '').trim() || String(u.username).trim() }) })
+  byU.forEach(u => nameCnt.set(lc(u.name), (nameCnt.get(lc(u.name)) || 0) + 1))
+  const put = (k, u) => { if (!k) return; byName.set(k, byName.has(k) && byName.get(k) !== u ? null : u) }
+  byU.forEach(u => { put(lc(u.name), u.username); put(lc(u.username), u.username) })
+  return { byU, byName, nameCnt }
+}
+/* Khoá lọc của 1 người phụ trách: username tài khoản; tên trùng nhiều tài khoản -> '~tên'; không khớp -> '' (chưa tải danh sách -> tên) */
+function staffKeyIn(ix, a) {
+  const nm = String(a.name).trim()
+  if (!ix) return nm
+  const hit = ix.byU.get(lc(a.username))
+  if (hit) return hit.username
+  const u = ix.byName.get(lc(nm))
+  if (u) return u
+  return u === null ? '~' + lc(nm) : ''
+}
+function optsOf(list, keysOf, noneLabel, labelOf) {
   const m = new Map()
   list.forEach(l => { const ks = keysOf(l); (ks.length ? ks : [NONE]).forEach(k => m.set(k, (m.get(k) || 0) + 1)) })
-  return [...m.entries()].map(([v, n]) => ({ v, n, label: v === NONE ? noneLabel : v }))
+  return [...m.entries()].map(([v, n]) => ({ v, n, label: v === NONE ? noneLabel : labelOf ? labelOf(v) : v }))
     .sort((a, b) => (a.v === NONE) - (b.v === NONE) || b.n - a.n || a.label.localeCompare(b.label, 'vi'))
 }
 /* Bộ lọc Giai đoạn / Giá trị (MarkUp 2026-11-16 18:01). Giá trị lead tính bằng tỷ (l.value) */
@@ -140,7 +160,7 @@ const LIST_HEAD_DA = [
 const cellTxt = { fontSize: 12.5, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }
 const cellLine = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 const SORT_LS = 'kd-list-sort'
-const readSort = () => { try { const v = JSON.parse(localStorage.getItem(SORT_LS) || 'null'); if (v && v.key) return v } catch { /* bỏ qua */ } return { key: 'care', dir: 1 } }
+const readSort = () => { try { const v = JSON.parse(localStorage.getItem(SORT_LS) || 'null'); if (v && v.key) return v } catch { /* bỏ qua */ } return { key: 'created', dir: -1 } }   // mặc định: Ngày tạo, mới nhất lên đầu (MarkUp 2026-11-22)
 const fmtDay = iso => (iso ? iso.split('-').reverse().join('/') : '')
 /* Ô tìm nhanh: tên, SĐT (bỏ dấu cách / chấm), email, địa chỉ, tỉnh, nguồn, tên dự án, người tạo */
 function matchQuery(l, q, extra) {
@@ -206,20 +226,35 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const rateOf = l => Number(rating[String(l.id)]) || 0
   const [srcF, setSrcF] = useState([])     // nguồn đang lọc
   const [staffF, setStaffF] = useState([]) // nhân sự phụ trách đang lọc
-  // Lọc nhân sự chỉ gồm tên khớp tài khoản trong database (họ tên hoặc tên đăng nhập, không phân biệt hoa thường);
-  // tên gõ tay không có tài khoản thì không hiện, khách chỉ có tên như vậy tính là "Chưa có người phụ trách".
+  // Lọc nhân sự theo TÀI KHOẢN (khoá = username, nhãn = họ tên hiện tại của tài khoản -> đổi họ tên thì nhãn đổi theo).
+  // Người phụ trách có username khớp tài khoản đang hoạt động -> tài khoản đó; không có username -> khớp theo họ tên / tên đăng nhập
+  // (không phân biệt hoa thường). Không khớp tài khoản nào thì không hiện, khách chỉ có tên như vậy tính là "Chưa có người phụ trách".
   const [users, setUsers] = useState(null)
   useEffect(() => {
     let off = false
     listStaff().then(list => {
       if (off) return
-      const s = new Set()
-      ;(list || []).forEach(u => { [u && u.name, u && u.username].forEach(x => { const k = String(x || '').trim().toLowerCase(); if (k) s.add(k) }) })
-      setUsers(s)
+      const ix = staffIndex(list)
+      setUsers(ix)
+      // lựa chọn lọc làm trước khi tải xong (khoá = tên) -> đổi sang khoá tài khoản
+      setStaffF(f => (f.length ? [...new Set(f.map(k => (k === NONE ? k : staffKeyIn(ix, { name: k }))).filter(Boolean))] : f))
     }, () => {})
     return () => { off = true }
   }, [])
-  const staffOf = l => { const r = rawStaffOf(l); return users ? r.filter(x => users.has(x.toLowerCase())) : r }
+  const staffOf = l => [...new Set(staffAsg(l).map(a => staffKeyIn(users, a)).filter(Boolean))]
+  /* khoá '~tên' (tên trùng nhiều tài khoản): nhãn = tên gốc đã lưu ở người phụ trách (giữ hoa thường), không tra tài khoản */
+  const tildeName = useMemo(() => {
+    const m = new Map()
+    ;(everyLead || []).forEach(l => staffAsg(l).forEach(a => { const nm = String(a.name).trim(), k = '~' + lc(nm); if (!m.has(k)) m.set(k, nm) }))
+    return m
+  }, [everyLead])
+  const staffLabel = k => {
+    if (!users) return k
+    if (k[0] === '~') return tildeName.get(k) || k.slice(1)
+    const u = users.byU.get(lc(k))
+    if (!u) return k
+    return users.nameCnt.get(lc(u.name)) > 1 ? u.name + ' (@' + u.username + ')' : u.name
+  }
   const okSrc = l => !srcF.length || srcF.indexOf(srcKey(l)) >= 0
   const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
   const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0
@@ -258,6 +293,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
     const ea = va == null || va === '', eb = vb == null || vb === ''
     if (ea || eb) return ea === eb ? careCmp(a, b) : (ea ? 1 : -1)   // ô trống luôn xuống cuối
     const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'vi')
+    if (!c && sortKey === 'created') return (Number(a.id) - Number(b.id)) * sort.dir || careCmp(a, b)   // cùng ngày: tạo sau (mã lớn hơn) theo cùng chiều
     return c ? c * sort.dir : careCmp(a, b)
   })
   const careMode = sortKey === 'care'
@@ -282,7 +318,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   /* số đếm của từng bộ lọc tính trên các bộ lọc còn lại */
   const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l) && rateOf(l) === n).length
   const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
-  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStage(l) && okVal(l) && okAddr(l)), staffOf, 'Chưa có người phụ trách')
+  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStage(l) && okVal(l) && okAddr(l)), staffOf, 'Chưa có người phụ trách', staffLabel)
   const forStage = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okVal(l) && okAddr(l))
   const stageOpts = STAGES.map(st => ({ v: st, label: STAGE_LABEL[st], n: forStage.filter(l => l.stage === st).length }))
   const forVal = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okAddr(l))
@@ -416,18 +452,21 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
       {/* 1 module xanh đậm (như băng dự án QS): phòng ban · thời gian | Kanban / Danh sách */}
       <div className="kd-pl-bar" ref={barRef}>
         <DeptFilter dept={dept} onChange={onDeptChange} />
-        <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill iconOnly />
-        <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} iconOnly />
+        {/* các nút biểu tượng gom 1 cụm (MarkUp 2026-11-22): thời gian, sao, nhân sự, giá trị, địa chỉ */}
+        <div className="kd-pl-icons">
+          <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill iconOnly />
+          <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} iconOnly />
+          <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF} iconOnly
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
+          <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF} iconOnly
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
+          <MultiFilter allLabel="Tất cả địa chỉ" options={addrOpts} value={addrF} onChange={setAddrF} iconOnly
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>} />
+        </div>
         <MultiFilter allLabel="Tất cả nguồn" options={srcOpts} value={srcF} onChange={setSrcF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></svg>} />
-        <MultiFilter allLabel="Tất cả nhân sự" options={staffOpts} value={staffF} onChange={setStaffF} iconOnly
-          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
         <MultiFilter allLabel="Tất cả giai đoạn" options={stageOpts} value={stageF} onChange={setStageF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>} />
-        <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF} iconOnly
-          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
-        <MultiFilter allLabel="Tất cả địa chỉ" options={addrOpts} value={addrF} onChange={setAddrF} iconOnly
-          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>} />
         {isDA && <MultiFilter allLabel="Tất cả chủ đầu tư" options={invOpts} value={invF} onChange={setInvF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg>} />}
         <span style={{ flex: 1 }} />

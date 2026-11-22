@@ -9,6 +9,7 @@ import (
 
 	"qspro-backend/internal/config"
 	"qspro-backend/internal/platform/database"
+	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/shared/actor"
 	"qspro-backend/internal/shared/contracts"
 	apperr "qspro-backend/internal/shared/errors"
@@ -30,6 +31,7 @@ type Service struct {
 	cfg       *config.Config
 	companies contracts.CompanyReader
 	sessions  contracts.SessionInvalidator
+	renames   contracts.UserRenameListener
 }
 
 var (
@@ -47,6 +49,30 @@ func (s *Service) SetCompanyReader(c contracts.CompanyReader) { s.companies = c 
 
 // SetSessionInvalidator: users <- auth (forgetSession_, A:407, 422, 431).
 func (s *Service) SetSessionInvalidator(si contracts.SessionInvalidator) { s.sessions = si }
+
+// SetRenameListener: users -> sales (đổi họ tên thì tên người phụ trách đã lưu đổi theo, chỉ bản Go).
+func (s *Service) SetRenameListener(l contracts.UserRenameListener) { s.renames = l }
+
+// notifyRename: sau khi đã lưu, họ tên (trim) thật sự đổi sang tên khác rỗng -> báo listener với công ty CỦA TÀI KHOẢN
+// (u = dòng trước khi sửa). Lỗi / panic chỉ ghi log, không đổi kết quả của hàm gọi.
+func (s *Service) notifyRename(ctx context.Context, u *omap.Map, newName any) {
+	if s.renames == nil || u == nil {
+		return
+	}
+	oldTen, newTen := jsval.Trim(jsval.StrOr(u.Val("ho_ten"), "")), jsval.Trim(jsval.StrOr(newName, ""))
+	if newTen == "" || newTen == oldTen {
+		return
+	}
+	username := jsval.StrOr(u.Val("username"), "")
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("users", "đổi tên người phụ trách theo họ tên mới lỗi:", username, r)
+		}
+	}()
+	if err := s.renames.UserRenamed(ctx, u.Val("cong_ty_id"), username, oldTen, newTen); err != nil {
+		logger.Error("users", "đổi tên người phụ trách theo họ tên mới lỗi:", username, err.Error())
+	}
+}
 
 func (s *Service) forgetSession(uid any) {
 	if s.sessions != nil {
@@ -332,6 +358,9 @@ func (s *Service) AdminUpdateUser(ctx context.Context, a *actor.Actor, id any, f
 	js, _ := omap.MarshalString(patch)
 	s.Audit(ctx, a, "update_user", "Sửa tài khoản "+jsval.ToString(name)+" "+js, nil)
 	if len(res) > 0 {
+		if patch.Has("ho_ten") {
+			s.notifyRename(ctx, u, patch.Val("ho_ten"))
+		}
 		return s.UserOut(res[0]), nil
 	}
 	return omap.Of("ok", true), nil
@@ -380,6 +409,9 @@ func (s *Service) UpdateMyProfile(ctx context.Context, a *actor.Actor, fields *o
 	s.forgetSession(a.UID)
 	js, _ := omap.MarshalString(patch)
 	s.Audit(ctx, a, "update_profile", "Tự sửa hồ sơ "+js, nil)
+	if patch.Has("ho_ten") {
+		s.notifyRename(ctx, u, patch.Val("ho_ten"))
+	}
 	return s.UserOut(res[0]), nil
 }
 

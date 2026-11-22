@@ -61,6 +61,8 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
     if (!open) return undefined
     let off = false
     setErr('')
+    setStaff(null)
+    staffP = null   // mỗi lần mở nạp lại: họ tên tài khoản có thể vừa đổi ở Cài đặt > Tài khoản
     loadStaff().then(s => { if (!off) setStaff(s) }, e => { if (!off) setErr((e && e.message) || 'Không tải được danh sách nhân sự') })
     const out = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     const esc = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false) } }
@@ -69,20 +71,28 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
     return () => { off = true; document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc, true) }
   }, [open])
   if (!onPatch) return <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
-  const have = new Set((lead.assignees || []).filter(a => a && a.name && !isAdminKd(a) && deptOf(a) === g.key).map(a => String(a.name).trim().toLowerCase()))
+  const isMgr = g.key === 'quanly'
+  const mine = isMgr ? (lead.manager ? [{ name: lead.manager }] : []) : (lead.assignees || []).filter(a => a && a.name && !isAdminKd(a) && deptOf(a) === g.key)
+  const have = new Set(mine.map(a => String(a.name).trim().toLowerCase()))
+  const haveU = new Set(mine.map(a => String(a.username || '').trim().toLowerCase()).filter(Boolean))
   const qq = noDau(q)
-  const list = (staff || []).filter(s => s && s.name && !have.has(String(s.name).trim().toLowerCase()))
+  const list = (staff || []).filter(s => s && s.name && !have.has(String(s.name).trim().toLowerCase()) && !haveU.has(String(s.username || '').trim().toLowerCase()))
     .filter(s => !qq || noDau(s.name + ' ' + (s.username || '') + ' ' + (s.department || '')).indexOf(qq) >= 0)
     .sort((a, b) => (b.sales ? 1 : 0) - (a.sales ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi'))
   const pick = s => {
     if (busy) return
     setBusy(true)
-    const next = [...(lead.assignees || []), { name: String(s.name).trim(), role: ROLE_OF[g.key] || 'Phụ trách', dept: g.key }]
+    const u = String(s.username || '').trim()
+    if (isMgr) {
+      Promise.resolve(onPatch({ manager: String(s.name).trim() })).then(saved => { setBusy(false); if (saved) { setOpen(false); setQ('') } }, () => setBusy(false))
+      return
+    }
+    const next = [...(lead.assignees || []), { name: String(s.name).trim(), role: ROLE_OF[g.key] || 'Phụ trách', dept: g.key, ...(u ? { username: u } : null) }]
     Promise.resolve(onPatch({ assignees: next })).then(saved => { setBusy(false); if (saved) { setOpen(false); setQ('') } }, () => setBusy(false))
   }
   return (
     <span className="cd-asg" ref={ref} data-cd-busy={open ? '1' : undefined}>
-      <button type="button" className="cd-btn sm" aria-expanded={open} onClick={() => setOpen(v => !v)} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+      <button type="button" className="cd-btn sm" aria-expanded={open} onClick={() => setOpen(v => !v)} title={isMgr ? (mine.length ? 'Đổi người quản lý' : 'Chọn người quản lý') : 'Gán người nhóm ' + g.label}>{isMgr && mine.length ? 'Đổi' : '+ Gán'}</button>
       {open && (
         <div className="cd-asg-pop" aria-label={'Gán người nhóm ' + g.label}>
           <input className="cd-asg-q" autoFocus placeholder="Tìm nhân sự..." value={q} onChange={e => setQ(e.target.value)}
@@ -114,6 +124,14 @@ export default function CdOwners({ lead: l, onEdit, onPatch }) {
   const main = leadOwner(l)
   const mainIdx = main ? main.idx : -1
   const groups = OWNER_GROUPS.map(g => ({ ...g, members: members.filter(x => deptOf(x.a) === g.key) }))
+  const MGR = { key: 'quanly', label: 'Quản lý', color: '#1E3A8A' }
+  const mgr = String(l.manager || '').trim()
+  const [mgrBusy, setMgrBusy] = [busyIdx === -2, v => setBusyIdx(v ? -2 : -1)]
+  const clearMgr = () => {
+    if (!onPatch || busyIdx !== -1) return
+    setMgrBusy(true)
+    Promise.resolve(onPatch({ manager: '' })).then(() => setMgrBusy(false), () => setMgrBusy(false))
+  }
   const remove = i => {
     if (!onPatch || busyIdx >= 0) return
     setBusyIdx(i)
@@ -125,6 +143,30 @@ export default function CdOwners({ lead: l, onEdit, onPatch }) {
         <span className="cd-card-t">Phụ trách</span>
       </div>
       <div className="cd-owners-list">
+        {/* Quản lý (lead.manager) đứng đầu khối Phụ trách */}
+        {mgr ? (
+          <div className="cd-grp">
+            <div className="cd-grp-h cd-grp-hd">
+              <span className="cd-grp-dot" style={{ background: MGR.color }} /><span className="cd-grp-l">{MGR.label}</span>
+              <AssignBtn g={MGR} lead={l} onPatch={onPatch} onEdit={onEdit} />
+            </div>
+            <div className="cd-mem">
+              <span className="cd-av">{lmInitials(mgr)}</span>
+              <span className="cd-mem-txt"><b>{mgr}</b></span>
+              {onPatch && (
+                <button type="button" className="cd-mem-x" disabled={busyIdx !== -1 || mgrBusy} onClick={clearMgr}
+                  title={'Bỏ ' + mgr + ' khỏi vị trí Quản lý'} aria-label={'Bỏ ' + mgr + ' khỏi vị trí Quản lý'}>×</button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="cd-grp cd-grp-mini">
+            <span className="cd-grp-dot" style={{ background: MGR.color }} />
+            <span className="cd-grp-mini-l">{MGR.label}</span>
+            <span className="cd-grp-mini-v">Chưa có</span>
+            <AssignBtn g={MGR} lead={l} onPatch={onPatch} onEdit={onEdit} />
+          </div>
+        )}
         {groups.map(g => !g.members.length ? (
           /* nhóm chưa có người: 1 dòng (tên nhóm · Chưa phân công · + Gán) */
           <div key={g.key} className="cd-grp cd-grp-mini">

@@ -63,6 +63,7 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
   const title = projNameMap[id] || l.name
   const sub = [[l.projectType || l.type, l.scale].filter(Boolean).join(' '), l.value > 0 ? fmtTy(l.value) : '', region].filter(Boolean).join(' · ')
   const owner = leadOwner(l)
+  const mgrName = String(l.manager || '').trim()
   const cur = FLOW.indexOf(l.stage)
   const n = daysSince(l.stageChangedAt || l.updatedAt)
   /* phoneNorms không nhận dạng được (số nước ngoài, số lẻ) -> gọi thẳng chữ số đã gõ */
@@ -76,7 +77,16 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
         {sub && <span className="cd-h-sub">{sub}</span>}
         <span className="cd-h-rate"><span>Mức độ</span><RatingStars id={id} /></span>
       </div>
-      {owner && (
+      {/* Có Quản lý: hiện tên Quản lý, dòng dưới là những người phụ trách; chưa có Quản lý: người phụ trách chính như cũ */}
+      {mgrName ? (
+        <div className="cd-h-owner" title={'Quản lý: ' + mgrName}>
+          <span className="cd-av lead">{lmInitials(mgrName)}</span>
+          <span className="cd-h-owner-t">
+            <span>Quản lý</span>
+            <b>{mgrName}</b>
+          </span>
+        </div>
+      ) : owner && (
         <div className="cd-h-owner">
           <span className="cd-av lead">{lmInitials(owner.name)}</span>
           <span className="cd-h-owner-t">
