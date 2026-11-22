@@ -109,7 +109,7 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 
 // RegisterRoutes: REST /api/v1/sales, khớp từng GoRoute ở trên.
 func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
-	g := v1.Group("/sales", middleware.RequireLogin())
+	g := v1.Group("/sales", s.readKeyAuth(), middleware.RequireLogin()) // readKeyAuth: khoá API chỉ đọc, apikey.go
 	withID := func(fn func(ctx context.Context, a *actor.Actor, id float64, c *gin.Context) (any, error)) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			id, err := validator.ParamNum(c, "id")

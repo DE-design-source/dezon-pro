@@ -74,6 +74,7 @@ type Service struct {
 	ai       AIClient
 	db       *database.DB
 	now      func() time.Time
+	readKeys []readKey // khoá API chỉ đọc (SALES_READ_KEYS, apikey.go)
 }
 
 // New tạo service.
@@ -82,7 +83,11 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	return &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, db: d.DB, now: time.Now}
+	s := &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, db: d.DB, now: time.Now}
+	if d.Cfg != nil {
+		s.readKeys = parseReadKeys(d.Cfg.SalesReadKeys)
+	}
+	return s
 }
 
 // tx: ghi khách hàng + tạo dự án triển khai trong cùng 1 transaction. Repo giả trong test không có DB -> chạy thẳng.

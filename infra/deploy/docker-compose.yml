@@ -73,6 +73,8 @@ services:
       LARK_APP_SECRET: ${LARK_APP_SECRET:-}
       DB_POOL_MAX: ${DB_POOL_MAX:-}
       RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-}
+      # Khoá API chỉ đọc Kinh doanh (vd Vua Thầu): ten:cong_ty_id:sha256hex, cách nhau dấu phẩy (backend/internal/modules/sales/apikey.go)
+      SALES_READ_KEYS: ${SALES_READ_KEYS:-}
       # IP người dùng lấy từ X-Forwarded-For do Caddy gửi (chỉ tin mạng nội bộ của compose, xem networks bên dưới)
       TRUSTED_PROXIES: 172.30.0.0/24
       # ---- Dezon Chat ----

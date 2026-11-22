@@ -42,7 +42,10 @@ type Config struct {
 	Debug        bool     // DEBUG: bật gin debug mode
 	ReportJob    bool     // REPORT_JOB: chỉ "0" mới tắt job báo cáo tự động
 	TokenTTLDays float64  // TOKEN_TTL_DAYS: hạn phiên đăng nhập (ngày); trống / <= 0 = 7 ngày như bản Node
-	UploadDir    string   // UPLOAD_DIR: kho ảnh / tài liệu tải lên trên đĩa, mặc định "uploads" (tương đối với thư mục chạy)
+	// SALES_READ_KEYS: khoá API chỉ đọc Kinh doanh cho hệ thống ngoài, "ten:cong_ty_id:sha256hex" cách nhau dấu phẩy
+	// (modules/sales/apikey.go). Rỗng = không có khoá.
+	SalesReadKeys string
+	UploadDir     string // UPLOAD_DIR: kho ảnh / tài liệu tải lên trên đĩa, mặc định "uploads" (tương đối với thư mục chạy)
 	// TRUSTED_PROXIES (IP / CIDR, cách nhau dấu phẩy): proxy được tin khi lấy IP client từ X-Forwarded-For
 	// cho RATE_LIMIT_RPS. Rỗng = không tin proxy nào, IP là địa chỉ kết nối trực tiếp.
 	TrustedProxies []string
@@ -123,6 +126,7 @@ func Load() *Config {
 	c.ReportJob = os.Getenv("REPORT_JOB") != "0"
 	c.TokenTTLDays, _ = strconv.ParseFloat(strings.TrimSpace(os.Getenv("TOKEN_TTL_DAYS")), 64)
 	c.CORSOrigins = list(os.Getenv("CORS_ORIGINS"))
+	c.SalesReadKeys = os.Getenv("SALES_READ_KEYS")
 	c.TrustedProxies = list(os.Getenv("TRUSTED_PROXIES"))
 	c.ChatJWTSecret = os.Getenv("CHAT_JWT_SECRET")
 	c.ChatAccessTTLMin = positive(os.Getenv("CHAT_ACCESS_TTL_MIN"), 15)
