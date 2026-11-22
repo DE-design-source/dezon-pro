@@ -16,7 +16,7 @@ import LeadModal from './components/LeadModal'
 import StaffRequestModal from './components/StaffRequestModal'
 import ConfirmDelete from './components/ConfirmDelete'
 import { useKdMap, saveKdOptionsMany } from './components/ShortlistSelect'
-import CustomerPage from './components/CustomerPage'
+import CustomerDashboard from './components/customer/CustomerDashboard'
 import NotifBell from '../../components/ui/NotifBell'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
@@ -426,7 +426,7 @@ function KinhDoanhPage() {
           onOpenLead={id => { closeLeadModal(); setDetail({ open: true, id }) }} onMergeInto={mergeIntoLead} />
         <div style={leadModal.open ? { display: 'none' } : { display: 'contents' }}>
         {detail.open && detailLead && (
-          <CustomerPage
+          <CustomerDashboard
             lead={detailLead}
             me={meName}
             interactions={interactions[detailLead.id] || []}
@@ -435,6 +435,7 @@ function KinhDoanhPage() {
             onEdit={() => openLeadModal(detailLead.id)}
             onMove={moveLead}
             onSetCreated={d => setCreatedAt(detailLead.id, d)}
+            onOpenNotif={openNotif}
           />
         )}
         <div style={detail.open && detailLead ? { display: 'none' } : { display: 'contents' }}>

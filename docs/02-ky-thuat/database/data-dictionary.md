@@ -97,7 +97,7 @@ Khách hàng tiềm năng / cơ hội của trang Kinh doanh - migration 0015 (2
 | `is_partner_handover` | `doi_tac` | boolean | không | false |  | True when the signed job is handed to a partner company. |  |
 | `creator_name` | `nguoi_tao_ten` | text | không | '' |  | Display name of the salesperson who created the lead (free text, may differ from created_by). | Tên hiển thị tự do (danh bạ nhân sự chưa có trong database). |
 | `manager_name` | `quan_ly` | text | không | '' |  | Display name of the managing salesperson (free text). |  |
-| `assignees` | `phu_trach` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "role": text}] - people on the card. | jsonb tài liệu nguyên khối (quy tắc 19): `[{"name": text, "role": text}]`, tối đa 50 phần tử. |
+| `assignees` | `phu_trach` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "role": text}] - people on the card. | jsonb tài liệu nguyên khối (quy tắc 19): `[{"name": text, "role": text, "username"?: text, "since"?: "yyyy-mm-dd", "dept"?: "kinhdoanh"\|"ctv"\|"concept"\|"thietke"\|"nhathau"}]`, tối đa 50 phần tử. `username` = tài khoản được giao (GET /sales/staff); `since` = ngày nhận phụ trách (người mới không gửi -> hôm nay giờ VN; người cũ, khớp theo `username` rồi theo `name`, không gửi -> giữ giá trị đã lưu); `dept` = nhóm trên khối Phụ trách (không gửi -> giữ giá trị đã lưu). |
 | `handoff` | `ban_giao` | jsonb | có |  | CHECK | Document read/written whole: last handoff slip {"status","dept","requestedAt","assignee"}; null = none. | jsonb tài liệu nguyên khối: `{"status","dept","requestedAt","assignee"}` (giá trị chuỗi hoặc null). |
 | `boq_file_name` | `file_boq` | text | không | '' |  | Name of the BOQ file the customer sent (name only, no upload yet). |  |
 | `project_code` | `ma_da` | text | có |  | FK SET NULL | Linked QS project (projects.project_code); its quote total is shown as the lead value. |  |
@@ -105,6 +105,7 @@ Khách hàng tiềm năng / cơ hội của trang Kinh doanh - migration 0015 (2
 | `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
 | `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
 | `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+| `stage_changed_at` | `ngay_doi_giai_doan` | timestamp with time zone | không | now() |  | When the lead entered its current stage (set by the service when stage changes; backfilled from updated_at). | Migration 0053. Giao diện: "Đã ở giai đoạn này N ngày" (`stageChangedAt`). |
 
 ## `sales_lead_activities` (`kd_cham_soc`)
 
@@ -124,6 +125,77 @@ Lịch sử chăm sóc khách hàng - migration 0015. **Bảng con** của `sale
 | `author_name` | `nguoi_viet` | text | không | '' |  | Display name of the writer at the time (snapshot). | **B (snapshot)**: tên người viết tại thời điểm ghi. |
 | `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who wrote the row; set null if the user is deleted. |  |
 | `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+
+## `sales_lead_scores` (`kd_cham_diem`)
+
+Chấm điểm deal 6 tiêu chí × 4 câu của trang khách hàng dạng dashboard - migration 0053 (2026-11-22). **Bảng con** của `sales_leads`, 1 dòng / khách (không có `company_id`; db-map `tenant` qua `lead_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `lead_id` | `khach_hang_id` | bigint | không |  | PK, FK CASCADE | Owning lead (primary key); row is deleted with it. |  |
+| `checks` | `tieu_chi` | jsonb | không | '{}' | CHECK | Document read/written whole: {"<criterion key>": [bool x4]} - which questions are answered yes. | jsonb tài liệu nguyên khối: `{"tien"\|"quyetdinh"\|"dat"\|"thoidiem"\|"nhucau"\|"canhtranh": [bool, bool, bool, bool]}`; API chỉ nhận `true` / `false`. |
+| `history` | `lich_su` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"at": ISO time, "score": deal score}] appended on each save (capped by the service). | jsonb tài liệu nguyên khối: `[{"at": "ISO UTC", "score": number}]`, chỉ thêm khi điểm deal đổi, giữ 500 điểm cuối; dùng cho "So với tuần trước". |
+| `updated_by` | `nguoi_sua` | text | không | '' |  | Display name of the last editor (snapshot). | **B (snapshot)**. |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last save time. |  |
+
+## `sales_lead_appointments` (`kd_lich_hen`)
+
+Lịch hẹn với khách hàng (khối "Việc tiếp theo") - migration 0053, CHECK giờ kết thúc sau giờ bắt đầu ở 0054. **Bảng con** của `sales_leads` (không có `company_id`; db-map `tenant` qua `lead_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `lead_id` | `khach_hang_id` | bigint | không |  | FK CASCADE | Owning lead; rows are deleted with it. |  |
+| `appointment_date` | `ngay` | date | không |  |  | Meeting date. |  |
+| `start_time` | `gio_bat_dau` | text | không | '' | CHECK | Start time HH:MM (local Vietnam time); empty = not set. |  |
+| `end_time` | `gio_ket_thuc` | text | không | '' | CHECK | End time HH:MM; empty = not set. | `ck_sales_lead_appointments_end_time_after_start` (0054): `start_time = '' or end_time = '' or end_time > start_time`. |
+| `title` | `tieu_de` | text | không |  | CHECK | Short title. |  |
+| `meeting_mode` | `hinh_thuc` | text | không | '' |  | How the meeting happens (Họp trực tiếp, Online, ...). Open list, no CHECK. |  |
+| `place` | `dia_diem` | text | không | '' |  | Meeting place / link. |  |
+| `goal` | `muc_tieu` | text | không | '' |  | Goal of the meeting. |  |
+| `members` | `thanh_vien` | jsonb | không | '[]' | CHECK | Document read/written whole: ["display name", ...] - attendees. | jsonb tài liệu nguyên khối: `["tên", ...]`, tối đa 30 phần tử. |
+| `prep_items` | `chuan_bi` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"text": text, "done": bool}] - preparation checklist. | jsonb tài liệu nguyên khối: `[{"text": text, "done": bool}]`, tối đa 50 phần tử; `done` chỉ nhận `true` / `false`. |
+| `status` | `trang_thai` | text | không | 'planned' | CHECK | planned / done / cancelled. |  |
+| `author_name` | `nguoi_viet` | text | không | '' |  | Display name of the writer at the time (snapshot). | **B (snapshot)**. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `sales_lead_tasks` (`kd_nhiem_vu_kh`)
+
+Task của khách hàng (khối "Danh sách Task") - migration 0053, CHECK `done_at` ở 0054. **Bảng con** của `sales_leads` (không có `company_id`; db-map `tenant` qua `lead_id`).
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `lead_id` | `khach_hang_id` | bigint | không |  | FK CASCADE | Owning lead; rows are deleted with it. |  |
+| `title` | `tieu_de` | text | không |  | CHECK | What to do. |  |
+| `due_date` | `han` | date | có |  |  | Deadline; null = none. |  |
+| `assignees` | `phu_trach` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"name": text, "username": text}] - people doing it. | jsonb tài liệu nguyên khối: `[{"name": text, "username": text}]`, tối đa 20 phần tử. |
+| `note` | `ghi_chu` | text | không | '' |  | Free note. |  |
+| `is_done` | `xong` | boolean | không | false |  | True when finished. | API `done` chỉ nhận `true` / `false`. |
+| `done_at` | `ngay_xong` | timestamp with time zone | có |  | CHECK | When it was marked done; null while open. | **C (dẫn xuất)** của `is_done`; `ck_sales_lead_tasks_done_at` (0054): `is_done or done_at is null`. |
+| `task_source` | `nguon` | text | không | '' | CHECK | Empty = typed by a user; ai = created from an AI suggestion. |  |
+| `author_name` | `nguoi_viet` | text | không | '' |  | Display name of the writer at the time (snapshot). | **B (snapshot)**. |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who created the row; set null if the user is deleted. |  |
+| `created_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Row creation time. |  |
+| `updated_at` | `cap_nhat` | timestamp with time zone | không | now() |  | Last change time (set by the service). |  |
+
+## `sales_lead_insights` (`kd_goi_y`)
+
+Bản phân tích khách hàng (khối "Phân tích AI": Gemini hoặc gợi ý theo quy tắc) - migration 0053. **Bảng con** của `sales_leads` (không có `company_id`; db-map `tenant` qua `lead_id`). Giao diện chỉ hiện bản mới nhất; service giữ 20 bản mới nhất / khách, lập lại trong 45 giây trả bản vừa lập.
+
+| Cột | Tên trong code | Kiểu | NULL | Mặc định | Ràng buộc | Ý nghĩa | Phân loại / ghi chú |
+|---|---|---|---|---|---|---|---|
+| `id` | `id` | bigint | không |  | PK | Primary key. |  |
+| `lead_id` | `khach_hang_id` | bigint | không |  | FK CASCADE | Owning lead; rows are deleted with it. |  |
+| `content` | `noi_dung` | jsonb | không |  | CHECK | Document read/written whole: {"actions","strategy","ideas","roadmap"} as returned to the UI. | jsonb tài liệu nguyên khối: `{"actions": {"main": {priority, why, title, zalo}, "side": [{tag, when, title, why}]}, "strategy": {headline, risks: [text], note, fit: {score, label}, pace: {score, delta}, closeChance: {pct, hint}}, "ideas": [{key, title, desc}], "roadmap": {anchor: "yyyy-mm-dd"\|null, title, steps: [{date, label, desc, state: done\|now\|open\|key\|end, dashed}]}}`. |
+| `engine` | `cong_cu` | text | không |  | CHECK | gemini = Gemini API answer; rules = server-side rule-based fallback. |  |
+| `model_name` | `mo_hinh` | text | không | '' |  | Gemini model used; empty for rules. |  |
+| `sources` | `nguon` | jsonb | không | '[]' | CHECK | Document read/written whole: [{"kind","date","summary","by"}] - data the analysis was built from. | jsonb tài liệu nguyên khối: `[{"kind": "lead"\|"activity"\|"appointment"\|"task"\|"score"\|"file", "date": "yyyy-mm-dd", "summary": text, "by": text}]`; nguồn `file` (tài liệu bổ sung) được giữ sang bản sau khi lần lập không gửi `extra`. |
+| `warning` | `canh_bao` | text | không | '' |  | Why the rule-based fallback was used (Vietnamese, shown to the user); empty when Gemini answered. |  |
+| `created_by` | `nguoi_tao` | uuid | có |  | FK SET NULL | User who asked for the analysis; set null if the user is deleted. |  |
+| `generated_at` | `ngay_tao` | timestamp with time zone | không | now() |  | Generation time. |  |
 
 ## `delivery_projects` (`tk_du_an`)
 

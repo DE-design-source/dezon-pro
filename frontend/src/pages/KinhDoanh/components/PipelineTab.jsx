@@ -3,6 +3,7 @@ import { STAGES, STAGE_LABEL, DEPT_COLOR, DEPT_SHORT, DEPT_TINT } from '../../..
 import { fmtTy, stageAccent, sourceColor, noDau, duplicateIndex, phoneNorms } from '../utils'
 import { useKdMap, saveKdOptions } from './ShortlistSelect'
 import { RatingStars } from './CustomerPage'
+import { listStaff } from '../api'
 
 /* Bộ lọc theo đánh giá tiềm năng (sao, kdOptions.rating): nút xổ danh sách, tích chọn nhiều mức 0..5 sao (0 = chưa đánh giá);
    không tích mức nào = tất cả */
@@ -99,7 +100,7 @@ function MultiFilter({ icon, allLabel, options, value, onChange, iconOnly }) {
 }
 const ADMIN_KD = 'Admin Kinh doanh'
 const srcKey = l => String(l.source || '').trim() || NONE
-const staffOf = l => [...new Set((l.assignees || []).filter(a => a && a.name && a.role !== ADMIN_KD).map(a => String(a.name).trim()).filter(Boolean))]
+const rawStaffOf = l => [...new Set((l.assignees || []).filter(a => a && a.name && a.role !== ADMIN_KD).map(a => String(a.name).trim()).filter(Boolean))]
 function optsOf(list, keysOf, noneLabel) {
   const m = new Map()
   list.forEach(l => { const ks = keysOf(l); (ks.length ? ks : [NONE]).forEach(k => m.set(k, (m.get(k) || 0) + 1)) })
@@ -205,6 +206,20 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const rateOf = l => Number(rating[String(l.id)]) || 0
   const [srcF, setSrcF] = useState([])     // nguồn đang lọc
   const [staffF, setStaffF] = useState([]) // nhân sự phụ trách đang lọc
+  // Lọc nhân sự chỉ gồm tên khớp tài khoản trong database (họ tên hoặc tên đăng nhập, không phân biệt hoa thường);
+  // tên gõ tay không có tài khoản thì không hiện, khách chỉ có tên như vậy tính là "Chưa có người phụ trách".
+  const [users, setUsers] = useState(null)
+  useEffect(() => {
+    let off = false
+    listStaff().then(list => {
+      if (off) return
+      const s = new Set()
+      ;(list || []).forEach(u => { [u && u.name, u && u.username].forEach(x => { const k = String(x || '').trim().toLowerCase(); if (k) s.add(k) }) })
+      setUsers(s)
+    }, () => {})
+    return () => { off = true }
+  }, [])
+  const staffOf = l => { const r = rawStaffOf(l); return users ? r.filter(x => users.has(x.toLowerCase())) : r }
   const okSrc = l => !srcF.length || srcF.indexOf(srcKey(l)) >= 0
   const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
   const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0

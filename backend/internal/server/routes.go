@@ -30,6 +30,7 @@ import (
 	"qspro-backend/internal/modules/system"
 	"qspro-backend/internal/modules/takeoff"
 	"qspro-backend/internal/modules/users"
+	"qspro-backend/internal/platform/gemini"
 	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/platform/mailer"
 	"qspro-backend/internal/platform/objstore"
@@ -142,7 +143,7 @@ func (s *Server) modules() []Module {
 	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: khách gửi tới phòng nào thì có dự án triển khai ở trang phòng đó (DeliveryFromLead)
 	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
-		Delivery: delivSvc, Notifier: notifSvc})
+		Delivery: delivSvc, Notifier: notifSvc, AI: salesAI(d.Cfg)})
 	// Chat (tài khoản theo số điện thoại / email, hoặc gắn tài khoản Dezon Pro: POST /chat/auth/dezon đọc users qua Users / UserFmt). Gateway WebSocket một tiến trình (realtime.Hub)
 	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
 	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);
@@ -182,6 +183,21 @@ func chatMail(cfg *config.Config) chat.MailSender {
 		From: cfg.SMTPFrom})
 	if err != nil {
 		logger.Error("chat", "email chat tắt (mã OTP email ghi vào log):", err.Error())
+		return nil
+	}
+	return c
+}
+
+// salesAI: client Gemini cho phân tích khách hàng Kinh doanh khi đặt GEMINI_API_KEY; không có -> nil (gợi ý theo quy tắc).
+// Trả interface nil thật như chatPush. Không ghi khoá vào log.
+func salesAI(cfg *config.Config) sales.AIClient {
+	if cfg.GeminiAPIKey == "" {
+		logger.Info("sales", "phân tích khách hàng bằng Gemini tắt: chưa đặt GEMINI_API_KEY, dùng gợi ý theo quy tắc")
+		return nil
+	}
+	c, err := gemini.New(gemini.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiModel})
+	if err != nil {
+		logger.Error("sales", "phân tích khách hàng bằng Gemini tắt:", err.Error())
 		return nil
 	}
 	return c

@@ -274,6 +274,18 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `DELETE` | `/sales/leads/:id` | `kdDeleteLead` | `rpc.Login` | sales | Xoá khách hàng + lịch sử chăm sóc |
 | `GET` | `/sales/leads/:id/activities` | `kdListActivities` | `rpc.Login` | sales | Lịch sử chăm sóc |
 | `POST` | `/sales/leads/:id/activities` | `kdAddActivity` | `rpc.Login` | sales | Ghi 1 lần chăm sóc |
+| `GET` | `/sales/leads/:id/score` | `kdGetScore` | `rpc.Login` | sales | Chỉ số chính 6 tiêu chí × 4 câu (`{checks, criteria, critScore, dealScore, locks, prevWeek, updatedAt, updatedBy}`) |
+| `PUT` | `/sales/leads/:id/score` | `kdSaveScore` | `rpc.Login` | sales | Lưu `checks` (mỗi câu chỉ nhận `true` / `false`) + thêm 1 điểm lịch sử khi điểm deal đổi (`prevWeek` = điểm mới nhất tại / trước 7 ngày trước) |
+| `GET` | `/sales/leads/:id/appointments` | `kdListAppointments` | `rpc.Login` | sales | Lịch hẹn (`{appointments: [...]}`) |
+| `POST` | `/sales/leads/:id/appointments` | `kdAddAppointment` | `rpc.Login` | sales | Thêm lịch hẹn (`date`, `title` bắt buộc) |
+| `PATCH` | `/sales/appointments/:apptId` | `kdUpdateAppointment` | `rpc.Login` | sales | Sửa 1 phần lịch hẹn |
+| `DELETE` | `/sales/appointments/:apptId` | `kdDeleteAppointment` | `rpc.Login` | sales | Xoá lịch hẹn |
+| `GET` | `/sales/leads/:id/tasks` | `kdListTasks` | `rpc.Login` | sales | Task của khách (`{tasks: [...]}`) |
+| `POST` | `/sales/leads/:id/tasks` | `kdAddTask` | `rpc.Login` | sales | Thêm task (`title` bắt buộc; `source` `ai` = từ gợi ý AI) |
+| `PATCH` | `/sales/tasks/:taskId` | `kdUpdateTask` | `rpc.Login` | sales | Sửa 1 phần task (`done` ghi kèm `doneAt`) |
+| `DELETE` | `/sales/tasks/:taskId` | `kdDeleteTask` | `rpc.Login` | sales | Xoá task |
+| `GET` | `/sales/leads/:id/insights` | `kdGetInsights` | `rpc.Login` | sales | Bản phân tích mới nhất (`{insight: ...\|null}`) |
+| `POST` | `/sales/leads/:id/insights/generate` | `kdGenerateInsights` | `rpc.Login` | sales | Lập phân tích bằng Gemini (`GEMINI_API_KEY`); không có khoá / lỗi -> theo quy tắc (`engine: rules`, `warning`); lập lại trong 45 giây -> trả bản vừa lập, giữ 20 bản mới nhất / khách |
 | `GET` | `/it/tickets` | `itListTickets` | `rpc.Login` | it | Yêu cầu hỗ trợ IT mới nhất trước (`{tickets, canManage}`): quyền IT (admin / perms `it`) thấy cả công ty, người khác hoặc `?mine=1` chỉ thấy yêu cầu mình gửi |
 | `POST` | `/it/tickets` | `itCreateTicket` | `rpc.Login` | it | Tạo yêu cầu (trang IT / nút Báo lỗi, `source=report`, `page`); ảnh `data:image/...;base64` lưu vào kho file `/files/it/...` (tối đa 8 ảnh, 8 MB); báo người trong `roles` có `username`, không ai thì báo nhân viên có perms `it` |
 | `PATCH` | `/it/tickets/:id` | `itUpdateTicket` | `rpc.Login` | it | Sửa 1 phần (quyền IT): `tasks` / `stages` (bảng xử lý), `status`, `progress` 0-100, `received`, thông tin; báo người VỪA được thêm vào `roles` |
