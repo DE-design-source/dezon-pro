@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { STAGES, STAGE_LABEL, DEPT_COLOR, DEPT_SHORT, DEPT_TINT } from '../../../data/kinhDoanhData'
 import { fmtTy, stageAccent, sourceColor, noDau, duplicateIndex, phoneNorms } from '../utils'
 import { useKdMap, saveKdOptions } from './ShortlistSelect'
@@ -68,8 +68,8 @@ function MultiFilter({ icon, allLabel, options, value, onChange, iconOnly }) {
   const toggle = v => onChange(value.indexOf(v) >= 0 ? value.filter(x => x !== v) : [...value, v])
   const lbl = v => (options.find(o => o.v === v) || { label: v }).label
   const label = !value.length ? allLabel : value.map(lbl).join(', ')
-  const t = q.trim().toLowerCase()
-  const shown = options.filter(o => !t || o.label.toLowerCase().indexOf(t) >= 0)
+  const t = noDau(q)
+  const shown = options.filter(o => !t || noDau(o.label).indexOf(t) >= 0)
   return (
     <div className="kd-pl-sdd" ref={box}>
       <button type="button" className={'kd-pl-sbtn' + (iconOnly ? ' ic' : '') + (value.length ? ' on' : '')} onClick={() => { setOpen(o => !o); setQ('') }} aria-expanded={open}
@@ -223,11 +223,15 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const okSrc = l => !srcF.length || srcF.indexOf(srcKey(l)) >= 0
   const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
   const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0
+  /* Lọc theo địa chỉ (tỉnh / thành, MarkUp 2026-11-22): khoá = tỉnh (kdOptions.geo), không có thì khu vực; chưa có -> "Chưa có tỉnh thành" */
+  const [addrF, setAddrF] = useState([])
+  const addrKey = l => tinhOf(l) || NONE
+  const okAddr = l => !addrF.length || addrF.indexOf(addrKey(l)) >= 0
   const [stageF, setStageF] = useState([])
   const [valF, setValF] = useState([])
   const okStage = l => !stageF.length || stageF.indexOf(l.stage) >= 0
   const okVal = l => !valF.length || valF.indexOf(bandOf(l)) >= 0
-  const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l))
+  const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l))
   /* ưu tiên sao: 5 -> 1 -> chưa đánh giá; cùng số sao giữ thứ tự cũ (sort ổn định) */
   const leads = starSort ? leads0.slice().sort((a, b) => (rateOf(b) || -1) - (rateOf(a) || -1)) : leads0
   /* Ưu tiên chăm sóc: khách chưa xếp hạng (mới) lên đầu, mới nhất trước; còn lại theo hạng đã kéo thả */
@@ -276,18 +280,35 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
     saveKdOptions('careOrder', m)
   }
   /* số đếm của từng bộ lọc tính trên các bộ lọc còn lại */
-  const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && rateOf(l) === n).length
-  const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l) && okStage(l) && okVal(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
-  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStage(l) && okVal(l)), staffOf, 'Chưa có người phụ trách')
-  const forStage = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okVal(l))
+  const starCnt = n => leadsAll.filter(l => okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l) && rateOf(l) === n).length
+  const srcOpts = optsOf(leadsAll.filter(l => okStar(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l)), l => [srcKey(l)].filter(k => k !== NONE), 'Chưa có nguồn')
+  const staffOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStage(l) && okVal(l) && okAddr(l)), staffOf, 'Chưa có người phụ trách')
+  const forStage = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okVal(l) && okAddr(l))
   const stageOpts = STAGES.map(st => ({ v: st, label: STAGE_LABEL[st], n: forStage.filter(l => l.stage === st).length }))
-  const forVal = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l))
+  const forVal = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okAddr(l))
   const valOpts = VAL_BANDS.map(([v, label]) => ({ v, label, n: forVal.filter(l => bandOf(l) === v).length }))
-  const invOpts = isDA ? optsOf(leadsQ.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l)), invKeys, 'Chưa có chủ đầu tư') : []
+  const addrOpts = optsOf(leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l)), l => { const k = tinhOf(l); return k ? [k] : [] }, 'Chưa có tỉnh thành')
+  const invOpts = isDA ? optsOf(leadsQ.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l)), invKeys, 'Chưa có chủ đầu tư') : []
   const [draggingId, setDraggingId] = useState(null)
   const [hoverStage, setHoverStage] = useState(null)
   const [memberOpenFor, setMemberOpenFor] = useState(null)
   const kanbanRef = useRef(null)
+  /* Thanh công cụ: 1 hàng (nút có chữ co lại, cắt …); chỉ khi co hết cỡ vẫn tràn mới cho xuống dòng (class wrap) */
+  const barRef = useRef(null)
+  const fitBar = () => {
+    const el = barRef.current
+    if (!el) return
+    el.classList.remove('wrap')
+    if (el.scrollWidth > el.clientWidth + 1) el.classList.add('wrap')
+  }
+  useLayoutEffect(fitBar)
+  useEffect(() => {
+    const el = barRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(() => fitBar())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const trackRef = useRef(null)
   const [hs, setHs] = useState({ ratio: 1, pos: 0 }) // thanh cuộn ngang: tỉ lệ phần nhìn thấy & vị trí (0–1)
 
@@ -393,7 +414,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
       {/* Thanh công cụ (+ tiêu đề cột của Danh sách) cố định khi cuộn lên xuống */}
       <div className="kd-pl-sticky" ref={stickyRef}>
       {/* 1 module xanh đậm (như băng dự án QS): phòng ban · thời gian | Kanban / Danh sách */}
-      <div className="kd-pl-bar">
+      <div className="kd-pl-bar" ref={barRef}>
         <DeptFilter dept={dept} onChange={onDeptChange} />
         <TimeFilter filter={timeFilter} onChange={onTimeFilterChange} pill iconOnly />
         <StarFilter value={star} onChange={setStar} count={starCnt} sortOn={starSort} onSort={setStarSort} iconOnly />
@@ -403,8 +424,10 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>} />
         <MultiFilter allLabel="Tất cả giai đoạn" options={stageOpts} value={stageF} onChange={setStageF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>} />
-        <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF}
+        <MultiFilter allLabel="Tất cả giá trị" options={valOpts} value={valF} onChange={setValF} iconOnly
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
+        <MultiFilter allLabel="Tất cả địa chỉ" options={addrOpts} value={addrF} onChange={setAddrF} iconOnly
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>} />
         {isDA && <MultiFilter allLabel="Tất cả chủ đầu tư" options={invOpts} value={invF} onChange={setInvF}
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg>} />}
         <span style={{ flex: 1 }} />
@@ -470,9 +493,14 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
                 onMove(e.dataTransfer.getData('text/plain'), stageId)
               }}
             >
-              <div className="kd-stage-head">
-                <span title={STAGE_LABEL[stageId]} style={{ fontWeight: 700, fontSize: 13, ...(headColor ? { color: headColor } : null) }}>{STAGE_LABEL[stageId]}</span>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: headColor || 'var(--text-muted)' }}>({items.length} dự án - {fmtTy(total)})</span>
+              {/* đầu làn dạng khối màu đặc (khác thẻ khách hàng nền trắng): chấm màu + TÊN GIAI ĐOẠN, số khách ở ô tròn bên phải, tổng giá trị dòng dưới */}
+              <div className={'kd-stage-head kd-sh' + (headColor ? ' tint' : '')} title={STAGE_LABEL[stageId] + ' - ' + items.length + ' khách - ' + fmtTy(total)}>
+                <div className="kd-sh-top">
+                  <i className="kd-sh-dot" aria-hidden="true" />
+                  <span className="kd-sh-l">{STAGE_LABEL[stageId]}</span>
+                  <b className="kd-sh-n">{items.length}</b>
+                </div>
+                <span className="kd-sh-v">{fmtTy(total)}</span>
               </div>
               <div className="kd-stage-body">
                 {!items.length && <div className="kd-stage-empty">Kéo thẻ vào đây</div>}

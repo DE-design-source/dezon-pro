@@ -9,8 +9,10 @@ import (
 	"encoding/base64"
 	"io"
 	"mime"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,6 +20,7 @@ import (
 	"qspro-backend/internal/platform/logger"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	"qspro-backend/internal/shared/contracts"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
 	"qspro-backend/internal/shared/response"
@@ -229,6 +232,17 @@ func (s *Service) exportSanPham(c *gin.Context) {
 // uploadLimit: giới hạn thân của express.raw ở /upload/file = (DOC_MAX_MB + 1) MB.
 const uploadLimit = (DocMaxMB + 1) << 20
 
+// uploadMax: giới hạn thực dùng ở /upload/file (= uploadLimit; test hạ xuống để thử quá giới hạn trên đĩa cho nhanh).
+var uploadMax int64 = uploadLimit
+
+// uploadReadTimeout: hạn đọc thân /upload/file, thay riêng cho route này ReadTimeout 300 giây của http.Server
+// (tính cho cả request): file 300MB qua mạng ~1MB/s cần 5 phút.
+const uploadReadTimeout = 30 * time.Minute
+
+// uploadDrainTimeout: hạn đọc còn lại sau khi /upload/file đã quyết định trả lỗi (quá giới hạn / lỗi ghi) - DrainBody
+// chỉ đọc nốt phần thân trong khoảng này.
+const uploadDrainTimeout = 10 * time.Second
+
 // loiQuaLon (I:776): số MB lấy từ DocMaxMB như Node lấy từ store.DOC_MAX_MB.
 var loiQuaLon = "File quá lớn (tối đa " + strconv.Itoa(DocMaxMB) + "MB) — hãy dán link thay vì tải lên."
 
@@ -376,12 +390,52 @@ func qsName(raw string) string {
 	return ""
 }
 
+// docSpool: io.Writer ghi thân /upload/file vào tệp tạm của kho; tệp mở ở byte đầu tiên (thân rỗng không tạo tệp).
+// up = nil (chưa đăng nhập) thì chỉ đếm rồi bỏ.
+type docSpool struct {
+	ctx  context.Context
+	up   contracts.DocUploader
+	t    contracts.TempFile
+	head []byte // tối đa 3 byte đầu: nhận ra thân JSON chỉ có BOM
+	werr error  // lỗi tạo / ghi tệp tạm (khác lỗi đọc thân)
+}
+
+func (sp *docSpool) Write(b []byte) (int, error) {
+	if len(sp.head) < 3 {
+		sp.head = append(sp.head, b[:min(len(b), 3-len(sp.head))]...)
+	}
+	if sp.up == nil || len(b) == 0 {
+		return len(b), nil
+	}
+	if sp.t == nil {
+		t, err := sp.up.CreateTemp(sp.ctx)
+		if err != nil {
+			sp.werr = err
+			return 0, err
+		}
+		sp.t = t
+	}
+	n, err := sp.t.Write(b)
+	if err != nil {
+		sp.werr = err
+	}
+	return n, err
+}
+
+func (sp *docSpool) discard() {
+	if sp.t != nil {
+		sp.t.Discard()
+		sp.t = nil
+	}
+}
+
 // uploadFileRoute: thân = nội dung file (mọi Content-Type), ?name= tên gốc. Chạy NGOÀI ngữ cảnh công ty (không đọc database).
 // Thứ tự như Node: express.raw đọc thân trước (quá giới hạn -> 413 JSON, kể cả khi chưa đăng nhập) rồi mới kiểm tra đăng nhập.
 func (s *Service) uploadFileRoute(c *gin.Context) {
 	r := c.Request
 	var buf []byte
 	var doDai any = 0.0 // req.body.length
+	var sp *docSpool    // thân nhị phân: đã ghi theo luồng vào tệp tạm
 	// Khoá "qs.body" là nơi middleware.JSONBody cất thân đã phân tích.
 	if parsed, daDoc := c.Get("qs.body"); daDoc {
 		// Thân application/json đã bị express.json đọc trước: express.raw bỏ qua, req.body là mảng / object chứ không phải
@@ -397,7 +451,7 @@ func (s *Service) uploadFileRoute(c *gin.Context) {
 		var src io.Reader = r.Body
 		switch strings.ToLower(r.Header.Get("Content-Encoding")) {
 		case "", "identity":
-			if r.ContentLength > uploadLimit {
+			if r.ContentLength > uploadMax {
 				response.Fail(c, 413, loiQuaLon)
 				return
 			}
@@ -419,25 +473,68 @@ func (s *Service) uploadFileRoute(c *gin.Context) {
 			response.HTMLError(c, 415, "Unsupported Media Type")
 			return
 		}
-		b, err := io.ReadAll(io.LimitReader(src, uploadLimit+1))
-		if len(b) > uploadLimit {
+		// Ghi thân theo luồng vào tệp tạm của kho (bộ nhớ không phụ thuộc cỡ file). Chưa đăng nhập: chỉ đếm rồi bỏ,
+		// vẫn trả 413 trước 401 như Node.
+		sp = &docSpool{ctx: r.Context()}
+		// Chỉ nới hạn đọc khi đã đăng nhập và Content-Length (nếu có) không vượt giới hạn; chưa đăng nhập giữ ReadTimeout
+		// của server. Không có ResponseController (httptest) thì giữ hạn của server.
+		rc := http.NewResponseController(c.Writer)
+		noiHan := actor.FromGin(c) != nil
+		if noiHan {
+			sp.up = s.uploader
+			_ = rc.SetReadDeadline(time.Now().Add(uploadReadTimeout))
+		}
+		// catHan: trả lỗi khi thân còn dữ liệu - DrainBody đọc nốt phần còn lại, không để nó đọc hàng GB dưới hạn 30 phút
+		catHan := func() {
+			if noiHan {
+				_ = rc.SetReadDeadline(time.Now().Add(uploadDrainTimeout))
+			}
+		}
+		defer sp.discard() // lỗi / quá giới hạn / client ngắt: không để lại tệp tạm; sau Commit thì không làm gì
+		n, err := io.Copy(sp, io.LimitReader(src, uploadMax))
+		quaLon := false
+		if err == nil && n == uploadMax { // còn dữ liệu sau giới hạn?
+			var mot [1]byte
+			k, perr := io.ReadFull(src, mot[:])
+			quaLon = k > 0
+			if perr != nil && perr != io.EOF {
+				err = perr
+			}
+		}
+		if quaLon {
+			catHan()
 			response.Fail(c, 413, loiQuaLon)
 			return
 		}
+		if sp.werr != nil {
+			catHan()
+			logger.Error("upload file", "lỗi:", sp.werr.Error())
+			response.Fail(c, 400, sp.werr.Error())
+			return
+		}
 		if err != nil {
+			catHan()
 			response.HTMLError(c, 400, "Bad Request")
 			return
 		}
 		// Thân JSON chỉ có BOM: express.json đặt req.body = {} (JSONBody không cất gì cho thân rỗng sau BOM)
-		if !(laJSON(r.Header.Get("Content-Type")) && len(bytes.TrimPrefix(b, []byte("\xEF\xBB\xBF"))) == 0) {
-			buf, doDai = b, float64(len(b))
+		if laJSON(r.Header.Get("Content-Type")) && n <= 3 && len(bytes.TrimPrefix(sp.head, []byte("\xEF\xBB\xBF"))) == 0 {
+			sp.discard()
+		} else {
+			doDai = float64(n)
 		}
 	}
 	if actor.FromGin(c) == nil {
 		response.Fail(c, 401, "Chưa đăng nhập")
 		return
 	}
-	out, err := s.uploadDoc(r.Context(), buf, doDai, qsName(r.URL.RawQuery), c.GetHeader("Content-Type"))
+	var out *omap.Map
+	var err error
+	if sp != nil && sp.t != nil {
+		out, err = saveDoc(doDai, qsName(r.URL.RawQuery), c.GetHeader("Content-Type"), sp.t.Commit)
+	} else {
+		out, err = s.uploadDoc(r.Context(), buf, doDai, qsName(r.URL.RawQuery), c.GetHeader("Content-Type"))
+	}
 	if err != nil {
 		logger.Error("upload file", "lỗi:", err.Error())
 		response.Fail(c, 400, err.Error())

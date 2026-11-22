@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { STAGES, STAGE_LABEL, DEPT_LABEL } from '../../../data/kinhDoanhData'
 import { useKdMap, saveKdOptions } from './ShortlistSelect'
-import { fmtTy, stageAccent, lmInitials } from '../utils'
+import { fmtTy, stageAccent, lmInitials, boqOf } from '../utils'
 import { mediaUrl } from '../../QS/api/files'
 import { MonthCalendar, TimeWheel } from './IosWheel'
 import DatePicker from '../../../components/ui/DatePicker'
@@ -392,7 +392,9 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
                 <button type="button" className="kd-cp-edit" title="Đóng cột Chi tiết" aria-label="Đóng cột Chi tiết" onClick={() => setDetail(false)}><Ic d="M18 6 6 18M6 6l12 12" size={14} /></button>
               </div>
               <DSec id="tai-lieu" title="Tài liệu & ghi chú" fold={fold} onFold={onFold}>
-                {l.boqFile && <div className="kd-cp-file"><Ic d={FILE_IC} />{l.boqFile}</div>}
+                {l.boqFile && (() => { const b = boqOf(l.boqFile); return b.url
+                  ? <a className="kd-cp-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer"><Ic d={FILE_IC} />{b.name}</a>
+                  : <div className="kd-cp-file"><Ic d={FILE_IC} />{b.name}</div> })()}
                 {l.concept && <p className="kd-cp-note"><b>Concept:</b>{l.concept}</p>}
                 {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b>{l.notes}</p>}
                 {!l.boqFile && !l.concept && !l.notes && <em className="kd-cp-dnone">Chưa có BOQ, concept hay ghi chú</em>}

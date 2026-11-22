@@ -39,6 +39,23 @@ export const deleteTask = taskId => request('DELETE', '/sales/tasks/' + enc(task
 export const getInsights = id => request('GET', L(id) + '/insights')
 export const generateInsights = (id, body) => request('POST', L(id) + '/insights/generate', { body: body || {} })
 
+/* ---- Cấu hình AI (prompt "Đề xuất hành động" theo công ty) ----
+   getAiConfig -> {instructions, defaultInstructions, custom, fixedRules, outputShape, aiEnabled, model,
+     modelChoice, defaultModel, models: [{id, label, desc}], modelsError,
+     updatedAt, updatedBy, canEdit, maxLength, history: [{instructions, model, at, by}]}; saveAiConfig trả về giống GET.
+   model: đang dùng thật; modelChoice: công ty đã chọn ('' = mặc định máy chủ defaultModel).
+   previewAiPrompt -> {system, prompt} (không gọi AI); testAiPrompt -> {content, engine, model, warning, ms, raw} (không lưu).
+   instructions / model null/undefined = dùng bản đang lưu (không gửi khoá); model '' = mặc định máy chủ. */
+const AIC = '/sales/ai-config'
+const draft = (body, instructions) => (instructions == null ? body : { ...body, instructions })
+const withModel = (body, model) => (model == null ? body : { ...body, model: String(model) })
+export const getAiConfig = () => request('GET', AIC)
+export const saveAiConfig = (instructions, model) =>
+  request('PUT', AIC, { body: withModel({ instructions: String(instructions == null ? '' : instructions) }, model) })
+export const previewAiPrompt = (leadId, instructions) => request('POST', AIC + '/preview', { body: draft({ leadId: Number(leadId) }, instructions) })
+export const testAiPrompt = (leadId, instructions, model) =>
+  request('POST', AIC + '/test', { body: withModel(draft({ leadId: Number(leadId) }, instructions), model) })
+
 /* ---- Báo thay đổi giữa các khối của trang ---- part: 'score' | 'appointments' | 'tasks' | 'insights' | 'activities' | 'lead' */
 const EV = 'kd:lead-change'
 export function emitLeadChange(leadId, part) {

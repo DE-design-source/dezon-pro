@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useKdMap } from '../ShortlistSelect'
-import { fmtTy, sourceColor } from '../../utils'
+import { fmtTy, sourceColor, boqOf } from '../../utils'
 import { mediaUrl } from '../../../QS/api/files'
 import DatePicker from '../../../../components/ui/DatePicker'
 import { HANDOFF_CONFIG } from '../../../../data/kinhDoanhData'
@@ -172,7 +172,9 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
             {l.wonAt && <Row k="Ngày chốt">{fmtD(l.wonAt)}</Row>}
             {l.partner && <Row k="Đối tác"><span className="cd-pri">Có chuyển giao đối tác ngoài</span></Row>}
             {hText && <Row k="Bàn giao"><span className="cd-gold">{hText}</span></Row>}
-            {l.boqFile && <div className="cd-file"><Ic d={FILE_IC} /><span>{l.boqFile}</span></div>}
+            {l.boqFile && (() => { const b = boqOf(l.boqFile); return b.url
+              ? <a className="cd-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer" title="Mở file BOQ"><Ic d={FILE_IC} /><span>{b.name}</span></a>
+              : <div className="cd-file"><Ic d={FILE_IC} /><span>{b.name}</span></div> })()}
             {l.concept && <p className="cd-note"><b>Concept:</b> {l.concept}</p>}
             {l.notes && <p className="cd-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
             {!l.boqFile && !l.concept && !l.notes && <em className="cd-none">Chưa có BOQ, concept hay ghi chú</em>}

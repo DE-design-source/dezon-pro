@@ -23,7 +23,7 @@ const JSONBodyLimit = 30 << 20
 
 // DocMaxMB = store.DOC_MAX_MB của Node: giới hạn 1 file tài liệu tải lên. Phải bằng materials.DocMaxMB
 // (middleware không import được module; internal/server có test giữ hai hằng bằng nhau).
-const DocMaxMB = 50
+const DocMaxMB = 300
 
 // MsgUploadTooLarge: thông báo 413 của /upload/file (server/index.js 776).
 var MsgUploadTooLarge = "File quá lớn (tối đa " + strconv.Itoa(DocMaxMB) + "MB) — hãy dán link thay vì tải lên."

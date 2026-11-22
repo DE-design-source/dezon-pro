@@ -228,3 +228,5 @@ html[data-theme="dark"] .cd-cc, html[data-theme="dark"] .cd-cmem-pop{ --cc-navy-
 .cd-next-pop button:hover{background:var(--cc-soft, #F7F8FA);}
 .cd-next-pop button.danger{color:#B42318;}
 .cd-next-pop em{font-style:normal; font-size:11.5px; color:#98A2B3; padding:6px 10px 2px; border-top:1px solid var(--cc-line, #EEF0F3); margin-top:4px;}
+/* Danh sách Task: nút "Thêm task" cuối danh sách khi đã có task */
+.cd-task-add{display:flex; margin-top:4px;}

@@ -53,7 +53,7 @@ export function saveBase64(res) {
   saveBlob(new Blob([a], { type: res.mimeType || 'application/octet-stream' }), res.name)
 }
 
-export const DOC_MAX_MB = 50
+export const DOC_MAX_MB = 300 // = DocMaxMB của máy chủ (backend/internal/modules/materials/model.go)
 
 /* Port upDoc_ (PUB/nhap.js:232-239): gửi NGUYÊN file nhị phân tới /upload/file?name= */
 export async function uploadRaw(file, signal) {

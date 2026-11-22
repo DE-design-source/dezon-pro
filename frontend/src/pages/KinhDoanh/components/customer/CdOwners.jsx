@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { DEPT_LABEL } from '../../../../data/kinhDoanhData'
 import { lmInitials, noDau } from '../../utils'
+import { listStaff } from '../../api'
 
 /* Khối "Phụ trách" của trang khách hàng dạng dashboard: người phụ trách gom theo nhóm (assignees[].dept),
-   người phụ trách chính (kinh doanh) tô nổi, nhóm trống có "+ Gán" (mở form sửa khách hàng). */
+   người phụ trách chính (kinh doanh) tô nổi; nhóm có người luôn hiện đủ nhân viên; "+ Gán" chọn tài khoản công ty và lưu ngay,
+   "×" cuối tên gỡ người khỏi nhóm (lưu ngay). Không còn Thu gọn / Mở rộng, nút Sửa, dòng Phòng / Quản lý / Khởi tạo. */
 export const OWNER_GROUPS = [
   { key: 'kinhdoanh', label: 'Kinh doanh', color: '#D9661F', empty: 'Chưa có nhân sự kinh doanh' },
   { key: 'ctv', label: 'CTV Kinh doanh', color: '#1877F2', empty: 'Chưa có cộng tác viên' },
@@ -42,148 +43,115 @@ export function leadOwner(l) {
 }
 
 
-/* Thu gọn / mở rộng thẻ (nhớ theo trình duyệt, mặc định thu gọn để cột 2 không dài hơn hẳn cột Hồ sơ) */
-function useFoldPref(key) {
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) === '1' } catch (e) { return false } })
-  const toggle = () => setOpen(v => { const n = !v; try { localStorage.setItem(key, n ? '1' : '0') } catch (e) { /* bỏ qua */ } return n })
-  return [open, toggle]
+/* "+ Gán": chọn tài khoản đang hoạt động của công ty (GET /sales/staff), lưu thẳng vào assignees của khách (không mở form sửa) */
+const ROLE_OF = { kinhdoanh: 'Nhân sự kinh doanh', ctv: 'CTV kinh doanh', concept: 'Concept', thietke: 'Thiết kế', nhathau: 'Nhà thầu' }
+let staffP = null
+const loadStaff = () => {
+  if (!staffP) staffP = listStaff().then(l => l || [], e => { staffP = null; throw e })
+  return staffP
 }
-const FOLD_D = { open: 'M18 15l-6-6-6 6', closed: 'M6 9l6 6 6-6' }
-function FoldBtn({ open, onClick, light }) {
+function AssignBtn({ g, lead, onPatch, onEdit }) {
+  const [open, setOpen] = useState(false)
+  const [staff, setStaff] = useState(null)
+  const [err, setErr] = useState('')
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    let off = false
+    setErr('')
+    loadStaff().then(s => { if (!off) setStaff(s) }, e => { if (!off) setErr((e && e.message) || 'Không tải được danh sách nhân sự') })
+    const out = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false) } }
+    document.addEventListener('mousedown', out)
+    document.addEventListener('keydown', esc, true)
+    return () => { off = true; document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc, true) }
+  }, [open])
+  if (!onPatch) return <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+  const have = new Set((lead.assignees || []).filter(a => a && a.name && !isAdminKd(a) && deptOf(a) === g.key).map(a => String(a.name).trim().toLowerCase()))
+  const qq = noDau(q)
+  const list = (staff || []).filter(s => s && s.name && !have.has(String(s.name).trim().toLowerCase()))
+    .filter(s => !qq || noDau(s.name + ' ' + (s.username || '') + ' ' + (s.department || '')).indexOf(qq) >= 0)
+    .sort((a, b) => (b.sales ? 1 : 0) - (a.sales ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi'))
+  const pick = s => {
+    if (busy) return
+    setBusy(true)
+    const next = [...(lead.assignees || []), { name: String(s.name).trim(), role: ROLE_OF[g.key] || 'Phụ trách', dept: g.key }]
+    Promise.resolve(onPatch({ assignees: next })).then(saved => { setBusy(false); if (saved) { setOpen(false); setQ('') } }, () => setBusy(false))
+  }
   return (
-    <button type="button" className={'cd-fold-btn' + (light ? ' light' : '')} aria-expanded={open} title={open ? 'Thu gọn' : 'Mở rộng'} onClick={onClick}>
-      {open ? 'Thu gọn' : 'Mở rộng'}
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={open ? FOLD_D.open : FOLD_D.closed} /></svg>
-    </button>
+    <span className="cd-asg" ref={ref} data-cd-busy={open ? '1' : undefined}>
+      <button type="button" className="cd-btn sm" aria-expanded={open} onClick={() => setOpen(v => !v)} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+      {open && (
+        <div className="cd-asg-pop" aria-label={'Gán người nhóm ' + g.label}>
+          <input className="cd-asg-q" autoFocus placeholder="Tìm nhân sự..." value={q} onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && list.length) { e.preventDefault(); pick(list[0]) } }} />
+          <div className="cd-asg-list">
+            {err ? <div className="cd-asg-empty">{err}</div>
+              : !staff ? <div className="cd-asg-empty">Đang tải...</div>
+              : !list.length ? <div className="cd-asg-empty">{q ? 'Không tìm thấy nhân sự' : 'Đã gán hết nhân sự'}</div>
+              : list.map(s => (
+                <button key={s.username || s.name} type="button" className="cd-asg-it" disabled={busy} onClick={() => pick(s)}>
+                  <span className="cd-av">{lmInitials(s.name)}</span>
+                  <span className="cd-mem-txt"><b>{s.name}</b><em>{[s.department, s.username].filter(Boolean).join(' · ')}</em></span>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </span>
   )
 }
 
-const fmtD = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : '' }
 
-export default function CdOwners({ lead: l, onEdit }) {
-  const [open, toggle] = useFoldPref('kd-cd-owners-open')
-  // Thẻ được kéo cao bằng cột Hồ sơ (CustomerDashboard đặt minHeight): tự hiện thêm cho kín khung thay vì để trống.
-  // Mức 0 = gọn; 1 = 1 dòng tóm tắt Phòng · Quản lý · Khởi tạo (cắt "…", rê chuột xem đủ); 2 = tóm tắt 2 dòng;
-  // 3 = bảng Phòng / Quản lý / Admin KD / Khởi tạo (sát đáy thẻ); 3+k = xổ sẵn nhân viên k nhóm có người đầu tiên;
-  // M+4 = đủ như Mở rộng (thêm dòng gợi ý của nhóm trống).
-  // Mức nào làm thẻ tràn khung thì lùi 1 mức và nhớ trần cho chiều cao đó; phần dư còn lại chia đều giữa các nhóm.
-  const memKeys = l ? OWNER_GROUPS.map(g => g.key).filter(k => (l.assignees || []).some(a => a && a.name && !isAdminKd(a) && deptOf(a) === k)) : []
-  const M = memKeys.length
-  const [autoLv, setAutoLv] = useState(0)
-  const [stretched, setStretched] = useState(false)
-  const cardRef = useRef(null)
-  const capRef = useRef({ want: '', cap: 99 })
-  const userOpenRef = useRef(false) // người dùng đã tự xổ nhóm nào đó: không vì thẻ dài ra mà ẩn Phòng / Quản lý / Khởi tạo
-  useEffect(() => {
-    const card = cardRef.current
-    if (!card || typeof ResizeObserver === 'undefined') return undefined
-    let raf = 0
-    const fit = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const want = card.style.minHeight
-        setStretched(!!want && !open)
-        if (open) return
-        if (!want) { setAutoLv(0); return }
-        if (capRef.current.want !== want) capRef.current = { want, cap: M + 4 }
-        if (card.offsetHeight > parseFloat(want) + 2) {
-          // tràn khung: bớt mức tự hiện; mức có bảng Phòng / Quản lý (2) thì giữ nếu chính người dùng vừa xổ nhóm làm thẻ dài ra
-          setAutoLv(v => { if (v <= 3 && userOpenRef.current) return v; const k = Math.max(0, v - 1); capRef.current.cap = k; return k })
-        }
-        else setAutoLv(v => (v < Math.min(capRef.current.cap, M + 4) ? v + 1 : v))
-      })
-    }
-    const ro = new ResizeObserver(fit)
-    ro.observe(card)
-    const mo = new MutationObserver(fit)
-    mo.observe(card, { attributes: true, attributeFilter: ['style'] })
-    fit()
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); mo.disconnect() }
-  }, [open, autoLv, M])
-  const auto = !open && autoLv > M + 3
-  const showMeta = open || autoLv >= 3
-  const showMini = !showMeta && autoLv >= 1
-  const full = open || auto
-  // Nhóm có người: bấm tiêu đề nhóm để xổ / ẩn danh sách nhân viên (nhớ theo trình duyệt). Chưa bấm: theo mức tự hiện.
-  const [grpOpen, setGrpOpen] = useState(() => { try { return JSON.parse(localStorage.getItem('kd-cd-owners-grp') || '{}') || {} } catch (e) { return {} } })
-  userOpenRef.current = Object.keys(grpOpen).some(k => grpOpen[k] && memKeys.indexOf(k) >= 0)
-  const autoOpen = k => !open && memKeys.indexOf(k) >= 0 && memKeys.indexOf(k) < autoLv - 3
-  const gOpen = k => (k in grpOpen ? !!grpOpen[k] : autoOpen(k))
-  const toggleGrp = k => setGrpOpen(s => { const n = { ...s, [k]: !(k in s ? s[k] : autoOpen(k)) }; try { localStorage.setItem('kd-cd-owners-grp', JSON.stringify(n)) } catch (e) { /* bỏ qua */ } return n })
+
+export default function CdOwners({ lead: l, onEdit, onPatch }) {
+  const [busyIdx, setBusyIdx] = useState(-1)
   if (!l) return null
   /* i = vị trí trong l.assignees gốc (khớp leadOwner().idx) */
-  const all = (l.assignees || []).map((a, i) => ({ a, i })).filter(x => x.a && x.a.name)
-  const members = all.filter(x => !isAdminKd(x.a))
-  const admins = all.filter(x => isAdminKd(x.a)).map(x => x.a.name)
+  const members = (l.assignees || []).map((a, i) => ({ a, i })).filter(x => x.a && x.a.name && !isAdminKd(x.a))
   const main = leadOwner(l)
   const mainIdx = main ? main.idx : -1
   const groups = OWNER_GROUPS.map(g => ({ ...g, members: members.filter(x => deptOf(x.a) === g.key) }))
+  const remove = i => {
+    if (!onPatch || busyIdx >= 0) return
+    setBusyIdx(i)
+    Promise.resolve(onPatch({ assignees: (l.assignees || []).filter((_, j) => j !== i) })).then(() => setBusyIdx(-1), () => setBusyIdx(-1))
+  }
   return (
-    <section className="cd-card cd-owners" ref={cardRef}>
+    <section className="cd-card cd-owners">
       <div className="cd-card-h">
         <span className="cd-card-t">Phụ trách</span>
-        <span className="cd-fold-sp" />
-        {!(auto && !open) && <FoldBtn open={open} onClick={toggle} />}
-        <button type="button" className="cd-link-btn acc" onClick={onEdit} title="Sửa người phụ trách">Sửa</button>
       </div>
-      <div className={'cd-owners-list' + (stretched ? ' fill' : '')}>
-        {groups.map(g => !full && !g.members.length ? (
-          /* thu gọn: nhóm chưa có người gọn 1 dòng (tên nhóm · Chưa phân công · + Gán) */
+      <div className="cd-owners-list">
+        {groups.map(g => !g.members.length ? (
+          /* nhóm chưa có người: 1 dòng (tên nhóm · Chưa phân công · + Gán) */
           <div key={g.key} className="cd-grp cd-grp-mini">
             <span className="cd-grp-dot" style={{ background: g.color }} />
             <span className="cd-grp-mini-l">{g.label}</span>
             <span className="cd-grp-mini-v">Chưa phân công</span>
-            <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+            <AssignBtn g={g} lead={l} onPatch={onPatch} onEdit={onEdit} />
           </div>
         ) : (
           <div key={g.key} className="cd-grp">
-            {g.members.length ? (
-              <button type="button" className={'cd-grp-h cd-grp-tg' + (gOpen(g.key) ? ' on' : '')} aria-expanded={!!gOpen(g.key)} onClick={() => toggleGrp(g.key)}
-                title={gOpen(g.key) ? 'Ẩn danh sách nhân viên' : 'Xem nhân viên phụ trách'}>
-                <span className="cd-grp-dot" style={{ background: g.color }} /><span>{g.label}</span>
-                <span className="cd-grp-n">{g.members.length}</span>
-                {!gOpen(g.key) && <span className="cd-grp-names">{g.members.map(x => x.a.name).join(', ')}</span>}
-                <svg className="cd-grp-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-              </button>
-            ) : <div className="cd-grp-h"><span className="cd-grp-dot" style={{ background: g.color }} /><span>{g.label}</span></div>}
-            {g.members.length ? (gOpen(g.key) ? g.members : []).map(({ a, i }) => {
-              const isLead = i === mainIdx
-              return (
-                <div key={i} className={'cd-mem' + (isLead ? ' lead' : '')}>
-                  <span className="cd-av">{lmInitials(a.name)}</span>
-                  <span className="cd-mem-txt">
-                    <b>{a.name}</b>
-                    <em>{[a.role || 'Phụ trách', a.since ? 'Nhận từ ' + fmtSince(a.since) : ''].filter(Boolean).join(' · ')}</em>
-                  </span>
-                </div>
-              )
-            }) : (
-              <div className="cd-mem empty">
-                <span className="cd-av">—</span>
-                <span className="cd-mem-txt"><b>Chưa phân công</b><em>{g.empty}</em></span>
-                <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+            <div className="cd-grp-h cd-grp-hd">
+              <span className="cd-grp-dot" style={{ background: g.color }} /><span className="cd-grp-l">{g.label}</span>
+              <span className="cd-grp-n">{g.members.length}</span>
+              <AssignBtn g={g} lead={l} onPatch={onPatch} onEdit={onEdit} />
+            </div>
+            {g.members.map(({ a, i }) => (
+              <div key={i} className={'cd-mem' + (i === mainIdx ? ' lead' : '')}>
+                <span className="cd-av">{lmInitials(a.name)}</span>
+                <span className="cd-mem-txt"><b>{a.name}</b></span>
+                {onPatch && (
+                  <button type="button" className="cd-mem-x" disabled={busyIdx >= 0} onClick={() => remove(i)}
+                    title={'Gỡ ' + a.name + ' khỏi nhóm ' + g.label} aria-label={'Gỡ ' + a.name + ' khỏi nhóm ' + g.label}>×</button>
+                )}
               </div>
-            )}
+            ))}
           </div>
         ))}
-        {/* Phòng, Quản lý, Khởi tạo: khi Mở rộng, hoặc khi thẻ được kéo cao (đẩy xuống đáy thẻ, lấp chỗ trống) */}
-        {showMeta && <>
-        <div className="cd-owners-meta">
-          {l.dept && <div className="cd-row"><span>Phòng</span><span>{DEPT_LABEL[l.dept] || l.dept}</span></div>}
-          <div className="cd-row"><span>Quản lý</span><span>{l.manager || '—'}</span></div>
-          {admins.length > 0 && <div className="cd-row cd-owners-admin"><span>Admin KD</span><span>{admins.join(', ')}</span></div>}
-        </div>
-        <div className="cd-owners-foot">Khởi tạo bởi {l.creator || '—'}{l.createdAt ? ' · ' + fmtD(l.createdAt) : ''}</div>
-        </>}
-        {showMini && (() => {
-          const a = [l.dept ? (DEPT_LABEL[l.dept] || l.dept) : '', 'Quản lý: ' + (l.manager || '—'), admins.length ? 'Admin KD: ' + admins.join(', ') : ''].filter(Boolean).join('  ·  ')
-          const b = 'Khởi tạo: ' + (l.creator || '—') + (l.createdAt ? ' · ' + fmtD(l.createdAt) : '')
-          return (
-            <div className="cd-owners-mini" title={a + '\n' + b}>
-              {autoLv >= 2 ? <><span>{a}</span><span>{b}</span></> : <span>{a + '  ·  ' + b}</span>}
-            </div>
-          )
-        })()}
       </div>
     </section>
   )

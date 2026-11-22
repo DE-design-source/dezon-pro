@@ -60,7 +60,7 @@ export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStar
           <div title={investor ? 'Chủ đầu tư: ' + investor : ''} style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.3, minHeight: 30, ...clamp2 }}>
             {investor ? <><span style={{ color: 'var(--text-muted)' }}>CĐT: </span><b style={{ fontWeight: 600 }}>{investor}</b></> : <span style={{ ...muted, color: 'var(--text-muted)' }}>Chưa có thông tin chủ đầu tư</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minHeight: 22, maxHeight: 48, overflow: 'hidden', fontSize: 11.5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', alignContent: 'flex-start', flexWrap: 'wrap', gap: 6, height: 46, flex: 'none', overflow: 'hidden', fontSize: 11.5 }}>
             <span title={contact ? 'Người phụ trách (CĐT): ' + [contact, cdt.dept].filter(Boolean).join(' · ') : ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, maxWidth: '100%', color: contact ? 'var(--text)' : 'var(--text-muted)', fontWeight: contact ? 600 : 400 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || <span style={muted}>Chưa có người phụ trách</span>}</span>
@@ -77,16 +77,23 @@ export default function LeadCard({ lead: l, projMode, dups, dragging, onDragStar
         {l.projectType || 'Chưa xác định'}{' · '}
         {l.scale ? <b style={{ fontWeight: 600, color: 'var(--text)' }}>{fmtScale(l.scale)}</b> : <span style={{ opacity: 0.6 }}>chưa có m²</span>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 6, minHeight: 22, maxHeight: 48, overflow: 'hidden' }}>
-        {/* chỉ 1 nhãn phòng ban: Dân dụng hoặc Dự án (bỏ chip '→ Dự án' dễ nhầm là 2 phòng) */}
-        <span style={{ ...pill, color: DEPT_COLOR[l.dept], background: DEPT_TINT[l.dept] }}>{DEPT_SHORT[l.dept]}</span>
-        {/* khách trùng SĐT / email: đặt ngay sau phòng ban để không bị ẩn bởi maxHeight */}
-        {dupPill}
-        {/* nguồn khách hàng: màu riêng theo nguồn (sourceColor) */}
-        {l.source ? <span title={'Nguồn: ' + l.source} style={{ ...pill, fontWeight: 700, color: srcC ? srcC.color : 'var(--text-muted)', background: srcC ? srcC.bg : 'var(--surface-alt)', border: srcC ? '1px solid ' + srcC.border : undefined, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.source}</span> : null}
-        {pendingPill}
-        {h && h.status === 'self-quoted' && <span style={{ ...pill, color: 'var(--sales)', background: 'var(--sales-tint)' }}>KD tự đề xuất</span>}
+      {/* 2 dòng nhãn cố định (MarkUp 2026-11-22: mọi thẻ cao bằng nhau dù thiếu trường): dòng 1 phòng ban (+ trùng), dòng 2 nguồn (+ trạng thái bàn giao) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 20, overflow: 'hidden' }}>
+          {/* chỉ 1 nhãn phòng ban: Dân dụng hoặc Dự án (bỏ chip '→ Dự án' dễ nhầm là 2 phòng) */}
+          <span style={{ ...pill, color: DEPT_COLOR[l.dept], background: DEPT_TINT[l.dept] }}>{DEPT_SHORT[l.dept]}</span>
+          {dupPill}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 20, overflow: 'hidden' }}>
+          {/* nguồn khách hàng: màu riêng theo nguồn (sourceColor) */}
+          {l.source ? <span title={'Nguồn: ' + l.source} style={{ ...pill, fontWeight: 700, color: srcC ? srcC.color : 'var(--text-muted)', background: srcC ? srcC.bg : 'var(--surface-alt)', border: srcC ? '1px solid ' + srcC.border : undefined, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.source}</span>
+            : <span style={{ ...pill, fontWeight: 500, color: 'var(--text-muted)', border: '1px dashed var(--border)', opacity: 0.8 }}>Chưa có nguồn</span>}
+          {pendingPill}
+          {h && h.status === 'self-quoted' && <span style={{ ...pill, color: 'var(--sales)', background: 'var(--sales-tint)' }}>KD tự đề xuất</span>}
+        </div>
       </div>
+      {/* gạch ngang chia phần như thẻ Phòng KD Dự Án: thông tin khách | người phụ trách, giá trị, tỉnh thành (MarkUp 2026-11-22) */}
+      <div aria-hidden="true" style={{ flex: 'none', height: 0, borderTop: '1px solid var(--border)', margin: '2px 0' }} />
       </>)}
       <CardMembers lead={l} open={memberOpen} onToggle={onToggleMember} onClose={onCloseMember} onAdd={onAddAssignee} onRemove={onRemoveAssignee} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>

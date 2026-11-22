@@ -286,6 +286,10 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `DELETE` | `/sales/tasks/:taskId` | `kdDeleteTask` | `rpc.Login` | sales | Xoá task |
 | `GET` | `/sales/leads/:id/insights` | `kdGetInsights` | `rpc.Login` | sales | Bản phân tích mới nhất (`{insight: ...\|null}`) |
 | `POST` | `/sales/leads/:id/insights/generate` | `kdGenerateInsights` | `rpc.Login` | sales | Lập phân tích bằng Gemini (`GEMINI_API_KEY`); không có khoá / lỗi -> theo quy tắc (`engine: rules`, `warning`); lập lại trong 45 giây -> trả bản vừa lập, giữ 20 bản mới nhất / khách |
+| `GET` | `/sales/ai-config` | `kdGetAiConfig` | `rpc.Login` | sales | Cấu hình AI của công ty (`cai_dat_cong_ty` khoá `kdAiConfig`): `{instructions, defaultInstructions, custom, fixedRules, outputShape, aiEnabled, model, modelChoice, defaultModel, models, modelsError, updatedAt, updatedBy, canEdit, maxLength, history}`; `model` = model đang dùng thật (`modelChoice` còn hợp lệ, không thì `defaultModel` = `GEMINI_MODEL`; không có AI -> ""), `models` = `[{id, label, desc}]` từ Gemini ListModels (cache 1 giờ; lỗi -> `[]` + `modelsError`), `history[]` = `{instructions, model, at, by}` |
+| `PUT` | `/sales/ai-config` | `kdSaveAiConfig` | `rpc.Admin` | sales | Lưu hướng dẫn cho AI (`instructions` bắt buộc là chuỗi, thiếu / null -> 400; tối đa 8000 ký tự); chuỗi rỗng / trùng mặc định -> dùng mặc định; `model?` thiếu / null = giữ, "" = mặc định máy chủ, khác "" phải có trong `models` (không lấy được danh sách: khớp `^gemini-[a-z0-9][a-z0-9.\-]{0,60}$`), sai -> 400 "Model AI không hợp lệ"; bản tuỳ chỉnh cũ (hướng dẫn hoặc model) vào `history` (20 bản), đổi model cũng là 1 phiên bản; trả như GET. Phân tích (`kdGenerateInsights`) dùng bản đã lưu + quy tắc cố định và model đã lưu (không còn hợp lệ -> mặc định máy chủ; `model` của bản phân tích = model đã dùng thật) |
+| `POST` | `/sales/ai-config/preview` | `kdPreviewAiPrompt` | `rpc.Admin` | sales | `{leadId, instructions?}` -> `{system, prompt}` sẽ gửi Gemini; không gọi AI; khách không có -> 404 |
+| `POST` | `/sales/ai-config/test` | `kdTestAiPrompt` | `rpc.Admin` | sales | `{leadId, instructions?, model?}` -> chạy thử, không lưu phân tích: `{content, engine, model, warning, ms, raw}` (`model` = model đã dùng thật); `model` thiếu / null = model đã lưu, "" = mặc định máy chủ, kiểm như PUT (sai -> 400, không tính lượt); cùng người trong 5 giây -> 429 |
 | `GET` | `/it/tickets` | `itListTickets` | `rpc.Login` | it | Yêu cầu hỗ trợ IT mới nhất trước (`{tickets, canManage}`): quyền IT (admin / perms `it`) thấy cả công ty, người khác hoặc `?mine=1` chỉ thấy yêu cầu mình gửi |
 | `POST` | `/it/tickets` | `itCreateTicket` | `rpc.Login` | it | Tạo yêu cầu (trang IT / nút Báo lỗi, `source=report`, `page`); ảnh `data:image/...;base64` lưu vào kho file `/files/it/...` (tối đa 8 ảnh, 8 MB); báo người trong `roles` có `username`, không ai thì báo nhân viên có perms `it` |
 | `PATCH` | `/it/tickets/:id` | `itUpdateTicket` | `rpc.Login` | it | Sửa 1 phần (quyền IT): `tasks` / `stages` (bảng xử lý), `status`, `progress` 0-100, `received`, thông tin; báo người VỪA được thêm vào `roles` |
@@ -1160,7 +1164,7 @@ Route lẻ của nghiệp vụ (đóng băng, bảng `RootRoutes` trong `rest.go
 | `POST /export/cong-tac` | có | xuất Excel công tác (header `X-Row-Count`) |
 | `POST /export/san-pham` | có | xuất Excel sản phẩm (header `X-Row-Count`) |
 | `POST /export/bang` | có | xuất Excel một bảng bất kỳ |
-| `POST /upload/file` | có | tải file lên kho (tối đa 50 MB) |
+| `POST /upload/file` | có | tải file lên kho (tối đa 300 MB; ghi theo luồng qua tệp tạm `UPLOAD_DIR/.tmp`, hạn đọc thân 30 phút) |
 | `GET /mau-nhap-thiet-bi-ve-sinh.xlsx` | không | file mẫu nhập thiết bị vệ sinh |
 | `GET /mau-nhap-cong-tac-o-cam.xlsx` | không | file mẫu nhập công tắc - ổ cắm |
 | `GET /mau-nhap-son-nuoc.xlsx` | không | file mẫu nhập sơn nước |
@@ -1197,7 +1201,7 @@ File nhúng: GET / HEAD, `Accept-Ranges: bytes`, ETag yếu theo nội dung (g�
 | Trường hợp | Mã | Thân |
 |---|---|---|
 | Đường dẫn không có (kể cả dưới `/api/v1`) hoặc sai phương thức | 404 | trang HTML: `Cannot <METHOD> <đường dẫn>` |
-| Thân JSON quá 30 MB gửi tới `/upload/file` | 413 | JSON `{"error":"File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}` |
+| Thân JSON quá 30 MB gửi tới `/upload/file` | 413 | JSON `{"error":"File quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên."}` |
 | Thân JSON quá 30 MB gửi tới route khác | 413 | trang HTML `Payload Too Large` |
 | `Content-Encoding` hoặc charset không hỗ trợ | 415 | trang HTML `Unsupported Media Type` |
 | Vượt giới hạn tần suất (chỉ khi đặt `RATE_LIMIT_RPS` > 0) | 429 | `{"error":"Quá nhiều yêu cầu, vui lòng thử lại sau"}` + header `Retry-After: 1` |

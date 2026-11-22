@@ -68,7 +68,10 @@ export const TIME_FILTER_OPTIONS = [
 export const SALES_TABS = [
   ['overview', 'Tổng quan'], ['pipeline', 'Pipeline khách hàng'], ['design-board', 'Dự án (Thiết kế)'],
   ['construction-board', 'Dự án (Thi công)'], ['tasks', 'Nhiệm vụ'], ['nhansu', 'Cơ cấu phòng ban'],
+  ['ai-config', 'Cấu hình AI'],
 ]
+/* Tab chỉ hiện cho quản trị (admin / super) */
+export const SALES_ADMIN_TABS = ['ai-config']
 
 /* ---------- Tổng quan (Overview dashboard) ---------- */
 export const OV_TREND_CFG = {

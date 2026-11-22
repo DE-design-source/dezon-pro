@@ -659,27 +659,127 @@ html[data-theme="dark"] .kd-sales-tab{color:var(--text-muted);}
 .kd-money .words{display:flex; align-items:center; height:38px; padding:0 12px; border-radius:8px; background:var(--sales-tint); color:var(--sales); font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .kd-money-rate{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--text-muted); flex-wrap:wrap;}
 .kd-money-rate input{width:120px; text-align:right;}
-/* Form khách hàng tiềm năng - bước Cơ bản: 4 nhóm thẻ (Khách hàng · Địa điểm | Dự án · Phụ trách), lưới 2 cột */
-.kd-lf-grid{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; align-items:start;}
-.kd-lf-sec{display:flex; flex-direction:column; gap:12px; padding:16px 18px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,.05);}
-.kd-lf-sec > h4{display:flex; align-items:center; gap:8px; margin:0 0 2px; padding-bottom:10px; border-bottom:1px solid var(--border); font-size:13.5px; font-weight:700; color:var(--text);}
-.kd-lf-sec > h4 i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--sales-tint); color:var(--sales); font-style:normal; font-size:11px; font-weight:800;}
-@media (max-width:1100px){ .kd-lf-grid{grid-template-columns:minmax(0, 1fr);} }
-/* Form khách hàng: bước đầu chọn phòng KD (MarkUp 2026-11-19) */
-.kd-lf-dept{grid-column:1 / -1; display:flex; flex-direction:column; gap:8px; padding:14px 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface);}
-.kd-lf-dept.warn{border-color:var(--danger);}
-.kd-lf-dept .lb{font-size:13.5px; font-weight:700; color:var(--text);}
-.kd-lf-dept .opts{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px;}
-.kd-lf-dept button{display:flex; align-items:center; gap:12px; padding:12px 14px; border:1.5px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
-.kd-lf-dept button:hover{border-color:var(--sales);}
-.kd-lf-dept button.on{border-color:var(--sales); background:var(--sales-tint);}
-.kd-lf-dept button > i{flex:none; width:16px; height:16px; border:2px solid var(--border); border-radius:50%; box-sizing:border-box;}
-.kd-lf-dept button.on > i{border:5px solid var(--sales);}
-.kd-lf-dept button span{display:flex; flex-direction:column; gap:2px; min-width:0;}
+/* ===================== Form khách hàng tiềm năng (mẫu "Form Du an", 2026-11-22) =====================
+   1 trang cuộn dọc, các khối thẻ trắng đánh số (vòng navy) xếp chồng, căn giữa: rộng 60% vùng nội dung nhưng không hẹp hơn 760px, màn hẹp thì full.
+   Ô nhập nền xám nhạt, nhấn cam. Màu riêng của form khai ở biến --lf-*, giao diện tối đổi theo html[data-theme="dark"] */
+.kd-lf{
+  --lf-navy:#1E3A8A; --lf-in:#F1F2F4; --lf-bd:#E5E7EB; --lf-line:#EEF0F2; --lf-dash:#D1D5DB;
+  --lf-acc:#C75C0E; --lf-acc2:#E06A12; --lf-tint:#FDEBDD; --lf-hover:#FFF8F2; --lf-btn:#C75C0E; --lf-btn-h:#E06A12;
+  width:100%; max-width:max(760px, 60%); margin:0 auto; display:flex; flex-direction:column; gap:16px; box-sizing:border-box; color:var(--text);
+}
+html[data-theme="dark"] .kd-lf{
+  --lf-navy:#3556B8; --lf-in:var(--surface-alt); --lf-bd:var(--border); --lf-line:var(--border); --lf-dash:#3A4150;
+  --lf-acc:#E8A268; --lf-acc2:#F0B07A; --lf-tint:#3A2814; --lf-hover:#2A2016; --lf-btn:#C75C0E; --lf-btn-h:#E06A12;
+}
+.kd-lf-head{display:flex; align-items:flex-start; gap:14px; padding:16px 18px; border:1px solid var(--lf-bd); border-radius:14px; background:var(--surface);}
+.kd-lf-back{flex:none; display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; border:1px solid var(--lf-bd); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.kd-lf-back:hover{border-color:var(--lf-acc); color:var(--lf-acc);}
+.kd-lf-title{flex:1; min-width:0;}
+.kd-lf-title b{display:block; font-size:17px; font-weight:800; line-height:1.3;}
+.kd-lf-title span{display:block; margin-top:2px; font-size:12px; color:var(--text-muted);}
+.kd-lf-x{flex:none; display:flex; padding:4px; border:0; border-radius:8px; background:none; color:var(--text-muted); cursor:pointer;}
+.kd-lf-x:hover{background:var(--lf-in); color:var(--text);}
+
+.kd-lf-sec{padding:16px 18px 20px; border:1px solid var(--lf-bd); border-radius:14px; background:var(--surface);}
+.kd-lf-sec-h{display:flex; align-items:center; gap:10px; margin:0;}
+/* Khối thu gọn được: <h4> bọc <button aria-expanded> (tiêu đề vẫn nằm trong danh sách heading) */
+.kd-lf-sec-h.tg > button{flex:1; min-width:0; display:flex; align-items:center; gap:10px; padding:0; border:0; border-radius:6px; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; user-select:none;}
+.kd-lf-sec-h.tg > button:focus-visible{outline:2px solid var(--lf-acc); outline-offset:4px;}
+.kd-lf-sec-h i{flex:none; display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--lf-navy); color:#fff; font-style:normal; font-size:14px; font-weight:600;}
+.kd-lf-sec-h > h4, .kd-lf-sec-h .t{flex:1; min-width:0; margin:0; font-size:15px; font-weight:700; color:var(--text);}
+.kd-lf-sec-h em{flex:none; font-style:normal; font-size:12.5px; font-weight:500; color:var(--text-muted);}
+.kd-lf-sec-h.tg > button:hover em{color:var(--lf-acc);}
+.kd-lf-sec-b{display:flex; flex-direction:column; gap:14px; margin-top:12px; padding-top:14px; border-top:1px solid var(--lf-line);}
+.kd-lf-g2{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px;}
+.kd-lf-g3{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px;}
+.kd-lf-full{grid-column:1 / -1;}
+.kd-lf-sub{display:flex; flex-direction:column; gap:12px; padding:12px 14px 14px; border:1px dashed var(--lf-dash); border-radius:10px;}
+.kd-lf-sub > b{font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);}
+
+/* Ô nhập trong form: nhãn 12.5px đậm, ô cao 38px nền xám, viền nhạt, bo 8px */
+.kd-lf .kd-field{gap:8px; min-width:0;}
+/* Thanh Lưu dính đáy (~62px) không che ô đang focus khi Tab / cuộn tới ô */
+.kd-lf .kd-field, .kd-lf-dept{scroll-margin-bottom:80px;}
+.kd-lf .kd-field > label, .kd-lf .kd-field > .kd-lf-lb > label{display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:12.5px; font-weight:700; color:var(--text);}
+/* Hàng nhãn có chú thích / nút bên phải (nút nằm ngoài <label>) */
+.kd-lf .kd-field > .kd-lf-lb{display:flex; align-items:baseline; justify-content:space-between; gap:8px; min-width:0;}
+.kd-lf .kd-lf-lb > span{display:flex; align-items:baseline; gap:10px; min-width:0;}
+.kd-lf .kd-lf-lb em{font-style:normal; font-size:11.5px; font-weight:500; color:var(--text-muted); white-space:nowrap;}
+.kd-lf .kd-lf-lb button{padding:0; border:0; background:none; font:inherit; font-size:11.5px; font-weight:600; color:var(--lf-acc); cursor:pointer;}
+.kd-lf .kd-lf-lb button:hover{text-decoration:underline;}
+.kd-lf .kd-lf-lb button:focus-visible{outline:2px solid var(--lf-acc); outline-offset:2px; border-radius:4px;}
+.kd-lf-msg{font-size:12px; font-weight:600; color:var(--danger);}
+.kd-lf .kd-field > input[aria-invalid="true"]{border-color:var(--danger);}
+.kd-lf .kd-field > input, .kd-lf .kd-field > select, .kd-lf .kd-money > input, .kd-lf .kd-money > select, .kd-lf .kd-sl-btn, .kd-lf-pick{
+  width:100%; min-width:0; height:38px; box-sizing:border-box; padding:0 12px; border:1px solid var(--lf-bd); border-radius:8px;
+  background:var(--lf-in); color:var(--text); font:inherit; font-size:13.5px;
+}
+.kd-lf .kd-field > textarea{box-sizing:border-box; padding:10px 12px; border:1px solid var(--lf-bd); border-radius:8px; background:var(--lf-in); color:var(--text); font:inherit; font-size:13.5px; line-height:1.5;}
+.kd-lf .kd-field > select, .kd-lf .kd-money > select{cursor:pointer;}
+.kd-lf .kd-field > input:focus, .kd-lf .kd-field > select:focus, .kd-lf .kd-field > textarea:focus, .kd-lf .kd-money > input:focus, .kd-lf .kd-money > select:focus,
+.kd-lf .kd-sl-btn.on, .kd-lf-pick.on, .kd-lf-pick:focus-visible{outline:none; border-color:var(--lf-acc); background:var(--surface);}
+.kd-lf input::placeholder, .kd-lf textarea::placeholder{color:var(--text-muted); opacity:.8;}
+.kd-lf .kd-sl-btn > span, .kd-lf-pick > span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.kd-lf .kd-sl-btn svg{color:var(--text-muted);}
+.kd-lf .kd-sl-pop .kd-sl-opt.on{background:var(--lf-tint); color:var(--lf-acc);}
+.kd-lf-pick{display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; cursor:pointer;}
+.kd-lf-pick .ph{color:var(--text-muted);}
+.kd-lf-pick svg{flex:none; color:var(--text-muted);}
+.kd-lf .kd-field > .dp{display:flex; width:100%; --dp-accent:var(--lf-acc);}
+.kd-lf .kd-field > .dp .dp-trigger{height:38px; padding:0 12px; border-color:var(--lf-bd); border-radius:8px; background:var(--surface); color:var(--text); font-size:13.5px;}
+
+/* Phòng KD: 2 lựa chọn dạng nút ở đầu khối 1 */
+.kd-lf-dept{display:flex; flex-direction:column; gap:8px;}
+.kd-lf-dept .lb{font-size:12.5px; font-weight:700; color:var(--text);}
+.kd-lf-dept .opts{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px;}
+.kd-lf-dept button{display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--lf-bd); border-radius:8px; background:var(--lf-in); color:var(--text); font:inherit; text-align:left; cursor:pointer;}
+.kd-lf-dept button:hover{border-color:var(--lf-acc2);}
+.kd-lf-dept button.on{border-color:var(--lf-acc); background:var(--lf-tint); box-shadow:inset 0 0 0 1px var(--lf-acc);}
+.kd-lf-dept button > i{flex:none; width:16px; height:16px; border:2px solid color-mix(in srgb, var(--text-muted) 55%, transparent); border-radius:50%; box-sizing:border-box; background:var(--surface);}
+.kd-lf-dept button.on > i{border:5px solid var(--lf-acc);}
+.kd-lf-dept button span{display:flex; flex-direction:column; gap:1px; min-width:0;}
 .kd-lf-dept button b{font-size:13.5px; font-weight:700;}
+.kd-lf-dept button.on b{color:var(--lf-acc);}
 .kd-lf-dept button em{font-style:normal; font-size:11.5px; color:var(--text-muted);}
+.kd-lf-dept.warn button{border-color:var(--danger);}
 .kd-lf-dept .msg{font-size:12px; font-weight:600; color:var(--danger);}
-@media (max-width:640px){ .kd-lf-dept .opts{grid-template-columns:minmax(0, 1fr);} }
+
+/* Giá trị ước tính: ô số căn phải · đơn vị tiền (nền trắng) · ô chữ cam nhạt */
+.kd-lf .kd-money{grid-template-columns:minmax(0, 2fr) 90px minmax(0, 1.5fr);}
+.kd-lf .kd-money > input{text-align:right;}
+.kd-lf .kd-money > select{background:var(--surface);}
+.kd-lf .kd-money .words{height:38px; box-sizing:border-box; background:var(--lf-tint); color:var(--lf-acc); font-size:13.5px; font-weight:600;}
+.kd-lf .kd-money-rate input{height:32px; box-sizing:border-box; padding:0 10px; border:1px solid var(--lf-bd); border-radius:8px; background:var(--lf-in); color:var(--text); font:inherit; font-size:13px;}
+.kd-lf .kd-money-rate input:focus{outline:none; border-color:var(--lf-acc);}
+
+/* Nâng cao: BOQ kéo thả, Concept | Hình | Tệp, Ghi chú, ô tích chuyển giao */
+.kd-lf-boq{display:flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:8px 14px; box-sizing:border-box; border:1px dashed var(--lf-dash); border-radius:10px; font-size:13px; color:var(--text-muted); text-align:center; cursor:pointer;}
+.kd-lf-boq:hover, .kd-lf-boq.over, .kd-lf-boq:focus-visible{outline:none; border-color:var(--lf-acc2); background:var(--lf-hover); color:var(--lf-acc);}
+.kd-lf-boq b{font-weight:600; color:var(--text);}
+.kd-lf-adv3{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; align-items:start;}
+.kd-lf-adv3 .kd-field > [role="button"]{min-height:96px !important; border-width:1px !important;}
+/* Ô Hình / Tệp (AttachBox, style inline dùng biến chung): đổi biến trong khối để cùng kiểu ô BOQ - viền đứt xám, nền xám nhạt, kéo tệp vào thì cam */
+.kd-lf-adv3{--border:var(--lf-dash); --surface-alt:var(--lf-in); --primary:var(--lf-acc2); --primary-tint:var(--lf-hover);}
+.kd-lf .kd-lf-adv3 textarea.kd-autogrow{min-height:96px;}
+.kd-lf-check{display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; color:var(--text); cursor:pointer;}
+.kd-lf-check input{width:16px; height:16px; margin:0; accent-color:var(--lf-btn); cursor:pointer;}
+
+/* Thanh Huỷ / Lưu dính đáy khung cuộn */
+.kd-lf-foot{position:sticky; bottom:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 18px; border:1px solid var(--lf-bd); border-radius:14px; background:var(--surface); box-shadow:0 -6px 18px rgba(15,23,42,.06);}
+.kd-lf-foot .hint{min-width:0; font-size:12px; color:var(--text-muted);}
+.kd-lf-foot .acts{display:flex; gap:8px; margin-left:auto;}
+.kd-lf-btn{height:38px; padding:0 16px; border:1px solid var(--lf-bd); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer;}
+.kd-lf-btn:hover{border-color:var(--text-muted);}
+.kd-lf-btn.pri{padding:0 18px; border-color:transparent; background:var(--lf-btn); color:#fff; font-weight:700;}
+.kd-lf-btn.pri:hover{background:var(--lf-btn-h);}
+.kd-lf-btn.pri.busy{opacity:.6; cursor:wait;}
+
+@media (max-width:640px){
+  .kd-lf-g2, .kd-lf-dept .opts{grid-template-columns:minmax(0, 1fr);}
+  .kd-lf .kd-money{grid-template-columns:minmax(0, 1fr) 84px;}
+  .kd-lf .kd-money .words{grid-column:1 / -1;}
+  .kd-lf-head, .kd-lf-sec{padding-left:14px; padding-right:14px;}
+}
 
 /* Ô chọn nhanh: nhóm gợi ý lấy từ nơi khác (kênh Marketing) */
 .kd-sl-grp{padding:8px 10px 4px; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); margin-top:4px;}
@@ -889,8 +989,53 @@ html[data-theme="dark"] .ios-cal-g .dow{color:rgba(235,235,245,.3);}
 .kd-field textarea.kd-autogrow{box-sizing:border-box; min-height:calc(4 * 1.5em + 20px); line-height:1.5; resize:vertical; overflow-y:auto;}
 /* Giao diện Glass / Super Glass: --bg trong suốt, --surface bán trong -> thanh cố định cần nền kính đậm + làm mờ để chữ các dòng phía dưới không lộ qua */
 html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky,
+html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-lf-foot,
 html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky .kd-list-head{
   background: var(--glass-surface-strong, var(--sg-surface-strong, var(--surface))) !important;
   -webkit-backdrop-filter: blur(30px) saturate(160%); backdrop-filter: blur(30px) saturate(160%);
 }
 html:is([data-ui-theme="glass"], [data-ui-theme="super-glass"]) body .kd-pl-sticky .kd-list-head{-webkit-backdrop-filter:none; backdrop-filter:none;}
+
+/* Pipeline (MarkUp 2026-11-22): đầu làn là khối màu đặc để tách bạch "menu" giai đoạn với thẻ khách hàng (nền trắng, viền màu).
+   Giai đoạn có màu riêng (stageAccent -> --lane) tô nền nhạt theo màu đó, còn lại nền xám; chữ IN HOA, số khách ở ô tròn trắng. */
+.kd-pl-panel .kd-stage-head.kd-sh{height:58px; padding:9px 12px; gap:2px; justify-content:center; border:0; border-radius:10px; box-shadow:none;
+  background:color-mix(in srgb, var(--text-muted) 20%, var(--surface)); color:var(--text);}
+.kd-pl-panel .kd-stage-head.kd-sh.tint{background:color-mix(in srgb, var(--lane) 26%, var(--surface)); color:color-mix(in srgb, var(--lane) 80%, var(--text));}
+.kd-sh-top{display:flex; align-items:center; gap:7px; min-width:0;}
+.kd-sh-dot{flex:none; width:7px; height:7px; border-radius:50%; background:var(--text-muted);}
+.kd-sh.tint .kd-sh-dot{background:var(--lane);}
+.kd-pl-panel .kd-stage-head.kd-sh .kd-sh-l{flex:1; min-width:0; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; line-height:1.25;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal;}
+.kd-sh-n{flex:none; min-width:22px; height:20px; padding:0 7px; border-radius:99px; background:var(--surface); color:var(--text); font-size:11px; font-weight:700;
+  display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 2px rgba(15,23,42,.08);}
+.kd-sh-v{padding-left:14px; font-size:11px; font-weight:600; color:var(--text-muted); white-space:nowrap;}
+.kd-sh.tint .kd-sh-v{color:color-mix(in srgb, var(--lane) 55%, var(--text-muted));}
+/* Thẻ khách hàng Kanban: mọi dòng cao cố định để thẻ thiếu trường vẫn cao bằng thẻ đủ trường (MarkUp 2026-11-22) */
+.kd-lead-card .kd-card-members{height:24px; min-height:24px !important; flex:none;}
+/* Thanh công cụ Pipeline 1 hàng (MarkUp 2026-11-22): Giá trị / Địa chỉ thành nút biểu tượng như Nhân sự, ô tìm co giãn thay vì rộng cố định
+   (chỉ xuống dòng khi màn hình quá hẹp) */
+.kd-pl-search{width:auto; flex:0 1 230px; min-width:150px;}
+/* Thanh công cụ Pipeline luôn 1 hàng khi màn hình đủ rộng (kể cả mở menu trái): không xuống dòng; khi chật thì nút có chữ
+   (Nguồn, Giai đoạn, Chủ đầu tư) co lại và cắt "…" (rê chuột xem đủ), ô tìm co tới 110px; co hết cỡ vẫn tràn thì PipelineTab gắn class wrap cho xuống dòng. */
+.kd-pl-bar{flex-wrap:nowrap;}
+.kd-pl-bar > *{flex-shrink:0;}
+.kd-pl-bar > .kd-pl-sdd{flex-shrink:1; min-width:0;}
+.kd-pl-bar > .kd-pl-sdd:has(> .kd-pl-sbtn.ic){flex-shrink:0;}
+.kd-pl-bar > .kd-pl-sdd > .kd-pl-sbtn{max-width:100%; min-width:76px;}
+.kd-pl-bar > .kd-pl-sdd > .kd-pl-sbtn.ic{min-width:32px;}
+.kd-pl-bar .kd-pl-sbtn span{min-width:0;}
+.kd-pl-bar > .kd-pl-search{flex:0 1 230px; min-width:110px;}
+.kd-pl-bar.wrap{flex-wrap:wrap;}
+/* Form khách hàng: dấu * bắt buộc màu đỏ; lỗi khi lưu hiện chữ đỏ ở thanh dưới + ô sai viền đỏ (MarkUp 2026-11-22) */
+.kd-req{color:#D92D20; font-weight:700;}
+.kd-lf-errmsg{color:#D92D20 !important; font-weight:600;}
+.kd-lf-err input, .kd-lf-err select{border-color:#D92D20 !important; box-shadow:0 0 0 3px rgba(217,45,32,.12);}
+.kd-lf-err > label{color:#D92D20;}
+html[data-theme="dark"] .kd-req, html[data-theme="dark"] .kd-lf-errmsg, html[data-theme="dark"] .kd-lf-err > label{color:#F97066 !important;}
+/* Form khách hàng - BOQ tải file thật: hàng thao tác dưới ô (Mở file · Đổi file · Gỡ) */
+.kd-lf-boq.busy{cursor:progress; opacity:.75;}
+.kd-lf-boq-acts{display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:6px;}
+.kd-lf-boq-acts a, .kd-lf-boq-acts button{font:inherit; font-weight:600; color:#C75C0E; background:none; border:0; padding:0; cursor:pointer; text-decoration:none;}
+.kd-lf-boq-acts a:hover, .kd-lf-boq-acts button:hover{text-decoration:underline;}
+.kd-lf-boq-acts button.danger{color:#D92D20;}
+.kd-lf-boq-acts em{font-style:normal; color:var(--text-muted);}

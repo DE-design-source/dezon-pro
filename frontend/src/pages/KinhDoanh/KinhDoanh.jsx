@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
 import {
-  SALES_TABS, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, DEPT_LABEL,
+  SALES_TABS, SALES_ADMIN_TABS, HANDOFF_CONFIG, KD_STEPS, KD_WALLET_INITIAL, DEPT_LABEL,
   DESIGN_STAGES, DESIGN_LABEL, DESIGN_COLOR, CONSTRUCTION_STAGES, CONSTRUCTION_LABEL, CONSTRUCTION_COLOR, STAGE_LABEL,
 } from '../../data/kinhDoanhData'
 import { fmtTy, matchesTimeFilter, phoneKeys, phoneNorms, emailKeys } from './utils'
@@ -12,6 +12,7 @@ import OverviewTab from './components/OverviewTab'
 import PipelineTab from './components/PipelineTab'
 import SubBoard from './components/SubBoard'
 import TasksTab from './components/TasksTab'
+import AiConfigTab from './components/AiConfigTab'
 import LeadModal from './components/LeadModal'
 import StaffRequestModal from './components/StaffRequestModal'
 import ConfirmDelete from './components/ConfirmDelete'
@@ -23,7 +24,7 @@ import TaskModal from './components/TaskModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import WorkGate from '../../components/ui/WorkGate'
-import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { usePageTabsHidden } from '../../hooks/usePageTabs'
 import { useWorkSession } from '../../services/workSession'
 import * as kdApi from './api'
 
@@ -40,9 +41,19 @@ function KinhDoanhPage() {
   const { me } = useWorkSession()
   const meName = (me && (me.hoTen || me.username)) || ''
   const [tab, setTab] = useState('overview')
-  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  // tab ẩn ở Cài đặt > Hiển thị + tab chỉ cho quản trị; tab đang mở không được hiện thì sang tab hiện đầu tiên
+  // (không còn tab nào hiện -> về 'overview', không nhảy qua lại giữa 2 tab)
   const tabHidden = usePageTabsHidden('/kinh-doanh')
-  useTabFallback(tabHidden, tab, SALES_TABS.map(t => t[0]), setTab)
+  const isManager = !!me && (me.role === 'admin' || me.role === 'super')
+  const visibleTabs = SALES_TABS.filter(t => tabHidden.indexOf(t[0]) < 0 && (isManager || SALES_ADMIN_TABS.indexOf(t[0]) < 0))
+  useEffect(() => {
+    if (visibleTabs.some(t => t[0] === tab)) return
+    const next = visibleTabs.length ? visibleTabs[0][0] : 'overview'
+    if (next !== tab) setTab(next)
+  }, [isManager, tab, tabHidden]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Tab Cấu hình AI chỉ tải khi mở lần đầu, sau đó giữ mount để không mất bản nháp khi đổi tab */
+  const [aicMounted, setAicMounted] = useState(false)
+  useEffect(() => { if (tab === 'ai-config') setAicMounted(true) }, [tab])
 
   /* ---------- Dữ liệu pipeline ---------- */
   const [leads, setLeads] = useState([])
@@ -181,7 +192,7 @@ function KinhDoanhPage() {
       const patch = {}
       if (geo) {
         const m = { ...geoMap }
-        if (geo.kv || geo.tinh) m[String(saved.id)] = geo; else delete m[String(saved.id)]
+        if (geo.kv || geo.tinh || geo.xa) m[String(saved.id)] = geo; else delete m[String(saved.id)]   // geo: {kv, tinh, xa?} (xa = Phường / Xã)
         patch.geo = m
       }
       if (projName !== undefined && (projName || projNameMap[String(saved.id)])) {
@@ -222,7 +233,7 @@ function KinhDoanhPage() {
       setLeads(prev => (editing ? prev.map(l => (sameId(l.id, saved.id) ? saved : l)) : [...prev, saved]))
       closeLeadModal()
     } catch (e) {
-      alert('Không lưu được: ' + e.message)
+      throw e   // LeadModal hiện lỗi màu đỏ ngay trên form và chỉ ô sai
     }
   }
 
@@ -347,7 +358,7 @@ function KinhDoanhPage() {
     const opt = {}
     const g = info.geo || {}
     const g0 = geoMap[key] || {}
-    if ((g.kv || g.tinh) && !g0.kv && !g0.tinh) opt.geo = { ...geoMap, [key]: { kv: g.kv || '', tinh: g.tinh || '' } }
+    if ((g.kv || g.tinh || g.xa) && !g0.kv && !g0.tinh && !g0.xa) opt.geo = { ...geoMap, [key]: { kv: g.kv || '', tinh: g.tinh || '', ...(g.xa ? { xa: g.xa } : null) } }
     if (info.projName && !projNameMap[key]) opt.projName = { ...projNameMap, [key]: info.projName }
     const t = info.timeline || {}
     const t0 = timelineMap[key] || {}
@@ -370,7 +381,7 @@ function KinhDoanhPage() {
         info.email ? 'Email: ' + info.email : '',
         info.source ? 'Nguồn: ' + info.source : '',
         info.address ? 'Địa chỉ: ' + info.address : '',
-        g.tinh || g.kv ? 'Tỉnh: ' + [g.tinh, g.kv].filter(Boolean).join(' - ') : '',
+        g.tinh || g.kv || g.xa ? 'Tỉnh: ' + [g.xa, g.tinh, g.kv].filter(Boolean).join(' - ') : '',
         info.projName ? 'Tên dự án: ' + info.projName : '',
         info.projectType ? 'Loại dự án: ' + info.projectType : '',
         info.scale ? 'Quy mô: ' + info.scale : '',
@@ -403,7 +414,7 @@ function KinhDoanhPage() {
         </div>
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>Kinh doanh</span>
         <div className="hdr-tabs" role="tablist">
-          {SALES_TABS.filter(t => tabHidden.indexOf(t[0]) < 0).map(([key, label]) => (
+          {visibleTabs.map(([key, label]) => (
             <button key={key} className={`kd-sales-tab${tab === key && !detail.open ? ' active' : ''}`} onClick={() => { setTab(key); setDetail(d => ({ ...d, open: false })) }}>{label}</button>
           ))}
         </div>
@@ -435,6 +446,7 @@ function KinhDoanhPage() {
             onEdit={() => openLeadModal(detailLead.id)}
             onMove={moveLead}
             onSetCreated={d => setCreatedAt(detailLead.id, d)}
+            onPatch={changes => patchLead(detailLead.id, changes)}
             onOpenNotif={openNotif}
           />
         )}
@@ -477,6 +489,13 @@ function KinhDoanhPage() {
         <div style={panel('nhansu', 16)}>
           <DeptStaff units={['kddd', 'kdda']} title="Kinh doanh" />
         </div>
+
+        {/* ================= TAB: CẤU HÌNH AI (admin / super) ================= */}
+        {isManager && (
+          <div style={panel('ai-config', 16)}>
+            {aicMounted && <AiConfigTab leads={leads} />}
+          </div>
+        )}
         </div>
         </div>
       </div>
