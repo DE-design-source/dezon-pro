@@ -443,7 +443,7 @@ scp -r root@<IP máy chủ>:/opt/qspro-backups/qspro-media .
 | Build bị `Killed` / hết bộ nhớ | VPS ít RAM | Kiểm tra swap `free -h`; chạy lại `setup-server.sh` |
 | `git pull` báo `Permission denied (publickey)` | Thiếu deploy key | Làm lại Bước 3 |
 | `git pull` báo không fast-forward được | Có người sửa file trực tiếp trên máy chủ | `git -C /opt/qspro status`; KHÔNG sửa code trên máy chủ, chỉ sửa `.env` |
-| Upload file lớn báo lỗi | Giới hạn của backend: JSON 30 MB, tài liệu 50 MB | Giảm dung lượng file |
+| Upload file lớn báo lỗi | Giới hạn của backend: JSON 30 MB, tài liệu 300 MB | Giảm dung lượng file |
 | Group Lark nhận 2 báo cáo | Hai server cùng bật job báo cáo | Đặt `REPORT_JOB=0` ở một bên |
 | Ảnh cũ (Lark) không hiện | Thiếu `LARK_APP_ID` / `LARK_APP_SECRET` | Điền vào `.env`, `bash deploy.sh --no-pull` |
 | Ảnh `/files/...` không hiện (trả trang React hoặc 404) | `Caddyfile` thiếu `/files/*`, hoặc file không có trong volume `uploads` (nạp dữ liệu mà không kèm bản nén kho file, volume bị xoá) | Kiểm tra dòng `@backend` trong `Caddyfile`; `docker compose exec api ls /app/uploads`; khôi phục kho file từ bản `qspro-files-*.tar.gz` |

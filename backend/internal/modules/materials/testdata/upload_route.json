@@ -162,9 +162,9 @@
    "Content-Type": "application/json"
   },
   "login": true,
-  "bodyHex": "7b226c656e677468223a36303030303030307d",
+  "bodyHex": "7b226c656e677468223a3630303030303030307d",
   "status": 400,
-  "body": "{\"error\":\"File 57.2MB quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên.\"}",
+  "body": "{\"error\":\"File 572.2MB quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên.\"}",
   "up": null
  },
  {
@@ -174,9 +174,9 @@
    "Content-Type": "application/json"
   },
   "login": true,
-  "bodyHex": "7b226c656e677468223a223630303030303030227d",
+  "bodyHex": "7b226c656e677468223a22363030303030303030227d",
   "status": 400,
-  "body": "{\"error\":\"File 57.2MB quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên.\"}",
+  "body": "{\"error\":\"File 572.2MB quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên.\"}",
   "up": null
  },
  {

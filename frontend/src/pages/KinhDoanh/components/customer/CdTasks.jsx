@@ -112,8 +112,6 @@ export default function CdTasks({ lead, me, people }) {
       <div className="cd-cc-h">
         <h3 className="cd-cc-t sm">Danh sách Task</h3>
         {tasks.length > 0 && <span className="cd-task-n">{open}/{tasks.length} chưa xong</span>}
-        <span className="cd-cflex" />
-        {edit !== 'new' && <button type="button" className="cd-cbtn sm" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button>}
       </div>
       {edit === 'new' && <TaskForm people={ppl} onCancel={() => setEdit(null)} onSave={f => save(f, null)} />}
       {!loaded && <div className="cd-task-none">Đang tải task…</div>}
@@ -145,6 +143,10 @@ export default function CdTasks({ lead, me, people }) {
           </div>
         )
       })}
+      {/* đã có task: nút thêm nằm cuối danh sách (bỏ nút ở góc trên thẻ) */}
+      {loaded && !err && tasks.length > 0 && edit !== 'new' && (
+        <div className="cd-task-add"><button type="button" className="cd-cbtn-or" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button></div>
+      )}
     </section>
   )
 }

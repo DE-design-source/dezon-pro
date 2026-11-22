@@ -3,6 +3,7 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,5 +85,131 @@ func TestGenerateJSONTimeout(t *testing.T) {
 	c, _ := New(Config{APIKey: "bi-mat", BaseURL: srv.URL, Timeout: 20 * time.Millisecond})
 	if _, err := c.GenerateJSON(context.Background(), "", "x"); err == nil || strings.Contains(err.Error(), "bi-mat") {
 		t.Errorf("timeout: %v", err)
+	}
+}
+
+func TestGenerateJSONWithModel(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`))
+	}))
+	defer srv.Close()
+	c, _ := New(Config{APIKey: "k", Model: "gemini-mac-dinh", BaseURL: srv.URL})
+	for _, m := range []string{"gemini-khac", " models/gemini-khac2 ", ""} {
+		if _, err := c.GenerateJSONWith(context.Background(), m, "", "x"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := "/models/gemini-khac:generateContent,/models/gemini-khac2:generateContent,/models/gemini-mac-dinh:generateContent"
+	if strings.Join(paths, ",") != want {
+		t.Errorf("paths %v", paths)
+	}
+	if c.Model() != "gemini-mac-dinh" {
+		t.Errorf("model mặc định không được đổi: %s", c.Model())
+	}
+}
+
+func TestListModels(t *testing.T) {
+	calls := 0
+	fail := false
+	var gotKey, gotQuery []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		gotKey = append(gotKey, r.Header.Get("x-goog-api-key"))
+		gotQuery = append(gotQuery, r.URL.RawQuery)
+		if r.URL.Path != "/models" || r.Method != http.MethodGet {
+			t.Errorf("gọi %s %s", r.Method, r.URL.Path)
+		}
+		if fail {
+			w.WriteHeader(403)
+			_, _ = w.Write([]byte(`{"error":{"message":"bad key bi-mat"}}`))
+			return
+		}
+		if r.URL.Query().Get("pageToken") == "" {
+			_, _ = w.Write([]byte(`{"models":[
+				{"name":"models/gemini-z-pro","displayName":"Gemini Z Pro","description":"Mạnh","supportedGenerationMethods":["generateContent","countTokens"]},
+				{"name":"models/embedding-001","displayName":"Embedding","supportedGenerationMethods":["embedContent"]},
+				{"name":"models/gemini-embed","displayName":"Gemini Embed","supportedGenerationMethods":["embedContent"]},
+				{"name":"models/imagen-3","supportedGenerationMethods":["generateContent"]}
+			],"nextPageToken":"p2"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"models":[
+			{"name":"models/gemini-a-flash","supportedGenerationMethods":["generateContent"],"description":"` + strings.Repeat("d", 300) + `"},
+			{"name":"models/gemini-z-pro","displayName":"Trùng","supportedGenerationMethods":["generateContent"]}
+		]}`))
+	}))
+	defer srv.Close()
+	now := time.Date(2026, 11, 22, 8, 0, 0, 0, time.UTC)
+	c, _ := New(Config{APIKey: "bi-mat", BaseURL: srv.URL})
+	c.now = func() time.Time { return now }
+
+	list, err := c.ListModels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 || list[0].ID != "gemini-a-flash" || list[0].Label != "gemini-a-flash" || len([]rune(list[0].Desc)) != descMax+3 ||
+		list[1] != (ModelInfo{ID: "gemini-z-pro", Label: "Gemini Z Pro", Desc: "Mạnh"}) {
+		t.Errorf("danh sách %+v", list)
+	}
+	if calls != 2 || gotKey[0] != "bi-mat" || strings.Contains(gotQuery[0], "bi-mat") || !strings.Contains(gotQuery[0], "pageSize=200") ||
+		!strings.Contains(gotQuery[1], "pageToken=p2") {
+		t.Errorf("gọi %d lần, key %v, query %v", calls, gotKey, gotQuery)
+	}
+	// trong 1 giờ: dùng cache, bản trả về là bản sao
+	list[0].ID = "sua"
+	now = now.Add(59 * time.Minute)
+	list, _ = c.ListModels(context.Background())
+	if calls != 2 || list[0].ID != "gemini-a-flash" {
+		t.Errorf("cache 1 giờ: %d lần, %+v", calls, list)
+	}
+	// hết 1 giờ + API lỗi: lỗi không lộ khoá, giữ lỗi 1 phút
+	now = now.Add(2 * time.Minute)
+	fail = true
+	if _, err := c.ListModels(context.Background()); err == nil || !strings.Contains(err.Error(), "HTTP 403") || strings.Contains(err.Error(), "bi-mat") {
+		t.Errorf("lỗi: %v", err)
+	}
+	if _, err := c.ListModels(context.Background()); err == nil || calls != 3 {
+		t.Errorf("lỗi giữ 1 phút: %v %d", err, calls)
+	}
+	fail = false
+	now = now.Add(61 * time.Second)
+	if list, err := c.ListModels(context.Background()); err != nil || len(list) != 2 || calls != 5 {
+		t.Errorf("sau 1 phút thử lại: %v %d %d", err, len(list), calls)
+	}
+}
+
+func TestListModelsCtxHuy(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-x","supportedGenerationMethods":["generateContent"]}]}`))
+	}))
+	defer srv.Close()
+	c, _ := New(Config{APIKey: "k", BaseURL: srv.URL})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := c.ListModels(ctx); err == nil {
+		t.Fatal("ctx huỷ phải lỗi")
+	}
+	if list, err := c.ListModels(context.Background()); err != nil || len(list) != 1 {
+		t.Errorf("lỗi do ctx huỷ không được giữ: %v %v", list, err)
+	}
+}
+
+// Đang có lần lấy danh sách khác giữ khoá: người chờ bỏ cuộc theo ctx của mình, không xếp hàng tới hết lần kia.
+func TestListModelsChoTheoCtx(t *testing.T) {
+	c, _ := New(Config{APIKey: "k", BaseURL: "http://127.0.0.1:9"})
+	c.listSem <- struct{}{}
+	defer func() { <-c.listSem }()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := c.ListModels(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("phải lỗi hết giờ, được %v", err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("chờ quá lâu: %v", d)
 	}
 }

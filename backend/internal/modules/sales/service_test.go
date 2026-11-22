@@ -32,6 +32,7 @@ type fakeRepo struct {
 	tasks    map[float64]*omap.Map
 	insights []*omap.Map
 	childID  float64
+	settings map[string]*omap.Map // cai_dat_cong_ty (service_aiconfig_test.go)
 }
 
 func newFake() *fakeRepo { return &fakeRepo{leads: map[float64]*omap.Map{}, nextID: 1} }

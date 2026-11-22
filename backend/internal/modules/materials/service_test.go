@@ -19,6 +19,7 @@ import (
 	"qspro-backend/internal/platform/database"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	"qspro-backend/internal/shared/contracts"
 	"qspro-backend/internal/shared/goonly"
 	"qspro-backend/internal/shared/jsval"
 	"qspro-backend/internal/shared/omap"
@@ -171,6 +172,7 @@ type fakeUploader struct {
 	rec  *omap.Map
 	fail string
 	buf  []byte
+	open int // tệp tạm đang mở (chưa Commit / Discard)
 }
 
 func (u *fakeUploader) Upload(_ context.Context, buf []byte, path, contentType string) (string, error) {
@@ -180,6 +182,47 @@ func (u *fakeUploader) Upload(_ context.Context, buf []byte, path, contentType s
 		return "", errors.New(u.fail)
 	}
 	return "URL:" + path, nil
+}
+
+// CreateTemp: tệp tạm giả trong RAM - giữ tối đa fakeKeep byte đầu (file lớn chỉ đếm), Commit ghi lại như Upload.
+func (u *fakeUploader) CreateTemp(context.Context) (contracts.TempFile, error) {
+	u.open++
+	return &fakeTemp{u: u}, nil
+}
+
+const fakeKeep = 1 << 20
+
+type fakeTemp struct {
+	u    *fakeUploader
+	buf  []byte
+	n    int64
+	done bool
+}
+
+func (f *fakeTemp) Write(b []byte) (int, error) {
+	if k := fakeKeep - len(f.buf); k > 0 {
+		f.buf = append(f.buf, b[:min(k, len(b))]...)
+	}
+	f.n += int64(len(b))
+	return len(b), nil
+}
+
+func (f *fakeTemp) Commit(path, contentType string) (string, error) {
+	f.done = true
+	f.u.open--
+	f.u.buf = f.buf
+	f.u.rec = omap.Of("len", float64(f.n), "path", path, "ct", contentType)
+	if f.u.fail != "" {
+		return "", errors.New(f.u.fail)
+	}
+	return "URL:" + path, nil
+}
+
+func (f *fakeTemp) Discard() {
+	if !f.done {
+		f.done = true
+		f.u.open--
+	}
 }
 
 func newSvc(repo Repository, up *fakeUploader) (*Service, *rpc.Registry) {
@@ -233,6 +276,11 @@ func callFn(ctx context.Context, s *Service, reg *rpc.Registry, a *actor.Actor, 
 	case "$uploadFileBuf":
 		var buf []byte
 		if n, ok := argAt(args, 0).(float64); ok {
+			if up, isFake := s.uploader.(*fakeUploader); isFake && n > fakeKeep {
+				// ca biên ~300MB: chỉ cỡ là quan trọng, không cấp phát cả buffer (fakeTemp ghi len = n như Upload ghi len(buf))
+				up.open++
+				return saveDoc(n, argAt(args, 1), jsval.AsString(argAt(args, 2)), (&fakeTemp{u: up, n: int64(n)}).Commit)
+			}
 			buf = bytes.Repeat([]byte{'A'}, int(n))
 		}
 		return s.UploadFileBuf(ctx, buf, argAt(args, 1), jsval.AsString(argAt(args, 2)))
@@ -539,12 +587,14 @@ func TestUploadRoute(t *testing.T) {
 		t.Errorf("content-type mặc định: %s", js(up.rec))
 	}
 	// quá (DOC_MAX_MB + 1) MB: 413 JSON kể cả khi chưa đăng nhập (express.raw chạy trước khi kiểm tra đăng nhập)
-	big := make([]byte, uploadLimit+1)
-	const qua = `{"error":"File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}`
-	check("quá giới hạn thân", do(e, "POST", "/upload/file?name=a.pdf", "application/pdf", big, false), 413, qua)
-	// giữa 50 MB và 51 MB: thân đọc được, uploadFileBuf từ chối -> 400
-	check("quá giới hạn file", do(e, "POST", "/upload/file?name=a.pdf", "application/pdf", big[:DocMaxMB<<20+1], true), 400,
-		`{"error":"File 50.0MB quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}`)
+	const qua = `{"error":"File quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên."}`
+	check("quá giới hạn thân", doStream(e, "/upload/file?name=a.pdf", "application/pdf", uploadLimit+1, false), 413, qua)
+	// giữa 300 MB và 301 MB: thân đọc được, uploadFileBuf từ chối -> 400
+	check("quá giới hạn file", doStream(e, "/upload/file?name=a.pdf", "application/pdf", DocMaxMB<<20+1, true), 400,
+		`{"error":"File 300.0MB quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên."}`)
+	if up.open != 0 {
+		t.Errorf("còn %d tệp tạm mở", up.open)
+	}
 	up.fail = "Storage upload -> 413 Payload too large"
 	check("kho từ chối", do(e, "POST", "/upload/file?name=a.pdf", "application/pdf", pdf, true), 400,
 		`{"error":"Kho file từ chối: file 0.0MB vượt giới hạn — hãy dán link thay vì tải lên."}`)

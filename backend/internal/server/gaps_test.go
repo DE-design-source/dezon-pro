@@ -165,7 +165,7 @@ func TestDocMaxMBInSync(t *testing.T) {
 		t.Errorf("middleware.DocMaxMB = %d, materials.DocMaxMB = %d", middleware.DocMaxMB, materials.DocMaxMB)
 	}
 	// Node: 'File quá lớn (tối đa ' + store.DOC_MAX_MB + 'MB) — hãy dán link thay vì tải lên.'
-	if middleware.MsgUploadTooLarge != "File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên." {
+	if middleware.MsgUploadTooLarge != "File quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên." {
 		t.Errorf("thông báo 413: %q", middleware.MsgUploadTooLarge)
 	}
 }

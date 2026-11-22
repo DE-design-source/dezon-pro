@@ -54,9 +54,11 @@ export async function saveKdOptions(key, list) {
    ô gõ trên cùng để lọc, Enter = chọn đúng chữ đã gõ (free) hoặc thêm thành mục mới; nút "Sửa danh sách" = thêm / xoá mục tự thêm.
    Props: value, onChange(v), base [], optKey ('source' | 'manager'), free (cho chọn chữ tự gõ), placeholder,
    linked [] + linkedLabel: nhóm gợi ý lấy từ nơi khác (vd kênh Marketing), chọn được nhưng không xoá ở đây.
-   Có linked thì danh sách chia 2 chip: [linkedLabel] | Khác (mục mặc định + mục tự thêm). */
-export default function ShortlistSelect({ value, onChange, base, optKey, free, placeholder, linked, linkedLabel }) {
-  const extra = useKdOptions(optKey)
+   Có linked thì danh sách chia 2 chip: [linkedLabel] | Khác (mục mặc định + mục tự thêm).
+   items + onAdd(v) + onRemove(v): danh sách mục tự thêm do nơi gọi tự quản (thay kdOptions[optKey]), vd Trang / Thương hiệu theo kênh nguồn. */
+export default function ShortlistSelect({ value, onChange, base, optKey, free, placeholder, linked, linkedLabel, items, onAdd, onRemove }) {
+  const optExtra = useKdOptions(optKey)
+  const extra = items || optExtra
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(false)
   const [q, setQ] = useState('')
@@ -81,7 +83,7 @@ export default function ShortlistSelect({ value, onChange, base, optKey, free, p
   const pick = v => { onChange(v); setOpen(false); setEdit(false); setQ('') }
   const add = () => {
     const v = q.trim(); if (!v) return
-    if (all.indexOf(v) < 0) saveKdOptions(optKey, [...extra, v])
+    if (all.indexOf(v) < 0) { if (onAdd) onAdd(v); else saveKdOptions(optKey, [...extra, v]) }
     setQ('')
     if (!edit) pick(v)
   }
@@ -108,7 +110,7 @@ export default function ShortlistSelect({ value, onChange, base, optKey, free, p
               return (
                 <div key={x} className={'kd-sl-opt' + (x === value ? ' on' : '')} onClick={() => (edit ? null : pick(x))}>
                   <span>{x}</span>
-                  {edit && mine && <button type="button" title={'Xoá "' + x + '" khỏi danh sách'} onClick={() => saveKdOptions(optKey, extra.filter(y => y !== x))}>×</button>}
+                  {edit && mine && <button type="button" title={'Xoá "' + x + '" khỏi danh sách'} onClick={() => (onRemove ? onRemove(x) : saveKdOptions(optKey, extra.filter(y => y !== x)))}>×</button>}
                   {!edit && x === value && <em>✓</em>}
                 </div>
               )

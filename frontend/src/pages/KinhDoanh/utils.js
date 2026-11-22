@@ -181,3 +181,15 @@ export function duplicateIndex(leads) {
   })
   return idx
 }
+
+/* File BOQ của khách (cột boq_file_name): bản cũ chỉ là tên tệp (mô phỏng, không có file); từ 2026-11-22 tải file thật lên
+   /upload/file và lưu "<url>#<tên gốc>". Trả {name, url} (url rỗng = bản cũ chỉ có tên) hoặc null. */
+export function boqOf(s) {
+  const v = String(s || '').trim()
+  if (!v) return null
+  if (!/^(\/files\/|https?:\/\/)/i.test(v)) return { name: v, url: '' }
+  const i = v.indexOf('#')
+  const url = i >= 0 ? v.slice(0, i) : v
+  const base = decodeURIComponent((url.split('/').pop() || '').replace(/^\d+-/, '')) || 'BOQ'
+  return { name: (i >= 0 ? v.slice(i + 1).trim() : '') || base, url }
+}

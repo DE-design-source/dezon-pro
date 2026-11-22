@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"qspro-backend/internal/config"
@@ -75,6 +76,8 @@ type Service struct {
 	db       *database.DB
 	now      func() time.Time
 	readKeys []readKey // khoá API chỉ đọc (SALES_READ_KEYS, apikey.go)
+	testMu   sync.Mutex
+	testAt   map[string]time.Time // lần chạy thử hướng dẫn AI gần nhất theo người (service_aiconfig.go)
 }
 
 // New tạo service.
@@ -648,7 +651,7 @@ func (s *Service) fields(ctx context.Context, b *omap.Map, old *omap.Map) (*omap
 	if b.Has("valueVnd") {
 		v := jsval.ToNumber(b.Val("valueVnd"))
 		if v != v || v < 0 || v > 1e17 {
-			return nil, apperr.BadRequest("Giá trị không hợp lệ")
+			return nil, apperr.BadRequest("Giá trị ước tính không hợp lệ: phải là số từ 0 đến 100.000.000 tỷ đồng")
 		}
 		p.Set("gia_tri_vnd", jsval.Round(v))
 	}

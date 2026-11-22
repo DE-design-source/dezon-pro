@@ -14,8 +14,9 @@ var dbNum = map[string]bool{
 	"BẢO HÀNH (năm)": true, "GIÁ BÁN LẺ": true, "CHIẾT KHẤU ĐẠI LÝ (%)": true, "GIÁ BÁN BỘ NGUỒN": true,
 }
 
-// DocMaxMB = DOC_MAX_MB (S:978): giới hạn 1 file tài liệu.
-const DocMaxMB = 50
+// DocMaxMB = DOC_MAX_MB (S:978): giới hạn 1 file tài liệu (bản Node: 50). Phải bằng middleware.DocMaxMB
+// và DOC_MAX_MB của giao diện (frontend/src/pages/QS/api/files.js).
+const DocMaxMB = 300
 
 // docExt = DOC_EXT (S:977). Đuôi đã qua toLowerCase nên không cần cờ i.
 var docExt = regexp.MustCompile(`^(pdf|png|jpe?g|webp|gif|dwg|dxf|skp|zip|rar|7z|docx?|xlsx?|pptx?)$`)

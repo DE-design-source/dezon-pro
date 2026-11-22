@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { uploadRaw, mediaUrl } from '../../QS/api/files'
 
 /* Ô đính kèm của form khách hàng (bước Nâng cao, MarkUp 2026-11-16 16:20): bấm, kéo thả hoặc dán (Ctrl+V) nhiều tệp, tải ngay lên kho tệp
-   máy chủ (/upload/file, giới hạn 50MB / tệp, đuôi theo DOC_EXT của máy chủ), giữ danh sách {name, url}.
+   máy chủ (/upload/file, giới hạn DOC_MAX_MB = 300MB / tệp, đuôi theo DOC_EXT của máy chủ), giữ danh sách {name, url}.
    kind 'img' = Hình đính kèm (ảnh, hiện ảnh nhỏ) | 'file' = Tệp đính kèm (các định dạng khác: PDF, CAD, nén, Office).
    Nhận cả ảnh kéo từ trang web khác (chỉ có URL / HTML <img src>, kể cả data: URL): tải ảnh về rồi tải lên như tệp thường.
    Props: kind, label, items [{name, url}], onChange(items), onBusy(số tệp đang tải lên). Ref: add(files) - LeadModal chuyển tệp dán ở cấp bước Nâng cao vào đây */

@@ -30,7 +30,7 @@ type Deps struct {
 	UserFmt  contracts.UserFormatter
 	Notifier contracts.Notifier
 	Admins   contracts.AdminLister
-	Uploader contracts.Uploader
+	Uploader contracts.DocUploader
 	Repo     Repository
 	// DuyetDelay > 0 (chỉ bản Go): gom thao tác thêm / sửa SP của tài khoản không phải admin trong khoảng này rồi báo
 	// người duyệt 1 lần (notify_duyet.go). 0 = tắt (test golden không có thông báo này).
@@ -46,7 +46,7 @@ type Service struct {
 	userFmt  contracts.UserFormatter
 	notifier contracts.Notifier
 	admins   contracts.AdminLister
-	uploader contracts.Uploader
+	uploader contracts.DocUploader
 	db       *database.DB // D-13: mở transaction; nil (repo giả trong test unit) -> chạy thẳng
 
 	// _cache / _cacheAt (S:157): danh mục theo từng công ty, xoá TOÀN BỘ khi có sản phẩm thay đổi

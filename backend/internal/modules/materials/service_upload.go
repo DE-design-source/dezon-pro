@@ -112,6 +112,14 @@ func (s *Service) UploadFileBuf(ctx context.Context, buf []byte, fileName any, c
 // uploadDoc: doDai = buf.length như JS thấy. Tách khỏi len(buf) vì ở /upload/file thân JSON đã bị express.json đọc
 // thành mảng / object: Node kiểm tra .length của giá trị đó rồi gửi String(giá trị) lên kho.
 func (s *Service) uploadDoc(ctx context.Context, buf []byte, doDai any, fileName any, contentType string) (*omap.Map, error) {
+	return saveDoc(doDai, fileName, contentType, func(path, ct string) (string, error) {
+		return s.uploader.Upload(ctx, buf, path, ct)
+	})
+}
+
+// saveDoc: kiểm tra (rỗng, cỡ, tên, đuôi) theo thứ tự của uploadFileBuf, dựng đường dẫn docs/<ms>-<tên>.<đuôi> rồi gọi put
+// để lưu (buf trong RAM qua Upload, hoặc tệp tạm đã ghi theo luồng qua TempFile.Commit).
+func saveDoc(doDai any, fileName any, contentType string, put func(path, contentType string) (string, error)) (*omap.Map, error) {
 	if !jsval.Truthy(doDai) {
 		return nil, apperr.New("File rỗng.")
 	}
@@ -154,7 +162,7 @@ func (s *Service) uploadDoc(ctx context.Context, buf []byte, doDai any, fileName
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	url, err := s.uploader.Upload(ctx, buf, path, contentType)
+	url, err := put(path, contentType)
 	if err != nil {
 		if reKhoTuChoi.MatchString(err.Error()) {
 			return nil, apperr.New("Kho file từ chối: file " + jsval.ToFixed(mb, 1) + "MB vượt giới hạn — hãy dán link thay vì tải lên.")

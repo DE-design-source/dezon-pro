@@ -685,15 +685,27 @@ func TestParseInsight(t *testing.T) {
 // ---- phân tích: service ----
 
 type fakeAI struct {
-	text   string
-	err    error
-	prompt string
+	text    string
+	err     error
+	prompt  string
+	system  string
+	model   string // model đã gọi ("" = mặc định)
+	calls   int
+	models  []gemini.ModelInfo
+	listErr error
 }
 
 func (f *fakeAI) Model() string { return "gemini-test" }
 func (f *fakeAI) GenerateJSON(ctx context.Context, system, prompt string) (string, error) {
-	f.prompt = prompt
+	return f.GenerateJSONWith(ctx, "", system, prompt)
+}
+func (f *fakeAI) GenerateJSONWith(ctx context.Context, model, system, prompt string) (string, error) {
+	f.prompt, f.system, f.model = prompt, system, model
+	f.calls++
 	return f.text, f.err
+}
+func (f *fakeAI) ListModels(ctx context.Context) ([]gemini.ModelInfo, error) {
+	return append([]gemini.ModelInfo(nil), f.models...), f.listErr
 }
 
 func TestGenerateInsights(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestUpload(t *testing.T) {
@@ -124,5 +125,85 @@ func TestValidPath(t *testing.T) {
 		if got := ValidPath(p); got != want {
 			t.Errorf("ValidPath(%q) = %v", p, got)
 		}
+	}
+}
+
+// CreateTemp -> Write -> Commit: file vào đúng chỗ (ghi đè nếu trùng), .tmp không còn gì; Discard xoá tệp tạm.
+func TestCreateTemp(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "kho")
+	s := New(dir)
+	ctx := context.Background()
+	for _, noiDung := range []string{"lần 1", "lần 2 dài hơn"} {
+		tf, err := s.CreateTemp(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tf.Write([]byte(noiDung)); err != nil {
+			t.Fatal(err)
+		}
+		url, err := tf.Commit("docs/1-a b.pdf", "application/pdf")
+		if err != nil || url != "/files/docs/1-a%20b.pdf" {
+			t.Fatalf("commit: %q %v", url, err)
+		}
+		tf.Discard() // sau Commit: không làm gì
+		if b, err := os.ReadFile(filepath.Join(dir, "docs", "1-a b.pdf")); err != nil || string(b) != noiDung {
+			t.Errorf("file: %q %v", b, err)
+		}
+	}
+	tf, _ := s.CreateTemp(ctx)
+	_, _ = tf.Write([]byte("bỏ"))
+	tf.Discard()
+	if _, err := tf.Write([]byte("x")); err == nil {
+		t.Error("ghi sau Discard không lỗi")
+	}
+	// đường dẫn sai: lỗi như Upload, tệp tạm bị xoá
+	tf, _ = s.CreateTemp(ctx)
+	if _, err := tf.Commit("../x.pdf", ""); err == nil || err.Error() != "Đường dẫn file không hợp lệ" {
+		t.Errorf("path sai: %v", err)
+	}
+	if es, _ := os.ReadDir(filepath.Join(dir, TempDir)); len(es) != 0 {
+		t.Errorf("còn tệp tạm: %v", es)
+	}
+	if _, ok := PathOf("/files/.tmp/x.tmp"); ok {
+		t.Error("/files/ phục vụ được tệp tạm")
+	}
+}
+
+// Lần CreateTemp đầu tiên của Client dọn tệp tạm cũ hơn 1 ngày, giữ tệp mới.
+func TestCreateTempSweep(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, TempDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cu, moi := filepath.Join(dir, TempDir, "cu.tmp"), filepath.Join(dir, TempDir, "moi.tmp")
+	for _, f := range []string{cu, moi} {
+		if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(cu, old, old); err != nil {
+		t.Fatal(err)
+	}
+	tf, err := New(dir).CreateTemp(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tf.Discard()
+	if _, err := os.Stat(cu); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("tệp tạm cũ còn: %v", err)
+	}
+	if _, err := os.Stat(moi); err != nil {
+		t.Errorf("tệp tạm mới bị xoá: %v", err)
+	}
+}
+
+func TestCreateTempLoiDia(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(f, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(f).CreateTemp(context.Background()); err == nil || err.Error() != "Không lưu được file lên máy chủ" {
+		t.Errorf("lỗi: %v", err)
 	}
 }

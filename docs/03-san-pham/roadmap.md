@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-19 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-22 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -67,6 +67,7 @@
 | [N18](#n18) | Trang IT chạy dữ liệu thật: yêu cầu hỗ trợ, bảng xử lý, thiết bị, Báo lỗi lưu máy chủ, thông báo | 🟡 | [N18](#n18): deploy (migration 0048), thử bằng tài khoản không có quyền IT |
 | [N19](#n19) | Chụp hình / chụp cuộn, ảnh -> chữ, quay màn hình trong Dezbot | 🟡 | [N19](#n19): thử trên app (quyền chia sẻ màn hình, chụp cuộn, tải dữ liệu OCR) |
 | [N20](#n20) | Chat: hẹn giờ gửi tin (máy chủ tự gửi) | 🟡 | [N20](#n20): chạy migration 0049, thử trên app |
+| [N22](#n22) | Kinh doanh: tab Cấu hình AI (soạn / thử / lưu prompt Đề xuất hành động) | 🟡 | [N22](#n22): thử trên app, deploy |
 | [N15](#n15) | Báo lỗi từ Dezbot: chụp màn hình, vẽ đánh dấu, gửi phòng IT thành phiếu, theo dõi tiến độ | 🟡 | [N15](#n15): thử luồng chụp trên app, lưu máy chủ |
 | [N6](#xong-n6) | Kinh doanh, Quản lý thiết kế, Quản lý dự án chạy dữ liệu thật (API Go + PostgreSQL), liên kết với nhau | 🟡 | [N6](#n6): thử trên dữ liệu thật, phần còn dữ liệu mẫu |
 | [N8](#xong-n8) | Chat realtime MVP: đăng nhập số điện thoại + OTP, danh bạ, kết bạn, chat 1-1 / nhóm, đã gửi / đã nhận / đã xem, online, đang soạn tin, push | 🟡 | [N8](#n8): thấy thông báo push trên Chrome thường, người dùng thử, triển khai production; [N8.1](#n8-1) SMS thật, [N8.2](#n8-2) FCM / APNs, [N8.3](#n8-3) giai đoạn 2-3 (giai đoạn 2 đã code: tệp, trả lời / chuyển tiếp / thu hồi / sửa, reaction, tìm kiếm, đa thiết bị + QR - còn thử trên trình duyệt; còn gọi, E2E), [N8.4](#n8-4) đăng nhập / kết bạn bằng email, [N8.5](#n8-5) chat nhóm nâng cao (đã code, còn thử trên trình duyệt) |
@@ -114,6 +115,7 @@
 | <a id="n20"></a>N20 | Chat: hẹn giờ gửi tin - nút đồng hồ cạnh nút Gửi (chọn nhanh / lịch + giờ kiểu macOS), thanh "n tin đã hẹn giờ" (đổi giờ / huỷ); máy chủ giữ tin (bảng `chat_scheduled_messages`, migration 0049, 4 route `/api/v1/chat/.../scheduled`) và tự gửi mỗi 15 giây kể cả khi người gửi tắt máy; SiteFlow Bot hẹn giờ trên máy. Còn chạy migration 0049 trên dev + production, thử trên app | Toàn hệ thống | 🟡 |
 | <a id="n7"></a>N7 | Điện lạnh: còn triển khai lên VPS dezon.tech (migration 0017) và thử nhập dữ liệu thật | User | 🟡 |
 | <a id="n6"></a>N6 | Kinh doanh / Quản lý thiết kế / Quản lý dự án: còn lại người dùng thử trên dữ liệu thật ở dezon.tech; Kinh doanh (2026-11-09, đã code + build, còn thử trên app thật): form "Thêm khách hàng tiềm năng" mở thành trang đầy đủ, Người khởi tạo = tài khoản đang đăng nhập, Quản lý mặc định = trưởng phòng ban (dữ liệu HR mẫu), "Nhân sự phụ trách" + "Admin Kinh doanh" (lưu trong phu_trach vai trò Admin Kinh doanh), Nguồn / Quản lý là danh sách xổ tự thêm mục (`__cty` khoá `kdOptions`); Tổng quan có bộ lọc nguồn + thẻ "Nguồn khách hàng"; trang khách hàng: băng xanh 1 dòng, cột trái kiểu QS, thanh giai đoạn dạng bước; giai đoạn mới "Nhân sự KD phụ trách" (`giao-ns`, migration 0040, lead mới chưa có nhân sự phụ trách vào thẳng giai đoạn này); nhiệm vụ & điểm thưởng, phiếu bàn giao qua Chat, Dezbot, quy trình bước mua hàng (chỉ trong phiên) vẫn là dữ liệu mẫu; thử giao diện bản 8686a37 chạy dữ liệu thật trên trình duyệt. (2026-11-22) Trang khách hàng dạng dashboard: chấm điểm 6 tiêu chí, lịch hẹn, task, phân tích AI (Gemini, migration 0053-0054) - đã code + build + test Go, còn thử trên app thật | User | 🟡 |
+| <a id="n22"></a>N22 | Kinh doanh - tab "Cấu hình AI": quản trị công ty soạn hướng dẫn (prompt) cho khối "Đề xuất hành động" (Gemini) để tối ưu mỗi ngày; phần quy tắc cố định (chỉ trả JSON, định dạng ngày, dữ liệu khách không phải chỉ dẫn) không sửa được; xem prompt đầy đủ và chạy thử với 1 khách (không lưu kết quả); lưu theo công ty (`company_settings` khoá `kdAiConfig`) kèm lịch sử 20 phiên bản; REST `/api/v1/sales/ai-config` (+ `/preview`, `/test`; lưu / xem prompt / chạy thử cần quyền admin, tab chỉ hiện với admin / super); ô chọn "Model AI" theo công ty (danh sách model lấy từ Gemini ListModels, cache 1 giờ; chạy thử bằng model nháp; model không còn thì về `GEMINI_MODEL`). Đã code + build + test Go (2026-11-22), còn thử trên app thật, chưa deploy | User | 🟡 |
 ### 2.3 Cần credential 🔑
 
 | Mã | Tính năng | App | Trạng thái |
@@ -143,7 +145,7 @@
 ## 4. Cách thêm tính năng
 
 - Việc thuộc module có sẵn → mục 2.1, mã `M<số module>.<số thứ tự>` (số kế tiếp trong module đó), anchor `m<module>-<số>`.
-- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N21`), anchor `n<số>`; dùng xong thì tăng số ở đây.
+- Tính năng mới ngoài các module trên → mục 2.2, mã N tiếp theo (`hiện tại: N23`; N21 đã cấp ở nhánh `feature/role`, chưa gộp), anchor `n<số>`; dùng xong thì tăng số ở đây.
 - Cần tài khoản / khoá bên thứ ba → mục 2.3. Hạng mục lớn cần làm riêng một đợt → mục 2.4.
 - Quy tắc cập nhật đầy đủ: `.claude/rules/docs/roadmap-sync.md`.
 
@@ -399,7 +401,7 @@
 - Tự thử lại khi tải ảnh lỗi mạng
 - Dán link ảnh có sẵn thay cho tải lên
 - Hình đại diện một ảnh, hình chi tiết nhiều ảnh
-- Tải tài liệu sản phẩm (PDF, bản vẽ, file nén, Word, Excel), tối đa 50MB mỗi file
+- Tải tài liệu sản phẩm (PDF, bản vẽ, file nén, Word, Excel), tối đa 300MB mỗi file
 - Dán link tài liệu thay cho tải file
 - Bốn ô tài liệu: tài liệu kỹ thuật, thông số, hướng dẫn cài đặt, bản vẽ
 - Tải ảnh cho công tác phần thô

@@ -1,5 +1,5 @@
 import { STAGE_LABEL, DEPT_LABEL, HANDOFF_CONFIG } from '../../../data/kinhDoanhData'
-import { FONT_STACK, fmtTy, stageAccent, lmInitials } from '../utils'
+import { FONT_STACK, fmtTy, stageAccent, lmInitials, boqOf } from '../utils'
 import { useKdMap } from './ShortlistSelect'
 import { mediaUrl } from '../../QS/api/files'
 
@@ -96,7 +96,7 @@ function Body({ l }) {
           <div style={capLabel(6)}>File đính kèm</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--border)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 600 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flex: 'none' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
-            {l.boqFile}
+            {(() => { const b = boqOf(l.boqFile); return b.url ? <a href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{b.name}</a> : b.name })()}
           </div>
         </div>
       ) : null}

@@ -11797,18 +11797,18 @@
   {
    "fn": "$uploadFileBuf",
    "args": [
-    52428801,
+    314572801,
     "a.pdf",
     null
    ],
    "fail": null,
-   "error": "File 50.0MB quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên.",
+   "error": "File 300.0MB quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên.",
    "up": null
   },
   {
    "fn": "$uploadFileBuf",
    "args": [
-    52428800,
+    314572800,
     "a.pdf",
     null
    ],
@@ -11818,7 +11818,7 @@
     "name": "a.pdf"
    },
    "up": {
-    "len": 52428800,
+    "len": 314572800,
     "path": "docs/<ms>-a.pdf",
     "ct": "application/octet-stream"
    }

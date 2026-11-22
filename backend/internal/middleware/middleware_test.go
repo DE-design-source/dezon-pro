@@ -179,7 +179,7 @@ func TestJSONBodyTooLargeUploadFile(t *testing.T) {
 	hdr := map[string]string{"Content-Type": "application/json"}
 	for _, p := range []string{"/upload/file", "/upload/file?name=a.pdf", "/UPLOAD/File/x"} {
 		w := hit(e, "POST", p, big, hdr)
-		if w.Code != 413 || w.Body.String() != `{"error":"File quá lớn (tối đa 50MB) — hãy dán link thay vì tải lên."}` || !strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
+		if w.Code != 413 || w.Body.String() != `{"error":"File quá lớn (tối đa 300MB) — hãy dán link thay vì tải lên."}` || !strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
 			t.Errorf("%s: %d %s %q", p, w.Code, w.Header().Get("Content-Type"), w.Body.String())
 		}
 	}

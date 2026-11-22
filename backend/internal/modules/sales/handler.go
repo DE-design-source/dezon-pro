@@ -105,6 +105,23 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		Summary: "Lập phân tích mới bằng Gemini (chưa có GEMINI_API_KEY / lỗi -> gợi ý theo quy tắc, engine rules), lưu lại và trả {insight}",
 		Fields: []rpc.GoField{idPath, {Name: "start", In: "body", Desc: "Khởi công dự kiến yyyy-mm-dd (tuỳ chọn)"},
 			{Name: "extra", In: "body", Type: "array", Desc: "Tài liệu bổ sung [{name, url}] (tuỳ chọn)"}}})
+
+	// Cấu hình AI (service_aiconfig.go): hướng dẫn cho khối "Đề xuất hành động", lưu ở cài đặt công ty khoá kdAiConfig
+	aiDraft := []rpc.GoField{{Name: "leadId", In: "body", Type: "number", Required: true, Desc: "Mã khách hàng dùng để thử"},
+		{Name: "instructions", In: "body", Desc: "Hướng dẫn nháp (thiếu / null = bản đang lưu; rỗng = mặc định)"}}
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdGetAiConfig", Method: "GET", Path: "/sales/ai-config", Perm: rpc.Login, Tag: tag,
+		Summary: "Cấu hình AI: {instructions, defaultInstructions, custom, fixedRules, outputShape, aiEnabled, model, modelChoice, defaultModel, models, modelsError, updatedAt, updatedBy, canEdit, maxLength, history}"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdSaveAiConfig", Method: "PUT", Path: "/sales/ai-config", Perm: rpc.Admin, Tag: tag,
+		Summary: "Lưu hướng dẫn + model cho AI (rỗng / trùng mặc định -> dùng mặc định; bản cũ vào lịch sử, giữ 20 bản), trả như GET",
+		Fields: []rpc.GoField{{Name: "instructions", In: "body", Required: true, Desc: "Hướng dẫn cho AI, tối đa 8000 ký tự"},
+			{Name: "model", In: "body", Desc: "Model Gemini (thiếu / null = giữ; rỗng = mặc định máy chủ; sai -> 400)"}}})
+	aiTest := append(append([]rpc.GoField{}, aiDraft...),
+		rpc.GoField{Name: "model", In: "body", Desc: "Model nháp (thiếu / null = model đã lưu; rỗng = mặc định máy chủ; sai -> 400)"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdPreviewAiPrompt", Method: "POST", Path: "/sales/ai-config/preview", Perm: rpc.Admin, Tag: tag,
+		Summary: "Xem trước {system, prompt} sẽ gửi Gemini cho 1 khách với hướng dẫn nháp; không gọi AI", Fields: aiDraft})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdTestAiPrompt", Method: "POST", Path: "/sales/ai-config/test", Perm: rpc.Admin, Tag: tag,
+		Summary: "Chạy thử hướng dẫn / model nháp với 1 khách (không lưu phân tích): {content, engine, model, warning, ms, raw}; cùng người trong 5 giây -> 429",
+		Fields:  aiTest})
 }
 
 // RegisterRoutes: REST /api/v1/sales, khớp từng GoRoute ở trên.
@@ -155,6 +172,24 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.DELETE("/tasks/:taskId", withParam("taskId", false, noBody(s.DeleteTask)))
 	g.GET("/leads/:id/insights", withParam("id", false, noBody(s.GetInsights)))
 	g.POST("/leads/:id/insights/generate", withParam("id", true, s.GenerateInsights))
+	withBody := func(fn func(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error)) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			body, err := validator.Body(c)
+			if err != nil {
+				response.Error(c, err)
+				return
+			}
+			r, err := fn(c.Request.Context(), actor.FromGin(c), body)
+			response.Result(c, r, err)
+		}
+	}
+	g.GET("/ai-config", func(c *gin.Context) {
+		r, err := s.GetAiConfig(c.Request.Context(), actor.FromGin(c))
+		response.Result(c, r, err)
+	})
+	g.PUT("/ai-config", middleware.RequireAdmin(), withBody(s.SaveAiConfig))
+	g.POST("/ai-config/preview", middleware.RequireAdmin(), withBody(s.PreviewAiPrompt))
+	g.POST("/ai-config/test", middleware.RequireAdmin(), withBody(s.TestAiPrompt))
 	g.GET("/leads", func(c *gin.Context) {
 		r, err := s.ListLeads(c.Request.Context(), actor.FromGin(c))
 		response.Result(c, r, err)

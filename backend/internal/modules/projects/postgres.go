@@ -81,13 +81,17 @@ func (r *pgRepo) ListProjDataKV(ctx context.Context, maDA string) ([]*omap.Map, 
 	return r.db.Select(ctx, "du_an_data", database.SelectOpt{Select: "khoa,gia_tri", Filter: database.Eq("ma_da", maDA), Limit: 50})
 }
 
+// settingsNotProj: khoá cai_dat_cong_ty của module khác, không trả qua getProjData (kdAiConfig: cấu hình AI Kinh doanh,
+// chỉ đọc qua /sales/ai-config có kiểm quyền).
+const settingsNotProj = "khoa=neq.kdAiConfig"
+
 // Không có công ty (super chưa chọn công ty): chỉ các dòng cong_ty_id NULL, bỏ lọc tự động.
 func (r *pgRepo) ListCompanySettings(ctx context.Context, khongCongTy bool) ([]*omap.Map, error) {
 	if khongCongTy {
-		return r.db.Select(ctx, "cai_dat_cong_ty", database.SelectOpt{Select: "khoa,gia_tri", Filter: "cong_ty_id=is.null",
+		return r.db.Select(ctx, "cai_dat_cong_ty", database.SelectOpt{Select: "khoa,gia_tri", Filter: "cong_ty_id=is.null&" + settingsNotProj,
 			Limit: 50, NoScope: true})
 	}
-	return r.db.Select(ctx, "cai_dat_cong_ty", database.SelectOpt{Select: "khoa,gia_tri", Limit: 50})
+	return r.db.Select(ctx, "cai_dat_cong_ty", database.SelectOpt{Select: "khoa,gia_tri", Filter: settingsNotProj, Limit: 50})
 }
 
 func (r *pgRepo) FindCompanySetting(ctx context.Context, loc string, khongCongTy bool) ([]*omap.Map, error) {

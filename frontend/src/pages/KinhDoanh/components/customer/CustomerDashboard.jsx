@@ -15,8 +15,8 @@ import CdAi from './CdAi'
    và báo nhau bằng emitLeadChange / useLeadChange.
    Esc = quay lại danh sách, trừ khi đang có hộp thoại ([role=dialog]), đang gõ trong ô nhập, hoặc một khối đang mở
    form tại chỗ (khối đặt thuộc tính data-cd-busy lên phần tử của form đó; Esc lúc ấy để khối tự xử lý). */
-/* Lưới 3 cột: Phụ trách kéo dài cho đáy cột 2 bằng đáy Hồ sơ; Chỉ số chính kéo dài cho khối AI bắt đầu
-   ngang thẻ "Danh sách Task". Chỉ khi 2 cột đứng cạnh nhau (cùng mép trên); xếp 2 / 1 cột thì bỏ. */
+/* Lưới 3 cột: Chỉ số chính kéo dài cho khối AI (cột 3) bắt đầu ngang "Danh sách Task" (cột 2), không bao giờ đẩy Task xuống;
+   AI chưa có phân tích thì cao bằng Task. Chỉ khi 2 cột đứng cạnh nhau (cùng mép trên); xếp 2 / 1 cột thì bỏ. */
 function useAlignScore(ref) {
   useEffect(() => {
     const root = ref.current
@@ -25,30 +25,34 @@ function useAlignScore(ref) {
     const fit = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
-        const col1 = root.querySelector('.cd-col1'), col2 = root.querySelector('.cd-col2'), col3 = root.querySelector('.cd-col3')
+        const col2 =root.querySelector('.cd-col2'), col3 = root.querySelector('.cd-col3')
         if (!col2 || !col3) return
         const c2 = col2.getBoundingClientRect(), c3 = col3.getBoundingClientRect()
-        // 1) Phụ trách (đầu cột 2) kéo dài cho đáy cột 2 (Danh sách Task) bằng đáy Hồ sơ khách hàng (cột 1)
-        const prof = root.querySelector('.cd-profile'), owners = root.querySelector('.cd-owners'), tasks = root.querySelector('.cd-tasks')
-        if (col1 && prof && owners && tasks) {
-          const c1 = col1.getBoundingClientRect()
-          const side1 = Math.abs(c1.top - c2.top) < 2 && c2.left >= c1.right - 1
-          const h = Math.round(owners.getBoundingClientRect().height + prof.getBoundingClientRect().bottom - tasks.getBoundingClientRect().bottom)
-          const vo = side1 && h > 0 ? h + 'px' : ''
-          if (owners.style.minHeight !== vo) owners.style.minHeight = vo
-        }
-        // 2) Sau khi cột 2 đã đổi (đọc lại vị trí): Chỉ số chính kéo dài cho khối AI (cột 3) bắt đầu ngang Danh sách Task
+        // 1) Phụ trách không kéo dài nữa: thẻ cao vừa nội dung, Việc tiếp theo / Danh sách Task xích lên ngay dưới
+        const tasks = root.querySelector('.cd-tasks'), owners = root.querySelector('.cd-owners')
+        if (owners && owners.style.minHeight) owners.style.minHeight = '' // bỏ chiều cao cũ còn sót (bản trước có kéo dài)
+        // 2) Chỉ số chính thu gọn (thấp hơn cột 2): kéo dài cho khối AI bắt đầu ngang Danh sách Task.
+        //    Chỉ số chính mở rộng (cao hơn cột 2): Danh sách Task giữ nguyên chỗ (không đẩy xuống), AI nằm dưới Chỉ số chính.
+        //    Chỉnh dần từ giá trị đang đặt (không xoá rồi đo lại) để không giật với phần tự lấp tiêu chí của CdScore.
         const score = root.querySelector('.cd-score'), ai = root.querySelector('.cd-ai')
+        const side = Math.abs(c2.top - c3.top) < 2 && c3.left >= c2.right - 1
+        if (tasks && tasks.style.marginTop) tasks.style.marginTop = '' // bản trước có đẩy Task xuống
         if (score && ai && tasks) {
-          const side = Math.abs(c2.top - c3.top) < 2 && c3.left >= c2.right - 1
-          const want = side ? Math.round(score.getBoundingClientRect().height + tasks.getBoundingClientRect().top - ai.getBoundingClientRect().top) : 0
-          const v = want > 0 ? want + 'px' : ''
+          let minH = parseFloat(score.style.minHeight) || 0
+          if (!side) minH = 0
+          else {
+            const d = Math.round(ai.getBoundingClientRect().top - tasks.getBoundingClientRect().top)
+            const sh = score.getBoundingClientRect().height
+            const bound = minH > 0 && sh <= minH + 1 // minHeight đang quyết định chiều cao Chỉ số chính
+            if (d > 1 && bound) minH = Math.max(0, minH - d)
+            else if (d < -1) minH = Math.round(sh - d)
+          }
+          const v = minH > 0 ? Math.round(minH) + 'px' : ''
           if (score.style.minHeight !== v) score.style.minHeight = v
         }
-        // 3) Khối AI chưa có phân tích: cao bằng Danh sách Task (cùng hàng) cho 2 thẻ bằng nhau
+        // 3) Khối AI chưa có phân tích: cao bằng Danh sách Task (khi 2 cột đứng cạnh nhau) cho 2 thẻ bằng nhau
         if (ai && tasks) {
-          const same = Math.abs(ai.getBoundingClientRect().top - tasks.getBoundingClientRect().top) < 3
-          const va = ai.classList.contains('is-empty') && same ? Math.round(tasks.getBoundingClientRect().height) + 'px' : ''
+          const va = ai.classList.contains('is-empty') && side ? Math.round(tasks.getBoundingClientRect().height) + 'px' : ''
           if (ai.style.minHeight !== va) ai.style.minHeight = va
         }
       })
@@ -66,7 +70,7 @@ function useAlignScore(ref) {
 
 const typing = el => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
 
-export default function CustomerDashboard({ lead: l, me, interactions, onAddInteraction, onBack, onEdit, onMove, onSetCreated, onOpenNotif }) {
+export default function CustomerDashboard({ lead: l, me, interactions, onAddInteraction, onBack, onEdit, onMove, onSetCreated, onOpenNotif, onPatch }) {
   const gridRef = useRef(null)
   useAlignScore(gridRef)
   useEffect(() => {
@@ -91,7 +95,7 @@ export default function CustomerDashboard({ lead: l, me, interactions, onAddInte
           <CdCare {...bp} />
         </div>
         <div className="cd-col cd-col2">
-          <CdOwners {...bp} />
+          <CdOwners {...bp} onPatch={onPatch} />
           <CdNext {...bp} />
           <CdTasks {...bp} />
         </div>

@@ -2,6 +2,7 @@ package sales
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"qspro-backend/internal/platform/database"
@@ -40,6 +41,10 @@ type Repository interface {
 	LatestInsight(ctx context.Context, leadID float64) (*omap.Map, error)
 	InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error)
 	PruneInsights(ctx context.Context, leadID float64, keep int) error
+
+	// cài đặt công ty (cai_dat_cong_ty, thuộc TenantTables: tự lọc / tự gắn công ty đang làm việc), vd khoá kdAiConfig
+	GetSetting(ctx context.Context, key string) (*omap.Map, error)
+	SaveSetting(ctx context.Context, key string, row *omap.Map) error
 }
 
 type pgRepo struct{ db *database.DB }
@@ -166,5 +171,27 @@ func (r *pgRepo) PruneInsights(ctx context.Context, leadID float64, keep int) er
 		ids = append(ids, jsval.Str(x.Val("id")))
 	}
 	_, err = r.db.Remove(ctx, "kd_goi_y", database.Eq("khach_hang_id", leadID)+"&id=in.("+strings.Join(ids, ",")+")")
+	return err
+}
+
+func (r *pgRepo) GetSetting(ctx context.Context, key string) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "cai_dat_cong_ty", database.SelectOpt{Select: "khoa,gia_tri,cap_nhat,nguoi_sua", Filter: database.Eq("khoa", key), Limit: 1}))
+}
+
+// SaveSetting: có dòng -> sửa, chưa có -> thêm; 2 lần lưu cùng lúc cùng thêm (trùng khoá 23505) -> sửa.
+func (r *pgRepo) SaveSetting(ctx context.Context, key string, row *omap.Map) error {
+	loc := database.Eq("khoa", key)
+	cur, err := r.GetSetting(ctx, key)
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		_, err = r.db.InsertOne(ctx, "cai_dat_cong_ty", row.Clone().Set("khoa", key))
+		var de *database.Error
+		if !errors.As(err, &de) || de.Code != "23505" {
+			return err
+		}
+	}
+	_, err = r.db.Update(ctx, "cai_dat_cong_ty", loc, row)
 	return err
 }

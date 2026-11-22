@@ -10,6 +10,7 @@ package contracts
 
 import (
 	"context"
+	"io"
 
 	"qspro-backend/internal/shared/actor"
 	"qspro-backend/internal/shared/omap"
@@ -204,6 +205,22 @@ type MediaDownloader interface {
 // Path không hợp lệ -> "Đường dẫn file không hợp lệ"; lỗi đĩa -> "Không lưu được file lên máy chủ" (chi tiết ghi log).
 type Uploader interface {
 	Upload(ctx context.Context, buf []byte, path, contentType string) (url string, err error)
+}
+
+// DocUploader - chủ: platform/storage (*storage.Client). Uploader + ghi file lớn theo luồng (POST /upload/file),
+// không giữ cả file trong RAM: CreateTemp mở tệp tạm trong kho (UPLOAD_DIR/.tmp, không phục vụ công khai, cùng ổ
+// đĩa nên Commit chỉ là đổi tên). Lỗi đĩa -> "Không lưu được file lên máy chủ" (chi tiết ghi log).
+type DocUploader interface {
+	Uploader
+	CreateTemp(ctx context.Context) (TempFile, error)
+}
+
+// TempFile: tệp tạm của DocUploader. Commit đóng tệp rồi đổi tên vào <path> (ghi đè nếu trùng), trả URL công khai
+// như Upload; lỗi thì tệp tạm đã bị xoá. Discard đóng và xoá tệp tạm; gọi sau Commit thì không làm gì.
+type TempFile interface {
+	io.Writer
+	Commit(path, contentType string) (url string, err error)
+	Discard()
 }
 
 // FileReader - chủ: platform/storage (*storage.Client). Đọc file của kho theo URL công khai "/files/<path>"
