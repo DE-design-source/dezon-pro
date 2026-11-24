@@ -4,9 +4,11 @@ import { fmtTy, sourceColor, boqOf } from '../../utils'
 import { mediaUrl } from '../../../QS/api/files'
 import DatePicker from '../../../../components/ui/DatePicker'
 import { HANDOFF_CONFIG } from '../../../../data/kinhDoanhData'
+import './profile2.css'
 
-/* Khối "Hồ sơ khách hàng": ô số liệu dự án, hạng mục, liên hệ (SĐT / email che bớt, bấm Hiện / Ẩn),
-   các trường của khách Phòng KD Dự Án, Ngày tạo sửa tại chỗ, mục thu gọn "Tài liệu & ghi chú"
+/* Khối "Hồ sơ khách hàng" dạng 2 trang (lưới tự xuống dòng):
+   Trang 1 = ô số liệu dự án, hạng mục, liên hệ (SĐT / email che bớt, bấm Hiện / Ẩn), các trường của khách Phòng KD Dự Án,
+   Ngày tạo sửa tại chỗ; Trang 2 (nút tròn cam bật / tắt) = "Tài liệu & ghi chú"
    (BOQ, Concept, Ghi chú nội bộ, hình / tệp đính kèm, mã dự án QS, báo giá, ngày chốt, đối tác, bàn giao). */
 const fmtD = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : '' }
 const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
@@ -48,7 +50,7 @@ const FOLD_LS = 'kd-cd-docs'
 const readFold = () => { try { return localStorage.getItem(FOLD_LS) === '1' } catch { return false } }
 const Ic = ({ d, size = 14 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 const FILE_IC = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6'
-const PEN = 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'
+const PEN = 'M4 20h4L19 9l-4-4L4 16v4M13.5 6.5l4 4'
 
 function Row({ k, children }) {
   return <div className="cd-row"><span>{k}</span><span className="cd-row-v">{children}</span></div>
@@ -85,8 +87,8 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
     { k: 'Doanh số dự kiến', v: l.value > 0 ? fmtTy(l.value) : '—', acc: true },
     { k: 'Khởi công dự kiến', v: tl.start ? fmtD(tl.start) : '—' },
     { k: 'Diện tích / Quy mô', v: l.scale || '—' },
-    { k: 'Khu vực', v: region || '—', sub: geo.tinh && geo.kv ? geo.kv : '' },
-    { k: 'Nguồn', tag: src.tag, v: src.detail || '—' },
+    { k: 'Khu vực', v: region || '—', sub: geo.tinh && geo.kv ? geo.kv : '', sm: true },
+    { k: 'Nguồn', tag: src.tag, v: src.detail || '—', sm: true },
   ]
   const secret = (key, label, full, masked) => {
     if (!full) return <Row k={label}>—</Row>
@@ -107,8 +109,8 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
       <div className="cd-card-h">
         <span className="cd-card-t">Hồ sơ khách hàng</span>
         <span className="cd-fold-sp" />
-        <button type="button" className="cd-link-btn" onClick={onEdit} title="Sửa thông tin khách hàng">Sửa</button>
-        {/* nút tròn viền cam như nút mở cột Chi tiết của trang cũ: mở cột "Tài liệu & ghi chú" nằm ngang bên phải thẻ */}
+        <button type="button" className="cd-btn sm pf2-edit" onClick={onEdit} title="Sửa thông tin khách hàng"><Ic d={PEN} size={12} /><span>Sửa</span></button>
+        {/* nút tròn viền cam như nút mở cột Chi tiết của trang cũ: mở / đóng Trang 2 "Tài liệu & ghi chú" cạnh Trang 1 */}
         <button type="button" className={'cd-docs-tg' + (docsOpen ? ' on' : '')} aria-expanded={docsOpen}
           title={(docsOpen ? 'Đóng' : 'Mở') + ' Tài liệu & ghi chú' + (docCount ? ' (' + docCount + ')' : '')}
           aria-label={(docsOpen ? 'Đóng' : 'Mở') + ' Tài liệu & ghi chú'} onClick={() => setDocsOpen(!docsOpen)}>
@@ -116,17 +118,18 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
           {docCount > 0 && !docsOpen && <b className="cd-docs-n">{docCount}</b>}
         </button>
       </div>
+      <div className="pf2-body">
+      <div className="pf2-page">
       <div className="cd-tiles">
         {tiles.map(t => (
           <div key={t.k} className="cd-tile">
             <span className="cd-tile-k">{t.k}{t.tag && <span className="cd-src-tag" style={sc ? { color: sc.color, borderColor: sc.color } : null}>{t.tag}</span>}</span>
-            <span className={'cd-tile-v' + (t.acc ? ' acc' : '') + (String(t.v).length > 16 ? ' long' : '')}>{t.v}</span>
+            <span className={'cd-tile-v' + (t.acc ? ' acc' : '') + (t.sm || String(t.v).length > 16 ? ' long' : '')}>{t.v}</span>
             {t.sub && <span className="cd-tile-sub">{t.sub}</span>}
           </div>
         ))}
       </div>
       {l.categories?.length > 0 && <div className="cd-chips">{l.categories.map(c => <span key={c}>{c}</span>)}</div>}
-      <div className="cd-sep" />
       <div className="cd-rows">
         {/* khách Phòng KD Dự Án: Chủ đầu tư -> Người phụ trách (= tên khách) -> Chức vụ -> Phòng ban phụ trách, đều bên CĐT */}
         {l.dept === 'du-an' ? (
@@ -151,13 +154,14 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
           ) : (
             <>
               {fmtD(l.createdAt) || '—'}
-              {onSetCreated && <button type="button" className="cd-icon-btn" title="Sửa ngày tạo" aria-label="Sửa ngày tạo" onClick={() => setSuaNgay(true)}><Ic d={PEN} size={12} /></button>}
+              {onSetCreated && <button type="button" className="cd-btn sm pf2-edit" title="Sửa ngày tạo" aria-label="Sửa ngày tạo" onClick={() => setSuaNgay(true)}><Ic d={PEN} size={12} /><span>Sửa</span></button>}
             </>
           )}
         </Row>
       </div>
+      </div>
       {docsOpen && (
-        <aside className="cd-docs-side" data-cd-busy="1" aria-label="Tài liệu & ghi chú">
+        <aside className="cd-docs-side pf2-page" data-cd-busy="1" aria-label="Tài liệu & ghi chú">
           <div className="cd-docs-h">
             <span>Tài liệu & ghi chú{docCount ? ' (' + docCount + ')' : ''}</span>
             <button type="button" className="cd-icon-btn" title="Đóng (Esc)" aria-label="Đóng Tài liệu & ghi chú" onClick={() => setDocsOpen(false)}>×</button>
@@ -178,18 +182,23 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
             {l.concept && <p className="cd-note"><b>Concept:</b> {l.concept}</p>}
             {l.notes && <p className="cd-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
             {!l.boqFile && !l.concept && !l.notes && <em className="cd-none">Chưa có BOQ, concept hay ghi chú</em>}
-            <div className="cd-sub-t">Hình đính kèm{imgs.length ? ' (' + imgs.length + ')' : ''}</div>
-            {imgs.length ? (
-              <div className="cd-imgs">{imgs.map((it, i) => <a key={i} href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><img src={mediaUrl(it.url)} alt={it.name} /></a>)}</div>
-            ) : <em className="cd-none">Chưa có hình</em>}
-            <div className="cd-sub-t">Tệp đính kèm{files.length ? ' (' + files.length + ')' : ''}</div>
-            {files.length ? files.map((it, i) => (
-              <a key={i} className="cd-file" href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><Ic d={FILE_IC} /><span>{it.name}</span></a>
-            )) : <em className="cd-none">Chưa có tệp</em>}
+            <div className="pf2-grp">
+              <div className="cd-sub-t">Hình đính kèm{imgs.length ? ' (' + imgs.length + ')' : ''}</div>
+              {imgs.length ? (
+                <div className="cd-imgs">{imgs.map((it, i) => <a key={i} href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><img src={mediaUrl(it.url)} alt={it.name} /></a>)}</div>
+              ) : <em className="cd-none">Chưa có hình</em>}
+            </div>
+            <div className="pf2-grp">
+              <div className="cd-sub-t">Tệp đính kèm{files.length ? ' (' + files.length + ')' : ''}</div>
+              {files.length ? files.map((it, i) => (
+                <a key={i} className="cd-file" href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><Ic d={FILE_IC} /><span>{it.name}</span></a>
+              )) : <em className="cd-none">Chưa có tệp</em>}
+            </div>
             <button type="button" className="cd-btn sm cd-fold-edit" onClick={onEdit}><Ic d={PEN} size={12} />Sửa / thêm tài liệu</button>
           </div>
         </aside>
       )}
+      </div>
     </section>
   )
 }

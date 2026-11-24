@@ -1,0 +1,64 @@
+/* Thẻ "Cập nhật chăm sóc" (CdCare) theo bản thiết kế mới. Chỉ ghi đè quy tắc của care.css dưới tiền tố .cd-cc.cd-care
+   (care.css còn dùng cho CdNext / CdTasks). Màu theo --cc-* / --cd-*, tự đổi khi html[data-theme="dark"]. */
+.cd-cc.cd-care{
+  --cc2-acc:#C2570F; --cc2-acc-bg:var(--cc-or-tint); --cc2-acc-line:#F9D9C4;
+  --cc2-dis-bg:#F3C5A5; --cc2-dis-ink:#7A3608;
+  padding:18px; gap:14px;
+}
+html[data-theme="dark"] .cd-cc.cd-care{
+  --cc2-acc:var(--cd-orange-d, #F0A06A); --cc2-acc-line:color-mix(in srgb, var(--cc-or) 40%, transparent);
+  --cc2-dis-bg:color-mix(in srgb, var(--cc-or) 28%, var(--cc-card)); --cc2-dis-ink:var(--cd-orange-d, #F0A06A);
+}
+
+/* tiêu đề, tab lọc, Log hệ thống: mỗi thứ một dòng */
+.cd-cc.cd-care .cd-cc-h{flex-direction:column; align-items:flex-start; gap:14px;}
+.cd-cc.cd-care .cd-cc-t{font-size:22px; font-weight:600; line-height:1.25;}
+.cd-cc.cd-care .cd-cseg{gap:2px; border-radius:8px; padding:3px; max-width:100%;}
+.cd-cc.cd-care .cd-cseg button{padding:5px 11px; font-size:12.5px;}
+.cd-cc.cd-care .cd-cseg button.on{box-shadow:none;}
+.cd-cc.cd-care .cd-care-sys{gap:7px; font-size:12.5px;}
+.cd-cc.cd-care .cd-care-sys input{width:14px; height:14px;}
+
+/* số liệu */
+.cd-cc.cd-care .cd-care-stats{gap:8px;}
+.cd-cc.cd-care .cd-care-stats > div{padding:8px 10px;}
+.cd-cc.cd-care .cd-care-stats span{font-size:11px;}
+
+/* ô ghi nhận nhanh */
+.cd-cc.cd-care .cd-care-quick{padding:6px 6px 6px 8px; border-radius:10px;}
+.cd-cc.cd-care .cd-care-quick:focus-within{border-color:var(--cc2-acc);}
+.cd-cc.cd-care .cd-care-qt{gap:4px;}
+.cd-cc.cd-care .cd-care-qt button{width:28px; height:28px; border-radius:8px; border:1px solid transparent; color:var(--cc-muted);}
+.cd-cc.cd-care .cd-care-qt button:hover{color:var(--cc2-acc);}
+.cd-cc.cd-care .cd-care-qt button.on{background:var(--cc2-acc-bg); border-color:var(--cc2-acc-line); color:var(--cc2-acc);}
+.cd-cc.cd-care .cd-care-quick input{font-size:13px;}
+.cd-cc.cd-care .cd-care-quick input::placeholder{color:var(--cc-muted);}
+.cd-cc.cd-care .cd-care-more{font-size:13px; font-weight:500; color:var(--cc-ink); padding:6px 2px;}
+.cd-cc.cd-care .cd-care-more:hover{color:var(--cc2-acc);}
+.cd-cc.cd-care .cd-cbtn-or{border-radius:8px; padding:7px 12px; font-size:12.5px;}
+.cd-cc.cd-care .cd-cbtn-or:disabled{opacity:1; background:var(--cc2-dis-bg); color:var(--cc2-dis-ink);}
+.cd-cc.cd-care .cd-care-form .cd-cbtn-or, .cd-cc.cd-care .cd-care-empty .cd-cbtn-or{padding:8px 14px;}
+
+/* dòng thời gian */
+.cd-cc.cd-care .cd-tl-i{grid-template-columns:28px minmax(0, 1fr); gap:12px;}
+.cd-cc.cd-care .cd-tl-rail i{width:1px; background:var(--cc-line); margin:4px 0 0;}
+.cd-cc.cd-care .cd-tl-i:last-child .cd-tl-rail i{background:transparent;}
+.cd-cc.cd-care .cd-tl-b{gap:5px; padding-bottom:14px;}
+.cd-cc.cd-care .cd-tl-top{align-items:baseline; gap:8px;}
+.cd-cc.cd-care .cd-tl-top b{font-size:14px;}
+.cd-cc.cd-care .cd-tl-type{font-size:11.5px; color:var(--cc-muted);}
+.cd-tl-meta{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;}
+.cd-cc.cd-care .cd-tl-out{font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:99px;
+  color:color-mix(in srgb, var(--o) 72%, var(--cc-ink)); background:color-mix(in srgb, var(--o) 16%, var(--cc-card));}
+.cd-cc.cd-care .cd-tl-date{margin-left:auto; font-size:11.5px; color:var(--cc-muted);}
+.cd-cc.cd-care .cd-tl-b p{color:var(--cc-body);}
+.cd-cc.cd-care .cd-tl-by{font-size:11.5px; color:var(--cc-muted);}
+.cd-cc.cd-care .cd-tl-i.sys .cd-tl-top b{font-size:13px;}
+
+/* Mở rộng / Thu gọn */
+.cd-cc.cd-care .cd-care-tog{padding:8px; font-size:13px; font-weight:500;}
+
+@media (max-width:520px){
+  .cd-cc.cd-care{padding:14px;}
+  .cd-cc.cd-care .cd-cc-t{font-size:19px;}
+}

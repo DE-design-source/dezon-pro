@@ -1,0 +1,30 @@
+/* Bố cục tổng trang khách hàng (CustomerDashboard.jsx, lớp .cd.cd2): đầu trang tràn viền + lưới 2 cột.
+   Cột chính (2.8fr): hàng [Hồ sơ 1.55fr | Cập nhật chăm sóc 1fr], Chỉ số chính, Phân tích AI.
+   Cột phụ (1fr): Việc tiếp theo, Danh sách Task, Phụ trách.
+   Khung <= 1100px: 1 cột ngoài (hàng Hồ sơ | Chăm sóc vẫn 2 cột); <= 720px: mọi lưới 1 cột.
+   Đo theo bề rộng khung .cd (container cd, customer.css) thay vì cửa sổ: panel AI của trang mở bên phải cũng tính. */
+.cd.cd2{
+  --cd-head-bg:linear-gradient(90deg, #0E2142 0%, #123069 55%, #183C8F 100%);
+  /* tràn viền: bù lề --page-gutter của vùng cuộn trang Kinh doanh (KinhDoanh.jsx) ở trên + 2 bên */
+  max-width:none; width:auto;
+  margin:calc(-1 * var(--page-gutter, 0px)) calc(-1 * var(--page-gutter, 0px)) 0;
+  gap:0;
+}
+html[data-theme="dark"] .cd.cd2{
+  --cd-head-bg:linear-gradient(90deg, #0A1830 0%, #0E2554 55%, #13306F 100%);
+}
+.cd2 .cd-head{border-radius:0;}
+
+.cd2 .cd-grid{
+  display:grid; grid-template-columns:minmax(0,2.8fr) minmax(0,1fr); gap:16px; align-items:start;
+  width:100%; max-width:1680px; margin:0 auto; padding:12px;
+}
+/* Hồ sơ | Cập nhật chăm sóc: cùng hàng, kéo bằng nhau (stretch) */
+.cd2 .cd-pair{display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:16px; align-items:stretch; min-width:0;}
+
+@container cd (max-width: 1100px){
+  .cd2 .cd-grid{grid-template-columns:minmax(0,1fr);}
+}
+@container cd (max-width: 720px){
+  .cd2 .cd-pair{grid-template-columns:minmax(0,1fr);}
+}

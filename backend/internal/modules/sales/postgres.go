@@ -40,6 +40,7 @@ type Repository interface {
 	DeleteTask(ctx context.Context, id float64) (int, error)
 	LatestInsight(ctx context.Context, leadID float64) (*omap.Map, error)
 	InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	UpdateInsight(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
 	PruneInsights(ctx context.Context, leadID float64, keep int) error
 
 	// đổi tên người phụ trách theo họ tên mới của tài khoản (service_rename.go): mọi dòng của công ty đang làm việc,
@@ -166,6 +167,11 @@ func (r *pgRepo) LatestInsight(ctx context.Context, leadID float64) (*omap.Map, 
 
 func (r *pgRepo) InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map, error) {
 	return first(r.db.InsertOne(ctx, "kd_goi_y", row))
+}
+
+// UpdateInsight: sửa 1 bản phân tích theo id (bảng con: công ty xét qua dòng cha kd_khach_hang).
+func (r *pgRepo) UpdateInsight(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_goi_y", database.Eq("id", id), patch))
 }
 
 // PruneInsights: chỉ giữ keep bản phân tích mới nhất của khách (thứ tự như LatestInsight).

@@ -1,0 +1,39 @@
+/* Hồ sơ khách hàng (CdProfile.jsx) dạng 2 trang: Trang 1 = số liệu + liên hệ, Trang 2 = "Tài liệu & ghi chú".
+   Chỉ ghi đè giao diện của customer.css bằng bộ chọn .cd-profile ...; màu nền / viền / chữ vẫn lấy var(--cd-*) nên tự đổi theo chế độ tối. */
+.cd-profile{--pf-acc:#C2570F; --pf-chip:#F2F4F7; --pf-hand:#B4521A;}
+html[data-theme="dark"] .cd-profile{--pf-acc:#F0A06A; --pf-chip:var(--cd-chip); --pf-hand:#F0A06A;}
+
+.cd-card.cd-profile{gap:14px;}
+.cd-profile .cd-card-h{justify-content:flex-start; gap:8px; flex-wrap:wrap;}
+.cd-profile .cd-card-t{font-size:22px; white-space:nowrap;}
+.cd-profile .pf2-edit{padding:4px 8px; gap:5px; font-size:12.5px; font-weight:500; color:var(--cd-text);}
+.cd-profile .pf2-edit:hover{border-color:var(--cd-faint);}
+
+/* Thân: lưới tự xuống dòng, đủ chỗ thì Trang 2 nằm cạnh Trang 1 */
+.pf2-body{flex:1; display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:20px 24px; min-width:0;}
+.pf2-page{display:flex; flex-direction:column; gap:14px; min-width:0;}
+
+/* Trang 1 */
+.cd-profile .cd-tile{padding:10px 10px 12px; gap:3px;}
+.cd-profile .cd-tile-v.acc{color:var(--pf-acc);}
+.cd-profile .cd-chips{gap:8px;}
+.cd-profile .cd-chips span{background:var(--pf-chip); color:var(--cd-text2); padding:5px 12px;}
+.cd-profile .cd-rows{border-top:1px solid var(--cd-line2); padding-top:14px;}
+.cd-profile .cd-row{grid-template-columns:100px minmax(0,1fr); font-size:13.5px; line-height:1.4;}
+.cd-profile .cd-reveal{color:var(--pf-acc); font-size:12.5px;}
+.cd-profile .cd-reveal:hover{text-decoration:underline;}
+
+/* Trang 2: cột trong thẻ thay vì khung nổi bên phải (thêm .pf2-page để thắng cả html[data-theme="dark"] .cd-docs-side) */
+.cd-profile .cd-docs-side.pf2-page{position:static; width:auto; max-height:none; overflow:visible; margin:0;
+  background:none; border:0; border-radius:0; padding:0; box-shadow:none; gap:14px;}
+.cd-profile .cd-docs-h{font-size:16px;}
+.cd-profile .cd-docs-h .cd-icon-btn{width:24px; height:24px;}
+.cd-profile .cd-fold-b{margin-top:0; gap:14px;}
+.cd-profile .cd-docs-side .cd-row{font-size:14px;}
+.cd-profile .cd-gold{color:var(--pf-hand); font-weight:600;}
+.cd-profile .cd-note{font-size:13.5px; color:var(--cd-text);}
+.pf2-grp{display:flex; flex-direction:column; gap:8px; min-width:0;}
+.cd-profile .cd-sub-t{color:var(--cd-text3); letter-spacing:.08em; margin-top:0;}
+.cd-profile .cd-none{font-size:13.5px; color:var(--cd-muted);}
+.cd-profile .cd-file{border-radius:10px; padding:10px 12px; font-size:13.5px; font-weight:600;}
+.cd-profile .cd-file span{flex:1; min-width:0;}

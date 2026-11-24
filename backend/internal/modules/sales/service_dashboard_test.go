@@ -136,6 +136,15 @@ func (f *fakeRepo) InsertInsight(ctx context.Context, row *omap.Map) (*omap.Map,
 	f.insights = append(f.insights, r)
 	return r, nil
 }
+func (f *fakeRepo) UpdateInsight(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	for _, r := range f.insights {
+		if jsval.ToNumber(r.Val("id")) == id {
+			patch.Each(func(k string, v any) { r.Set(k, v) })
+			return r, nil
+		}
+	}
+	return nil, nil
+}
 func (f *fakeRepo) PruneInsights(ctx context.Context, leadID float64, keep int) error {
 	n := 0
 	out := []*omap.Map{}
@@ -743,7 +752,7 @@ func TestGenerateInsights(t *testing.T) {
 	}
 	keys := []string{}
 	in.Each(func(k string, _ any) { keys = append(keys, k) })
-	if strings.Join(keys, ",") != "engine,model,generatedAt,warning,actions,strategy,ideas,roadmap,sources" {
+	if strings.Join(keys, ",") != "engine,model,generatedAt,warning,editedBy,editedAt,actions,strategy,ideas,roadmap,sources" {
 		t.Errorf("thứ tự khoá %v", keys)
 	}
 	src := in.Val("sources").([]any)
@@ -1026,6 +1035,10 @@ func TestDashboardDB(t *testing.T) {
 		"DeleteTask":        func() error { _, err := sa.DeleteTask(ctxA, aA, tkID); return err },
 		"GetInsights":       func() error { _, err := sa.GetInsights(ctxA, aA, idB); return err },
 		"GenerateInsights":  func() error { _, err := sa.GenerateInsights(ctxA, aA, idB, omap.New()); return err },
+		"UpdateInsight": func() error {
+			_, err := sa.UpdateInsight(ctxA, aA, idB, omap.Of("content", omap.Of("actions", omap.Of("main", omap.Of("title", "hack")))))
+			return err
+		},
 	}
 	for name, fn := range checks {
 		if err := fn(); status(err) != 404 {

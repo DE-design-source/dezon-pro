@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { INTERACTION_TYPES, OUTCOMES } from '../CustomerPage'
 import { emitLeadChange } from '../../customerApi'
 import './care.css'
+import './care2.css'
 
 /* Khối "Cập nhật chăm sóc" của trang khách hàng dạng dashboard: tab lọc theo loại, ẩn / hiện log hệ thống,
    đếm tương tác + số ngày chưa liên hệ, ô ghi nhận nhanh, form đầy đủ (7 loại tương tác) và dòng thời gian chăm sóc.
@@ -100,7 +101,6 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
     <section className="cd-cc cd-care" aria-label="Cập nhật chăm sóc">
       <div className="cd-cc-h">
         <h3 className="cd-cc-t">Cập nhật chăm sóc</h3>
-        <span className="cd-cflex" />
         <div className="cd-cseg" role="tablist" aria-label="Lọc theo loại tương tác">
           {TABS.filter(([k]) => k !== 'other' || cnt('other') || tab === 'other').map(([k, lab]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => pickTab(k)}>{lab} ({cnt(k)})</button>
@@ -135,7 +135,7 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
           <span className="cd-care-qt" role="group" aria-label="Loại ghi nhận nhanh">
             {['call', 'note'].map(k => (
               <button key={k} type="button" className={qType === k ? 'on' : ''} title={INTERACTION_TYPES[k].label} aria-pressed={qType === k} onClick={() => setQType(k)}>
-                <Ic d={INTERACTION_TYPES[k].icon} size={13} />
+                <Ic d={INTERACTION_TYPES[k].icon} size={14} />
               </button>
             ))}
           </span>
@@ -187,13 +187,14 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
             const o = OUTCOMES[x.outcome]
             return (
               <li key={x.id} className={'cd-tl-i' + (sys ? ' sys' : '')} style={{ '--c': sys ? '#98A2B3' : t.color }}>
-                <div className="cd-tl-rail"><span className="cd-tl-ic" title={sys ? 'Log hệ thống' : t.label}><Ic d={sys ? SYS_IC : t.icon} size={13} /></span><i /></div>
+                <div className="cd-tl-rail"><span className="cd-tl-ic" title={sys ? 'Log hệ thống' : t.label}><Ic d={sys ? SYS_IC : t.icon} size={14} /></span><i /></div>
                 <div className="cd-tl-b">
                   <div className="cd-tl-top">
                     <b>{x.title}</b>
                     {!sys && <span className="cd-tl-type">{t.label}</span>}
+                  </div>
+                  <div className="cd-tl-meta">
                     {o && <em className="cd-tl-out" style={{ '--o': o[1] }}>{o[0]}</em>}
-                    <span className="cd-cflex" />
                     <span className="cd-tl-date">{fmtD(x.date)}</span>
                   </div>
                   {x.content && <p>{x.content}</p>}
