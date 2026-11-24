@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listTasks, addTask, updateTask, deleteTask, emitLeadChange, useLeadChange } from '../../customerApi'
 import { listStaff } from '../../api'
 import DatePicker from '../../../../components/ui/DatePicker'
-import { Ic, IC_EDIT, IC_X, IC_PLUS, todayIso, fmtDM, peopleOf } from './CdCare'
+import { Ic, IC_EDIT, IC_X, IC_PLUS, todayIso, fmtDM, daysBetween, peopleOf } from './CdCare'
 import './care.css'
 
 /* Khối "Danh sách Task" của khách hàng: việc cần làm có hạn, người làm, ghi chú; tick = xong (gạch ngang).
@@ -128,6 +128,10 @@ export default function CdTasks({ lead, me, people }) {
         const due = t.dueDate ? String(t.dueDate).slice(0, 10) : ''
         const late = due && !t.done && due < today
         const sub = [names(t).join(', '), t.note].filter(Boolean).join(' · ')
+        // nhãn hạn bên phải: Xong / Quá hạn / Hôm nay / Còn 1-2 ngày
+        const n = due ? daysBetween(today, due) : null
+        const pill = t.done ? ['Xong', 'ok'] : late ? ['Quá hạn', 'late'] : n === 0 ? ['Hôm nay', 'late']
+          : n !== null && n <= 2 ? ['Còn ' + n + ' ngày', n <= 1 ? 'late' : 'warn'] : null
         return (
           <div key={t.id} className={'cd-task' + (t.done ? ' done' : '') + (late ? ' late' : '')}>
             <div className="cd-task-date" title={due ? 'Hạn ' + due.split('-').reverse().join('/') + (late ? ' (quá hạn)' : '') : 'Chưa đặt hạn'}>
@@ -137,6 +141,7 @@ export default function CdTasks({ lead, me, people }) {
               <span className="cd-task-t">{t.title}{t.source === 'ai' && <em className="cd-task-ai" title="Task do AI gợi ý">AI</em>}</span>
               {sub && <span className="cd-task-s">{sub}</span>}
             </div>
+            {pill && <span className={'cd-task-due ' + pill[1]}>{pill[0]}</span>}
             <span className="cd-task-a">
               <button type="button" title="Sửa task" aria-label="Sửa task" onClick={() => setEdit(t.id)}><Ic d={IC_EDIT} size={13} /></button>
               <button type="button" title="Xoá task" aria-label="Xoá task" onClick={() => del(t)}><Ic d={IC_X} size={13} /></button>
@@ -145,7 +150,7 @@ export default function CdTasks({ lead, me, people }) {
           </div>
         )
       })}
-      {/* đã có task: nút thêm nằm cuối danh sách (bỏ nút ở góc trên thẻ) */}
+      {/* đã có task: nút thêm nằm cuối danh sách (người dùng yêu cầu bỏ nút ở góc trên thẻ, MarkUp 2026-11-22) */}
       {loaded && !err && tasks.length > 0 && edit !== 'new' && (
         <div className="cd-task-add"><button type="button" className="cd-cbtn-or" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button></div>
       )}

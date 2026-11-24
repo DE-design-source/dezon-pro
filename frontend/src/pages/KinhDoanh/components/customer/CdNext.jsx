@@ -3,8 +3,9 @@ import { listAppointments, addAppointment, updateAppointment, deleteAppointment,
 import { useKdMap, saveKdOptions } from '../ShortlistSelect'
 import { MonthCalendar, TimeWheel } from '../IosWheel'
 import { lmInitials } from '../../utils'
-import { Ic, IC_EDIT, IC_X, IC_PLUS, IC_CAL, pad2, todayIso, fmtD, fmtDM, daysBetween, weekdayOf, peopleOf, isSystemEntry } from './CdCare'
+import { Ic, IC_EDIT, IC_X, IC_PLUS, IC_CAL, pad2, todayIso, fmtD, daysBetween, weekdayOf, peopleOf, isSystemEntry } from './CdCare'
 import './care.css'
+import './side2.css'
 
 /* Thu gọn / mở rộng thẻ (nhớ theo trình duyệt, mặc định thu gọn để cột 2 không dài hơn hẳn cột Hồ sơ) */
 function useFoldPref(key) {
@@ -315,12 +316,16 @@ export default function CdNext({ lead, me, interactions, people }) {
   }
 
   const countdown = a => { const n = daysBetween(today, a.date); return n <= 0 ? 'Hôm nay' : n === 1 ? 'Ngày mai' : 'Còn ' + n + ' ngày' }
+  // ô ngày của dòng lịch: số ngày lớn + "TH <tháng>"
+  const dayBox = iso => (
+    <span className="cd-next-rd"><b>{String(iso || '').slice(8, 10) || '--'}</b><em>TH {Number(String(iso || '').slice(5, 7)) || ''}</em></span>
+  )
   const row = (a, tag) => (
-    <li key={a.id} className={'cd-next-row' + (tag ? ' ' + tag[1] : '')}>
-      <span className="cd-next-rd">{fmtDM(a.date)}<em>{a.start || ''}</em></span>
+    <li key={a.id} className={'cd-next-row' + (tag ? ' ' + tag[1] : '')} title={fmtD(a.date)}>
+      {dayBox(a.date)}
       <span className="cd-next-rt">
         <b>{a.title || 'Lịch hẹn'}</b>
-        <em>{[modeLabel(a.mode), a.place, (a.members || []).join(', ')].filter(Boolean).join(' · ')}</em>
+        <em>{[weekdayOf(a.date), a.start, modeLabel(a.mode), a.place, (a.members || []).join(', ')].filter(Boolean).join(' · ')}</em>
       </span>
       {tag && <span className="cd-next-tag">{tag[0]}</span>}
       <span className="cd-next-ra">
@@ -332,9 +337,9 @@ export default function CdNext({ lead, me, interactions, people }) {
     </li>
   )
   const followRow = (f, i, late) => (
-    <li key={(late ? 'fl' : 'f') + i} className={'cd-next-row follow' + (late ? ' late' : '')}>
-      <span className="cd-next-rd">{fmtDM(f.date)}</span>
-      <span className="cd-next-rt"><b>{f.note}</b><em>Hẹn chăm sóc tiếp{f.from.by ? ' · ' + f.from.by : ''}</em></span>
+    <li key={(late ? 'fl' : 'f') + i} className={'cd-next-row follow' + (late ? ' late' : '')} title={fmtD(f.date)}>
+      {dayBox(f.date)}
+      <span className="cd-next-rt"><b>{f.note}</b><em>{weekdayOf(f.date)} · Hẹn chăm sóc tiếp{f.from.by ? ' · ' + f.from.by : ''}</em></span>
       <span className="cd-next-tag">{late ? 'Quá hạn' : 'Hẹn tiếp'}</span>
       <span className="cd-next-ra">
         <button type="button" title="Đặt thành lịch hẹn" aria-label="Đặt thành lịch hẹn"
@@ -382,6 +387,11 @@ export default function CdNext({ lead, me, interactions, people }) {
                 <span className="cd-next-time">{next.start}{next.end ? ' – ' + next.end : ''}</span>
                 {modeLabel(next.mode) && <span className="cd-next-mode">{modeLabel(next.mode)}</span>}
               </div>
+              {/* thu gọn: tóm tắt người tham gia · địa điểm · mục tiêu ngay trên dải xanh (mở rộng thì xem đủ ở thân thẻ) */}
+              {!open && (() => {
+                const meta = [(next.members || []).join(', '), next.place, next.goal ? 'Mục tiêu: ' + String(next.goal).split('\n')[0] : ''].filter(Boolean).join(' · ')
+                return meta ? <span className="cd-next-meta" title={meta}>{meta}</span> : null
+              })()}
             </div>
           </div>
         ) : (
@@ -394,7 +404,7 @@ export default function CdNext({ lead, me, interactions, people }) {
 
       {next && !open && (
         <div className="cd-next-b cd-next-b-fold">
-          <button type="button" className="cd-cbtn cd-next-add" onClick={() => setSheet({ init: null })}>+ Tạo lịch mới</button>
+          <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>
         </div>
       )}
 
@@ -424,7 +434,7 @@ export default function CdNext({ lead, me, interactions, people }) {
             <input className="cd-prep-in" value={prepText} placeholder="+ Thêm việc cần chuẩn bị (Enter)" aria-label="Thêm việc cần chuẩn bị"
               onChange={e => setPrepText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); addPrep() } }} />
           </div>
-          <button type="button" className="cd-cbtn cd-next-add" onClick={() => setSheet({ init: null })}>+ Tạo lịch mới</button>
+          <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>
         </div>
       )}
 

@@ -35,9 +35,13 @@ export const deleteTask = taskId => request('DELETE', '/sales/tasks/' + enc(task
      ideas: [{key, title, desc}],
      roadmap: {anchor: 'yyyy-mm-dd'|null, title, steps: [{date, label, desc, state: 'done'|'now'|'open'|'key'|'end', dashed}]},
      sources: [{kind, date, summary, by}]}
-   getInsights -> {insight: insight|null}; generateInsights(id, {extra: [{name, url}]}) -> {insight} */
+   getInsights -> {insight: insight|null}; generateInsights(id, {extra: [{name, url}]}) -> {insight}
+   updateInsight(id, {actions, strategy, ideas, roadmap}, generatedAt) -> {insight} (thêm editedBy, editedAt);
+   generatedAt = bản đang sửa, máy chủ trả 409 nếu đã có bản phân tích mới hơn */
 export const getInsights = id => request('GET', L(id) + '/insights')
 export const generateInsights = (id, body) => request('POST', L(id) + '/insights/generate', { body: body || {} })
+export const updateInsight = (id, content, generatedAt) =>
+  request('PATCH', L(id) + '/insights', { body: { content, generatedAt: generatedAt == null ? null : generatedAt } })
 
 /* ---- Cấu hình AI (prompt "Đề xuất hành động" theo công ty) ----
    getAiConfig -> {instructions, defaultInstructions, custom, fixedRules, outputShape, aiEnabled, model,

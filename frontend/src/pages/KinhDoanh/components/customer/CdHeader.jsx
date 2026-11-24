@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { STAGES, STAGE_LABEL } from '../../../../data/kinhDoanhData'
 import { useKdMap } from '../ShortlistSelect'
 import { RatingStars } from '../CustomerPage'
-import { fmtTy, lmInitials, phoneNorms } from '../../utils'
+import { fmtTy, phoneNorms } from '../../utils'
 import { notifCount } from '../../../QS/api/qsApi'
 import { isAbort } from '../../../QS/api/http'
 import { leadOwner, fmtSince } from './CdOwners'
 
-/* Header trang khách hàng dạng dashboard: tên, tóm tắt, Mức độ (sao), người phụ trách chính, giai đoạn + dải 9 bước,
+/* Header trang khách hàng dạng dashboard (dải tràn viền nền gradient, CSS .cd-h-* trong customer.css):
+   tên, tóm tắt, Mức độ (sao), Quản lý / người phụ trách chính (chỉ chữ, viền trái mờ), giai đoạn + dải 9 bước,
    số thông báo chưa đọc, Đặt lịch hẹn / Gọi khách / Nhắn tin Zalo.
    Chuông thật nằm ở header trang Kinh doanh (KinhDoanh.jsx, NotifBell tự hỏi lại 30 s): ở đây chỉ đọc số chưa đọc 1 lần
    khi mở khách, bấm thì mở chuông đó.
@@ -80,15 +81,13 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
       {/* Có Quản lý: hiện tên Quản lý, dòng dưới là những người phụ trách; chưa có Quản lý: người phụ trách chính như cũ */}
       {mgrName ? (
         <div className="cd-h-owner" title={'Quản lý: ' + mgrName}>
-          <span className="cd-av lead">{lmInitials(mgrName)}</span>
           <span className="cd-h-owner-t">
             <span>Quản lý</span>
             <b>{mgrName}</b>
           </span>
         </div>
       ) : owner && (
-        <div className="cd-h-owner">
-          <span className="cd-av lead">{lmInitials(owner.name)}</span>
+        <div className="cd-h-owner" title={'Phụ trách: ' + owner.name}>
           <span className="cd-h-owner-t">
             <span>Phụ trách</span>
             <b>{owner.name}</b>

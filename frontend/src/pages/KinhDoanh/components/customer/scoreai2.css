@@ -1,0 +1,94 @@
+/* Giao diện bản 2 (Option2) cho "Chỉ số chính" (CdScore) và khối AI (CdAi): màu mới + phần tử mới.
+   Quy tắc gốc ở score.css / ai.css; file này chỉ khai biến chưa có ở đó và lớp mới, không khai trùng thuộc tính. */
+
+/* Chỉ số chính */
+.cd-score {
+  --cd-sc-kpi-line: var(--cd-sc-navy);
+  --cd-sc-weight: #1F6FA8;
+}
+html[data-theme="dark"] .cd-score {
+  --cd-sc-kpi-line: color-mix(in srgb, var(--cd-sc-navy) 55%, transparent);
+  --cd-sc-weight: #7DB7E0;
+}
+
+/* "6 tiêu chí đánh giá" + hướng dẫn: nằm trong dải KPI, sau "So với tuần trước" */
+.cd-sc-crit { flex: 3 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-left: 18px; border-left: 1px solid var(--cd-sc-line2); }
+
+/* Dòng tiêu chí: đệm 10px theo mẫu + phần đệm lấp khung (--cd-sc-extra do CdScore đặt) */
+.cd-score .cd-sc-box .cd-sc-row { padding-top: calc(10px + var(--cd-sc-extra, 0px)); padding-bottom: calc(10px + var(--cd-sc-extra, 0px)); }
+
+@media (max-width: 420px) {
+  .cd-sc-crit { padding-left: 10px; }
+}
+
+/* Khối AI */
+.cd-ai {
+  --ai-gem: #3F43A8; --ai-gem-bg: #E8E9FB;
+  --ai-tag-or: #93370D; --ai-tag-or-bg: #FDEBDD;
+  --ai-tag-red-bg: #FEE4E2;
+}
+html[data-theme="dark"] .cd-ai {
+  --ai-gem: #B4B7F5; --ai-gem-bg: #262A4D;
+  --ai-tag-or: #F2A673; --ai-tag-or-bg: #3A2617;
+  --ai-tag-red-bg: #3A211E;
+}
+
+/* Khối AI: nút "Sửa" từng phần + form sửa tại chỗ (CdAi EditForm) */
+.cd-ai .cd-ai-btn.sm.cd-ai-editbtn { padding: 4px 10px; font-size: 12px; gap: 5px; color: var(--ai-text2) }
+.cd-ai-rm-act { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto }
+.cd-ai-ideas-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+.cd-ai-edited { font-size: 12px; color: var(--ai-violet); background: var(--ai-violet-bg); padding: 2px 8px; border-radius: 99px; white-space: nowrap }
+
+.cd-ai-edit {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  border: 1.5px dashed var(--ai-btn-bd); border-radius: 12px; padding: 12px; background: var(--ai-soft)
+}
+.cd-ai-edit-fs { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px }
+.cd-ai-ef { display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.cd-ai-ef > .cd-ai-cap { font-size: 11px }
+.cd-ai-lc { text-transform: none; letter-spacing: 0; font-weight: 400 }
+.cd-ai-req { color: var(--ai-red) }
+.cd-ai-egrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
+.cd-ai-in {
+  font-family: inherit; font-size: 13px; color: var(--ai-text); background: var(--ai-bg); border: 1px solid var(--ai-btn-bd);
+  border-radius: 8px; padding: 7px 10px; min-width: 0; width: 100%; box-sizing: border-box; line-height: 1.45
+}
+.cd-ai-in::placeholder { color: var(--ai-mut2) }
+.cd-ai-in:focus { outline: none; border-color: var(--ai-navy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai-navy) 18%, transparent) }
+.cd-ai-in.ta { resize: none; overflow: hidden; min-height: 34px; display: block }
+.cd-ai-in.sel { width: auto; flex: none; padding: 6px 8px; cursor: pointer }
+.cd-ai-in.num { max-width: 140px }
+.cd-ai-in.grow { flex: 1 1 160px; width: auto }
+.cd-ai-in.w-tag { flex: 1 1 130px; width: auto }
+html[data-theme="dark"] .cd-ai-in { color-scheme: dark }
+
+.cd-ai-erow { display: flex; flex-direction: column; gap: 8px; background: var(--ai-bg); border: 1px solid var(--ai-line); border-radius: 10px; padding: 10px 12px; min-width: 0 }
+.cd-ai-erow.main { border-color: var(--ai-orange) }
+.cd-ai-erow-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0 }
+.cd-ai-erow-n {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ai-navy-bg); color: var(--ai-navy);
+  font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center
+}
+.cd-ai-raw { font-size: 12px; color: var(--ai-mut); font-style: italic }
+.cd-ai-rowtools { display: inline-flex; gap: 4px; margin-left: auto }
+.cd-ai-ix {
+  font-family: inherit; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--ai-btn-bd); background: var(--ai-bg);
+  color: var(--ai-text2); font-size: 14px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0
+}
+.cd-ai-ix:hover:not(:disabled) { background: var(--ai-soft) }
+.cd-ai-ix:disabled { opacity: .4; cursor: default }
+.cd-ai-ix.del { color: var(--ai-red); font-size: 16px }
+.cd-ai-addrow {
+  font-family: inherit; align-self: flex-start; background: var(--ai-bg); border: 1px dashed var(--ai-mut2); border-radius: 8px;
+  padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--ai-text); cursor: pointer
+}
+.cd-ai-addrow:hover:not(:disabled) { background: var(--ai-soft) }
+.cd-ai-addrow:disabled { opacity: .5; cursor: default }
+
+.cd-ai-edit-err { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ai-red); background: var(--ai-red-bg); border-radius: 8px; padding: 7px 10px }
+.cd-ai-edit-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap }
+.cd-ai-edit-hint { font-size: 11.5px; color: var(--ai-mut); margin-right: auto }
+@media (max-width: 560px) {
+  .cd-ai-edit-hint { display: none }
+  .cd-ai-in.num { max-width: none }
+}

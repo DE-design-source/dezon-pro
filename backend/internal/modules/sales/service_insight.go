@@ -1092,6 +1092,7 @@ func insightOut(r *omap.Map) *omap.Map {
 		c = omap.New()
 	}
 	return omap.Of("engine", r.Val("cong_cu"), "model", jsval.Str(r.Val("mo_hinh")), "generatedAt", r.Val("ngay_tao"), "warning", jsval.Str(r.Val("canh_bao")),
+		"editedBy", jsval.Str(c.Val("editedBy")), "editedAt", jsval.Or(c.Val("editedAt"), nil),
 		"actions", jsval.Or(c.Val("actions"), nil), "strategy", jsval.Or(c.Val("strategy"), nil), "ideas", orArr(c.Val("ideas")),
 		"roadmap", jsval.Or(c.Val("roadmap"), nil), "sources", orArr(r.Val("nguon")))
 }
@@ -1113,6 +1114,106 @@ func (s *Service) GetInsights(ctx context.Context, a *actor.Actor, id float64) (
 		out = insightOut(r)
 	}
 	return omap.Of("insight", out), nil
+}
+
+// stepHold: mốc giữ chỗ nối vào steps gửi lên để parseInsight luôn lập roadmap từ dữ liệu người sửa (kể cả khi xoá hết mốc),
+// bỏ ra sau khi chuẩn hoá.
+const stepHold = "\x00kd-step-hold"
+
+// UpdateInsight: người dùng sửa tay bản phân tích mới nhất -> chuẩn hoá như kết quả Gemini (parseInsight, phần thiếu giữ
+// nội dung hiện tại), ghi đè đúng dòng đó kèm editedBy / editedAt. body: {content: {actions, strategy, ideas, roadmap}, generatedAt?}.
+// Mảng risks / ideas / roadmap.steps gửi lên rỗng -> lưu rỗng.
+func (s *Service) UpdateInsight(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
+	if err := s.allow(ctx, a); err != nil {
+		return nil, err
+	}
+	if _, err := s.leadOr404(ctx, id); err != nil {
+		return nil, err
+	}
+	content, ok := body.Val("content").(*omap.Map)
+	if !ok {
+		return nil, apperr.BadRequest("Nội dung phân tích không hợp lệ")
+	}
+	cur, err := s.repo.LatestInsight(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if cur == nil {
+		return nil, apperr.NotFound("Chưa có bản phân tích để sửa")
+	}
+	if g := body.Val("generatedAt"); !jsval.IsNullish(g) && !sameTime(jsval.Str(g), jsval.Str(cur.Val("ngay_tao"))) {
+		return nil, apperr.E(409, "Đã có bản phân tích mới hơn, tải lại rồi sửa")
+	}
+	def, _ := cur.Val("noi_dung").(*omap.Map)
+	if def == nil {
+		def = omap.New()
+	}
+	// mảng gửi lên tường minh: phần dự phòng của parseInsight (lấy từ def khi lọc xong rỗng) thành mảng rỗng
+	in := content.Clone()
+	def = def.Clone()
+	isArr := func(v any) bool { _, ok := v.([]any); return ok }
+	if st := mv(content, "strategy"); st != nil && isArr(st.Val("risks")) {
+		def.Set("strategy", orMap(mv(def, "strategy")).Clone().Set("risks", []any{}))
+	}
+	if isArr(content.Val("ideas")) {
+		def.Set("ideas", []any{})
+	}
+	// roadmap gửi lên: thiếu steps -> giữ steps hiện tại (vẫn nhận title / anchor mới)
+	rmIn := mv(content, "roadmap")
+	if rmIn != nil {
+		steps := av(rmIn, "steps")
+		if !isArr(rmIn.Val("steps")) {
+			steps = av(mv(def, "roadmap"), "steps")
+		}
+		in.Set("roadmap", rmIn.Clone().Set("steps", append(append([]any{}, steps...), omap.Of("label", stepHold))))
+	}
+	text, err := omap.MarshalString(in)
+	if err != nil {
+		return nil, apperr.BadRequest("Nội dung phân tích không hợp lệ")
+	}
+	c, ok := parseInsight(text, def)
+	if !ok {
+		return nil, apperr.BadRequest("Hành động chính không được để trống")
+	}
+	if rm := mv(c, "roadmap"); rmIn != nil && rm != nil {
+		steps := []any{}
+		for _, x := range av(rm, "steps") {
+			if m, _ := x.(*omap.Map); m == nil || m.Val("label") != stepHold {
+				steps = append(steps, x)
+			}
+		}
+		rm.Set("steps", steps)
+		// anchor gửi null / "" -> bỏ mốc khởi công (parseInsight chỉ nhận ngày hợp lệ, còn lại lấy của def)
+		if rmIn.Has("anchor") && (jsval.IsNullish(rmIn.Val("anchor")) || jsval.Str(rmIn.Val("anchor")) == "") {
+			rm.Set("anchor", nil)
+		}
+	}
+	c.Set("editedBy", s.displayName(ctx, a)).Set("editedAt", s.now().UTC().Format(time.RFC3339))
+	row, err := s.repo.UpdateInsight(ctx, jsval.ToNumber(cur.Val("id")), omap.Of("noi_dung", c))
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, apperr.NotFound("Chưa có bản phân tích để sửa")
+	}
+	return omap.Of("insight", insightOut(row)), nil
+}
+
+func orMap(m *omap.Map) *omap.Map {
+	if m == nil {
+		return omap.New()
+	}
+	return m
+}
+
+// sameTime: 2 thời điểm ISO trùng nhau (so theo giá trị thời gian, không theo cách viết); không đọc được -> so chuỗi.
+func sameTime(a, b string) bool {
+	ta, ea := time.Parse(time.RFC3339Nano, a)
+	tb, eb := time.Parse(time.RFC3339Nano, b)
+	if ea != nil || eb != nil {
+		return a == b
+	}
+	return ta.Equal(tb)
 }
 
 // gather: đọc dữ liệu khách hàng cho phân tích.

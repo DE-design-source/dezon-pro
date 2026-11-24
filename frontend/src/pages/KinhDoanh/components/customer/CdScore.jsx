@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getScore, saveScore, emitLeadChange, useLeadChange } from '../../customerApi'
 import { isSystemEntry } from './CdCare'
 import './score.css'
+import './scoreai2.css'
 
 /* Khối "Chỉ số chính": điểm deal, điểm tiêu chí, liên hệ gần nhất, so với tuần trước + 6 tiêu chí × 4 câu.
    Bấm câu -> đổi ngay trên giao diện (tính lại cùng công thức với máy chủ), lưu sau ~400ms; lỗi thì trả lại như cũ. */
 const SAVE_DELAY = 400
+const MIN_SHOWN = 3 // số tiêu chí hiện khi thu gọn và thẻ không bị kéo cao (cột trái rộng, mỗi tiêu chí 1 dòng)
 
 const pad = n => String(n).padStart(2, '0')
 const isoDay = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
@@ -61,8 +63,8 @@ export default function CdScore({ lead, interactions }) {
   const [loadErr, setLoadErr] = useState('')
   const [open, setOpen] = useState(false)
   // Số tiêu chí hiện khi thu gọn: thẻ được kéo cao bằng "Việc tiếp theo" (CustomerDashboard.useAlignScore, đặt minHeight)
-  // thì hiện thêm tiêu chí cho kín khung thay vì để trống; không kéo thì 1 như thiết kế.
-  const [fitN, setFitN] = useState(1)
+  // thì hiện thêm tiêu chí cho kín khung thay vì để trống; không kéo thì MIN_SHOWN.
+  const [fitN, setFitN] = useState(MIN_SHOWN)
   const cardRef = useRef(null)
   const boxRef = useRef(null)
   const padRef = useRef(0) // khoảng đệm thêm (px, mỗi phía) đang chia cho các dòng tiêu chí để lấp phần dư nhỏ hơn 1 dòng
@@ -200,7 +202,7 @@ export default function CdScore({ lead, interactions }) {
         if (open) { padRef.current = 0; box.style.setProperty('--cd-sc-extra', '0px'); return }
         const want = parseFloat(card.style.minHeight) || 0
         const setPad = px => { if (padRef.current !== px) { padRef.current = px; box.style.setProperty('--cd-sc-extra', px + 'px') } }
-        if (!want) { setPad(0); setFitN(n => (n === 1 ? n : 1)); return }
+        if (!want) { setPad(0); setFitN(n => (n === MIN_SHOWN ? n : MIN_SHOWN)); return }
         if (capRef.current.want !== want) capRef.current = { want, cap: 99 }
         const rows = box.querySelectorAll('.cd-sc-row:not(.is-skel)')
         if (!rows.length) return
@@ -248,19 +250,18 @@ export default function CdScore({ lead, interactions }) {
           <div className="cd-sc-stat"><span>Điểm tiêu chí</span><b>{loading ? '--' : sc.critScore}/100</b></div>
           <div className="cd-sc-stat"><span>Liên hệ gần nhất</span><b>{lastContact}</b></div>
           <div className="cd-sc-stat"><span>So với tuần trước</span><b className={'cd-sc-delta ' + deltaView.cls}>{loading ? '--' : deltaView.text}</b></div>
+          <div className="cd-sc-crit">
+            <span className="cd-sc-box-title">{(sc.list.length || 6) + ' tiêu chí đánh giá'}</span>
+            <span className="cd-sc-hint">Bấm từng câu để đánh dấu có hoặc chưa · <span className="cd-sc-req">*</span> câu bắt buộc, chưa có thì thành điểm liệt sẽ không được tính điểm</span>
+          </div>
         </div>
       </div>
 
       <div className="cd-sc-box" ref={boxRef}>
-        <div className="cd-sc-box-head">
-          <span className="cd-sc-box-title">{(sc.list.length || 6) + ' tiêu chí đánh giá'}</span>
-          <span className="cd-sc-hint">Bấm từng câu để đánh dấu có hoặc chưa · <span className="cd-sc-req">*</span> câu bắt buộc, chưa có thì thành điểm liệt sẽ không được tính điểm</span>
-        </div>
-
         {loading ? (
           <div className="cd-sc-row is-skel" aria-hidden="true">
             <div className="cd-sc-name"><i className="cd-sc-skel w70" /><i className="cd-sc-skel w40" /></div>
-            {[0, 1, 2, 3].map(i => <i key={i} className="cd-sc-skel" />)}
+            <div className="cd-sc-qs">{[0, 1, 2, 3].map(i => <i key={i} className="cd-sc-skel" />)}</div>
           </div>
         ) : shown.map(c => (
           <div key={c.key} className="cd-sc-row">
@@ -268,12 +269,14 @@ export default function CdScore({ lead, interactions }) {
               <div className="cd-sc-name-l1"><span className="cd-sc-cname">{c.label}</span><span className="cd-sc-cscore">{c.score}</span></div>
               <div className="cd-sc-name-l2"><span className="cd-sc-w">Trọng số {c.weight}%</span><StatusPill status={c.status} /></div>
             </div>
-            {(c.items || []).map((it, i) => (
-              <button key={i} type="button" role="checkbox" aria-checked={!!c.on[i]} className={'cd-sc-q' + (c.on[i] ? ' is-on' : '')} onClick={() => toggle(c.key, i)}>
-                <span className="cd-sc-box-ic" aria-hidden="true">{c.on[i] ? '✓' : ''}</span>
-                <span>{it.text}{it.required ? <span className="cd-sc-req"> *</span> : null}</span>
-              </button>
-            ))}
+            <div className="cd-sc-qs">
+              {(c.items || []).map((it, i) => (
+                <button key={i} type="button" role="checkbox" aria-checked={!!c.on[i]} className={'cd-sc-q' + (c.on[i] ? ' is-on' : '')} onClick={() => toggle(c.key, i)}>
+                  <span className="cd-sc-box-ic" aria-hidden="true">{c.on[i] ? '✓' : ''}</span>
+                  <span>{it.text}{it.required ? <span className="cd-sc-req"> *</span> : null}</span>
+                </button>
+              ))}
+            </div>
           </div>
         ))}
 

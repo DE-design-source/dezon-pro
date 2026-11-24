@@ -105,6 +105,10 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		Summary: "Lập phân tích mới bằng Gemini (chưa có GEMINI_API_KEY / lỗi -> gợi ý theo quy tắc, engine rules), lưu lại và trả {insight}",
 		Fields: []rpc.GoField{idPath, {Name: "start", In: "body", Desc: "Khởi công dự kiến yyyy-mm-dd (tuỳ chọn)"},
 			{Name: "extra", In: "body", Type: "array", Desc: "Tài liệu bổ sung [{name, url}] (tuỳ chọn)"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdUpdateInsight", Method: "PATCH", Path: "/sales/leads/:id/insights", Perm: rpc.Login, Tag: tag,
+		Summary: "Sửa tay bản phân tích mới nhất (chuẩn hoá như kết quả Gemini, phần thiếu giữ nguyên, ghi editedBy / editedAt), trả {insight}",
+		Fields: []rpc.GoField{idPath, {Name: "content", In: "body", Type: "object", Required: true, Desc: "{actions, strategy, ideas, roadmap}; actions.main.title bắt buộc; mảng rỗng = xoá hết"},
+			{Name: "generatedAt", In: "body", Desc: "generatedAt của bản đang sửa; khác bản mới nhất -> 409 (tuỳ chọn)"}}})
 
 	// Cấu hình AI (service_aiconfig.go): hướng dẫn cho khối "Đề xuất hành động", lưu ở cài đặt công ty khoá kdAiConfig
 	aiDraft := []rpc.GoField{{Name: "leadId", In: "body", Type: "number", Required: true, Desc: "Mã khách hàng dùng để thử"},
@@ -171,6 +175,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.PATCH("/tasks/:taskId", withParam("taskId", true, s.UpdateTask))
 	g.DELETE("/tasks/:taskId", withParam("taskId", false, noBody(s.DeleteTask)))
 	g.GET("/leads/:id/insights", withParam("id", false, noBody(s.GetInsights)))
+	g.PATCH("/leads/:id/insights", withParam("id", true, s.UpdateInsight))
 	g.POST("/leads/:id/insights/generate", withParam("id", true, s.GenerateInsights))
 	withBody := func(fn func(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error)) gin.HandlerFunc {
 		return func(c *gin.Context) {

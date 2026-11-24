@@ -1,0 +1,100 @@
+/* Cột phải trang khách hàng dạng dashboard: giao diện 3 thẻ "Việc tiếp theo" (CdNext), "Danh sách Task" (CdTasks), "Phụ trách" (CdOwners)
+   theo bản thiết kế mới. Chỉ GHI ĐÈ quy tắc của care.css / customer.css bằng bộ chọn cụ thể của từng thẻ (.cd-cc.cd-next,
+   .cd-cc.cd-tasks, .cd-card.cd-owners) để không phụ thuộc thứ tự nạp CSS. Màu theo biến --cc-* / --cd-* nên tự đổi ở nền tối. */
+
+/* ---------- Việc tiếp theo ---------- */
+.cd-cc.cd-next .cd-next-h{padding:18px; gap:14px;}
+.cd-cc.cd-next .cd-next-top .cd-cc-t{font-size:17px;}
+.cd-cc.cd-next .cd-next-cd{background:#C2570F; padding:3px 10px; font-size:11.5px;}
+.cd-cc.cd-next .cd-next-main{align-items:flex-start;}
+.cd-cc.cd-next .cd-cdate{line-height:1.15;}
+.cd-cc.cd-next .cd-cdate span{font-size:10px; color:#C2570F;}
+.cd-cc.cd-next .cd-cdate b{font-weight:700;}
+.cd-cc.cd-next .cd-cdate em{font-size:10px;}
+.cd-cc.cd-next .cd-next-info{flex:1; gap:6px;}
+.cd-cc.cd-next .cd-next-title{font-size:15.5px; line-height:1.3;}
+.cd-cc.cd-next .cd-next-when{margin-top:0;}
+.cd-cc.cd-next .cd-next-time{font-size:17px;}
+.cd-cc.cd-next .cd-next-mode{font-size:11.5px; padding:2px 10px; border-color:rgba(255,255,255,.45);}
+.cd-next-meta{font-size:12.5px; line-height:1.5; color:#D5DEEC; overflow-wrap:anywhere;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+/* thân trắng */
+.cd-cc.cd-next .cd-next-b, .cd-cc.cd-next .cd-next-b-fold{padding:14px 18px 18px; gap:12px;}
+.cd-cc.cd-next .cd-next-add{width:auto; align-self:flex-start; padding:9px 14px; font-size:13px; font-weight:600; border-radius:8px; gap:7px;}
+/* nhãn mục: chữ hoa nhỏ giãn chữ như "SẮP TỚI" của mẫu */
+.cd-cc.cd-next .cd-ckv > span:first-child, .cd-cc.cd-next .cd-prep-t, .cd-cc.cd-next .cd-next-sub{
+  font-size:11.5px; font-weight:600; color:var(--cd-text3, #475467); text-transform:uppercase; letter-spacing:.08em;}
+.cd-cc.cd-next .cd-next-grid{gap:12px 14px;}
+.cd-cc.cd-next .cd-ckv{gap:4px;}
+.cd-cc.cd-next .cd-ckv b{font-size:13.5px;}
+.cd-cc.cd-next .cd-prep{gap:8px;}
+/* Lịch khác / đã xong */
+.cd-cc.cd-next .cd-next-more{padding:14px 18px 18px; gap:8px;}
+.cd-cc.cd-next .cd-next-list{gap:8px;}
+.cd-cc.cd-next .cd-next-row{position:relative; gap:12px; padding:8px 10px; border:0; border-radius:10px; background:var(--cc-soft);}
+.cd-cc.cd-next .cd-next-rd{width:40px; align-items:center; line-height:1.1; font-size:inherit; font-weight:inherit;}
+.cd-cc.cd-next .cd-next-rd b{font-size:17px; font-weight:700; color:var(--cc-navy-ink);}
+.cd-cc.cd-next .cd-next-rd em{font-size:10px; font-weight:400; color:var(--cc-muted); white-space:nowrap;}
+.cd-cc.cd-next .cd-next-rt{gap:2px;}
+.cd-cc.cd-next .cd-next-rt b{font-size:13.5px; line-height:1.3; white-space:normal; overflow-wrap:anywhere;}
+.cd-cc.cd-next .cd-next-rt em{font-size:11.5px;}
+.cd-cc.cd-next .cd-next-tag{border-radius:99px; padding:2px 9px; font-size:11px;}
+.cd-cc.cd-next .cd-next-row.late .cd-next-rd b{color:var(--cc-red);}
+/* nút sửa / xong / xoá của dòng lịch: hiện khi rê chuột (màn cảm ứng luôn hiện) để dòng hẹp không mất chỗ cho tiêu đề */
+@media (hover:hover){
+  .cd-cc.cd-next .cd-next-ra{position:absolute; right:6px; top:50%; transform:translateY(-50%); padding:2px; border-radius:8px;
+    background:var(--cc-card); box-shadow:0 0 0 1px var(--cc-line); opacity:0; pointer-events:none; transition:opacity .12s;}
+  .cd-cc.cd-next .cd-next-row:hover .cd-next-ra, .cd-cc.cd-next .cd-next-ra:focus-within{opacity:1; pointer-events:auto;}
+}
+.cd-cc.cd-next .cd-next-past{font-weight:500;}
+
+/* ---------- Danh sách Task ---------- */
+.cd-cc.cd-tasks{padding:18px; gap:10px;}
+.cd-cc.cd-tasks .cd-cc-h{gap:6px 10px;}
+.cd-cc.cd-tasks .cd-cc-t.sm{font-size:22px; line-height:1.2;}
+.cd-cc.cd-tasks .cd-task-n{font-size:12.5px; color:var(--cc-muted);}
+.cd-cc.cd-tasks .cd-task-n::before{content:'· ';}
+.cd-cc.cd-tasks .cd-task-addh{padding:6px 10px; font-size:12.5px; gap:5px; border-radius:8px;}
+.cd-cc.cd-tasks .cd-task{position:relative; gap:12px; padding:8px 12px;}
+.cd-cc.cd-tasks .cd-task-date{width:40px; padding:0; background:none; border-radius:0; line-height:1.1; align-items:center;}
+.cd-cc.cd-tasks .cd-task-date b{font-size:17px; font-weight:700;}
+.cd-cc.cd-tasks .cd-task-date span{font-size:10px;}
+.cd-cc.cd-tasks .cd-task.late .cd-task-date{background:none;}
+.cd-cc.cd-tasks .cd-task-t{font-size:13.5px; line-height:1.3; color:var(--cc-ink);}
+.cd-cc.cd-tasks .cd-task-s{font-size:11.5px;}
+.cd-cc.cd-tasks .cd-task.done .cd-task-t{color:var(--cc-muted);}
+.cd-task-due{flex:none; border-radius:99px; padding:2px 9px; font-size:11px; font-weight:600; white-space:nowrap; background:var(--cc-seg); color:var(--cc-muted);}
+.cd-task-due.late{background:#FEE4E2; color:#B42318;}
+.cd-task-due.warn{background:#FEF0C7; color:#93370D;}
+.cd-task-due.ok{background:#DDF3E7; color:#17603F;}
+html[data-theme="dark"] .cd-task-due.late{background:var(--cd-red-bg); color:var(--cd-red);}
+html[data-theme="dark"] .cd-task-due.warn{background:var(--cd-amber-bg); color:var(--cd-amber);}
+html[data-theme="dark"] .cd-task-due.ok{background:var(--cd-green-bg); color:var(--cd-green-d);}
+/* nút sửa / xoá nổi trên dòng khi rê chuột (không chiếm chỗ của tiêu đề); màn cảm ứng giữ như cũ (luôn hiện, nằm trong dòng) */
+@media (hover:hover){
+  .cd-cc.cd-tasks .cd-task-a{position:absolute; right:40px; top:50%; transform:translateY(-50%); padding:2px; border-radius:8px;
+    background:var(--cc-card); box-shadow:0 0 0 1px var(--cc-line);}
+}
+@media (max-width:520px){
+  .cd-cc.cd-tasks{padding:14px;}
+}
+
+/* ---------- Phụ trách ---------- */
+.cd-card.cd-owners{gap:16px;}
+.cd-card.cd-owners .cd-card-t{font-size:22px; line-height:1.2;}
+.cd-card.cd-owners .cd-owners-list{gap:14px;}
+.cd-card.cd-owners .cd-grp{gap:10px;}
+.cd-card.cd-owners .cd-grp-hd, .cd-card.cd-owners .cd-grp-mini{min-height:28px; gap:8px;}
+.cd-card.cd-owners .cd-grp-hd > .cd-grp-l, .cd-card.cd-owners .cd-grp-mini-l{font-size:12px; font-weight:600; color:var(--cd-text3); text-transform:uppercase; letter-spacing:.08em; white-space:nowrap;}
+.cd-card.cd-owners .cd-grp-mini-v{flex:1; min-width:0; font-size:12.5px; color:var(--cd-muted);}
+.cd-card.cd-owners .cd-grp-n{min-width:18px; height:18px; padding:0 5px; line-height:18px; text-align:center; font-size:11px; font-weight:600; background:#FDEBDD; color:#B4521A;}
+html[data-theme="dark"] .cd-card.cd-owners .cd-grp-n{background:var(--cd-orange-bg); color:var(--cd-orange-d);}
+.cd-card.cd-owners .cd-asg .cd-btn.sm{padding:5px 10px; font-size:12px; font-weight:600; border-radius:8px; color:var(--cd-text);}
+.cd-card.cd-owners .cd-asg .cd-btn.sm:hover{border-color:var(--cd-orange); color:var(--cd-orange);}
+.cd-card.cd-owners .cd-mem{gap:10px; padding:0;}
+.cd-card.cd-owners .cd-mem .cd-av{width:32px; height:32px; font-size:11.5px; background:var(--cd-chip); color:var(--cd-text3);}
+.cd-card.cd-owners .cd-mem-txt b{font-size:14px;}
+.cd-card.cd-owners .cd-mem.lead{padding:9px 12px; margin:0 -10px; border-radius:10px; background:var(--cd-orange-bg); border:1px solid var(--cd-orange-line);}
+.cd-card.cd-owners .cd-mem.lead .cd-av{background:#FDEBDD; color:#B4521A;}
+html[data-theme="dark"] .cd-card.cd-owners .cd-mem.lead .cd-av{background:color-mix(in srgb, var(--cd-orange) 30%, var(--cd-card)); color:var(--cd-orange-d);}
+.cd-card.cd-owners .cd-mem-x{width:22px; height:22px; font-size:16px; color:var(--cd-muted);}

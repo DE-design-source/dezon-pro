@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { getInsights, generateInsights, addTask, emitLeadChange, useLeadChange } from '../../customerApi'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { getInsights, generateInsights, updateInsight, addTask, emitLeadChange, useLeadChange } from '../../customerApi'
+import DatePicker from '../../../../components/ui/DatePicker'
 import { uploadRaw, saveBlob } from '../../../QS/api/files'
 import { useKdMap, saveKdOptions } from '../ShortlistSelect'
 import { phoneNorms } from '../../utils'
 import './ai.css'
+import './scoreai2.css'
 
-/* Khối AI của trang khách hàng (Customer Dashboard): 1 Đề xuất hành động · 2 Phân tích chiến lược · 3 Gợi ý lộ trình chăm sóc
+/* Khối AI của trang khách hàng (Customer Dashboard): 1 Timeline đề xuất · 2 Phân tích chiến lược · 3 Đề xuất hành động
    · Nguồn dữ liệu AI đã phân tích. Dữ liệu: customerApi getInsights / generateInsights (lưu database, máy chủ gọi Gemini
    hoặc tự tính theo quy tắc). "Tạo task" -> addTask(source 'ai') rồi báo khối Danh sách Task tải lại. */
 
@@ -137,6 +139,295 @@ const IcRefresh = ({ spin }) => (
 
 const UP_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.dwg,.dxf,.skp'
 
+/* ---- Sửa tay từng phần AI đề xuất (Timeline / Phân tích chiến lược / Gợi ý / Đề xuất hành động) ----
+   Lưu: updateInsight gửi đủ 4 phần (bản hiện tại thay phần vừa sửa) + generatedAt lúc bắt đầu sửa. */
+const MAX = { steps: 12, risks: 5, ideas: 4, side: 3 }
+const STATE_OPTS = [['done', 'Đã xong'], ['now', 'Đang làm'], ['open', 'Chưa làm'], ['key', 'Mốc ký HĐ'], ['end', 'Mốc cuối']]
+const isState = s => STATE_OPTS.some(o => o[0] === s)
+const tx = s => String(s == null ? '' : s)
+const tt = s => tx(s).trim()
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/
+let seq = 0
+const kid = () => 'r' + (++seq)
+const strip = ({ _k, ...rest }) => rest   // eslint-disable-line no-unused-vars
+/* Số 0-100: '' -> {v: null}; sai -> {err} */
+function num100(s, name) {
+  const t = tt(s)
+  if (!t) return { v: null }
+  const n = Number(t.replace(',', '.'))
+  if (!isFinite(n) || n < 0 || n > 100) return { err: name + ' phải là số từ 0 đến 100' }
+  return { v: Math.round(n) }
+}
+
+function useRows(init) {
+  const [rows, setRows] = useState(() => (Array.isArray(init) ? init : []).filter(r => r && typeof r === 'object').map(r => ({ ...r, _k: kid() })))
+  return {
+    rows,
+    set: (i, patch) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, ...patch } : r))),
+    move: (i, d) => setRows(rs => { const j = i + d; if (j < 0 || j >= rs.length) return rs; const n = rs.slice(); [n[i], n[j]] = [n[j], n[i]]; return n }),
+    del: i => setRows(rs => rs.filter((_, j) => j !== i)),
+    add: r => setRows(rs => rs.concat([{ ...r, _k: kid() }])),
+  }
+}
+
+/* textarea tự giãn theo nội dung */
+function AutoTa({ value, onChange, className, ...rest }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = (el.scrollHeight + 2) + 'px'
+  }, [value])
+  return <textarea ref={ref} rows={1} className={'cd-ai-in ta' + (className ? ' ' + className : '')} value={value} onChange={e => onChange(e.target.value)} {...rest} />
+}
+
+function RowTools({ i, n, onMove, onDel, what }) {
+  return (
+    <span className="cd-ai-rowtools">
+      <button type="button" className="cd-ai-ix" title="Chuyển lên" aria-label={'Chuyển ' + what + ' ' + (i + 1) + ' lên'} disabled={i === 0} onClick={() => onMove(i, -1)}>↑</button>
+      <button type="button" className="cd-ai-ix" title="Chuyển xuống" aria-label={'Chuyển ' + what + ' ' + (i + 1) + ' xuống'} disabled={i === n - 1} onClick={() => onMove(i, 1)}>↓</button>
+      <button type="button" className="cd-ai-ix del" title={'Xoá ' + what} aria-label={'Xoá ' + what + ' ' + (i + 1)} onClick={() => onDel(i)}>×</button>
+    </span>
+  )
+}
+
+const AddRow = ({ n, max, label, onClick }) => (
+  <button type="button" className="cd-ai-addrow" disabled={n >= max} onClick={onClick}>
+    + {label} <span className="cd-ai-mut">({n}/{max})</span>
+  </button>
+)
+
+/* Khung form sửa: Lưu / Huỷ, lỗi chữ đỏ tại chỗ, Esc huỷ, Ctrl+Enter lưu. data-cd-busy để Esc không thoát trang. */
+function EditForm({ build, onSave, onCancel, onReload, children }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  async function submit() {
+    if (busy) return
+    const r = build()
+    if (r.error) { setErr({ text: r.error }); return }
+    setBusy(true); setErr(null)
+    try { await onSave(r.value) } catch (e) {
+      setErr({ text: (e && e.message) || String(e), reload: !!(e && e.status === 409) })
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="cd-ai-edit" data-cd-busy="1"
+      onKeyDown={e => {
+        if (e.key === 'Escape' && !document.querySelector('[role=dialog]')) { e.preventDefault(); e.stopPropagation(); if (!busy) onCancel() }
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit() }
+      }}>
+      <fieldset className="cd-ai-edit-fs" disabled={busy}>{children}</fieldset>
+      {err && (
+        <div className="cd-ai-edit-err" role="alert">
+          <span>{err.text}</span>
+          {err.reload && <button type="button" className="cd-ai-link" onClick={onReload}>Tải lại</button>}
+        </div>
+      )}
+      <div className="cd-ai-edit-foot">
+        <span className="cd-ai-edit-hint">Ctrl+Enter lưu · Esc huỷ</span>
+        <button type="button" className="cd-ai-btn sm" disabled={busy} onClick={onCancel}>Huỷ</button>
+        <button type="button" className="cd-ai-btn sm primary" disabled={busy} onClick={submit}>{busy ? 'Đang lưu...' : 'Lưu'}</button>
+      </div>
+    </div>
+  )
+}
+
+function RoadmapForm({ rm, ...p }) {
+  const L = useRows(rm.steps)
+  const build = () => {
+    const steps = []
+    for (let i = 0; i < L.rows.length; i++) {
+      const r = L.rows[i]
+      const s = { ...strip(r), date: tt(r.date), label: tt(r.label), desc: tt(r.desc), state: isState(r.state) ? r.state : 'open' }
+      if (!s.label && !s.desc && !s.date) continue
+      if (!s.label) return { error: 'Mốc thứ ' + (i + 1) + ' chưa có nội dung (nhãn)' }
+      steps.push(s)
+    }
+    if (steps.length > MAX.steps) return { error: 'Tối đa ' + MAX.steps + ' mốc' }
+    return { value: { ...rm, steps } }
+  }
+  return (
+    <EditForm build={build} {...p}>
+      {L.rows.length === 0 && <span className="cd-ai-none">Chưa có mốc nào. Bấm "+ Thêm mốc".</span>}
+      {L.rows.map((r, i) => {
+        const iso = ISO_RE.test(tx(r.date))
+        return (
+          <div key={r._k} className="cd-ai-erow">
+            <div className="cd-ai-erow-h">
+              <span className="cd-ai-erow-n">{i + 1}</span>
+              <DatePicker value={iso ? r.date : ''} onChange={v => L.set(i, { date: v || '' })} clearable ariaLabel={'Ngày mốc ' + (i + 1)} />
+              {!iso && tt(r.date) && <span className="cd-ai-raw" title="Thời gian AI ghi (chọn ngày để thay)">{r.date}</span>}
+              <select className="cd-ai-in sel" value={isState(r.state) ? r.state : 'open'} aria-label={'Trạng thái mốc ' + (i + 1)}
+                onChange={e => L.set(i, { state: e.target.value })}>
+                {STATE_OPTS.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}
+              </select>
+              <RowTools i={i} n={L.rows.length} onMove={L.move} onDel={L.del} what="mốc" />
+            </div>
+            <input className="cd-ai-in" autoFocus={i === 0} value={tx(r.label)} placeholder="Nhãn mốc (VD: Gửi báo giá khái toán)" aria-label={'Nhãn mốc ' + (i + 1)}
+              onChange={e => L.set(i, { label: e.target.value })} />
+            <AutoTa value={tx(r.desc)} onChange={v => L.set(i, { desc: v })} placeholder="Mô tả (không bắt buộc)" aria-label={'Mô tả mốc ' + (i + 1)} />
+          </div>
+        )
+      })}
+      <AddRow n={L.rows.length} max={MAX.steps} label="Thêm mốc" onClick={() => L.add({ date: '', label: '', desc: '', state: 'open' })} />
+    </EditForm>
+  )
+}
+
+function StrategyForm({ st, ...p }) {
+  const fit = st.fit || {}
+  const pace = st.pace || {}
+  const cc = st.closeChance || {}
+  const [f, setF] = useState(() => ({
+    headline: tx(st.headline), risks: (st.risks || []).map(tx).join('\n'), note: tx(st.note),
+    fitLabel: tx(fit.label), fitScore: fit.score == null ? '' : tx(fit.score), paceScore: pace.score == null ? '' : tx(pace.score),
+    ccPct: cc.pct == null ? '' : tx(cc.pct), ccHint: tx(cc.hint),
+  }))
+  const up = k => v => setF(x => ({ ...x, [k]: v }))
+  const build = () => {
+    const risks = f.risks.split('\n').map(s => s.trim()).filter(Boolean)
+    if (risks.length > MAX.risks) return { error: 'Tối đa ' + MAX.risks + ' rủi ro (mỗi dòng 1 rủi ro)' }
+    const fs = num100(f.fitScore, 'Điểm độ khớp'); if (fs.err) return { error: fs.err }
+    const ps = num100(f.paceScore, 'Điểm nhịp deal'); if (ps.err) return { error: ps.err }
+    const cp = num100(f.ccPct, 'Khả năng chốt'); if (cp.err) return { error: cp.err }
+    const hint = tt(f.ccHint)
+    if (hint && cp.v == null) return { error: 'Nhập khả năng chốt (0-100) hoặc xoá gợi ý khả năng chốt' }
+    return {
+      value: {
+        ...st, headline: tt(f.headline), risks, note: tt(f.note),
+        fit: { ...fit, score: fs.v == null ? 0 : fs.v, label: tt(f.fitLabel) },
+        pace: { ...pace, score: ps.v == null ? 0 : ps.v },
+        closeChance: cp.v == null ? null : { ...cc, pct: cp.v, hint },
+      },
+    }
+  }
+  return (
+    <EditForm build={build} {...p}>
+      <label className="cd-ai-ef"><span className="cd-ai-cap">Nhận định</span>
+        <AutoTa autoFocus value={f.headline} onChange={up('headline')} placeholder="Nhận định chính về khách hàng / deal" />
+      </label>
+      <label className="cd-ai-ef"><span className="cd-ai-cap">Rủi ro <span className="cd-ai-mut cd-ai-lc">(mỗi dòng 1 rủi ro, tối đa {MAX.risks}; cụm trùng trong nhận định được tô đỏ)</span></span>
+        <AutoTa value={f.risks} onChange={up('risks')} placeholder={'VD: chưa rõ người quyết định\nngân sách thấp hơn dự toán'} />
+      </label>
+      <label className="cd-ai-ef"><span className="cd-ai-cap">Ghi chú</span>
+        <AutoTa value={f.note} onChange={up('note')} placeholder="Ghi chú thêm (không bắt buộc)" />
+      </label>
+      <div className="cd-ai-egrid">
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Độ khớp (0-100)</span>
+          <input className="cd-ai-in num" type="number" min="0" max="100" value={f.fitScore} onChange={e => up('fitScore')(e.target.value)} />
+        </label>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Nhãn độ khớp</span>
+          <input className="cd-ai-in" value={f.fitLabel} placeholder="VD: Khớp tốt" onChange={e => up('fitLabel')(e.target.value)} />
+        </label>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Nhịp deal (0-100)</span>
+          <input className="cd-ai-in num" type="number" min="0" max="100" value={f.paceScore} onChange={e => up('paceScore')(e.target.value)} />
+        </label>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Khả năng chốt % (0-100)</span>
+          <input className="cd-ai-in num" type="number" min="0" max="100" value={f.ccPct} placeholder="Bỏ trống = ẩn" onChange={e => up('ccPct')(e.target.value)} />
+        </label>
+      </div>
+      <label className="cd-ai-ef"><span className="cd-ai-cap">Gợi ý khả năng chốt</span>
+        <input className="cd-ai-in" value={f.ccHint} placeholder="VD: nếu gửi báo giá trước 30/11" onChange={e => up('ccHint')(e.target.value)} />
+      </label>
+    </EditForm>
+  )
+}
+
+function IdeasForm({ ideas, ...p }) {
+  const L = useRows(ideas)
+  const build = () => {
+    const out = []
+    for (let i = 0; i < L.rows.length; i++) {
+      const r = L.rows[i]
+      const w = { ...strip(r), title: tt(r.title), desc: tt(r.desc) }
+      if (!w.title && !w.desc) continue
+      if (!w.title) return { error: 'Gợi ý thứ ' + (i + 1) + ' chưa có tiêu đề' }
+      if (!w.key) w.key = 'tay-' + Date.now().toString(36) + '-' + i
+      out.push(w)
+    }
+    if (out.length > MAX.ideas) return { error: 'Tối đa ' + MAX.ideas + ' gợi ý' }
+    return { value: out }
+  }
+  return (
+    <EditForm build={build} {...p}>
+      {L.rows.length === 0 && <span className="cd-ai-none">Chưa có gợi ý. Bấm "+ Thêm gợi ý".</span>}
+      {L.rows.map((r, i) => (
+        <div key={r._k} className="cd-ai-erow">
+          <div className="cd-ai-erow-h">
+            <span className="cd-ai-erow-n">{i + 1}</span>
+            <input className="cd-ai-in grow" autoFocus={i === 0} value={tx(r.title)} placeholder="Tiêu đề gợi ý" aria-label={'Tiêu đề gợi ý ' + (i + 1)}
+              onChange={e => L.set(i, { title: e.target.value })} />
+            <RowTools i={i} n={L.rows.length} onMove={L.move} onDel={L.del} what="gợi ý" />
+          </div>
+          <AutoTa value={tx(r.desc)} onChange={v => L.set(i, { desc: v })} placeholder="Mô tả (không bắt buộc)" aria-label={'Mô tả gợi ý ' + (i + 1)} />
+        </div>
+      ))}
+      <AddRow n={L.rows.length} max={MAX.ideas} label="Thêm gợi ý" onClick={() => L.add({ title: '', desc: '' })} />
+    </EditForm>
+  )
+}
+
+function ActionsForm({ act, ...p }) {
+  const m0 = act.main || {}
+  const [m, setM] = useState(() => ({ priority: tx(m0.priority), title: tx(m0.title), why: tx(m0.why), zalo: tx(m0.zalo) }))
+  const L = useRows(act.side)
+  const upM = k => v => setM(x => ({ ...x, [k]: v }))
+  const build = () => {
+    const title = tt(m.title)
+    if (!title) return { error: 'Hành động chính không được để trống' }
+    const side = []
+    for (let i = 0; i < L.rows.length; i++) {
+      const r = L.rows[i]
+      const a = { ...strip(r), tag: tt(r.tag), when: tt(r.when), title: tt(r.title), why: tt(r.why) }
+      if (!a.tag && !a.when && !a.title && !a.why) continue
+      if (!a.title) return { error: 'Hành động phụ thứ ' + (i + 1) + ' chưa có tiêu đề' }
+      side.push(a)
+    }
+    if (side.length > MAX.side) return { error: 'Tối đa ' + MAX.side + ' hành động phụ' }
+    return { value: { ...act, main: { ...m0, priority: tt(m.priority), title, why: tt(m.why), zalo: tx(m.zalo).trim() }, side } }
+  }
+  return (
+    <EditForm build={build} {...p}>
+      <div className="cd-ai-erow main">
+        <span className="cd-ai-cap">Hành động chính</span>
+        <div className="cd-ai-egrid">
+          <label className="cd-ai-ef"><span className="cd-ai-cap">Mức ưu tiên</span>
+            <input className="cd-ai-in" value={m.priority} placeholder="VD: Ưu tiên cao · Hôm nay" onChange={e => upM('priority')(e.target.value)} />
+          </label>
+        </div>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Tiêu đề <span className="cd-ai-req">*</span></span>
+          <AutoTa autoFocus value={m.title} onChange={upM('title')} placeholder="Việc cần làm ngay (bắt buộc)" />
+        </label>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Vì sao</span>
+          <AutoTa value={m.why} onChange={upM('why')} placeholder="Lý do nên làm việc này" />
+        </label>
+        <label className="cd-ai-ef"><span className="cd-ai-cap">Tin Zalo soạn sẵn</span>
+          <AutoTa value={m.zalo} onChange={upM('zalo')} placeholder="Nội dung tin nhắn gửi khách (không bắt buộc)" />
+        </label>
+      </div>
+      <span className="cd-ai-cap">Hành động phụ</span>
+      {L.rows.map((r, i) => (
+        <div key={r._k} className="cd-ai-erow">
+          <div className="cd-ai-erow-h">
+            <span className="cd-ai-erow-n">{i + 1}</span>
+            <input className="cd-ai-in w-tag" value={tx(r.tag)} placeholder="Nhãn (VD: Trước 30/11)" aria-label={'Nhãn hành động phụ ' + (i + 1)}
+              onChange={e => L.set(i, { tag: e.target.value })} />
+            <input className="cd-ai-in w-tag" value={tx(r.when)} placeholder="Thời điểm" aria-label={'Thời điểm hành động phụ ' + (i + 1)}
+              onChange={e => L.set(i, { when: e.target.value })} />
+            <RowTools i={i} n={L.rows.length} onMove={L.move} onDel={L.del} what="hành động" />
+          </div>
+          <input className="cd-ai-in" value={tx(r.title)} placeholder="Tiêu đề hành động" aria-label={'Tiêu đề hành động phụ ' + (i + 1)}
+            onChange={e => L.set(i, { title: e.target.value })} />
+          <AutoTa value={tx(r.why)} onChange={v => L.set(i, { why: v })} placeholder="Vì sao (không bắt buộc)" aria-label={'Vì sao hành động phụ ' + (i + 1)} />
+        </div>
+      ))}
+      <AddRow n={L.rows.length} max={MAX.side} label="Thêm hành động phụ" onClick={() => L.add({ tag: '', when: '', title: '', why: '' })} />
+    </EditForm>
+  )
+}
+
 export default function CdAi({ lead, interactions }) {
   const id = lead && lead.id
   const timeline = useKdMap('timeline')[String(id)] || {}
@@ -153,6 +444,8 @@ export default function CdAi({ lead, interactions }) {
   const [stale, setStale] = useState(false)
   const [made, setMade] = useState({})     // khoá thẻ đã tạo task: true | 'busy'
   const [toast, setToast] = useState(null)
+  const [editing, setEditing] = useState(null)   // null | 'roadmap' | 'strategy' | 'ideas' | 'actions'
+  const editBase = useRef(null)                  // generatedAt của bản đang sửa (máy chủ báo 409 nếu đã có bản mới hơn)
   const fileRef = useRef(null)
   const selfEmit = useRef(false)
   const toastTimer = useRef(null)
@@ -172,7 +465,7 @@ export default function CdAi({ lead, interactions }) {
       e => setLoadErr((e && e.message) || 'Không tải được phân tích AI'))
       .finally(() => setLoading(false))
   }
-  useEffect(() => { setIns(null); setMade({}); load() }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setIns(null); setMade({}); setEditing(null); load() }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useLeadChange(id, ['score', 'activities', 'insights'], part => {
     if (part === 'insights') { if (selfEmit.current) selfEmit.current = false; else load(); return }
@@ -199,7 +492,7 @@ export default function CdAi({ lead, interactions }) {
   }
 
   async function run(map) {
-    if (running || id == null) return
+    if (running || editing || id == null) return
     setRunning(true)
     try {
       const body = {}
@@ -237,6 +530,37 @@ export default function CdAi({ lead, interactions }) {
     await run(next)
   }
 
+  function startEdit(part) {
+    if (editing || running || uploading > 0 || !ins) return
+    editBase.current = ins.generatedAt
+    setEditing(part)
+  }
+  /* Lưu 1 phần: gửi đủ 4 phần (bản hiện tại thay phần vừa sửa). Lỗi ném ra để form hiện chữ đỏ tại chỗ. */
+  async function saveSection(part, value) {
+    const content = {
+      actions: ins.actions || {}, strategy: ins.strategy || {}, ideas: ins.ideas || [], roadmap: ins.roadmap || { steps: [] },
+      [part]: value,
+    }
+    const r = await updateInsight(id, content, editBase.current)
+    const next = r && r.insight
+    setIns(x => next || { ...x, [part]: value })
+    setEditing(null)
+    /* thẻ "Đã tạo task" theo vị trí: phần vừa sửa đổi thứ tự / nội dung -> bỏ đánh dấu của phần đó */
+    const pre = part === 'actions' ? /^(main|side\d+)$/ : part === 'ideas' ? /^idea\d+$/ : null
+    if (pre) setMade(mk => { const n = {}; Object.keys(mk).forEach(k => { if (!pre.test(k)) n[k] = mk[k] }); return n })
+    selfEmit.current = true
+    emitLeadChange(id, 'insights')
+    say('Đã lưu chỉnh sửa')
+  }
+  const reloadAfterConflict = () => { setEditing(null); load() }
+  const formProps = part => ({ onSave: v => saveSection(part, v), onCancel: () => setEditing(null), onReload: reloadAfterConflict })
+  const editBtn = (part, label) => editing !== part && (
+    <button type="button" className="cd-ai-btn sm cd-ai-editbtn" disabled={!!editing || running || uploading > 0}
+      title={editing ? 'Đang sửa phần khác' : 'Sửa ' + label} aria-label={'Sửa ' + label} onClick={() => startEdit(part)}>
+      <IcPen />Sửa
+    </button>
+  )
+
   async function makeTask(key, { title, when, note }) {
     if (!title || made[key]) return
     setMade(m => ({ ...m, [key]: 'busy' }))
@@ -267,7 +591,12 @@ export default function CdAi({ lead, interactions }) {
         </span>
       )}
       {ins && ins.generatedAt && <span className="cd-ai-at">Phân tích lúc {atLabel(ins.generatedAt)}</span>}
-      {ins && (
+      {ins && ins.editedAt && (
+        <span className="cd-ai-edited" title="Nội dung AI đề xuất đã được người dùng chỉnh sửa">
+          Đã chỉnh tay{ins.editedBy ? ' bởi ' + ins.editedBy : ''}{atLabel(ins.editedAt) ? ' · ' + atLabel(ins.editedAt) : ''}
+        </span>
+      )}
+      {ins && !editing && (
         <button type="button" className="cd-ai-btn sm" disabled={busy} onClick={() => run()}>
           <IcRefresh spin={running} />{running ? 'Đang phân tích...' : 'Phân tích lại'}
         </button>
@@ -277,7 +606,7 @@ export default function CdAi({ lead, interactions }) {
   const toastEl = toast && <div className={'cd-ai-toast' + (toast.bad ? ' bad' : '')} role="status">{toast.text}</div>
   const badge = (
     <span className="cd-ai-h">
-      <span className="cd-ai-badge">AI</span><span className="cd-ai-title">1 · Đề xuất hành động</span>
+      <span className="cd-ai-badge">AI</span><span className="cd-ai-title">1 · TIMELINE ĐỀ XUẤT</span>
     </span>
   )
 
@@ -330,13 +659,97 @@ export default function CdAi({ lead, interactions }) {
       {stale && (
         <div className="cd-ai-stale">
           <span>Dữ liệu đã đổi - Phân tích lại?</span>
-          <button type="button" className="cd-ai-link" disabled={busy} onClick={() => run()}>Phân tích lại</button>
+          <button type="button" className="cd-ai-link" disabled={busy || !!editing} title={editing ? 'Lưu hoặc huỷ phần đang sửa trước' : ''} onClick={() => run()}>Phân tích lại</button>
           <button type="button" className="cd-ai-x" title="Ẩn" onClick={() => setStale(false)}>×</button>
         </div>
       )}
 
       <section className="cd-ai-sec">
         <div className="cd-ai-top">{badge}{meta}</div>
+        <div className="cd-ai-rm">
+          <div className="cd-ai-rm-h">
+            <span className="cd-ai-rm-t">{rmHead}</span>
+            <span className="cd-ai-rm-act">
+              {steps.length > 0 && editing !== 'roadmap' && <a href="#" className="cd-ai-export" onClick={e => { e.preventDefault(); exportTimeline(lead, rm, rmHead) }}>Xuất file timeline gửi khách</a>}
+              {editBtn('roadmap', 'timeline đề xuất')}
+            </span>
+          </div>
+          {editing === 'roadmap' ? <RoadmapForm rm={rm} {...formProps('roadmap')} /> : steps.length ? (
+            <div className="cd-ai-steps">
+              {steps.map((r, i) => {
+                const s = r.state || 'open'
+                return (
+                  <div key={i} className={'cd-ai-step ' + s} title={r.desc || ''}>
+                    {i < steps.length - 1 && <div className={'cd-ai-line ' + s + (r.dashed ? ' dashed' : '')} />}
+                    <div className={'cd-ai-dot ' + s} />
+                    <div className="cd-ai-step-b">
+                      <span className="cd-ai-step-d">{stepDate(r.date)}</span>
+                      <span className="cd-ai-step-l">{r.label}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : <span className="cd-ai-none">Chưa có lộ trình. Nhập ngày khởi công ở hồ sơ khách rồi bấm Phân tích lại.</span>}
+          {steps.length > 0 && editing !== 'roadmap' && (
+            <button type="button" className="cd-ai-pen" title="Sao chép lộ trình dạng chữ (dán vào Zalo / ghi chú)" aria-label="Sao chép lộ trình"
+              onClick={async () => say((await copyText(roadmapText(lead, rm, rmHead))) ? 'Đã sao chép lộ trình - dán vào Zalo / ghi chú để chỉnh sửa' : 'Không sao chép được', false)}>
+              <IcCopy />
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="cd-ai-sec">
+        <div className="cd-ai-top"><span className="cd-ai-title">2 · Phân tích chiến lược</span>{editBtn('strategy', 'phân tích chiến lược')}</div>
+        {editing === 'strategy' ? <StrategyForm st={st} {...formProps('strategy')} /> : (
+        <div className="cd-ai-strat">
+          <div className="cd-ai-insight">
+            <span className="cd-ai-cap">Nhận định</span>
+            <span className="cd-ai-head"><Highlight text={st.headline || 'Chưa có nhận định.'} risks={st.risks} /></span>
+            {st.note && <span className="cd-ai-note">{st.note}</span>}
+          </div>
+          <div className="cd-ai-bars">
+            <div className="cd-ai-bar">
+              <div className="cd-ai-bar-h">
+                <span><b>Độ khớp</b> <span className="cd-ai-mut">(ngân sách, nhu cầu, quy mô)</span></span>
+                <span className={'cd-ai-val ' + scoreTone(fitS)}>{fitS}{fit.label ? ' · ' + fit.label : ''}</span>
+              </div>
+              <div className="cd-ai-track"><div className={'cd-ai-fill ' + scoreTone(fitS)} style={{ width: fitS + '%' }} /></div>
+            </div>
+            <div className="cd-ai-bar">
+              <div className="cd-ai-bar-h">
+                <span><b>Nhịp deal</b> <span className="cd-ai-mut">(tương tác, giữ cam kết)</span></span>
+                <span className={'cd-ai-val ' + scoreTone(paceS)}>{paceS}{delta ? ' · ' + (delta < 0 ? '▼' : '▲') + Math.abs(delta) : ''}</span>
+              </div>
+              <div className="cd-ai-track"><div className={'cd-ai-fill ' + scoreTone(paceS)} style={{ width: paceS + '%' }} /></div>
+            </div>
+            {cc && cc.pct != null && (
+              <span className="cd-ai-chance">Khả năng chốt HĐ thiết kế: <b>~{Math.round(Number(cc.pct) || 0)}%</b>{cc.hint ? ', ' + cc.hint : ''}</span>
+            )}
+          </div>
+        </div>
+        )}
+        <div className="cd-ai-ideas-w">
+          <div className="cd-ai-ideas-h"><span className="cd-ai-cap">Gợi ý</span>{editBtn('ideas', 'gợi ý')}</div>
+          {editing === 'ideas' ? <IdeasForm ideas={ideas} {...formProps('ideas')} /> : !ideas.length ? <span className="cd-ai-none">Chưa có gợi ý.</span> : (
+            <div className="cd-ai-ideas">
+              {ideas.map((w, i) => (
+                <div key={w.key || i} className="cd-ai-idea">
+                  <span className="cd-ai-idea-t">{w.title}</span>
+                  {w.desc && <span className="cd-ai-idea-d">{w.desc}</span>}
+                  <div className="cd-ai-grow" />
+                  <span className="cd-ai-idea-b">{taskBtn('idea' + i, { title: w.title, when: [w.when, w.tag, w.priority], note: w.desc }, true, true)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="cd-ai-sec">
+        <div className="cd-ai-top"><span className="cd-ai-title">3 · Đề xuất hành động</span>{editBtn('actions', 'đề xuất hành động')}</div>
+        {editing === 'actions' ? <ActionsForm act={act} {...formProps('actions')} /> : (
         <div className="cd-ai-acts">
           {main && (
             <div className="cd-ai-main">
@@ -377,90 +790,13 @@ export default function CdAi({ lead, interactions }) {
           )}
           {!main && !side.length && <span className="cd-ai-none">Chưa có đề xuất hành động.</span>}
         </div>
-      </section>
-
-      <section className="cd-ai-sec">
-        <span className="cd-ai-title">2 · Phân tích chiến lược</span>
-        <div className="cd-ai-strat">
-          <div className="cd-ai-insight">
-            <span className="cd-ai-cap">Nhận định</span>
-            <span className="cd-ai-head"><Highlight text={st.headline || 'Chưa có nhận định.'} risks={st.risks} /></span>
-            {st.note && <span className="cd-ai-note">{st.note}</span>}
-          </div>
-          <div className="cd-ai-bars">
-            <div className="cd-ai-bar">
-              <div className="cd-ai-bar-h">
-                <span><b>Độ khớp</b> <span className="cd-ai-mut">(ngân sách, nhu cầu, quy mô)</span></span>
-                <span className={'cd-ai-val ' + scoreTone(fitS)}>{fitS}{fit.label ? ' · ' + fit.label : ''}</span>
-              </div>
-              <div className="cd-ai-track"><div className={'cd-ai-fill ' + scoreTone(fitS)} style={{ width: fitS + '%' }} /></div>
-            </div>
-            <div className="cd-ai-bar">
-              <div className="cd-ai-bar-h">
-                <span><b>Nhịp deal</b> <span className="cd-ai-mut">(tương tác, giữ cam kết)</span></span>
-                <span className={'cd-ai-val ' + scoreTone(paceS)}>{paceS}{delta ? ' · ' + (delta < 0 ? '▼' : '▲') + Math.abs(delta) : ''}</span>
-              </div>
-              <div className="cd-ai-track"><div className={'cd-ai-fill ' + scoreTone(paceS)} style={{ width: paceS + '%' }} /></div>
-            </div>
-            {cc && cc.pct != null && (
-              <span className="cd-ai-chance">Khả năng chốt HĐ thiết kế: <b>~{Math.round(Number(cc.pct) || 0)}%</b>{cc.hint ? ', ' + cc.hint : ''}</span>
-            )}
-          </div>
-        </div>
-        {ideas.length > 0 && (
-          <div className="cd-ai-ideas-w">
-            <span className="cd-ai-cap">Gợi ý</span>
-            <div className="cd-ai-ideas">
-              {ideas.map((w, i) => (
-                <div key={w.key || i} className="cd-ai-idea">
-                  <span className="cd-ai-idea-t">{w.title}</span>
-                  {w.desc && <span className="cd-ai-idea-d">{w.desc}</span>}
-                  <div className="cd-ai-grow" />
-                  <span className="cd-ai-idea-b">{taskBtn('idea' + i, { title: w.title, when: [w.when, w.tag, w.priority], note: w.desc }, true, true)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         )}
-      </section>
-
-      <section className="cd-ai-sec">
-        <span className="cd-ai-title">3 · Gợi ý lộ trình chăm sóc</span>
-        <div className="cd-ai-rm">
-          <div className="cd-ai-rm-h">
-            <span className="cd-ai-rm-t">{rmHead}</span>
-            {steps.length > 0 && <a href="#" className="cd-ai-export" onClick={e => { e.preventDefault(); exportTimeline(lead, rm, rmHead) }}>Xuất file timeline gửi khách</a>}
-          </div>
-          {steps.length ? (
-            <div className="cd-ai-steps">
-              {steps.map((r, i) => {
-                const s = r.state || 'open'
-                return (
-                  <div key={i} className={'cd-ai-step ' + s} title={r.desc || ''}>
-                    {i < steps.length - 1 && <div className={'cd-ai-line ' + s + (r.dashed ? ' dashed' : '')} />}
-                    <div className={'cd-ai-dot ' + s} />
-                    <div className="cd-ai-step-b">
-                      <span className="cd-ai-step-d">{stepDate(r.date)}</span>
-                      <span className="cd-ai-step-l">{r.label}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : <span className="cd-ai-none">Chưa có lộ trình. Nhập ngày khởi công ở hồ sơ khách rồi bấm Phân tích lại.</span>}
-          {steps.length > 0 && (
-            <button type="button" className="cd-ai-pen" title="Sao chép lộ trình dạng chữ để chỉnh sửa (dán vào Zalo / ghi chú)"
-              onClick={async () => say((await copyText(roadmapText(lead, rm, rmHead))) ? 'Đã sao chép lộ trình - dán vào Zalo / ghi chú để chỉnh sửa' : 'Không sao chép được', false)}>
-              <IcPen />
-            </button>
-          )}
-        </div>
       </section>
 
       <section className="cd-ai-src">
         <div className="cd-ai-src-h">
           <span className="cd-ai-cap">Nguồn dữ liệu AI đã phân tích ({sources.length})</span>
-          <button type="button" className="cd-ai-up" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}
+          <button type="button" className="cd-ai-up" disabled={busy || !!editing} onClick={() => fileRef.current && fileRef.current.click()}
             title="Tải tệp (báo giá, bản vẽ, ghi chú...) lên kho tệp, lưu vào Tệp đính kèm của khách rồi phân tích lại">
             {uploading > 0 ? <IcRefresh spin /> : <IcUp />}{uploading > 0 ? 'Đang tải lên ' + uploading + ' tệp...' : 'Tải thêm dữ liệu nguồn'}
           </button>
