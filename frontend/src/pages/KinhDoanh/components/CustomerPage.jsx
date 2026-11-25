@@ -394,7 +394,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
               <DSec id="tai-lieu" title="Tài liệu & ghi chú" fold={fold} onFold={onFold}>
                 {l.boqFile && (() => { const b = boqOf(l.boqFile); return b.url
                   ? <a className="kd-cp-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer"><Ic d={FILE_IC} />{b.name}</a>
-                  : <div className="kd-cp-file"><Ic d={FILE_IC} />{b.name}</div> })()}
+                  : <div className="kd-cp-file" title="Chưa có file thật - Sửa > Nâng cao > BOQ để tải file lên"><Ic d={FILE_IC} />{b.name} · chưa tải file</div> })()}
                 {l.concept && <p className="kd-cp-note"><b>Concept:</b>{l.concept}</p>}
                 {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b>{l.notes}</p>}
                 {!l.boqFile && !l.concept && !l.notes && <em className="kd-cp-dnone">Chưa có BOQ, concept hay ghi chú</em>}
