@@ -183,10 +183,17 @@ const viewBtnStyle = active => ({
   background: active ? 'var(--sales-tint)' : 'none', color: active ? 'var(--sales)' : 'var(--text-muted)', fontFamily: 'inherit',
 })
 
+/* Giữ trạng thái Pipeline khi rời trang Kinh doanh rồi quay lại (theo tab trình duyệt): kiểu xem, ô tìm, bộ lọc, cuộn ngang kanban */
+const PL_NAV = 'kd-nav-pipeline'
+const readPlNav = () => { try { const v = JSON.parse(sessionStorage.getItem(PL_NAV) || 'null'); return v && typeof v === 'object' ? v : {} } catch { return {} } }
+const writePlNav = v => { try { sessionStorage.setItem(PL_NAV, JSON.stringify(v)) } catch { /* bỏ qua */ } }
+const arrOf = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' || typeof x === 'number') : [])
+
 export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChange, timeFilter, onTimeFilterChange, scrollRef, onMove, onDelete, onOpenDetail, onEdit, onAddAssignee, onRemoveAssignee }) {
-  const [view, setView] = useState('kanban')
+  const [nav0] = useState(readPlNav)
+  const [view, setView] = useState(() => (nav0.view === 'list' ? 'list' : 'kanban'))
   /* Tìm nhanh khách hàng (SĐT, tên...) - áp cho cả Kanban và Danh sách */
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(() => (typeof nav0.q === 'string' ? nav0.q : ''))
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')
   const tinhOf = l => { const g = geoMap[String(l.id)] || {}; return g.tinh || g.kv || '' }
@@ -205,7 +212,7 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const qt = q.trim()
   const leadsQ = qt ? leadsIn.filter(l => matchQuery(l, qt, [tinhOf(l), projNameMap[String(l.id)], investorOf(l), cdtOf(l).role, cdtOf(l).dept].filter(Boolean).join(' '))) : leadsIn
   /* Bộ lọc Chủ đầu tư (MarkUp 2026-11-19): chỉ hiện + chỉ áp khi lọc Phòng KD Dự Án */
-  const [invF, setInvF] = useState([])
+  const [invF, setInvF] = useState(() => arrOf(nav0.invF).map(String))
   const invKeys = l => { const v = investorOf(l); return v ? [v] : [] }
   const okInv = l => { if (!isDA || !invF.length) return true; const v = investorOf(l); return invF.indexOf(v || NONE) >= 0 }
   const leadsAll = leadsQ.filter(okInv)
@@ -220,12 +227,14 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const [dropAt, setDropAt] = useState(null) // {id, after}
   const stickyRef = useRef(null)
   const rating = useKdMap('rating')
-  const [star, setStar] = useState([])   // các mức sao đang lọc ([] = tất cả)
+  const [star, setStar] = useState(() => arrOf(nav0.star).map(Number).filter(n => STAR_FLT.indexOf(n) >= 0))   // các mức sao đang lọc ([] = tất cả)
   const [starSort, setStarSortRaw] = useState(() => { try { return localStorage.getItem('kd-star-sort') === '1' } catch { return false } })
   const setStarSort = v => { setStarSortRaw(v); try { localStorage.setItem('kd-star-sort', v ? '1' : '0') } catch { /* bỏ qua */ } }
   const rateOf = l => Number(rating[String(l.id)]) || 0
-  const [srcF, setSrcF] = useState([])     // nguồn đang lọc
-  const [staffF, setStaffF] = useState([]) // nhân sự phụ trách đang lọc
+  const [srcF, setSrcF] = useState(() => arrOf(nav0.srcF).map(String))     // nguồn đang lọc
+  const [staffF, setStaffF] = useState(() => arrOf(nav0.staffF).map(String)) // nhân sự phụ trách đang lọc
+  /* khoá lọc nhân sự đã khôi phục là khoá tài khoản (lưu sau khi tải danh sách tài khoản) -> không đổi lại theo tên */
+  const staffAcct = useRef(!!nav0.staffAcct)
   // Lọc nhân sự theo TÀI KHOẢN (khoá = username, nhãn = họ tên hiện tại của tài khoản -> đổi họ tên thì nhãn đổi theo).
   // Người phụ trách có username khớp tài khoản đang hoạt động -> tài khoản đó; không có username -> khớp theo họ tên / tên đăng nhập
   // (không phân biệt hoa thường). Không khớp tài khoản nào thì không hiện, khách chỉ có tên như vậy tính là "Chưa có người phụ trách".
@@ -237,7 +246,8 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
       const ix = staffIndex(list)
       setUsers(ix)
       // lựa chọn lọc làm trước khi tải xong (khoá = tên) -> đổi sang khoá tài khoản
-      setStaffF(f => (f.length ? [...new Set(f.map(k => (k === NONE ? k : staffKeyIn(ix, { name: k }))).filter(Boolean))] : f))
+      if (!staffAcct.current) setStaffF(f => (f.length ? [...new Set(f.map(k => (k === NONE ? k : staffKeyIn(ix, { name: k }))).filter(Boolean))] : f))
+      staffAcct.current = true
     }, () => {})
     return () => { off = true }
   }, [])
@@ -259,11 +269,11 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
   const okStaff = l => { if (!staffF.length) return true; const ss = staffOf(l); return ss.length ? ss.some(x => staffF.indexOf(x) >= 0) : staffF.indexOf(NONE) >= 0 }
   const okStar = l => !star.length || star.indexOf(rateOf(l)) >= 0
   /* Lọc theo địa chỉ (tỉnh / thành, MarkUp 2026-11-22): khoá = tỉnh (kdOptions.geo), không có thì khu vực; chưa có -> "Chưa có tỉnh thành" */
-  const [addrF, setAddrF] = useState([])
+  const [addrF, setAddrF] = useState(() => arrOf(nav0.addrF).map(String))
   const addrKey = l => tinhOf(l) || NONE
   const okAddr = l => !addrF.length || addrF.indexOf(addrKey(l)) >= 0
-  const [stageF, setStageF] = useState([])
-  const [valF, setValF] = useState([])
+  const [stageF, setStageF] = useState(() => arrOf(nav0.stageF).map(String).filter(s => STAGES.indexOf(s) >= 0))
+  const [valF, setValF] = useState(() => arrOf(nav0.valF).map(String).filter(v => VAL_BANDS.some(b => b[0] === v)))
   const okStage = l => !stageF.length || stageF.indexOf(l.stage) >= 0
   const okVal = l => !valF.length || valF.indexOf(bandOf(l)) >= 0
   const leads0 = leadsAll.filter(l => okStar(l) && okSrc(l) && okStaff(l) && okStage(l) && okVal(l) && okAddr(l))
@@ -352,11 +362,36 @@ export default function PipelineTab({ leads: leadsIn, allLeads, dept, onDeptChan
      leads là mảng lọc tạo lại mỗi lần render: phụ thuộc theo danh sách id (leadsKey) và chỉ setHs khi số đổi,
      nếu không effect chạy lại -> setHs object mới -> render -> lặp vô hạn (treo trang, bấm sang trang khác không được) */
   const leadsKey = leads.map(l => l.id).join(',')
+  /* Lưu trạng thái Pipeline (sessionStorage); cuộn ngang kanban khôi phục khi kanban hiện ra lần đầu (tab đang ẩn thì chờ) */
+  const kLeft = useRef(Number(nav0.left) > 0 ? Number(nav0.left) : 0)
+  const kLeftWant = useRef(kLeft.current > 0 ? kLeft.current : null)
+  const plSave = useRef(null)
+  plSave.current = () => writePlNav({ view, q, srcF, staffF, staffAcct: staffAcct.current, stageF, valF, addrF, star, invF, left: kLeft.current })
+  const plTimer = useRef(null)
+  useEffect(() => { plSave.current() }, [view, q, srcF, staffF, stageF, valF, addrF, star, invF])
+  useEffect(() => () => { clearTimeout(plTimer.current); plSave.current() }, [])
+  useEffect(() => {
+    const k = kanbanRef.current
+    if (!k) return undefined
+    const onLeft = () => {
+      if (kLeftWant.current != null || !k.clientWidth) return
+      kLeft.current = k.scrollLeft
+      clearTimeout(plTimer.current); plTimer.current = setTimeout(() => plSave.current(), 200)
+    }
+    k.addEventListener('scroll', onLeft)
+    return () => k.removeEventListener('scroll', onLeft)
+  }, [])
   useEffect(() => {
     const k = kanbanRef.current
     if (!k) return undefined
     const upd = () => {
       const max = k.scrollWidth - k.clientWidth
+      // kanban đã hiện: có cuộn ngang thì về chỗ cũ; đã có thẻ mà không cuộn được (màn rộng hơn) thì bỏ chờ, để cuộn sau vẫn được lưu
+      if (kLeftWant.current != null && k.clientWidth > 0 && (max > 0 || leads.length > 0)) {
+        const want = kLeftWant.current
+        kLeftWant.current = null
+        if (max > 0) k.scrollLeft = Math.min(want, max)
+      }
       const ratio = k.scrollWidth ? Math.min(1, k.clientWidth / k.scrollWidth) : 1
       const pos = max > 0 ? k.scrollLeft / max : 0
       // chỉ đổi state khi số đo thật sự đổi: object mới mỗi lần sẽ vẽ lại vô hạn

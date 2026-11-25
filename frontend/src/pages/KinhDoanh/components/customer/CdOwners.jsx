@@ -43,7 +43,8 @@ export function leadOwner(l) {
 }
 
 
-/* "+ Gán": chọn tài khoản đang hoạt động của công ty (GET /sales/staff), lưu thẳng vào assignees của khách (không mở form sửa) */
+/* "+ Gán": chọn tài khoản đang hoạt động của công ty (GET /sales/staff), lưu thẳng vào assignees của khách (không mở form sửa);
+   gõ tên không khớp tài khoản nào -> "+ Thêm" lưu người đó không có username (nhân sự chưa có tài khoản) */
 const ROLE_OF = { kinhdoanh: 'Nhân sự kinh doanh', ctv: 'CTV kinh doanh', concept: 'Concept', thietke: 'Thiết kế', nhathau: 'Nhà thầu' }
 let staffP = null
 const loadStaff = () => {
@@ -73,14 +74,26 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
   if (!onPatch) return <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
   const isMgr = g.key === 'quanly'
   const mine = isMgr ? (lead.manager ? [{ name: lead.manager }] : []) : (lead.assignees || []).filter(a => a && a.name && !isAdminKd(a) && deptOf(a) === g.key)
-  const have = new Set(mine.map(a => String(a.name).trim().toLowerCase()))
+  // so tên bỏ dấu + gộp khoảng trắng: gõ "nguyen van an" coi như trùng "Nguyễn Văn An"
+  const nk = s => noDau(s).replace(/\s+/g, ' ')
+  const have = new Set(mine.map(a => nk(a.name)))
   const haveU = new Set(mine.map(a => String(a.username || '').trim().toLowerCase()).filter(Boolean))
   const qq = noDau(q)
-  const list = (staff || []).filter(s => s && s.name && !have.has(String(s.name).trim().toLowerCase()) && !haveU.has(String(s.username || '').trim().toLowerCase()))
+  const list = (staff || []).filter(s => s && s.name && !have.has(nk(s.name)) && !haveU.has(String(s.username || '').trim().toLowerCase()))
     .filter(s => !qq || noDau(s.name + ' ' + (s.username || '') + ' ' + (s.department || '')).indexOf(qq) >= 0)
     .sort((a, b) => (b.sales ? 1 : 0) - (a.sales ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi'))
+  /* Gõ tên tự do (nhân sự chưa có tài khoản): chữ gõ không trùng chính xác tên tài khoản đang hiện -> dòng "+ Thêm" (lưu không có username) */
+  const typed = q.trim().replace(/\s+/g, ' ')
+  const tl = nk(typed)
+  const dupFree = !!tl && have.has(tl)
+  const exact = tl ? list.find(s => nk(s.name) === tl) : null
+  const canFree = !!tl && (!!staff || !!err) && !dupFree && !exact
+  /* Enter chọn: tên trùng khớp -> tài khoản đó; còn tài khoản gợi ý -> dòng đầu; không còn -> "+ Thêm" (dòng được chọn có đánh dấu) */
+  const enterPick = exact || (staff && list.length ? list[0] : null)
+  const enterFree = !enterPick && canFree
   const pick = s => {
     if (busy) return
+    if (have.has(nk(s.name))) return
     setBusy(true)
     const u = String(s.username || '').trim()
     if (isMgr) {
@@ -95,18 +108,31 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
       <button type="button" className="cd-btn sm" aria-expanded={open} onClick={() => setOpen(v => !v)} title={isMgr ? (mine.length ? 'Đổi người quản lý' : 'Chọn người quản lý') : 'Gán người nhóm ' + g.label}>{isMgr && mine.length ? 'Đổi' : '+ Gán'}</button>
       {open && (
         <div className="cd-asg-pop" aria-label={'Gán người nhóm ' + g.label}>
-          <input className="cd-asg-q" autoFocus placeholder="Tìm nhân sự..." value={q} onChange={e => setQ(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && list.length) { e.preventDefault(); pick(list[0]) } }} />
+          <input className="cd-asg-q" autoFocus placeholder="Tìm hoặc gõ tên nhân sự..." value={q} onChange={e => setQ(e.target.value)}
+            onKeyDown={e => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              if (enterPick) pick(enterPick)
+              else if (enterFree) pick({ name: typed })
+            }} />
           <div className="cd-asg-list">
             {err ? <div className="cd-asg-empty">{err}</div>
               : !staff ? <div className="cd-asg-empty">Đang tải...</div>
-              : !list.length ? <div className="cd-asg-empty">{q ? 'Không tìm thấy nhân sự' : 'Đã gán hết nhân sự'}</div>
+              : !list.length ? (typed ? (canFree || dupFree ? null : <div className="cd-asg-empty">Không tìm thấy nhân sự</div>) : <div className="cd-asg-empty">Đã gán hết nhân sự</div>)
               : list.map(s => (
-                <button key={s.username || s.name} type="button" className="cd-asg-it" disabled={busy} onClick={() => pick(s)}>
+                <button key={s.username || s.name} type="button" className={'cd-asg-it' + (s === enterPick ? ' is-enter' : '')} disabled={busy} onClick={() => pick(s)}>
                   <span className="cd-av">{lmInitials(s.name)}</span>
                   <span className="cd-mem-txt"><b>{s.name}</b><em>{[s.department, s.username].filter(Boolean).join(' · ')}</em></span>
                 </button>
               ))}
+            {canFree && (
+              <button type="button" className={'cd-asg-it cd-asg-free' + (enterFree ? ' is-enter' : '')} disabled={busy} onClick={() => pick({ name: typed })}
+                title={'Lưu “' + typed + '” vào nhóm ' + g.label + ' (không gắn tài khoản)'}>
+                <span className="cd-av">+</span>
+                <span className="cd-mem-txt"><b>Thêm “{typed}”</b><em>chưa có tài khoản</em></span>
+              </button>
+            )}
+            {dupFree && <div className="cd-asg-empty cd-asg-dup">“{typed}” đã có trong nhóm {g.label}</div>}
           </div>
         </div>
       )}
@@ -185,7 +211,7 @@ export default function CdOwners({ lead: l, onEdit, onPatch }) {
             {g.members.map(({ a, i }) => (
               <div key={i} className={'cd-mem' + (i === mainIdx ? ' lead' : '')}>
                 <span className="cd-av">{lmInitials(a.name)}</span>
-                <span className="cd-mem-txt"><b>{a.name}</b></span>
+                <span className="cd-mem-txt"><b>{a.name}</b>{!String(a.username || '').trim() && <em className="cd-mem-noacc" title="Người này chưa gắn tài khoản trong hệ thống">chưa có tài khoản</em>}</span>
                 {onPatch && (
                   <button type="button" className="cd-mem-x" disabled={busyIdx >= 0} onClick={() => remove(i)}
                     title={'Gỡ ' + a.name + ' khỏi nhóm ' + g.label} aria-label={'Gỡ ' + a.name + ' khỏi nhóm ' + g.label}>×</button>
