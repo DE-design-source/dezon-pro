@@ -197,7 +197,7 @@ nano /opt/qspro/infra/deploy/.env
 | Biến | Điền | Ghi chú |
 |---|---|---|
 | `DOMAIN` | `qs.dezon.vn` | **Bắt buộc.** Không có `https://`, không có `/` cuối |
-| `WWW_DOMAIN` | `www.dezon.tech` hoặc để trống | Tuỳ chọn. Địa chỉ phụ, mọi request chuyển hẳn (301) về `DOMAIN`. Cần bản ghi A riêng trỏ về máy chủ |
+| `WWW_DOMAIN` | `"dezon.tech www.dezon.tech"` hoặc để trống | Tuỳ chọn. Một hoặc nhiều địa chỉ phụ (cách nhau dấu cách), mọi request chuyển hẳn (301) về `DOMAIN`. Mỗi tên cần bản ghi A trỏ về máy chủ. Từ 2026-11-25 `DOMAIN=pro.dezon.vn` (bản ghi A `pro` ở DNS PA Việt Nam của dezon.vn), tên cũ dezon.tech để ở đây |
 | `ACME_EMAIL` | email của bạn | **Bắt buộc.** Let's Encrypt gửi cảnh báo chứng chỉ vào đây |
 | `POSTGRES_PASSWORD` | (đã sinh sẵn) | Giữ nguyên. Cần khi nối pgAdmin |
 | `AUTH_SECRET` | (đã sinh sẵn) | Giữ nguyên. Đổi = mọi người bị đăng xuất |

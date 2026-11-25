@@ -6,11 +6,12 @@
 	email {$ACME_EMAIL}
 }
 
-# WWW_DOMAIN (tuỳ chọn, vd www.dezon.tech): cùng xin chứng chỉ, mọi request chuyển hẳn về {$DOMAIN}. Trống = không có địa chỉ phụ.
+# WWW_DOMAIN (tuỳ chọn): MỘT hoặc NHIỀU địa chỉ phụ cách nhau dấu cách (vd "dezon.tech www.dezon.tech" - tên miền cũ),
+# cùng xin chứng chỉ, mọi request chuyển hẳn về {$DOMAIN}. Trống = không có địa chỉ phụ.
 {$DOMAIN} {$WWW_DOMAIN} {
 	encode zstd gzip
 
-	@www expression `{host} == "{$WWW_DOMAIN}"`
+	@www not host {$DOMAIN}
 	redir @www https://{$DOMAIN}{uri} permanent
 
 	header {

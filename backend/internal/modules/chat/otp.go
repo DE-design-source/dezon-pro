@@ -90,7 +90,7 @@ func otpEmail(code string) (subject, text, htmlBody string) {
 		// chân thư
 		`<tr><td align="center" style="padding:18px 16px 0;font-size:12px;line-height:18px;color:#9ca3af">` +
 		`Email tự động từ Dezon Chat, vui lòng không trả lời.<br>` +
-		`<a href="https://dezon.tech" style="color:#6b7280;text-decoration:none">dezon.tech</a></td></tr>` +
+		`<a href="https://pro.dezon.vn" style="color:#6b7280;text-decoration:none">pro.dezon.vn</a></td></tr>` +
 		`</table></td></tr></table></body></html>`
 	return subject, text, htmlBody
 }
