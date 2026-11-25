@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { lmInitials, noDau } from '../../utils'
 import { listStaff } from '../../api'
+import { useKdOptions, saveKdOptions } from '../ShortlistSelect'
 
 /* Khối "Phụ trách" của trang khách hàng dạng dashboard: người phụ trách gom theo nhóm (assignees[].dept),
    người phụ trách chính (kinh doanh) tô nổi; nhóm có người luôn hiện đủ nhân viên; "+ Gán" chọn tài khoản công ty và lưu ngay,
@@ -58,6 +59,8 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const ref = useRef(null)
+  /* Tên tự gõ (nhân sự chưa có tài khoản) đã từng thêm: lưu chung công ty kdOptions.ownerFree để lần sau chọn lại trong danh sách */
+  const freeNames = useKdOptions('ownerFree')
   useEffect(() => {
     if (!open) return undefined
     let off = false
@@ -79,9 +82,20 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
   const have = new Set(mine.map(a => nk(a.name)))
   const haveU = new Set(mine.map(a => String(a.username || '').trim().toLowerCase()).filter(Boolean))
   const qq = noDau(q)
-  const list = (staff || []).filter(s => s && s.name && !have.has(nk(s.name)) && !haveU.has(String(s.username || '').trim().toLowerCase()))
+  const accNames = new Set((staff || []).filter(s => s && s.name).map(s => nk(s.name)))
+  // tên tự gõ đã lưu (bỏ tên đã trùng một tài khoản) -> hiện trong danh sách như nhân sự, đánh dấu chưa có tài khoản
+  const frees = [...new Set((freeNames || []).map(n => String(n || '').trim().replace(/s+/g, ' ')).filter(Boolean))]
+    .filter(n => !accNames.has(nk(n))).map(n => ({ name: n, free: true }))
+  const list = [...(staff || []).filter(s => s && s.name), ...frees]
+    .filter(s => !have.has(nk(s.name)) && !haveU.has(String(s.username || '').trim().toLowerCase()))
     .filter(s => !qq || noDau(s.name + ' ' + (s.username || '') + ' ' + (s.department || '')).indexOf(qq) >= 0)
-    .sort((a, b) => (b.sales ? 1 : 0) - (a.sales ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi'))
+    .sort((a, b) => (a.free ? 1 : 0) - (b.free ? 1 : 0) || (b.sales ? 1 : 0) - (a.sales ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'vi'))
+  const rememberFree = name => {
+    const n = String(name || '').trim().replace(/s+/g, ' ')
+    if (!n || accNames.has(nk(n)) || (freeNames || []).some(x => nk(x) === nk(n))) return
+    saveKdOptions('ownerFree', [...(freeNames || []), n])
+  }
+  const forgetFree = name => saveKdOptions('ownerFree', (freeNames || []).filter(x => nk(x) !== nk(name)))
   /* Gõ tên tự do (nhân sự chưa có tài khoản): chữ gõ không trùng chính xác tên tài khoản đang hiện -> dòng "+ Thêm" (lưu không có username) */
   const typed = q.trim().replace(/\s+/g, ' ')
   const tl = nk(typed)
@@ -89,13 +103,14 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
   const exact = tl ? list.find(s => nk(s.name) === tl) : null
   const canFree = !!tl && (!!staff || !!err) && !dupFree && !exact
   /* Enter chọn: tên trùng khớp -> tài khoản đó; còn tài khoản gợi ý -> dòng đầu; không còn -> "+ Thêm" (dòng được chọn có đánh dấu) */
-  const enterPick = exact || (staff && list.length ? list[0] : null)
+  const enterPick = exact || ((staff || err) && list.length ? list[0] : null)
   const enterFree = !enterPick && canFree
   const pick = s => {
     if (busy) return
     if (have.has(nk(s.name))) return
     setBusy(true)
     const u = String(s.username || '').trim()
+    if (!u) rememberFree(s.name)   // người chưa có tài khoản: nhớ tên cho lần gán sau
     if (isMgr) {
       Promise.resolve(onPatch({ manager: String(s.name).trim() })).then(saved => { setBusy(false); if (saved) { setOpen(false); setQ('') } }, () => setBusy(false))
       return
@@ -116,14 +131,18 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
               else if (enterFree) pick({ name: typed })
             }} />
           <div className="cd-asg-list">
-            {err ? <div className="cd-asg-empty">{err}</div>
-              : !staff ? <div className="cd-asg-empty">Đang tải...</div>
+            {err ? <div className="cd-asg-empty">{err}</div> : null}
+            {err && !list.length ? null
+              : !staff && !err ? <div className="cd-asg-empty">Đang tải...</div>
               : !list.length ? (typed ? (canFree || dupFree ? null : <div className="cd-asg-empty">Không tìm thấy nhân sự</div>) : <div className="cd-asg-empty">Đã gán hết nhân sự</div>)
               : list.map(s => (
-                <button key={s.username || s.name} type="button" className={'cd-asg-it' + (s === enterPick ? ' is-enter' : '')} disabled={busy} onClick={() => pick(s)}>
-                  <span className="cd-av">{lmInitials(s.name)}</span>
-                  <span className="cd-mem-txt"><b>{s.name}</b><em>{[s.department, s.username].filter(Boolean).join(' · ')}</em></span>
-                </button>
+                <div key={(s.free ? 'free:' : '') + (s.username || s.name)} className={'cd-asg-row' + (s.free ? ' free' : '')}>
+                  <button type="button" className={'cd-asg-it' + (s === enterPick ? ' is-enter' : '')} disabled={busy} onClick={() => pick(s)}>
+                    <span className="cd-av">{lmInitials(s.name)}</span>
+                    <span className="cd-mem-txt"><b>{s.name}</b><em>{s.free ? 'chưa có tài khoản' : [s.department, s.username].filter(Boolean).join(' · ')}</em></span>
+                  </button>
+                  {s.free && <button type="button" className="cd-asg-forget" title={'Bỏ “' + s.name + '” khỏi danh sách gợi ý'} aria-label={'Bỏ ' + s.name + ' khỏi danh sách gợi ý'} onClick={() => forgetFree(s.name)}>×</button>}
+                </div>
               ))}
             {canFree && (
               <button type="button" className={'cd-asg-it cd-asg-free' + (enterFree ? ' is-enter' : '')} disabled={busy} onClick={() => pick({ name: typed })}

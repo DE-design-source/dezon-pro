@@ -62,3 +62,18 @@ html[data-theme="dark"] .cd-cc.cd-care{
   .cd-cc.cd-care{padding:14px;}
   .cd-cc.cd-care .cd-cc-t{font-size:19px;}
 }
+/* Ghi âm thành chữ: nút micro ở hàng ghi nhận nhanh và cạnh ô Nội dung trao đổi; đang nghe thì nút đỏ nhấp nháy */
+.cd-cc.cd-care .cd-care-mic{display:inline-flex; align-items:center; justify-content:center; gap:5px; flex:none; height:32px; min-width:32px; padding:0 8px;
+  border:1px solid var(--cc-line, #E4E7EC); border-radius:8px; background:var(--cc-card, #fff); color:#C2570F; font:inherit; font-size:12px; font-weight:600; cursor:pointer;}
+.cd-cc.cd-care .cd-care-mic:hover:not(:disabled){border-color:#D9661F; background:#FFF5EE;}
+.cd-cc.cd-care .cd-care-mic:disabled{opacity:.45; cursor:not-allowed;}
+.cd-cc.cd-care .cd-care-mic.on{background:#FEE4E2; border-color:#F04438; color:#B42318; animation:cdMicPulse 1.2s ease-in-out infinite;}
+@keyframes cdMicPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,68,56,.35);}50%{box-shadow:0 0 0 5px rgba(240,68,56,0);}}
+.cd-cc.cd-care .cd-care-dict{display:flex; flex-direction:column; gap:6px;}
+.cd-cc.cd-care .cd-care-dict-h{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.cd-cc.cd-care .cd-care-dict-h .cd-care-mic{height:28px;}
+.cd-cc.cd-care .cd-care-interim{font-style:italic; font-size:12.5px; color:var(--cc-muted, #98A2B3);}
+.cd-cc.cd-care .cd-care-dict-err{font-style:normal; font-size:12px; font-weight:600; color:#D92D20;}
+html[data-theme="dark"] .cd-cc.cd-care .cd-care-mic{color:#F0A06A;}
+html[data-theme="dark"] .cd-cc.cd-care .cd-care-mic.on{background:rgba(240,68,56,.2); color:#F97066;}
+html[data-theme="dark"] .cd-cc.cd-care .cd-care-dict-err{color:#F97066;}

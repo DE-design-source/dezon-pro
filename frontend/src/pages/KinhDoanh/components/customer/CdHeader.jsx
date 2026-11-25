@@ -9,10 +9,10 @@ import { leadOwner, fmtSince } from './CdOwners'
 
 /* Header trang khách hàng dạng dashboard (dải tràn viền nền gradient, CSS .cd-h-* trong customer.css):
    tên, tóm tắt, Mức độ (sao), Quản lý / người phụ trách chính (chỉ chữ, viền trái mờ), giai đoạn + dải 9 bước,
-   số thông báo chưa đọc, Đặt lịch hẹn / Gọi khách / Nhắn tin Zalo.
+   số thông báo chưa đọc, Nhắn tin Zalo (bỏ nút Đặt lịch hẹn / Gọi khách, MarkUp 2026-11-25).
    Chuông thật nằm ở header trang Kinh doanh (KinhDoanh.jsx, NotifBell tự hỏi lại 30 s): ở đây chỉ đọc số chưa đọc 1 lần
    khi mở khách, bấm thì mở chuông đó.
-   "Đặt lịch hẹn" phát sự kiện window 'kd:open-appt' {detail: {leadId: String}}; khối Việc tiếp theo (CdNext) nghe sự kiện
+   OPEN_APPT_EVENT (giữ cho nơi khác dùng): sự kiện window 'kd:open-appt' {detail: {leadId: String}}; khối Việc tiếp theo (CdNext) nghe sự kiện
    này để mở hộp đặt lịch hẹn mới cho đúng khách. */
 export const OPEN_APPT_EVENT = 'kd:open-appt'
 const FLOW = STAGES.filter(s => s !== 'khong-tham-gia' && s !== 'truot-thau' && s !== 'spam')
@@ -69,7 +69,6 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
   const n = daysSince(l.stageChangedAt || l.updatedAt)
   /* phoneNorms không nhận dạng được (số nước ngoài, số lẻ) -> gọi thẳng chữ số đã gõ */
   const phone = phoneNorms(l.phone)[0] || String(l.phone || '').replace(/[^\d+]/g, '')
-  const openAppt = () => { try { window.dispatchEvent(new CustomEvent(OPEN_APPT_EVENT, { detail: { leadId: id } })) } catch { /* bỏ qua */ } }
   return (
     <div className="cd-head">
       <button type="button" className="cd-back" onClick={onBack} title="Quay lại danh sách khách hàng (Esc)" aria-label="Quay lại"><Ic d="M15 5l-7 7 7 7" w={2.4} /></button>
@@ -114,10 +113,6 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
       </div>
       <div className="cd-h-acts">
         <NotifBadge leadId={id} />
-        <button type="button" className="cd-hbtn" onClick={openAppt} title="Hẹn gặp khách: thời gian, địa điểm, nội dung">Đặt lịch hẹn</button>
-        {phone
-          ? <a className="cd-hbtn call" href={'tel:' + phone} title={'Gọi ' + phone}>Gọi khách</a>
-          : <button type="button" className="cd-hbtn call" disabled title="Khách chưa có số điện thoại">Gọi khách</button>}
         {phone
           ? <a className="cd-hbtn zalo" href={'https://zalo.me/' + phone} target="_blank" rel="noopener noreferrer" title={'Zalo ' + phone}>Nhắn tin Zalo</a>
           : <button type="button" className="cd-hbtn zalo" disabled title="Khách chưa có số điện thoại">Nhắn tin Zalo</button>}

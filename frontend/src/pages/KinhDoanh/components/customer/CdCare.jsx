@@ -3,6 +3,7 @@ import { INTERACTION_TYPES, OUTCOMES } from '../CustomerPage'
 import { emitLeadChange } from '../../customerApi'
 import './care.css'
 import './care2.css'
+import useDictation from './useDictation'
 
 /* Khối "Cập nhật chăm sóc" của trang khách hàng dạng dashboard: tab lọc theo loại, ẩn / hiện log hệ thống,
    đếm tương tác + số ngày chưa liên hệ, ô ghi nhận nhanh, form đầy đủ (7 loại tương tác) và dòng thời gian chăm sóc.
@@ -50,8 +51,13 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
   const [form, setForm] = useState(null)        // form đầy đủ đang mở (null = đóng)
   const pending = useRef(false)
   const leadId = lead ? lead.id : ''
+  /* Ghi âm -> chữ (nút micro): câu nói xong được nối vào ô Nội dung trao đổi của form (đang mở) hoặc ô ghi nhận nhanh */
+  const joinTxt = (a, b) => (a && a.trim() ? a.replace(/s+$/, '') + ' ' + b : b)
+  const dict = useDictation(text => setForm(f => (f ? { ...f, content: joinTxt(f.content, text) } : f)))
 
-  useEffect(() => { setTab('all'); setSub(''); setExpand(false); setQ(''); setForm(null) }, [leadId])
+  useEffect(() => { setTab('all'); setSub(''); setExpand(false); setQ(''); setForm(null); dict.stop() }, [leadId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // đóng form thì tắt micro
+  useEffect(() => { if (!form) dict.stop() }, [form]) // eslint-disable-line react-hooks/exhaustive-deps
   // lịch sử chăm sóc đổi sau khi ghi -> báo các khối khác (chấm điểm, AI) tải lại
   const sig = all.length + ':' + (all[0] ? all[0].id : '')
   useEffect(() => { if (pending.current) { pending.current = false; emitLeadChange(leadId, 'activities') } }, [sig, leadId])
@@ -139,8 +145,13 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
               </button>
             ))}
           </span>
-          <input value={q} placeholder="Báo cáo tương tác mới…" aria-label="Báo cáo tương tác mới"
+          <input value={q} placeholder="Báo cáo" aria-label="Báo cáo tương tác mới" title="Báo cáo tương tác mới"
             onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); quick() } }} />
+          <button type="button" className="cd-care-mic" disabled={!dict.supported}
+            title={dict.supported ? 'Ghi âm: bấm rồi nói, lời nói chuyển thành chữ trong ô Nội dung trao đổi' : 'Trình duyệt này chưa hỗ trợ ghi âm thành chữ (dùng Chrome / Edge)'}
+            aria-label="Ghi âm thành chữ" onClick={() => { openForm(); dict.start() }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v4" /></svg>
+          </button>
           <button type="button" className="cd-care-more" onClick={openForm} title="Mở form đầy đủ: loại, ngày, kết quả, hẹn chăm sóc tiếp">Chi tiết</button>
           <button type="button" className="cd-cbtn-or" disabled={!q.trim()} onClick={quick}>+ Ghi nhận</button>
         </div>
@@ -157,7 +168,20 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
           <div className="cd-care-grid">
             <label><span>Ngày</span><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
             <label><span>Tiêu đề</span><input autoFocus value={form.title} placeholder={INTERACTION_TYPES[form.type].label} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
-            <label className="full"><span>Nội dung trao đổi</span><textarea rows={3} value={form.content} placeholder="Khách hỏi gì, đã tư vấn gì, phản hồi của khách…" onChange={e => setForm({ ...form, content: e.target.value })} /></label>
+            <div className="full cd-care-dict">
+              <span className="cd-care-dict-h">
+                <label htmlFor={'cd-care-content-' + leadId}>Nội dung trao đổi</label>
+                <button type="button" className={'cd-care-mic' + (dict.listening ? ' on' : '')} disabled={!dict.supported} aria-pressed={dict.listening}
+                  title={!dict.supported ? 'Trình duyệt này chưa hỗ trợ ghi âm thành chữ (dùng Chrome / Edge)' : dict.listening ? 'Đang nghe - bấm để dừng' : 'Ghi âm: bấm rồi nói, lời nói chuyển thành chữ'}
+                  onClick={dict.toggle}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v4" /></svg>
+                  {dict.listening ? 'Đang nghe… bấm để dừng' : 'Ghi âm'}
+                </button>
+              </span>
+              <textarea id={'cd-care-content-' + leadId} rows={3} value={form.content} placeholder="Khách hỏi gì, đã tư vấn gì, phản hồi của khách… (hoặc bấm Ghi âm rồi nói)" onChange={e => setForm({ ...form, content: e.target.value })} />
+              {dict.listening && dict.interim ? <em className="cd-care-interim">{dict.interim}</em> : null}
+              {dict.error ? <em className="cd-care-dict-err" role="alert">{dict.error}</em> : null}
+            </div>
             <div className="full"><span>Kết quả</span>
               <div className="cd-care-outs">{Object.entries(OUTCOMES).map(([k, [lab, c]]) => (
                 <button key={k} type="button" className={form.outcome === k ? 'on' : ''} style={{ '--c': c }} onClick={() => setForm({ ...form, outcome: form.outcome === k ? '' : k })}>{lab}</button>

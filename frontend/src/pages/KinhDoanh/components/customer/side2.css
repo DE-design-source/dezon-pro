@@ -104,3 +104,10 @@ html[data-theme="dark"] .cd-card.cd-owners .cd-mem.lead .cd-av{background:color-
 .cd-card.cd-owners .cd-asg-free .cd-av{background:var(--cd-orange-bg); color:var(--cd-orange); border:1px dashed var(--cd-orange-line); font-size:15px;}
 .cd-card.cd-owners .cd-asg-free b{color:var(--cd-orange-d, var(--cd-orange));}
 .cd-card.cd-owners .cd-asg-dup{padding:6px; font-size:11.5px;}
+/* "+ Gán": tên tự gõ đã lưu (chưa có tài khoản) hiện trong danh sách, có nút × bỏ khỏi gợi ý */
+.cd-card.cd-owners .cd-asg-row{display:flex; align-items:center; gap:2px;}
+.cd-card.cd-owners .cd-asg-row > .cd-asg-it{flex:1; min-width:0;}
+.cd-card.cd-owners .cd-asg-row.free .cd-mem-txt em{color:var(--cd-orange, #D9661F);}
+.cd-card.cd-owners .cd-asg-forget{flex:none; width:24px; height:24px; border:0; border-radius:6px; background:transparent; color:var(--cd-faint, #98A2B3); font-size:16px; line-height:1; cursor:pointer;}
+.cd-card.cd-owners .cd-asg-forget:hover{background:#FEE4E2; color:#B42318;}
+html[data-theme="dark"] .cd-card.cd-owners .cd-asg-forget:hover{background:rgba(180,35,24,.22); color:#F97066;}
