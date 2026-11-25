@@ -300,7 +300,7 @@ func TestScoreService(t *testing.T) {
 		t.Errorf("checks %s", js(m.Val("checks")))
 	}
 	c0 := m.Val("criteria").([]any)[0].(*omap.Map)
-	if js(c0) != `{"key":"tien","label":"Tiền","weight":25,"score":0,"lock":true,"status":"lock","items":[{"text":"Khách đã nói rõ ngân sách","required":false,"on":false},{"text":"Ngân sách khớp quy mô công trình","required":false,"on":false},{"text":"Nguồn tiền đã xác nhận","required":true,"on":false},{"text":"Khách đồng ý khung phí thiết kế","required":false,"on":false}]}` {
+	if js(c0) != `{"key":"tien","label":"Tiền","weight":25,"score":0,"lock":true,"status":"lock","items":[{"text":"Khách đã nói rõ ngân sách","required":false,"on":false},{"text":"Ngân sách khớp quy mô công trình","required":false,"on":false},{"text":"Khách đồng ý tiến độ thanh toán theo đợt","required":true,"on":false},{"text":"Khách đồng ý khung phí thiết kế","required":false,"on":false}]}` {
 		t.Errorf("tiêu chí 1: %s", js(c0))
 	}
 	sv, err := s.SaveScore(ctx, a, id, omap.Of("checks", omap.Of("tien", []any{true, true, true, true}, "quyetdinh", []any{true, true}, "dat", []any{true, true, true})))

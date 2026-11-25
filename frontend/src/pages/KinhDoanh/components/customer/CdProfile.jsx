@@ -168,7 +168,7 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
             {hText && <Row k="Bàn giao"><span className="cd-gold">{hText}</span></Row>}
             {l.boqFile && (() => { const b = boqOf(l.boqFile); return b.url
               ? <a className="cd-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer" title="Mở file BOQ"><Ic d={FILE_IC} /><span>{b.name}</span></a>
-              : <div className="cd-file"><Ic d={FILE_IC} /><span>{b.name}</span></div> })()}
+              : <div className="cd-file" title="Bản cũ chỉ lưu tên file (mô phỏng), chưa có file thật - Sửa > Nâng cao > BOQ để tải file lên"><Ic d={FILE_IC} /><span>{b.name} <em style={{ fontStyle: 'normal', fontWeight: 500, color: 'var(--cd-danger, #D92D20)' }}>· chưa tải file</em></span></div> })()}
             {l.concept && <p className="cd-note"><b>Concept:</b> {l.concept}</p>}
             {l.notes && <p className="cd-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
             {!l.boqFile && !l.concept && !l.notes && <em className="cd-none">Chưa có BOQ, concept hay ghi chú</em>}

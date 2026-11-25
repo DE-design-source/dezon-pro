@@ -4,13 +4,12 @@ import { isSystemEntry } from './CdCare'
 import './score.css'
 import './scoreai2.css'
 
-/* Khối "Chỉ số chính": điểm deal, điểm tiêu chí, liên hệ gần nhất, so với tuần trước + 6 tiêu chí × 4 câu.
+/* Khối "Chỉ số đánh giá": điểm deal, cập nhật (liên hệ) gần nhất, so với tuần trước + 6 tiêu chí × 4 câu.
    Bấm câu -> đổi ngay trên giao diện (tính lại cùng công thức với máy chủ), lưu sau ~400ms; lỗi thì trả lại như cũ. */
 const SAVE_DELAY = 400
 
 const pad = n => String(n).padStart(2, '0')
 const isoDay = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
-const fmtDay = d => pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear()
 const dayDiff = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000)
 
 /* Cùng công thức với máy chủ: điểm tiêu chí = round(số câu có / số câu × 100); thiếu câu bắt buộc = điểm liệt, tính 0 điểm;
@@ -165,11 +164,6 @@ export default function CdScore({ lead, interactions }) {
     return d + '/' + m + ' · ' + (n === 0 ? 'hôm nay' : n + ' ngày')
   }, [interactions])
 
-  const asOf = useMemo(() => {
-    const d = data && data.updatedAt ? new Date(data.updatedAt) : null
-    return fmtDay(d && !isNaN(d) ? d : new Date())
-  }, [data])
-
   const prev = data && data.prevWeek != null && data.prevWeek !== '' ? Number(data.prevWeek) : null
   const delta = prev == null || isNaN(prev) ? null : sc.dealScore - prev
   const deltaView = delta == null ? { text: '—', cls: 'is-none' }
@@ -180,11 +174,9 @@ export default function CdScore({ lead, interactions }) {
   const loading = !data && !loadErr
 
   return (
-    <section className="cd-card cd-score" aria-label="Chỉ số chính">
+    <section className="cd-card cd-score" aria-label="Chỉ số đánh giá">
       <div className="cd-sc-head">
-        <span className="cd-sc-title">Chỉ số chính</span>
-        <div className="cd-sc-grow" />
-        <span className="cd-sc-asof" title={data && data.updatedBy ? 'Cập nhật bởi ' + data.updatedBy : undefined}>Tính đến {asOf}</span>
+        <span className="cd-sc-title">Chỉ số đánh giá</span>
       </div>
 
       {loadErr ? (
@@ -200,8 +192,7 @@ export default function CdScore({ lead, interactions }) {
             <div className="cd-sc-deal-num"><b>{loading ? '--' : sc.dealScore}</b><span>/100</span></div>
             {sc.locks > 0 ? <span className="cd-sc-lock"><LockIcon />{'Còn ' + sc.locks + ' điểm liệt, không được tính điểm'}</span> : null}
           </div>
-          <div className="cd-sc-stat"><span>Điểm tiêu chí</span><b>{loading ? '--' : sc.critScore}/100</b></div>
-          <div className="cd-sc-stat"><span>Liên hệ gần nhất</span><b>{lastContact}</b></div>
+          <div className="cd-sc-stat"><span>Cập nhật gần nhất</span><b>{lastContact}</b></div>
           <div className="cd-sc-stat"><span>So với tuần trước</span><b className={'cd-sc-delta ' + deltaView.cls}>{loading ? '--' : deltaView.text}</b></div>
           <div className="cd-sc-crit">
             <span className="cd-sc-box-title">{(sc.list.length || 6) + ' tiêu chí đánh giá'}</span>
