@@ -186,6 +186,10 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   // dữ liệu công ty tải xong sau khi mở form sửa: điền lại nếu chưa tự chọn
   const geoKey = lead ? geoMap[String(lead.id)] : null
   useEffect(() => { if (geoKey && !geo.kv && !geo.tinh && !geo.xa) setGeo({ kv: geoKey.kv || '', tinh: geoKey.tinh || '', xa: geoKey.xa || '' }) }, [geoKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Link Google Maps (geo.map): giữ trạng thái riêng để các nút "Bỏ chọn" tỉnh / phường không xoá mất link */
+  const [mapLink, setMapLink] = useState(geo0.map ? String(geo0.map) : '')
+  const mapTouched = useRef(false)
+  useEffect(() => { if (geoKey && geoKey.map && !mapTouched.current && !mapLink) setMapLink(String(geoKey.map)) }, [geoKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const foreign = geo.kv === FOREIGN
   /* Gợi ý Phường / Xã: các phường đã nhập ở khách khác (cùng tỉnh nếu đã chọn tỉnh) */
   const xaBase = useMemo(() => [...new Set(Object.values(geoMap).filter(g => g && g.xa && (!geo.tinh || g.tinh === geo.tinh)).map(g => String(g.xa)))]
@@ -358,13 +362,29 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     })
   }
 
-  /* geo gửi đi: chỉ thêm khoá xa khi có (khách cũ giữ đúng dạng {kv, tinh}) */
-  const geoOut = () => (geo.xa ? { kv: geo.kv || '', tinh: geo.tinh || '', xa: geo.xa } : { kv: geo.kv || '', tinh: geo.tinh || '' })
+  /* geo gửi đi: chỉ thêm khoá xa / map khi có (khách cũ giữ đúng dạng {kv, tinh}) */
+  const geoOut = () => {
+    const g = geo.xa ? { kv: geo.kv || '', tinh: geo.tinh || '', xa: geo.xa } : { kv: geo.kv || '', tinh: geo.tinh || '' }
+    const m = mapLink.trim()
+    if (m) g.map = m
+    return g
+  }
+  /* Link Google Maps chỉ nhận http(s) (chặn javascript: ...) */
+  const mapOk = s => /^https?:\/\/[^\s]+$/i.test(s)
+  const mapTrim = mapLink.trim()
+  const mapBad = () => {
+    if (!mapTrim || mapOk(mapTrim)) return false
+    showErr('map', 'Link Google Maps không hợp lệ: phải bắt đầu bằng http:// hoặc https://')
+    return true
+  }
+  const mapsQuery = [form.address.trim(), foreign ? '' : geo.xa, geo.tinh].filter(Boolean).join(', ')
+  const openUrl = u => { try { window.open(u, '_blank', 'noopener,noreferrer') } catch { /* bỏ qua */ } }
   /* Giá trị dự án quy ra tỷ VND (dùng chung cho Lưu và Gộp vào khách cũ) */
   const valueTy = () => (Number(digits_(form.value)) || 0) * (form.cur === 'VND' ? 1 : (Number(digits_(form.rate)) || (CURRENCIES.find(c => c[0] === form.cur) || [0, 1])[1])) / 1e9
   /* Gộp vào khách cũ: gửi mọi thông tin đã nhập, KinhDoanh.mergeIntoLead điền chỗ trống / ghi lịch sử chăm sóc */
   function mergeInto(id) {
     if (uploading) { alert(UPLOAD_WAIT); return }
+    if (mapBad()) return
     const type = form.type || ''
     onMergeInto(id, {
       source: form.source,
@@ -410,6 +430,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     if (!form.dept) { setDeptWarn(true); scrollTo(deptRef); return }
     const name = form.name.trim()
     if (!name) { setNameWarn(true); setNameFocusTick(t => t + 1); return }
+    if (mapBad()) return
     if (!lead && strongDups.length && !window.confirm('Khách này trùng SĐT/email với: '
       + strongDups.slice(0, 5).map(d => d.lead.name + (d.lead.source ? ' (' + d.lead.source + ')' : '')).join(', ') + (strongDups.length > 5 ? '...' : '')
       + '\nVẫn lưu thành lead mới? (Bấm Huỷ để quay lại, có thể Gộp vào khách cũ)')) { scrollTo(sec1Ref); return }
@@ -597,7 +618,20 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
                   <ShortlistSelect value={geo.xa} free optKey="phuongXa" base={xaBase} items={[]} onAdd={() => {}} placeholder="Chọn hoặc gõ phường / xã" onChange={x => setGeo(g => ({ ...g, xa: x }))} />
                 </div>
               )}
-              <div className="kd-field kd-lf-full"><label htmlFor={fid('addr')}>Địa chỉ</label><input id={fid('addr')} type="text" placeholder="Số nhà, tên đường" value={form.address} onChange={e => set('address', e.target.value)} /></div>
+              <div className="kd-field"><label htmlFor={fid('addr')}>Địa chỉ</label><input id={fid('addr')} type="text" placeholder="Số nhà, tên đường" value={form.address} onChange={e => set('address', e.target.value)} /></div>
+              <div ref={fref('map')} className={'kd-field' + (errOn('map') ? ' kd-lf-err' : '')}>
+                <Lb htmlFor={fid('map')} aside={(
+                  <>
+                    {mapsQuery ? <button type="button" title={'Tìm "' + mapsQuery + '" trên Google Maps (tab mới), rồi dán link vào ô này'}
+                      onClick={() => openUrl('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(mapsQuery))}>Tìm trên Maps</button> : null}
+                    {mapTrim && mapOk(mapTrim) ? <button type="button" title="Mở link Google Maps (tab mới)" onClick={() => openUrl(mapTrim)}>Mở</button> : null}
+                  </>
+                )}>Link Google Maps</Lb>
+                <input id={fid('map')} type="url" inputMode="url" placeholder="Dán link Google Maps (https://maps.app.goo.gl/...)" value={mapLink}
+                  aria-invalid={errOn('map') || undefined} aria-describedby={errOn('map') ? fid('mapMsg') : undefined}
+                  onChange={e => { mapTouched.current = true; setMapLink(e.target.value); if (errOn('map')) setSaveErr(null) }} />
+                {errOn('map') ? <span className="kd-lf-msg" id={fid('mapMsg')} role="alert">{saveErr.msg}</span> : null}
+              </div>
             </div>
           </Sec>
 

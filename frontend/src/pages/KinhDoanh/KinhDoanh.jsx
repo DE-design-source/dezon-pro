@@ -36,11 +36,18 @@ export default function KinhDoanh() {
 
 const sameId = (a, b) => String(a) === String(b)
 
+/* Giữ vị trí khi rời trang Kinh doanh (menu trái sang Chat, QS...) rồi quay lại: tab, khách đang mở, phòng ban, thời gian,
+   vị trí cuộn dọc - lưu theo tab trình duyệt (sessionStorage). Trạng thái Pipeline (bộ lọc, cuộn ngang) lưu ở PipelineTab */
+const NAV_KEY = 'kd-nav-state'
+const readNav = () => { try { const v = JSON.parse(sessionStorage.getItem(NAV_KEY) || 'null'); return v && typeof v === 'object' ? v : {} } catch { return {} } }
+const writeNav = v => { try { sessionStorage.setItem(NAV_KEY, JSON.stringify(v)) } catch { /* bỏ qua */ } }
+
 function KinhDoanhPage() {
   const { theme, toggleTheme } = useTheme()
   const { me } = useWorkSession()
   const meName = (me && (me.hoTen || me.username)) || ''
-  const [tab, setTab] = useState('overview')
+  const [nav0] = useState(readNav)
+  const [tab, setTab] = useState(() => (typeof nav0.tab === 'string' && nav0.tab) || 'overview')
   // tab ẩn ở Cài đặt > Hiển thị + tab chỉ cho quản trị; tab đang mở không được hiện thì sang tab hiện đầu tiên
   // (không còn tab nào hiện -> về 'overview', không nhảy qua lại giữa 2 tab)
   const tabHidden = usePageTabsHidden('/kinh-doanh')
@@ -57,8 +64,11 @@ function KinhDoanhPage() {
 
   /* ---------- Dữ liệu pipeline ---------- */
   const [leads, setLeads] = useState([])
-  const [dept, setDept] = useState('all')
-  const [timeFilter, setTimeFilter] = useState({ time: 'all', from: '', to: '' })
+  const [dept, setDept] = useState(() => (typeof nav0.dept === 'string' && nav0.dept) || 'all')
+  const [timeFilter, setTimeFilter] = useState(() => {
+    const t = nav0.timeFilter
+    return t && typeof t === 'object' && typeof t.time === 'string' ? { time: t.time, from: String(t.from || ''), to: String(t.to || '') } : { time: 'all', from: '', to: '' }
+  })
 
   /* ---------- Modal ---------- */
   const [leadModal, setLeadModal] = useState({ open: false, id: null, seq: 0 })
@@ -78,11 +88,28 @@ function KinhDoanhPage() {
 
   const scrollRef = useRef(null)
 
-  useEffect(() => { kdApi.listLeads().then(setLeads, e => alert('Lỗi tải khách hàng: ' + e.message)) }, [])
+  const [leadsLoaded, setLeadsLoaded] = useState(false)
+  useEffect(() => { kdApi.listLeads().then(ls => { setLeads(ls); setLeadsLoaded(true) }, e => { restoreScroll.current = null; alert('Lỗi tải khách hàng: ' + e.message) }) }, [])
 
   /* Mở thẳng 1 khách hàng: /kinh-doanh?lead=<id> (bấm thông báo "được giao phụ trách" ở chuông QS / chuông trang này) */
   const [params, setParams] = useSearchParams()
   const leadParam = params.get('lead')
+
+  /* Khôi phục khách đang mở lần trước (sau khi tải xong danh sách); URL ?lead= được ưu tiên; khách đã xoá -> ở lại danh sách.
+     Chưa khôi phục xong thì vẫn giữ mã khách trong trạng thái lưu (restoreLead) */
+  const restoreLead = useRef(nav0.lead != null && nav0.lead !== '' ? String(nav0.lead) : null)
+  const restoreScroll = useRef(nav0.scroll && typeof nav0.scroll === 'object' ? nav0.scroll : null)
+  const scrollPos = useRef(restoreScroll.current)
+  const scrollWait = useRef(false)
+  useEffect(() => {
+    if (!leadsLoaded || restoreLead.current == null) return
+    const id = restoreLead.current
+    restoreLead.current = null
+    if (leadParam || detail.open || leadModal.open) { restoreScroll.current = null; return }
+    const l = leads.find(x => sameId(x.id, id))
+    if (l) { setDetail({ open: true, id: l.id }); scrollWait.current = true }
+    else restoreScroll.current = null
+  }, [leadsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!leadParam || !leads.length) return
     if (leads.some(l => sameId(l.id, leadParam))) setDetail({ open: true, id: leads.find(l => sameId(l.id, leadParam)).id })
@@ -192,7 +219,10 @@ function KinhDoanhPage() {
       const patch = {}
       if (geo) {
         const m = { ...geoMap }
-        if (geo.kv || geo.tinh || geo.xa) m[String(saved.id)] = geo; else delete m[String(saved.id)]   // geo: {kv, tinh, xa?} (xa = Phường / Xã)
+        const gv = { ...geo }
+        const link = String(gv.map || '').trim()
+        if (link) gv.map = link; else delete gv.map   // map: link Google Maps công trình, chỉ lưu khi có
+        if (gv.kv || gv.tinh || gv.xa || gv.map) m[String(saved.id)] = gv; else delete m[String(saved.id)]   // geo: {kv, tinh, xa?, map?} (xa = Phường / Xã)
         patch.geo = m
       }
       if (projName !== undefined && (projName || projNameMap[String(saved.id)])) {
@@ -312,6 +342,57 @@ function KinhDoanhPage() {
   const editingLead = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) || null : null
   const detailLead = detail.id ? leads.find(l => sameId(l.id, detail.id)) || null : null
   const handoffLead = handoff.leadId ? leads.find(l => sameId(l.id, handoff.leadId)) || null : null
+
+  /* ---------- Lưu / khôi phục vị trí (sessionStorage 'kd-nav-state') ---------- */
+  /* navCtx: nơi đang xem để gắn với vị trí cuộn dọc (form thêm / sửa khách không lưu) */
+  const navCtx = leadModal.open ? null : detail.open && detailLead ? 'lead:' + detailLead.id : 'tab:' + tab
+  const navSave = useRef(null)
+  navSave.current = () => writeNav({
+    tab, dept, timeFilter,
+    lead: detail.open && detail.id != null ? detail.id : restoreLead.current,
+    scroll: scrollPos.current,
+  })
+  const navTimer = useRef(null)
+  const saveNavSoon = () => { clearTimeout(navTimer.current); navTimer.current = setTimeout(() => navSave.current(), 200) }
+  useEffect(() => () => { clearTimeout(navTimer.current); navSave.current() }, [])
+  /* Cuộn dọc về chỗ cũ khi đã về đúng nơi đang xem lần trước (thử lại vài lần trong lúc nội dung còn đang tải) */
+  useEffect(() => {
+    const want = restoreScroll.current
+    if (!want || !leadsLoaded || restoreLead.current != null) return undefined
+    if (scrollWait.current) {
+      if (!(detail.open && detailLead)) return undefined   // vừa mở lại khách, chờ lượt vẽ trang khách
+      scrollWait.current = false
+    }
+    restoreScroll.current = null
+    if (want.ctx !== navCtx || !(Number(want.top) > 0)) return undefined
+    const el = scrollRef.current
+    if (!el) return undefined
+    let n = 0, tm = null, raf = 0, stop = false
+    const cancel = () => { stop = true }
+    const go = () => {
+      if (stop || !scrollRef.current) return
+      scrollRef.current.scrollTop = Number(want.top)
+      if (Math.abs(scrollRef.current.scrollTop - Number(want.top)) > 2 && n++ < 8) tm = setTimeout(go, 150)
+    }
+    raf = requestAnimationFrame(go)
+    el.addEventListener('wheel', cancel, { passive: true })
+    el.addEventListener('touchstart', cancel, { passive: true })
+    el.addEventListener('pointerdown', cancel)
+    return () => {
+      cancelAnimationFrame(raf); clearTimeout(tm)
+      el.removeEventListener('wheel', cancel); el.removeEventListener('touchstart', cancel); el.removeEventListener('pointerdown', cancel)
+    }
+  }, [leadsLoaded, navCtx]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!restoreScroll.current && navCtx && scrollRef.current) scrollPos.current = { ctx: navCtx, top: scrollRef.current.scrollTop }
+    navSave.current()
+  }, [tab, dept, timeFilter, detail.open, detail.id, navCtx])
+  const onPageScroll = e => {
+    if (!navCtx || restoreScroll.current) return
+    scrollPos.current = { ctx: navCtx, top: e.currentTarget.scrollTop }
+    saveNavSoon()
+  }
+
   function addInteraction(lead, x) {
     kdApi.addActivity(lead.id, x).then(saved => setInteractions(m => ({
       ...m, [lead.id]: [saved, ...(m[lead.id] || [])].sort((a, b) => b.date.localeCompare(a.date)),
@@ -358,7 +439,11 @@ function KinhDoanhPage() {
     const opt = {}
     const g = info.geo || {}
     const g0 = geoMap[key] || {}
-    if ((g.kv || g.tinh || g.xa) && !g0.kv && !g0.tinh && !g0.xa) opt.geo = { ...geoMap, [key]: { kv: g.kv || '', tinh: g.tinh || '', ...(g.xa ? { xa: g.xa } : null) } }
+    const gMap = String(g.map || '').trim()
+    let ng = null
+    if ((g.kv || g.tinh || g.xa) && !g0.kv && !g0.tinh && !g0.xa) ng = { ...g0, kv: g.kv || '', tinh: g.tinh || '', ...(g.xa ? { xa: g.xa } : null) }
+    if (gMap && !String(g0.map || '').trim()) ng = { ...(ng || g0), map: gMap }   // link Google Maps: mang theo khi khách đích chưa có
+    if (ng) opt.geo = { ...geoMap, [key]: ng }
     if (info.projName && !projNameMap[key]) opt.projName = { ...projNameMap, [key]: info.projName }
     const t = info.timeline || {}
     const t0 = timelineMap[key] || {}
@@ -382,6 +467,7 @@ function KinhDoanhPage() {
         info.source ? 'Nguồn: ' + info.source : '',
         info.address ? 'Địa chỉ: ' + info.address : '',
         g.tinh || g.kv || g.xa ? 'Tỉnh: ' + [g.xa, g.tinh, g.kv].filter(Boolean).join(' - ') : '',
+        gMap ? 'Google Maps: ' + gMap : '',
         info.projName ? 'Tên dự án: ' + info.projName : '',
         info.projectType ? 'Loại dự án: ' + info.projectType : '',
         info.scale ? 'Quy mô: ' + info.scale : '',
@@ -431,7 +517,7 @@ function KinhDoanhPage() {
       </div>
 
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
-      <div ref={scrollRef} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
+      <div ref={scrollRef} onScroll={onPageScroll} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
         {/* Thêm / sửa khách hàng tiềm năng: trang đầy đủ thay chỗ nội dung tab (không còn hộp nổi) */}
         <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} leads={leads} onClose={closeLeadModal} onSave={saveLead}
           onOpenLead={id => { closeLeadModal(); setDetail({ open: true, id }) }} onMergeInto={mergeIntoLead} />

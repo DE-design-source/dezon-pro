@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useKdMap } from '../ShortlistSelect'
 import { fmtTy, sourceColor, boqOf } from '../../utils'
 import { mediaUrl } from '../../../QS/api/files'
+import { safeUrl_ } from '../../../QS/lib/format'
 import DatePicker from '../../../../components/ui/DatePicker'
 import { HANDOFF_CONFIG } from '../../../../data/kinhDoanhData'
 import './profile2.css'
 
 /* Khối "Hồ sơ khách hàng" dạng 2 trang (lưới tự xuống dòng):
    Trang 1 = ô số liệu dự án, hạng mục, liên hệ (SĐT / email che bớt, bấm Hiện / Ẩn), các trường của khách Phòng KD Dự Án,
-   Ngày tạo sửa tại chỗ; Trang 2 (nút tròn cam bật / tắt) = "Tài liệu & ghi chú"
+   Ngày tạo sửa tại chỗ, link Google Maps (geo.map); Trang 2 (luôn hiện) = "Tài liệu & ghi chú"
    (BOQ, Concept, Ghi chú nội bộ, hình / tệp đính kèm, mã dự án QS, báo giá, ngày chốt, đối tác, bàn giao). */
 const fmtD = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : '' }
 const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
@@ -46,11 +47,12 @@ function handoffText(h) {
   if (h.status === 'self-quoted') return (cfg && cfg.selfLabel) || 'Phòng KD tự đề xuất báo giá'
   return ''
 }
-const FOLD_LS = 'kd-cd-docs'
-const readFold = () => { try { return localStorage.getItem(FOLD_LS) === '1' } catch { return false } }
+/* Link Google Maps: chỉ nhận http(s), còn lại (javascript: ...) bỏ */
+const mapHref = u => { const s = String(u || '').trim(); return /^https?:\/\/\S+$/i.test(s) && safeUrl_(s) !== '#' ? s : '' }
 const Ic = ({ d, size = 14 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 const FILE_IC = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6'
 const PEN = 'M4 20h4L19 9l-4-4L4 16v4M13.5 6.5l4 4'
+const PIN = 'M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'
 
 function Row({ k, children }) {
   return <div className="cd-row"><span>{k}</span><span className="cd-row-v">{children}</span></div>
@@ -59,15 +61,6 @@ function Row({ k, children }) {
 export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
   const [reveal, setReveal] = useState({})
   const [suaNgay, setSuaNgay] = useState(false)
-  const [docsOpen, setDocsOpenRaw] = useState(readFold)
-  const setDocsOpen = v => { setDocsOpenRaw(v); try { localStorage.setItem(FOLD_LS, v ? '1' : '0') } catch { /* bỏ qua */ } }
-  // Esc đóng cột "Tài liệu & ghi chú" (cột có data-cd-busy nên CustomerDashboard không coi Esc là quay lại danh sách)
-  useEffect(() => {
-    if (!docsOpen) return undefined
-    const k = e => { if (e.key === 'Escape' && !document.querySelector('[role=dialog]')) { e.preventDefault(); setDocsOpenRaw(false); try { localStorage.setItem(FOLD_LS, '0') } catch { /* bỏ qua */ } } }
-    document.addEventListener('keydown', k, true)
-    return () => document.removeEventListener('keydown', k, true)
-  }, [docsOpen])
   const geoMap = useKdMap('geo')
   const investorMap = useKdMap('investor')
   const cdtMap = useKdMap('cdtContact')
@@ -82,6 +75,7 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
   const src = splitSource(l.source)
   const sc = src.tag ? sourceColor(src.tag) : null
   const region = geo.tinh || geo.kv || ''
+  const mapUrl = mapHref(geo.map)
   const tiles = [
     { k: 'Loại hình dự án', v: l.projectType || l.type || '—' },
     { k: 'Doanh số dự kiến', v: l.value > 0 ? fmtTy(l.value) : '—', acc: true },
@@ -105,18 +99,11 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
   const hText = handoffText(l.handoff)
   const docCount = (l.boqFile ? 1 : 0) + (l.concept ? 1 : 0) + (l.notes ? 1 : 0) + imgs.length + files.length
   return (
-    <section className={'cd-card cd-profile' + (docsOpen ? ' docs-on' : '')}>
+    <section className="cd-card cd-profile">
       <div className="cd-card-h">
         <span className="cd-card-t">Hồ sơ khách hàng</span>
         <span className="cd-fold-sp" />
         <button type="button" className="cd-btn sm pf2-edit" onClick={onEdit} title="Sửa thông tin khách hàng"><Ic d={PEN} size={12} /><span>Sửa</span></button>
-        {/* nút tròn viền cam như nút mở cột Chi tiết của trang cũ: mở / đóng Trang 2 "Tài liệu & ghi chú" cạnh Trang 1 */}
-        <button type="button" className={'cd-docs-tg' + (docsOpen ? ' on' : '')} aria-expanded={docsOpen}
-          title={(docsOpen ? 'Đóng' : 'Mở') + ' Tài liệu & ghi chú' + (docCount ? ' (' + docCount + ')' : '')}
-          aria-label={(docsOpen ? 'Đóng' : 'Mở') + ' Tài liệu & ghi chú'} onClick={() => setDocsOpen(!docsOpen)}>
-          <Ic d={docsOpen ? 'm9 18 6-6-6-6' : 'm15 18-6-6 6-6'} size={14} />
-          {docCount > 0 && !docsOpen && <b className="cd-docs-n">{docCount}</b>}
-        </button>
       </div>
       <div className="pf2-body">
       <div className="pf2-page">
@@ -143,6 +130,11 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
         {secret('phone', 'Điện thoại', l.phone, maskPhone(l.phone))}
         {secret('email', 'Email', l.email, maskEmail(l.email))}
         <Row k="Địa chỉ">{l.address || '—'}</Row>
+        <Row k="Google Maps">
+          {mapUrl
+            ? <a className="pf2-map" href={mapUrl} target="_blank" rel="noopener noreferrer" title={mapUrl}><Ic d={PIN} size={13} /><span>Mở Google Maps</span></a>
+            : '—'}
+        </Row>
         <Row k="Tỉnh thành">{[geo.kv, geo.tinh].filter(Boolean).join(' · ') || '—'}</Row>
         <Row k="Hoàn công">{tl.end ? fmtD(tl.end) : '—'}</Row>
         <Row k="Ngày tạo">
@@ -160,11 +152,9 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
         </Row>
       </div>
       </div>
-      {docsOpen && (
-        <aside className="cd-docs-side pf2-page" data-cd-busy="1" aria-label="Tài liệu & ghi chú">
+      <aside className="cd-docs-side pf2-page" aria-label="Tài liệu & ghi chú">
           <div className="cd-docs-h">
             <span>Tài liệu & ghi chú{docCount ? ' (' + docCount + ')' : ''}</span>
-            <button type="button" className="cd-icon-btn" title="Đóng (Esc)" aria-label="Đóng Tài liệu & ghi chú" onClick={() => setDocsOpen(false)}>×</button>
           </div>
           <div className="cd-fold-b">
             {l.maDA && <Row k="Mã dự án QS"><b className="cd-mono" title="Dự án QS gắn với khách hàng">{l.maDA}</b></Row>}
@@ -196,8 +186,7 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
             </div>
             <button type="button" className="cd-btn sm cd-fold-edit" onClick={onEdit}><Ic d={PEN} size={12} />Sửa / thêm tài liệu</button>
           </div>
-        </aside>
-      )}
+      </aside>
       </div>
     </section>
   )

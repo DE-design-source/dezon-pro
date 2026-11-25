@@ -87,7 +87,6 @@ html[data-theme="dark"] .cd-score {
 
 .cd-sc-btn { background: var(--cd-sc-bg); border: 1px solid var(--cd-sc-btn-line); border-radius: 8px; padding: 7px 10px; font-size: 12.5px;
   font-weight: 500; color: var(--cd-sc-text); cursor: pointer; }
-.cd-sc-more { margin-top: 6px; align-self: stretch; padding: 7px; }
 
 /* Khung chờ tải */
 .cd-sc-row.is-skel { min-height: 44px; }

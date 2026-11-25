@@ -22,12 +22,14 @@ html[data-theme="dark"] .cd-profile{--pf-acc:#F0A06A; --pf-chip:var(--cd-chip); 
 .cd-profile .cd-row{grid-template-columns:100px minmax(0,1fr); font-size:13.5px; line-height:1.4;}
 .cd-profile .cd-reveal{color:var(--pf-acc); font-size:12.5px;}
 .cd-profile .cd-reveal:hover{text-decoration:underline;}
+.cd-profile .pf2-map{display:inline-flex; align-items:center; gap:5px; color:var(--pf-acc); font-weight:500; text-decoration:none;}
+.cd-profile .pf2-map:hover{text-decoration:underline;}
+.cd-profile .pf2-map svg{flex:none;}
 
-/* Trang 2: cột trong thẻ thay vì khung nổi bên phải (thêm .pf2-page để thắng cả html[data-theme="dark"] .cd-docs-side) */
+/* Trang 2: luôn hiện, cột trong thẻ thay vì khung nổi bên phải (thêm .pf2-page để thắng cả html[data-theme="dark"] .cd-docs-side) */
 .cd-profile .cd-docs-side.pf2-page{position:static; width:auto; max-height:none; overflow:visible; margin:0;
   background:none; border:0; border-radius:0; padding:0; box-shadow:none; gap:14px;}
 .cd-profile .cd-docs-h{font-size:16px;}
-.cd-profile .cd-docs-h .cd-icon-btn{width:24px; height:24px;}
 .cd-profile .cd-fold-b{margin-top:0; gap:14px;}
 .cd-profile .cd-docs-side .cd-row{font-size:14px;}
 .cd-profile .cd-gold{color:var(--pf-hand); font-weight:600;}

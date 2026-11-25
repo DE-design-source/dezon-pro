@@ -7,7 +7,6 @@ import './scoreai2.css'
 /* Khối "Chỉ số chính": điểm deal, điểm tiêu chí, liên hệ gần nhất, so với tuần trước + 6 tiêu chí × 4 câu.
    Bấm câu -> đổi ngay trên giao diện (tính lại cùng công thức với máy chủ), lưu sau ~400ms; lỗi thì trả lại như cũ. */
 const SAVE_DELAY = 400
-const MIN_SHOWN = 3 // số tiêu chí hiện khi thu gọn và thẻ không bị kéo cao (cột trái rộng, mỗi tiêu chí 1 dòng)
 
 const pad = n => String(n).padStart(2, '0')
 const isoDay = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
@@ -61,14 +60,6 @@ export default function CdScore({ lead, interactions }) {
   const [data, setData] = useState(null)
   const [checks, setChecks] = useState({})
   const [loadErr, setLoadErr] = useState('')
-  const [open, setOpen] = useState(false)
-  // Số tiêu chí hiện khi thu gọn: thẻ được kéo cao bằng "Việc tiếp theo" (CustomerDashboard.useAlignScore, đặt minHeight)
-  // thì hiện thêm tiêu chí cho kín khung thay vì để trống; không kéo thì MIN_SHOWN.
-  const [fitN, setFitN] = useState(MIN_SHOWN)
-  const cardRef = useRef(null)
-  const boxRef = useRef(null)
-  const padRef = useRef(0) // khoảng đệm thêm (px, mỗi phía) đang chia cho các dòng tiêu chí để lấp phần dư nhỏ hơn 1 dòng
-  const capRef = useRef({ want: 0, cap: 99 }) // số tiêu chí tối đa đã thấy vừa với chiều cao khung đang có (chống tăng / giảm qua lại)
   const [toast, setToast] = useState('')
 
   const savedRef = useRef({}) // bản đã lưu được trên máy chủ (để trả lại khi lỗi)
@@ -108,7 +99,7 @@ export default function CdScore({ lead, interactions }) {
   }, [leadId, apply])
 
   useEffect(() => {
-    setData(null); setChecks({}); setLoadErr(''); setOpen(false)
+    setData(null); setChecks({}); setLoadErr('')
     checksRef.current = {}; savedRef.current = {}
     load()
   }, [load])
@@ -187,47 +178,9 @@ export default function CdScore({ lead, interactions }) {
         : { text: 'Không đổi', cls: 'is-none' }
 
   const loading = !data && !loadErr
-  const total = sc.list.length
-  const nShow = open ? total : Math.min(Math.max(1, fitN), total || 1)
-  const shown = sc.list.slice(0, nShow)
-  const more = Math.max(0, total - nShow)
-
-  useEffect(() => {
-    const card = cardRef.current, box = boxRef.current
-    if (!card || !box || typeof ResizeObserver === 'undefined') return undefined
-    let raf = 0
-    const fit = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        if (open) { padRef.current = 0; box.style.setProperty('--cd-sc-extra', '0px'); return }
-        const want = parseFloat(card.style.minHeight) || 0
-        const setPad = px => { if (padRef.current !== px) { padRef.current = px; box.style.setProperty('--cd-sc-extra', px + 'px') } }
-        if (!want) { setPad(0); setFitN(n => (n === MIN_SHOWN ? n : MIN_SHOWN)); return }
-        if (capRef.current.want !== want) capRef.current = { want, cap: 99 }
-        const rows = box.querySelectorAll('.cd-sc-row:not(.is-skel)')
-        if (!rows.length) return
-        const rowH = rows[0].getBoundingClientRect().height - 2 * padRef.current + 8
-        const kids = box.children, last = kids[kids.length - 1]
-        const pb = parseFloat(getComputedStyle(box).paddingBottom) || 0
-        const used = last.getBoundingClientRect().bottom - box.getBoundingClientRect().top + pb
-        const added = padRef.current * 2 * rows.length            // phần đệm thêm hiện có: trừ ra để đo chiều cao tự nhiên
-        const free = box.clientHeight - (used - added)
-        if (card.offsetHeight - added > want + 2) {                                      // nhiều quá -> thẻ cao hơn khung: bớt và nhớ trần
-          setFitN(n => { const k = n > 1 ? n - 1 : n; capRef.current.cap = k; return k })
-        } else if (free >= rowH && rows.length < total && rows.length < capRef.current.cap) {
-          setPad(0); setFitN(n => (n < total && n < capRef.current.cap ? n + 1 : n))      // còn chỗ -> thêm 1 tiêu chí
-        } else setPad(Math.max(0, Math.floor(free / (2 * rows.length))))                  // phần dư < 1 dòng: chia đều làm đệm các dòng
-      })
-    }
-    const ro = new ResizeObserver(fit)
-    ro.observe(card)
-    ro.observe(box)
-    fit()
-    return () => { cancelAnimationFrame(raf); ro.disconnect() }
-  }, [open, total, fitN])
 
   return (
-    <section className="cd-card cd-score" aria-label="Chỉ số chính" ref={cardRef}>
+    <section className="cd-card cd-score" aria-label="Chỉ số chính">
       <div className="cd-sc-head">
         <span className="cd-sc-title">Chỉ số chính</span>
         <div className="cd-sc-grow" />
@@ -257,13 +210,13 @@ export default function CdScore({ lead, interactions }) {
         </div>
       </div>
 
-      <div className="cd-sc-box" ref={boxRef}>
+      <div className="cd-sc-box">
         {loading ? (
           <div className="cd-sc-row is-skel" aria-hidden="true">
             <div className="cd-sc-name"><i className="cd-sc-skel w70" /><i className="cd-sc-skel w40" /></div>
             <div className="cd-sc-qs">{[0, 1, 2, 3].map(i => <i key={i} className="cd-sc-skel" />)}</div>
           </div>
-        ) : shown.map(c => (
+        ) : sc.list.map(c => (
           <div key={c.key} className="cd-sc-row">
             <div className="cd-sc-name">
               <div className="cd-sc-name-l1"><span className="cd-sc-cname">{c.label}</span><span className="cd-sc-cscore">{c.score}</span></div>
@@ -279,12 +232,6 @@ export default function CdScore({ lead, interactions }) {
             </div>
           </div>
         ))}
-
-        {!loading && (more > 0 || (open && fitN < total)) ? (
-          <button type="button" className="cd-sc-btn cd-sc-more" onClick={() => setOpen(o => !o)}>
-            {open ? 'Thu gọn' : 'Mở rộng (+' + more + ' tiêu chí)'}
-          </button>
-        ) : null}
       </div>
 
       {toast ? <div className="cd-sc-toast" role="alert">{toast}</div> : null}
