@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useKdMap } from '../ShortlistSelect'
+import { useKdMap, saveKdOptions } from '../ShortlistSelect'
 import { fmtTy, sourceColor, boqOf } from '../../utils'
 import { mediaUrl } from '../../../QS/api/files'
 import { safeUrl_ } from '../../../QS/lib/format'
 import DatePicker from '../../../../components/ui/DatePicker'
 import { HANDOFF_CONFIG } from '../../../../data/kinhDoanhData'
 import './profile2.css'
+import RichNote from '../RichNote'
 
 /* Khối "Hồ sơ khách hàng" dạng 2 trang (lưới tự xuống dòng):
    Trang 1 = ô số liệu dự án, hạng mục, liên hệ (SĐT / email che bớt, bấm Hiện / Ẩn), các trường của khách Phòng KD Dự Án,
@@ -58,7 +59,7 @@ function Row({ k, children }) {
   return <div className="cd-row"><span>{k}</span><span className="cd-row-v">{children}</span></div>
 }
 
-export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
+export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
   const [reveal, setReveal] = useState({})
   const [suaNgay, setSuaNgay] = useState(false)
   const geoMap = useKdMap('geo')
@@ -66,6 +67,7 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
   const cdtMap = useKdMap('cdtContact')
   const attachMap = useKdMap('attach')
   const timelineMap = useKdMap('timeline')
+  const verifiedMap = useKdMap('verified')   // xác nhận Lead có nhu cầu, liên hệ được: { mã khách: { by, at } } (kdOptions, lưu database)
   if (!l) return null
   const id = String(l.id)
   const geo = geoMap[id] || {}
@@ -102,6 +104,30 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
     <section className="cd-card cd-profile">
       <div className="cd-card-h">
         <span className="cd-card-t">Hồ sơ khách hàng</span>
+        {(() => {
+          const v = verifiedMap[String(l.id)]
+          const on = !!v
+          const flip = () => {
+            if (on && !window.confirm('Bỏ xác nhận "Lead có nhu cầu, liên hệ được"' + (v.by ? ' (do ' + v.by + ' xác nhận)' : '') + '?')) return
+            const m = { ...verifiedMap }
+            if (on) delete m[String(l.id)]
+            else m[String(l.id)] = { by: String(me || '').trim() || 'Không rõ', at: new Date().toISOString() }
+            saveKdOptions('verified', m)
+          }
+          const when = on && v.at ? new Date(v.at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+          return (
+            <span className={'pf2-vf' + (on ? ' on' : '')}>
+              <button type="button" role="switch" aria-checked={on} className="pf2-sw" onClick={flip}
+                title={on ? 'Bỏ xác nhận Lead có nhu cầu, liên hệ được' : 'Gạt để xác nhận Lead có nhu cầu, liên hệ được'}><i /></button>
+              {on
+                ? <span className="pf2-vf-t" title={'Đã xác nhận Lead có nhu cầu, liên hệ được - bởi ' + (v.by || '') + (when ? ' lúc ' + when : '')}><b>✓</b> Đã xác nhận</span>
+                : null}
+              {on && v.by ? <em className="pf2-vf-by" title={'Người xác nhận: ' + v.by}>· {v.by}</em> : null}
+              {on ? null
+                : <span className="pf2-vf-t off" title="Gạt để xác nhận Lead có nhu cầu, liên hệ được">Xác nhận Lead</span>}
+            </span>
+          )
+        })()}
         <span className="cd-fold-sp" />
         <button type="button" className="cd-btn sm pf2-edit" onClick={onEdit} title="Sửa thông tin khách hàng"><Ic d={PEN} size={12} /><span>Sửa</span></button>
       </div>
@@ -170,7 +196,7 @@ export default function CdProfile({ lead: l, onEdit, onSetCreated }) {
               ? <a className="cd-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer" title="Mở file BOQ"><Ic d={FILE_IC} /><span>{b.name}</span></a>
               : <div className="cd-file" title="Bản cũ chỉ lưu tên file (mô phỏng), chưa có file thật - Sửa > Nâng cao > BOQ để tải file lên"><Ic d={FILE_IC} /><span>{b.name} <em style={{ fontStyle: 'normal', fontWeight: 500, color: 'var(--cd-danger, #D92D20)' }}>· chưa tải file</em></span></div> })()}
             {l.concept && <p className="cd-note"><b>Concept:</b> {l.concept}</p>}
-            {l.notes && <p className="cd-note"><b>Ghi chú nội bộ:</b> {l.notes}</p>}
+            {l.notes && <div className="cd-note"><b>Ghi chú nội bộ:</b> <RichNote text={l.notes} /></div>}
             {!l.boqFile && !l.concept && !l.notes && <em className="cd-none">Chưa có BOQ, concept hay ghi chú</em>}
             <div className="pf2-grp">
               <div className="cd-sub-t">Hình đính kèm{imgs.length ? ' (' + imgs.length + ')' : ''}</div>

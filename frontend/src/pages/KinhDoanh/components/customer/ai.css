@@ -70,7 +70,7 @@ html[data-theme="dark"] .cd-ai-btn.primary:hover { color: #111 }
 .cd-ai-zalo-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
 .cd-ai-zalo-act { display: flex; gap: 6px; flex-wrap: wrap }
 .cd-ai-zalo-act .cd-ai-btn.sm { padding: 4px 10px; font-size: 12px }
-.cd-ai-zalo-t { font-size: 13.5px; line-height: 1.6; color: var(--ai-text); text-wrap: pretty; white-space: pre-wrap }
+.cd-ai-zalo-t { font-size: 13.5px; line-height: 1.6; color: var(--ai-text); text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere }
 .cd-ai-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: auto }
 .cd-ai-row > .cd-ai-btn { padding: 7px 14px }
 .cd-ai-side { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 12px }

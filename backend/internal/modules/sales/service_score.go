@@ -35,8 +35,8 @@ var criteria = []criterion{
 		{"Sổ, giấy tờ đất hợp lệ", true}, {"Đủ điều kiện xin phép xây dựng", false}}},
 	{"thoidiem", "Thời điểm", 15, []critItem{{"Khách có mốc khởi công mong muốn", false}, {"Mốc đủ gần để tạo áp lực ký", false},
 		{"Khách muốn ký sớm cho kịp mốc", false}, {"Lịch hồ sơ, giấy phép không vướng Tết", false}}},
-	{"nhucau", "Nhu cầu & quan tâm", 10, []critItem{{"Trọn gói Thiết kế và thi công", false}, {"Khách cần thi công sớm", false},
-		{"Khách thích thiết kế đã gởi", false}, {"Tương tác gần đây tích cực", false}}},
+	{"nhucau", "Nhu cầu & quan tâm", 10, []critItem{{"Phạm vi rõ: trọn gói 4 hạng mục", false}, {"Khách đã xem phương án 3D", false},
+		{"Khách sẵn sàng chọn concept", false}, {"Tương tác gần đây tích cực", false}}},
 	{"canhtranh", "Cạnh tranh", 10, []critItem{{"Đã hỏi khách có so sánh đơn vị khác", false}, {"Biết đối thủ là ai, báo giá ra sao", false},
 		{"Khách nêu được lý do thích Vua Thầu", false}, {"Có lợi thế rõ: trọn gói TK + thi công", false}}},
 }

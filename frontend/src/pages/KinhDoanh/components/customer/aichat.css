@@ -1,0 +1,67 @@
+/* Khối "Hỏi AI" (CdAiChat.jsx), tiền tố cd-aic2-. Màu lấy từ biến --cd-* (customer.css), chế độ tối tự đổi theo. */
+.cd-card.cd-aic2{gap:12px;}
+.cd-card.cd-aic2 .cd-aic2-t{font-size:22px; line-height:1.2;}
+.cd-aic2-hr{display:inline-flex; align-items:center; gap:10px; min-width:0;}
+.cd-aic2-engine{font-size:11px; font-weight:600; color:var(--cd-violet); background:var(--cd-violet-bg); border-radius:999px; padding:2px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;}
+.cd-aic2-hr .cd-link-btn:disabled{opacity:.5; cursor:default;}
+.cd-aic2-intro{margin:0; font-size:12.5px; line-height:1.5; color:var(--cd-muted);}
+.cd-aic2-note{margin:0; font-size:12px; line-height:1.45; color:var(--cd-amber); background:var(--cd-amber-bg); border-radius:8px; padding:6px 10px;}
+
+.cd-aic2-list{display:flex; flex-direction:column; gap:10px; max-height:420px; overflow-y:auto; padding:10px; margin:0 -4px; background:var(--cd-soft); border:1px solid var(--cd-line2); border-radius:10px;}
+.cd-aic2-row{display:flex; flex-direction:column; gap:6px; max-width:92%;}
+.cd-aic2-row.has-prop{max-width:100%;}
+.cd-aic2-row.me{align-self:flex-end; align-items:flex-end;}
+.cd-aic2-row.ai{align-self:flex-start; align-items:flex-start;}
+.cd-aic2-bub{font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; padding:8px 11px; border-radius:12px; color:var(--cd-text);}
+.cd-aic2-row.me .cd-aic2-bub{background:var(--cd-orange-bg); border:1px solid var(--cd-orange-line); border-bottom-right-radius:4px;}
+.cd-aic2-row.ai .cd-aic2-bub{background:var(--cd-card); border:1px solid var(--cd-line); border-bottom-left-radius:4px;}
+.cd-aic2-wait{color:var(--cd-muted) !important; font-style:italic;}
+
+.cd-aic2-prop{width:100%; min-width:min(220px,100%); box-sizing:border-box; display:flex; flex-direction:column; gap:6px; padding:10px 12px; background:var(--cd-card); border:1px dashed var(--cd-orange); border-radius:10px;}
+.cd-aic2-prop.applied{border-style:solid; border-color:var(--cd-green);}
+.cd-aic2-prop.dismissed, .cd-aic2-prop.stale{border-style:solid; border-color:var(--cd-line); opacity:.85;}
+.cd-aic2-prop-h{font-size:12.5px; font-weight:600; color:var(--cd-orange-d);}
+.cd-aic2-prop-s{font-size:12.5px; line-height:1.45; color:var(--cd-text2);}
+.cd-aic2-prop-b{display:flex; gap:8px; flex-wrap:wrap;}
+.cd-aic2-prop-ok{font-size:12px; font-weight:600; color:var(--cd-green-d);}
+.cd-aic2-prop-off{font-size:12px; color:var(--cd-muted);}
+.cd-aic2-prop-bad{font-size:12px; color:var(--cd-red);}
+.cd-aic2-pv{display:flex; flex-direction:column; gap:4px; font-size:12px; line-height:1.45; color:var(--cd-text3);}
+.cd-aic2-pv ul{margin:0; padding-left:16px; display:flex; flex-direction:column; gap:2px;}
+.cd-aic2-pv em{font-style:normal; font-weight:600; color:var(--cd-text2); margin-right:6px;}
+.cd-aic2-pv b{color:var(--cd-text2); font-weight:600;}
+.cd-aic2-pv-cap{display:block; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--cd-faint);}
+.cd-aic2-pv-none{font-size:12px; font-style:italic; color:var(--cd-red);}
+.cd-aic2-pv-main{display:flex; flex-direction:column; gap:1px;}
+.cd-aic2-pv-zalo{white-space:pre-wrap; color:var(--cd-muted); font-style:italic;}
+
+.cd-aic2-err{font-size:12.5px; line-height:1.45; color:var(--cd-red);}
+
+.cd-aic2-chips{display:flex; flex-wrap:wrap; gap:6px;}
+.cd-aic2-chip{font-size:12px; line-height:1.3; padding:5px 10px; border-radius:999px; border:1px solid var(--cd-btn-line); background:var(--cd-card); color:var(--cd-text2); cursor:pointer; text-align:left;}
+.cd-aic2-chip:hover:not(:disabled){border-color:var(--cd-orange); color:var(--cd-orange);}
+.cd-aic2-chip:disabled{opacity:.5; cursor:default;}
+
+.cd-aic2-box{display:flex; align-items:flex-end; gap:6px;}
+.cd-aic2-box textarea{flex:1; min-width:0; resize:none; font:inherit; font-size:13px; line-height:1.45; padding:7px 10px; min-height:34px; max-height:160px;
+  border:1px solid var(--cd-btn-line); border-radius:8px; background:var(--cd-card); color:var(--cd-text); outline:none;}
+.cd-aic2-box textarea:focus{border-color:var(--cd-orange);}
+.cd-aic2-box textarea::placeholder{color:var(--cd-faint);}
+.cd-aic2-mic{display:inline-flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; border:1px solid var(--cd-btn-line); border-radius:8px;
+  background:var(--cd-card); color:var(--cd-orange); cursor:pointer;}
+.cd-aic2-mic:hover:not(:disabled){border-color:var(--cd-orange); background:var(--cd-orange-bg);}
+.cd-aic2-mic:disabled{opacity:.45; cursor:not-allowed;}
+.cd-aic2-mic.on{background:#FEE4E2; border-color:#F04438; color:#B42318; animation:cdAic2Pulse 1.2s ease-in-out infinite;}
+@keyframes cdAic2Pulse{0%,100%{box-shadow:0 0 0 0 rgba(240,68,56,.35);}50%{box-shadow:0 0 0 5px rgba(240,68,56,0);}}
+.cd-aic2-send{flex:none; height:34px;}
+.cd-aic2-interim{font-size:12px; color:var(--cd-faint); font-style:italic;}
+
+html[data-theme="dark"] .cd-aic2-mic.on{background:rgba(240,68,56,.2); border-color:#F04438; color:#F97066;}
+
+/* Khung Hỏi AI bám theo khi cuộn trang (cột phải kéo dài hết chiều cao lưới để thẻ dính được); quá cao thì tự cuộn bên trong.
+   Màn hẹp (1 cột) thì không dính. */
+.cd2 .cd-col-side{align-self:stretch;}
+.cd2 .cd-col-side > .cd-aic2{position:sticky; top:12px; z-index:2; max-height:calc(100vh - 110px); overflow:auto;}
+@container cd (max-width: 1100px){
+  .cd2 .cd-col-side > .cd-aic2{position:static; max-height:none; overflow:visible;}
+}

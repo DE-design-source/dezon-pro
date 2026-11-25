@@ -78,6 +78,7 @@ type Service struct {
 	readKeys []readKey // khoá API chỉ đọc (SALES_READ_KEYS, apikey.go)
 	testMu   sync.Mutex
 	testAt   map[string]time.Time // lần chạy thử hướng dẫn AI gần nhất theo người (service_aiconfig.go)
+	chatAt   map[string]time.Time // lần hỏi AI về bản phân tích gần nhất theo người (service_insight_chat.go)
 }
 
 // New tạo service.

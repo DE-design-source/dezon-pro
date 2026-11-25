@@ -42,7 +42,8 @@ export default function App() {
             {/* xác nhận đăng nhập bằng mã QR: /chat/qr#<mã> (API.md "Đăng nhập bằng QR") */}
             <Route path="chat/qr" element={<Chat />} />
             <Route path="marketing" element={<Marketing />} />
-            <Route path="kinh-doanh" element={<KinhDoanh />} />
+            {/* /kinh-doanh/<mã khách> = link riêng của 1 khách hàng (sao chép gửi cho nhân viên); 1 route tham số tuỳ chọn để trang không dựng lại khi mở khách */}
+            <Route path="kinh-doanh/:leadId?" element={<KinhDoanh />} />
             <Route path="du-an" element={<DuAn />} />
             <Route path="quan-ly-thiet-ke" element={<QuanLyThietKe />} />
             <Route path="gantt" element={<Gantt />} />

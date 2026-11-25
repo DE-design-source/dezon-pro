@@ -5,6 +5,7 @@ import { fmtTy, stageAccent, lmInitials, boqOf } from '../utils'
 import { mediaUrl } from '../../QS/api/files'
 import { MonthCalendar, TimeWheel } from './IosWheel'
 import DatePicker from '../../../components/ui/DatePicker'
+import RichNote from './RichNote'
 
 /* Trang khách hàng riêng: hồ sơ, tiến trình pipeline, lịch sử chăm sóc & chi tiết từng lần tương tác */
 export const INTERACTION_TYPES = {
@@ -396,7 +397,7 @@ export default function CustomerPage({ lead: l, interactions, onAddInteraction, 
                   ? <a className="kd-cp-file" href={mediaUrl(b.url)} target="_blank" rel="noopener noreferrer"><Ic d={FILE_IC} />{b.name}</a>
                   : <div className="kd-cp-file" title="Chưa có file thật - Sửa > Nâng cao > BOQ để tải file lên"><Ic d={FILE_IC} />{b.name} · chưa tải file</div> })()}
                 {l.concept && <p className="kd-cp-note"><b>Concept:</b>{l.concept}</p>}
-                {l.notes && <p className="kd-cp-note"><b>Ghi chú nội bộ:</b>{l.notes}</p>}
+                {l.notes && <div className="kd-cp-note"><b>Ghi chú nội bộ:</b><RichNote text={l.notes} /></div>}
                 {!l.boqFile && !l.concept && !l.notes && <em className="kd-cp-dnone">Chưa có BOQ, concept hay ghi chú</em>}
               </DSec>
               <DSec id="hinh" title={'Hình đính kèm' + (imgs.length ? ' (' + imgs.length + ')' : '')} fold={fold} onFold={onFold}>

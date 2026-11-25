@@ -39,3 +39,19 @@ html[data-theme="dark"] .cd-profile{--pf-acc:#F0A06A; --pf-chip:var(--cd-chip); 
 .cd-profile .cd-none{font-size:13.5px; color:var(--cd-muted);}
 .cd-profile .cd-file{border-radius:10px; padding:10px 12px; font-size:13.5px; font-weight:600;}
 .cd-profile .cd-file span{flex:1; min-width:0;}
+
+/* Nút gạt xác nhận Lead có nhu cầu, liên hệ được (kdOptions.verified) + tên người gạt */
+.cd-profile .cd-card-h:has(.pf2-vf){flex-wrap:nowrap;}
+.cd-profile .cd-card-h .pf2-edit{flex:none;}
+.cd-profile .pf2-vf{display:inline-flex; align-items:center; gap:8px; flex:0 1 auto; min-width:0; font-size:13px;}
+.cd-profile .pf2-sw{flex:none; position:relative; width:38px; height:22px; padding:0; border:0; border-radius:999px; background:#D0D5DD; cursor:pointer; transition:background .15s;}
+.cd-profile .pf2-sw i{position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.25); transition:transform .15s;}
+.cd-profile .pf2-vf.on .pf2-sw{background:#12B76A;}
+.cd-profile .pf2-vf.on .pf2-sw i{transform:translateX(16px);}
+.cd-profile .pf2-sw:focus-visible{outline:2px solid #12B76A; outline-offset:2px;}
+.cd-profile .pf2-vf-t{min-width:0; color:#067647; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cd-profile .pf2-vf-t b{display:inline-grid; place-items:center; width:18px; height:18px; margin-right:2px; border-radius:50%; background:#DCFAE6; font-size:11px;}
+.cd-profile .pf2-vf-by{flex:0 0 auto; max-width:180px; font-style:normal; font-weight:500; color:var(--cd-text2, #475467); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cd-profile .pf2-vf-t.off{color:var(--cd-faint, #98A2B3); font-weight:500;}
+html[data-theme="dark"] .cd-profile .pf2-vf-t{color:#47CD89;}
+html[data-theme="dark"] .cd-profile .pf2-vf-t b{background:rgba(18,183,106,.2);}

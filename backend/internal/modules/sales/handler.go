@@ -109,6 +109,10 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		Summary: "Sửa tay bản phân tích mới nhất (chuẩn hoá như kết quả Gemini, phần thiếu giữ nguyên, ghi editedBy / editedAt), trả {insight}",
 		Fields: []rpc.GoField{idPath, {Name: "content", In: "body", Type: "object", Required: true, Desc: "{actions, strategy, ideas, roadmap}; actions.main.title bắt buộc; mảng rỗng = xoá hết"},
 			{Name: "generatedAt", In: "body", Desc: "generatedAt của bản đang sửa; khác bản mới nhất -> 409 (tuỳ chọn)"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdInsightChat", Method: "POST", Path: "/sales/leads/:id/insights/chat", Perm: rpc.Login, Tag: tag,
+		Summary: "Hỏi AI về khách hàng / bản phân tích hoặc nhờ sửa 1 phần (không lưu): {reply, proposal: {section, summary, content, generatedAt, editedAt} | null, engine, model}",
+		Fields: []rpc.GoField{idPath, {Name: "messages", In: "body", Type: "array", Required: true, Desc: "Cuộc trò chuyện [{role: user | ai, text}], tin cuối là câu hỏi của người dùng; giữ 20 tin gần nhất, mỗi tin tối đa 2000 ký tự"},
+			{Name: "generatedAt", In: "body", Desc: "generatedAt của bản phân tích đang xem (tuỳ chọn; đề xuất luôn dựa trên bản mới nhất)"}}})
 
 	// Cấu hình AI (service_aiconfig.go): hướng dẫn cho khối "Đề xuất hành động", lưu ở cài đặt công ty khoá kdAiConfig
 	aiDraft := []rpc.GoField{{Name: "leadId", In: "body", Type: "number", Required: true, Desc: "Mã khách hàng dùng để thử"},
@@ -177,6 +181,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/leads/:id/insights", withParam("id", false, noBody(s.GetInsights)))
 	g.PATCH("/leads/:id/insights", withParam("id", true, s.UpdateInsight))
 	g.POST("/leads/:id/insights/generate", withParam("id", true, s.GenerateInsights))
+	g.POST("/leads/:id/insights/chat", withParam("id", true, s.ChatInsight))
 	withBody := func(fn func(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error)) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			body, err := validator.Body(c)

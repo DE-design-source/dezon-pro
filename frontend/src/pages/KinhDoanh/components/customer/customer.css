@@ -149,7 +149,7 @@ html[data-theme="dark"] .cd .cd-av.lead{background:var(--cd-orange-bg); color:va
 .cd-file span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .cd a.cd-file{color:var(--cd-text);}
 .cd a.cd-file:hover{border-color:var(--cd-faint); text-decoration:none;}
-.cd-note{margin:0; font-size:13px; line-height:1.5; color:var(--cd-text2); white-space:pre-line;}
+.cd-note{margin:0; font-size:13px; line-height:1.5; color:var(--cd-text2); white-space:pre-line; overflow-wrap:anywhere; min-width:0;}
 .cd-note b{font-weight:600; color:var(--cd-text);}
 .cd-imgs{display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:6px;}
 .cd-imgs a{display:block; aspect-ratio:1; border-radius:8px; overflow:hidden; border:1px solid var(--cd-line);}

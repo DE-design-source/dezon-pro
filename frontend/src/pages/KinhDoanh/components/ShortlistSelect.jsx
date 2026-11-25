@@ -36,18 +36,71 @@ export function useKdMap(key) {
   const o = useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f) }, () => opts, () => opts)
   return o[key] && typeof o[key] === 'object' && !Array.isArray(o[key]) ? o[key] : {}
 }
-/* Ghi nhiều khoá trong 1 lần gửi (tránh 2 lần gửi cả kdOptions về sai thứ tự làm mất khoá) */
-export async function saveKdOptionsMany(patch) {
-  opts = { ...opts, ...patch }
-  Object.keys(patch).forEach(k => { dirty[k] = 1 })
-  emit()
-  try { await setProjData('__cty', 'kdOptions', opts) } catch (e) { alert('Không lưu được lên máy chủ: ' + ((e && e.message) || e)) }
+/* Lưu kdOptions KHÔNG ghi đè thay đổi của người / tab khác (MarkUp 2026-11-25: sao đánh giá bị mất):
+   kdOptions là 1 tài liệu chung cả công ty; trước đây mỗi lần lưu gửi nguyên bản trong máy (tải 1 lần lúc mở trang) nên
+   lưu từ bản cũ làm mất sao / tỉnh / tên dự án... người khác vừa sửa. Giờ: tải bản mới nhất trên máy chủ, chỉ ghép PHẦN VỪA ĐỔI
+   (khoá dạng object {mã khách: giá trị} -> từng mục; mảng chuỗi -> thêm / bớt từng phần tử; còn lại thay cả khoá) rồi mới lưu.
+   Các lần lưu xếp hàng lần lượt; khoá còn đang chờ lưu giữ bản trong máy để không nhấp nháy. */
+const isMap = v => !!v && typeof v === 'object' && !Array.isArray(v)
+const isFlatList = v => Array.isArray(v) && v.every(x => x == null || typeof x !== 'object')
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+function mergeKey(cur, before, after) {
+  if (isMap(after) && (before == null || isMap(before)) && (cur == null || isMap(cur))) {
+    const m = { ...(cur || {}) }, o = before || {}
+    Object.keys(after).forEach(e => { if (!same(after[e], o[e])) m[e] = after[e] })
+    Object.keys(o).forEach(e => { if (!(e in after)) delete m[e] })
+    return m
+  }
+  if (isFlatList(after) && (before == null || isFlatList(before)) && (cur == null || isFlatList(cur))) {
+    const o = before || [], c = cur || []
+    const removed = o.filter(x => after.indexOf(x) < 0)
+    const added = after.filter(x => o.indexOf(x) < 0)
+    return [...c.filter(x => removed.indexOf(x) < 0), ...added.filter(x => c.indexOf(x) < 0)]
+  }
+  return after
 }
-export async function saveKdOptions(key, list) {
-  opts = { ...opts, [key]: list }
-  dirty[key] = 1
+let chain = Promise.resolve()
+const pending = {}   // khoá -> số lần lưu đang chờ
+export function saveKdOptionsMany(patch) {
+  const keys = Object.keys(patch)
+  const before = {}
+  keys.forEach(k => { before[k] = opts[k]; dirty[k] = 1; pending[k] = (pending[k] || 0) + 1 })
+  opts = { ...opts, ...patch }
   emit()
-  try { await setProjData('__cty', 'kdOptions', opts) } catch (e) { alert('Không lưu được lên máy chủ: ' + ((e && e.message) || e)) }
+  const run = chain.then(async () => {
+    try {
+      let sv
+      try { const d = await getProjData('__cty'); sv = (d && d.kdOptions) || {} } catch { sv = null }
+      const base = sv || opts   // không tải được bản mới nhất -> lưu như cũ
+      const next = { ...base }
+      keys.forEach(k => { next[k] = sv ? mergeKey(sv[k], before[k], patch[k]) : patch[k] })
+      await setProjData('__cty', 'kdOptions', next)
+      // bản trong máy = bản vừa lưu; khoá còn lần lưu khác đang chờ thì giữ giá trị trong máy
+      const keep = {}
+      Object.keys(pending).forEach(k => { if (pending[k] > 1 || (pending[k] === 1 && keys.indexOf(k) < 0)) keep[k] = opts[k] })
+      opts = { ...next, ...keep }
+      emit()
+    } catch (e) {
+      alert('Không lưu được lên máy chủ: ' + ((e && e.message) || e))
+    } finally {
+      keys.forEach(k => { pending[k] -= 1; if (pending[k] <= 0) delete pending[k] })
+    }
+  })
+  chain = run.catch(() => {})
+  return run
+}
+export function saveKdOptions(key, list) { return saveKdOptionsMany({ [key]: list }) }
+/* Quay lại tab trình duyệt: tải lại kdOptions để thấy thay đổi của người khác (bỏ qua khi còn lần lưu đang chờ) */
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !loaded || Object.keys(pending).length) return
+    getProjData('__cty').then(d => {
+      if (Object.keys(pending).length) return
+      opts = (d && d.kdOptions) || {}
+      mkKenh = d && d.mkAds && Array.isArray(d.mkAds.kenh) ? d.mkAds.kenh.map(x => String(x || '').trim()).filter(Boolean) : mkKenh
+      emit()
+    }, () => {})
+  })
 }
 
 /* Ô chọn có danh sách xổ: bấm ô = xổ danh sách (base = mục mặc định không xoá được, extra = mục tự thêm của công ty);

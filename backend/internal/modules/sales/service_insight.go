@@ -1145,6 +1145,24 @@ func (s *Service) UpdateInsight(ctx context.Context, a *actor.Actor, id float64,
 		return nil, apperr.E(409, "Đã có bản phân tích mới hơn, tải lại rồi sửa")
 	}
 	def, _ := cur.Val("noi_dung").(*omap.Map)
+	c, ok := mergeInsight(content, def)
+	if !ok {
+		return nil, apperr.BadRequest("Hành động chính không được để trống")
+	}
+	c.Set("editedBy", s.displayName(ctx, a)).Set("editedAt", s.now().UTC().Format(time.RFC3339))
+	row, err := s.repo.UpdateInsight(ctx, jsval.ToNumber(cur.Val("id")), omap.Of("noi_dung", c))
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, apperr.NotFound("Chưa có bản phân tích để sửa")
+	}
+	return omap.Of("insight", insightOut(row)), nil
+}
+
+// mergeInsight: nội dung sửa (content) chuẩn hoá như kết quả Gemini (parseInsight), phần thiếu giữ theo def (bản hiện tại);
+// mảng risks / ideas / roadmap.steps gửi lên rỗng -> rỗng. Thiếu hành động chính / không đọc được -> ok=false.
+func mergeInsight(content, def *omap.Map) (*omap.Map, bool) {
 	if def == nil {
 		def = omap.New()
 	}
@@ -1169,11 +1187,11 @@ func (s *Service) UpdateInsight(ctx context.Context, a *actor.Actor, id float64,
 	}
 	text, err := omap.MarshalString(in)
 	if err != nil {
-		return nil, apperr.BadRequest("Nội dung phân tích không hợp lệ")
+		return nil, false
 	}
 	c, ok := parseInsight(text, def)
 	if !ok {
-		return nil, apperr.BadRequest("Hành động chính không được để trống")
+		return nil, false
 	}
 	if rm := mv(c, "roadmap"); rmIn != nil && rm != nil {
 		steps := []any{}
@@ -1188,15 +1206,7 @@ func (s *Service) UpdateInsight(ctx context.Context, a *actor.Actor, id float64,
 			rm.Set("anchor", nil)
 		}
 	}
-	c.Set("editedBy", s.displayName(ctx, a)).Set("editedAt", s.now().UTC().Format(time.RFC3339))
-	row, err := s.repo.UpdateInsight(ctx, jsval.ToNumber(cur.Val("id")), omap.Of("noi_dung", c))
-	if err != nil {
-		return nil, err
-	}
-	if row == nil {
-		return nil, apperr.NotFound("Chưa có bản phân tích để sửa")
-	}
-	return omap.Of("insight", insightOut(row)), nil
+	return c, true
 }
 
 func orMap(m *omap.Map) *omap.Map {

@@ -9,6 +9,7 @@ import CdNext from './CdNext'
 import CdTasks from './CdTasks'
 import CdScore from './CdScore'
 import CdAi from './CdAi'
+import CdAiChat from './CdAiChat'
 
 /* Trang khách hàng dạng dashboard (thay CustomerPage): đầu trang tràn viền + lưới 2 cột (hẹp: 1 cột), xem layout2.css.
    Cột chính: [Hồ sơ | Cập nhật chăm sóc] (2 thẻ cùng hàng, cao bằng nhau), Chỉ số chính, Phân tích AI.
@@ -51,6 +52,7 @@ export default function CustomerDashboard({ lead: l, me, interactions, onAddInte
           <CdNext {...bp} />
           <CdTasks {...bp} />
           <CdOwners {...bp} onPatch={onPatch} />
+          <CdAiChat {...bp} />
         </div>
       </div>
     </div>

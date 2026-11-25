@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
 import {
@@ -93,7 +93,13 @@ function KinhDoanhPage() {
 
   /* Mở thẳng 1 khách hàng: /kinh-doanh?lead=<id> (bấm thông báo "được giao phụ trách" ở chuông QS / chuông trang này) */
   const [params, setParams] = useSearchParams()
-  const leadParam = params.get('lead')
+  /* Link riêng của khách: /kinh-doanh/<mã khách> (thanh địa chỉ luôn hiện link của khách đang mở để sao chép gửi nhân viên);
+     ?lead=<id> cũ (thông báo) vẫn nhận. linkDone: đã xử lý link lúc vào trang (trước đó không ghi đè đường dẫn) */
+  const { leadId: pathLead } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const leadParam = params.get('lead') || pathLead || null
+  const linkDone = useRef(!(params.get('lead') || pathLead))
 
   /* Khôi phục khách đang mở lần trước (sau khi tải xong danh sách); URL ?lead= được ưu tiên; khách đã xoá -> ở lại danh sách.
      Chưa khôi phục xong thì vẫn giữ mã khách trong trạng thái lưu (restoreLead) */
@@ -111,11 +117,20 @@ function KinhDoanhPage() {
     else restoreScroll.current = null
   }, [leadsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!leadParam || !leads.length) return
+    if (!leadParam || !leadsLoaded) return
+    // đường dẫn đã khớp khách đang mở (vd vừa tự ghi link khi mở khách) -> không làm gì
+    if (detail.open && sameId(detail.id, leadParam) && !params.get('lead')) { linkDone.current = true; return }
     if (leads.some(l => sameId(l.id, leadParam))) setDetail({ open: true, id: leads.find(l => sameId(l.id, leadParam)).id })
-    else alert('Không tìm thấy khách hàng (có thể đã bị xoá)')
-    setParams(p => { p.delete('lead'); return p }, { replace: true })
-  }, [leadParam, leads]) // eslint-disable-line react-hooks/exhaustive-deps
+    else { alert('Không tìm thấy khách hàng (có thể đã bị xoá hoặc thuộc công ty khác)'); navigate('/kinh-doanh', { replace: true }) }
+    linkDone.current = true
+    if (params.get('lead')) setParams(p => { p.delete('lead'); return p }, { replace: true })
+  }, [leadParam, leadsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Đồng bộ thanh địa chỉ với khách đang mở: mở khách -> /kinh-doanh/<id>, quay lại danh sách -> /kinh-doanh */
+  useEffect(() => {
+    if (!linkDone.current) return
+    const want = detail.open && detail.id != null ? '/kinh-doanh/' + encodeURIComponent(String(detail.id)) : '/kinh-doanh'
+    if (location.pathname !== want) navigate(want + location.search, { replace: true })
+  }, [detail.open, detail.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const openLeadById = id => {
     const l = leads.find(x => sameId(x.id, id))
     if (l) setDetail({ open: true, id: l.id })

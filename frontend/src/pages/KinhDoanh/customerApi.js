@@ -42,6 +42,11 @@ export const getInsights = id => request('GET', L(id) + '/insights')
 export const generateInsights = (id, body) => request('POST', L(id) + '/insights/generate', { body: body || {} })
 export const updateInsight = (id, content, generatedAt) =>
   request('PATCH', L(id) + '/insights', { body: { content, generatedAt: generatedAt == null ? null : generatedAt } })
+/* Hỏi AI về khách / nhờ sửa phân tích (không lưu hội thoại): messages [{role: 'user'|'ai', text}] (tin cuối của user, tối đa 20)
+   -> {reply, proposal: null | {section: 'actions'|'strategy'|'ideas'|'roadmap', summary, content: {actions, strategy, ideas, roadmap}, generatedAt, editedAt}, engine, model}
+   (generatedAt / editedAt: bản phân tích mà đề xuất dựa vào, editedAt null = chưa sửa tay) */
+export const chatInsight = (id, messages, generatedAt) =>
+  request('POST', L(id) + '/insights/chat', { body: generatedAt == null ? { messages } : { messages, generatedAt } })
 
 /* ---- Cấu hình AI (prompt "Đề xuất hành động" theo công ty) ----
    getAiConfig -> {instructions, defaultInstructions, custom, fixedRules, outputShape, aiEnabled, model,

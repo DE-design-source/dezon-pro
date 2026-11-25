@@ -58,6 +58,9 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
+  const [edit, setEdit] = useState(null)   // sửa tên tự gõ: { from, val, err }
+  const editRef = useRef(null)
+  editRef.current = edit
   const ref = useRef(null)
   /* Tên tự gõ (nhân sự chưa có tài khoản) đã từng thêm: lưu chung công ty kdOptions.ownerFree để lần sau chọn lại trong danh sách */
   const freeNames = useKdOptions('ownerFree')
@@ -66,10 +69,11 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
     let off = false
     setErr('')
     setStaff(null)
+    setEdit(null)
     staffP = null   // mỗi lần mở nạp lại: họ tên tài khoản có thể vừa đổi ở Cài đặt > Tài khoản
     loadStaff().then(s => { if (!off) setStaff(s) }, e => { if (!off) setErr((e && e.message) || 'Không tải được danh sách nhân sự') })
     const out = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false) } }
+    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (editRef.current) setEdit(null); else setOpen(false) } }
     document.addEventListener('mousedown', out)
     document.addEventListener('keydown', esc, true)
     return () => { off = true; document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc, true) }
@@ -96,6 +100,17 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
     saveKdOptions('ownerFree', [...(freeNames || []), n])
   }
   const forgetFree = name => saveKdOptions('ownerFree', (freeNames || []).filter(x => nk(x) !== nk(name)))
+  /* Sửa tên tự gõ trong danh sách gợi ý (chỉ đổi gợi ý; khách đã gán tên cũ giữ nguyên) */
+  const saveEdit = () => {
+    if (!edit) return
+    const n = String(edit.val || '').trim().replace(/s+/g, ' ')
+    if (!n) { setEdit({ ...edit, err: 'Tên không được để trống' }); return }
+    if (n === edit.from) { setEdit(null); return }
+    if (accNames.has(nk(n))) { setEdit({ ...edit, err: 'Trùng tên một tài khoản' }); return }
+    if (nk(n) !== nk(edit.from) && (freeNames || []).some(x => nk(x) === nk(n))) { setEdit({ ...edit, err: 'Tên này đã có trong danh sách' }); return }
+    saveKdOptions('ownerFree', (freeNames || []).map(x => (nk(x) === nk(edit.from) ? n : x)))
+    setEdit(null)
+  }
   /* Gõ tên tự do (nhân sự chưa có tài khoản): chữ gõ không trùng chính xác tên tài khoản đang hiện -> dòng "+ Thêm" (lưu không có username) */
   const typed = q.trim().replace(/\s+/g, ' ')
   const tl = nk(typed)
@@ -137,11 +152,25 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
               : !list.length ? (typed ? (canFree || dupFree ? null : <div className="cd-asg-empty">Không tìm thấy nhân sự</div>) : <div className="cd-asg-empty">Đã gán hết nhân sự</div>)
               : list.map(s => (
                 <div key={(s.free ? 'free:' : '') + (s.username || s.name)} className={'cd-asg-row' + (s.free ? ' free' : '')}>
+                  {edit && s.free && edit.from === s.name ? (
+                    <div className="cd-asg-edit">
+                      <input autoFocus value={edit.val} aria-label={'Sửa tên ' + s.name}
+                        onChange={e => setEdit({ ...edit, val: e.target.value, err: '' })}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+                      <button type="button" className="cd-asg-ok" title="Lưu tên" aria-label="Lưu tên" onClick={saveEdit}>✓</button>
+                      <button type="button" className="cd-asg-forget" title="Huỷ sửa" aria-label="Huỷ sửa" onClick={() => setEdit(null)}>×</button>
+                      {edit.err && <div className="cd-asg-edit-err">{edit.err}</div>}
+                    </div>
+                  ) : (<>
                   <button type="button" className={'cd-asg-it' + (s === enterPick ? ' is-enter' : '')} disabled={busy} onClick={() => pick(s)}>
                     <span className="cd-av">{lmInitials(s.name)}</span>
                     <span className="cd-mem-txt"><b>{s.name}</b><em>{s.free ? 'chưa có tài khoản' : [s.department, s.username].filter(Boolean).join(' · ')}</em></span>
                   </button>
+                  {s.free && <button type="button" className="cd-asg-pen" title={'Sửa tên “' + s.name + '”'} aria-label={'Sửa tên ' + s.name} onClick={() => setEdit({ from: s.name, val: s.name, err: '' })}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  </button>}
                   {s.free && <button type="button" className="cd-asg-forget" title={'Bỏ “' + s.name + '” khỏi danh sách gợi ý'} aria-label={'Bỏ ' + s.name + ' khỏi danh sách gợi ý'} onClick={() => forgetFree(s.name)}>×</button>}
+                  </>)}
                 </div>
               ))}
             {canFree && (

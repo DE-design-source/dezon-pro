@@ -289,25 +289,29 @@ func (s *Service) PreviewAiPrompt(ctx context.Context, a *actor.Actor, body *oma
 }
 
 // testAllowed: cùng 1 người chạy thử cách nhau ít nhất aiTestCooldown.
-func (s *Service) testAllowed(a *actor.Actor) bool {
+func (s *Service) testAllowed(a *actor.Actor) bool { return s.throttle(&s.testAt, a, aiTestCooldown) }
+
+// throttle: cùng 1 người gọi cách nhau ít nhất d (lần gọi gần nhất ghi ở *at); được gọi -> ghi lại lúc này.
+func (s *Service) throttle(at *map[string]time.Time, a *actor.Actor, d time.Duration) bool {
 	key := jsval.Str(a.UID) + "|" + a.U
 	now := time.Now()
 	s.testMu.Lock()
 	defer s.testMu.Unlock()
-	if s.testAt == nil {
-		s.testAt = map[string]time.Time{}
+	if *at == nil {
+		*at = map[string]time.Time{}
 	}
-	if t, ok := s.testAt[key]; ok && now.Sub(t) < aiTestCooldown {
+	m := *at
+	if t, ok := m[key]; ok && now.Sub(t) < d {
 		return false
 	}
-	if len(s.testAt) > 1000 {
-		for k, t := range s.testAt {
-			if now.Sub(t) >= aiTestCooldown {
-				delete(s.testAt, k)
+	if len(m) > 1000 {
+		for k, t := range m {
+			if now.Sub(t) >= d {
+				delete(m, k)
 			}
 		}
 	}
-	s.testAt[key] = now
+	m[key] = now
 	return true
 }
 

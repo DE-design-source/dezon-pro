@@ -9,6 +9,7 @@ import { lmInitials, findDuplicates, sourceColor, boqOf } from '../utils'
 import { uploadRaw, mediaUrl } from '../../QS/api/files'
 import ShortlistSelect, { useKdMap, useKdOptions, useMkChannels, saveKdOptions } from './ShortlistSelect'
 import AttachBox, { filesOf } from './AttachBox'
+import { NoteToolbar, noteHotkey } from './RichNote'
 import DatePicker from '../../../components/ui/DatePicker'
 import { OWNER_GROUPS } from './customer/CdOwners'
 const GROUP_LABEL = Object.fromEntries(OWNER_GROUPS.map(g => [g.key, g.label]))
@@ -90,7 +91,7 @@ const LEAD_SCALES = ['Dưới 100 m²', '100 - 200 m²', '200 - 500 m²', '500 -
    active = ô đang hiện (ô bị ẩn thì scrollHeight = 0, đo lại khi hiện).
    Đặt height 'auto' để đo làm khung cuộn chứa ô ngắn lại trong chốc lát -> trình duyệt kéo scrollTop lên (trang nhảy khi đang cuộn gần đáy):
    ghi scrollTop của mọi khung cuộn tổ tiên (và trang) trước khi đo, đặt lại sau khi đặt chiều cao mới */
-function AutoTextarea({ value, active, ...rest }) {
+function AutoTextarea({ value, active, inputRef, ...rest }) {
   const ref = useRef(null)
   useLayoutEffect(() => {
     const el = ref.current
@@ -107,7 +108,7 @@ function AutoTextarea({ value, active, ...rest }) {
     el.style.height = Math.min(h, Math.round(window.innerHeight * 0.5)) + 'px'
     saved.forEach(([p, top]) => { if (p.scrollTop !== top) p.scrollTop = top })
   }, [value, active])
-  return <textarea ref={ref} className="kd-autogrow" rows={4} value={value} {...rest} />
+  return <textarea ref={el => { ref.current = el; if (inputRef) inputRef.current = el }} className="kd-autogrow" rows={4} value={value} {...rest} />
 }
 
 /* Khối thẻ đánh số: vòng số navy + tiêu đề; onToggle = khối thu gọn được (thân vẫn mount, chỉ ẩn, để ô đính kèm đang tải không mất) */
@@ -251,6 +252,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   const [boqBusy, setBoqBusy] = useState(0)
   const [boqErr, setBoqErr] = useState('')
   const boqInputRef = useRef(null)
+  const notesRef = useRef(null)
   const uploading = imgBusy + fileBusy + boqBusy > 0
   const UPLOAD_WAIT = 'Đang tải tệp đính kèm lên, vui lòng đợi xong rồi lưu'
 
@@ -779,7 +781,13 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
               <AttachBox ref={imgBoxRef} kind="img" label="Hình đính kèm" items={attach.img} onChange={img => setAttach(a => ({ ...a, img }))} onBusy={setImgBusy} />
               <AttachBox ref={fileBoxRef} kind="file" label="Tệp đính kèm" items={attach.file} onChange={file => setAttach(a => ({ ...a, file }))} onBusy={setFileBusy} />
             </div>
-            <div className="kd-field"><label>Ghi chú nội bộ</label><AutoTextarea active={open && advOpen} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật..." value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
+            <div className="kd-field"><label>Ghi chú nội bộ</label>
+              <div className="rn-wrap">
+                <AutoTextarea active={open && advOpen} inputRef={notesRef} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật... (bôi đen chữ rồi bấm B để in đậm)" value={form.notes}
+                  onChange={e => set('notes', e.target.value)} onKeyDown={e => noteHotkey(e, form.notes, v => set('notes', v))} />
+                <NoteToolbar taRef={notesRef} value={form.notes} onChange={v => set('notes', v)} />
+              </div>
+            </div>
             <label className="kd-lf-check">
               <input type="checkbox" checked={form.partner} onChange={e => set('partner', e.target.checked)} />
               Chuyển giao cho đối tác thi công/thiết kế ngoài

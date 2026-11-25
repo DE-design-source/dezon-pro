@@ -59,6 +59,16 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')
   const id = String(l.id)
+  /* Sao chép link riêng của khách (/kinh-doanh/<mã khách>) để gửi nhân viên */
+  const [copied, setCopied] = useState(false)
+  const copyLink = async () => {
+    const url = window.location.origin + '/kinh-doanh/' + encodeURIComponent(id)
+    let ok = false
+    try { await navigator.clipboard.writeText(url); ok = true } catch {
+      try { const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove() } catch { ok = false }
+    }
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000) } else window.prompt('Sao chép link khách hàng:', url)
+  }
   const geo = geoMap[id] || {}
   const region = geo.tinh || geo.kv || ''
   const title = projNameMap[id] || l.name
@@ -113,6 +123,7 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
       </div>
       <div className="cd-h-acts">
         <NotifBadge leadId={id} />
+        <button type="button" className="cd-hbtn" onClick={copyLink} title={'Sao chép link khách này để gửi nhân viên: ' + window.location.origin + '/kinh-doanh/' + id}>{copied ? 'Đã chép link' : 'Sao chép link'}</button>
         {phone
           ? <a className="cd-hbtn zalo" href={'https://zalo.me/' + phone} target="_blank" rel="noopener noreferrer" title={'Zalo ' + phone}>Nhắn tin Zalo</a>
           : <button type="button" className="cd-hbtn zalo" disabled title="Khách chưa có số điện thoại">Nhắn tin Zalo</button>}

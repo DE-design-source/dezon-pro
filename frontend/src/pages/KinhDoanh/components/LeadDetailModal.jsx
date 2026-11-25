@@ -2,6 +2,7 @@ import { STAGE_LABEL, DEPT_LABEL, HANDOFF_CONFIG } from '../../../data/kinhDoanh
 import { FONT_STACK, fmtTy, stageAccent, lmInitials, boqOf } from '../utils'
 import { useKdMap } from './ShortlistSelect'
 import { mediaUrl } from '../../QS/api/files'
+import RichNote from './RichNote'
 
 /* ===================== Modal: Chi tiết lead (đầy đủ thông tin đã nhập từ modal +Thêm) ===================== */
 
@@ -126,7 +127,7 @@ function Body({ l }) {
       {l.notes ? (
         <div>
           <div style={capLabel(6)}>Ghi chú nội bộ</div>
-          <div style={noteBox}>{l.notes}</div>
+          <div style={noteBox}><RichNote text={l.notes} /></div>
         </div>
       ) : null}
       {empty ? <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5, padding: '12px 0' }}>Lead này chưa có thông tin chi tiết (được tạo trước khi có form đầy đủ).</div> : null}
