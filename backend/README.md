@@ -99,7 +99,7 @@ webhook Lark thật ghi sẵn trong code):
 | Webhook | `PURCHASE_WEBHOOK` trống = webhook Lark thật ghi sẵn trong code; `REPORT_WEBHOOK` trống = dùng chung. Chạy thử thì đặt cả hai thành địa chỉ giả. |
 | Phiên đăng nhập | Token được ký bằng `AUTH_SECRET` (trống = khoá mặc định trong code). Các server cùng `AUTH_SECRET` và cùng database thì nhận token của nhau. |
 
-Triển khai production (VPS CloudFly, https://dezon.tech) bằng Docker Compose: `bash infra/deploy/deploy.sh`, xem
+Triển khai production (VPS CloudFly, https://pro.dezon.vn) bằng Docker Compose: `bash infra/deploy/deploy.sh`, xem
 `docs/04-van-hanh/trien-khai-vps-cloudfly.md` (cấu hình compose: `infra/deploy/docker-compose.yml`). Migration chạy trong bước triển khai;
 chạy tay thì xem [docs/DATABASE.md](docs/DATABASE.md).
 

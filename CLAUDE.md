@@ -94,7 +94,7 @@ node backend/scripts/gen-specs.js         # sinh lại specs/data + golden sau k
 
 ## Deploy
 
-- Production: VPS CloudFly, https://dezon.tech. Docker Compose ở `infra/deploy/` (`docker-compose.yml`, `Caddyfile`, `.env` từ `.env.example`).
+- Production: VPS CloudFly, https://pro.dezon.vn (tên miền cũ dezon.tech, www.dezon.tech tự chuyển về). Docker Compose ở `infra/deploy/` (`docker-compose.yml`, `Caddyfile`, `.env` từ `.env.example`).
 - Máy chủ mới: `bash infra/deploy/setup-server.sh` (1 lần). Cập nhật: `bash infra/deploy/deploy.sh` (git pull + build + sao lưu database +
   migration + khởi động lại) hoặc `--no-pull`. Hướng dẫn đầy đủ: `docs/04-van-hanh/trien-khai-vps-cloudfly.md`.
 
