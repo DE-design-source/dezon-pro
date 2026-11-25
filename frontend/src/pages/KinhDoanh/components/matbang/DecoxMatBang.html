@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DECOX Mặt Bằng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: công cụ hai cột — bảng nhập bên trái, bản vẽ + kiểm tra + giá bên phải; xếp một cột trên điện thoại */
+/* Layout: bảng vẽ kỹ thuật kiểu Dimensions — nền trắng, nét đen mảnh, kích thước ghi mm; cột trái nhập liệu/thư viện, cột phải bản vẽ */
+:root{
+  --bg:#f4f4f2;
+  --paper:#ffffff;
+  --ink:#141414;
+  --muted:#7b7b78;
+  --line:#e2e2df;
+  --accent:#e0571b;
+  --accent-ink:#ffffff;
+  --blue:#2a6496;
+  --ok:#2f7d4f; --ok-bg:#e6f2ea;
+  --warn:#946000; --warn-bg:#fbf1dc;
+  --bad:#b3261e; --bad-bg:#fbe6e4;
+  --room-live:#ffffff; --room-bed:#ffffff; --room-wet:#ffffff; --room-core:#ffffff; --room-void:#ffffff; --room-out:#f0f0ed;
+  --wall:#141414;
+  --display:"Be Vietnam Pro", system-ui, sans-serif;
+  --body:"Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f0f0f; --paper:#181818; --ink:#efefec; --muted:#9a9a96; --line:#2c2c2a;
+    --accent:#f07a3e; --accent-ink:#160b05; --blue:#86b9e3;
+    --ok:#7fd3a0; --ok-bg:#1b3125; --warn:#f0c46a; --warn-bg:#382d14; --bad:#ff9b92; --bad-bg:#3b1e1b;
+    --room-live:#181818; --room-bed:#181818; --room-wet:#181818; --room-core:#181818; --room-void:#181818; --room-out:#222220;
+    --wall:#efefec; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0f; --paper:#181818; --ink:#efefec; --muted:#9a9a96; --line:#2c2c2a;
+  --accent:#f07a3e; --accent-ink:#160b05; --blue:#86b9e3;
+  --ok:#7fd3a0; --ok-bg:#1b3125; --warn:#f0c46a; --warn-bg:#382d14; --bad:#ff9b92; --bad-bg:#3b1e1b;
+  --room-live:#181818; --room-bed:#181818; --room-wet:#181818; --room-core:#181818; --room-void:#181818; --room-out:#222220;
+  --wall:#efefec; color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+h1,h2,h3{text-wrap:balance;margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:20px;padding:12px 20px;background:var(--ink);color:var(--bg);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand b{font-family:var(--display);font-size:26px;letter-spacing:.06em}
+.brand span{font-size:13px;opacity:.75}
+.nav{display:flex;gap:4px;margin-left:auto}
+.nav a{color:inherit;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:500;font-size:14px;opacity:.75}
+.nav a[aria-current="page"]{background:var(--accent);color:var(--accent-ink);opacity:1}
+
+/* Steps strip */
+.steps{display:flex;gap:0;padding:0 20px;background:var(--paper);border-bottom:1px solid var(--line);overflow-x:auto}
+.steps div{padding:10px 16px 10px 0;font-size:13px;color:var(--muted);white-space:nowrap;display:flex;gap:8px;align-items:center}
+.steps i{font-style:normal;font-family:var(--mono);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);font-size:12px}
+.steps div.on{color:var(--ink);font-weight:600}
+.steps div.on i{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.steps div+div::before{content:"";width:24px;height:1px;background:var(--line);margin-right:8px}
+
+.wrap{display:grid;grid-template-columns:330px 1fr;gap:20px;padding:20px;max-width:1360px;margin:0 auto;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;padding:16px}}
+
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px}
+.panel>header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.panel>header h2{font-family:var(--display);font-size:21px;letter-spacing:.02em;text-transform:uppercase}
+.panel>header p{margin:0;color:var(--muted);font-size:13px}
+.panel .body{padding:16px 18px}
+
+/* Form */
+form.in{display:grid;gap:14px}
+.grp{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.fld{display:grid;gap:4px}
+.fld.full{grid-column:1/-1}
+.fld label{font-size:13px;font-weight:600}
+.fld small{color:var(--muted);font-size:12px}
+.unit{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.unit input,.unit select{border:0;background:transparent;padding:8px 10px;width:100%;min-width:0}
+.unit em{font-style:normal;color:var(--muted);font-size:13px;padding-right:10px;font-family:var(--mono)}
+select.plain,input.plain{border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:8px 10px;width:100%}
+.checks-in{display:flex;flex-wrap:wrap;gap:8px}
+.tog{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;background:var(--bg)}
+.tog input{accent-color:var(--accent);margin:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);padding:8px 6px;font-size:13px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:600}
+.sec-t{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;border-top:1px solid var(--line);padding-top:12px}
+.btn{border:0;border-radius:6px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.sm{padding:6px 12px;font-size:13px}
+
+/* Result area */
+.res{display:grid;gap:20px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.summary div{background:var(--paper);padding:12px 16px}
+.summary b{display:block;font-family:var(--mono);font-size:20px;font-weight:500}
+.summary span{font-size:12px;color:var(--muted)}
+@media (max-width:640px){.summary{grid-template-columns:1fr 1fr}}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--blue);color:var(--paper);border-color:var(--blue);font-weight:600}
+.var-desc{font-size:13px;color:var(--muted);margin:0}
+
+.plan-box{display:grid;grid-template-columns:1fr 220px;gap:16px}
+@media (max-width:1100px){.plan-box{grid-template-columns:1fr}}
+.svg-wrap{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;display:flex;justify-content:safe center;align-items:flex-start;max-height:800px}
+.svg-wrap svg{max-height:760px;min-height:420px;width:auto;max-width:100%;height:auto}
+.legend{display:grid;gap:6px;font-size:13px;align-content:start}
+.legend div{display:flex;gap:8px;align-items:center}
+.legend s{width:14px;height:14px;border:1px solid var(--line);border-radius:3px;display:inline-block}
+.roomlist{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.roomlist td{padding:4px 0;border-bottom:1px dashed var(--line)}
+.roomlist td:last-child{text-align:right;font-family:var(--mono)}
+
+/* Checks */
+.chk{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.chk li{display:grid;grid-template-columns:76px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.chk li:last-child{border-bottom:0}
+.pill{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;text-align:center}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.info{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.chk b{font-weight:600;font-size:14px}
+.chk p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.chk cite{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.chk-sum{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Cost */
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t th,table.t td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;background:var(--bg)}
+table.t td.r,table.t th.r{text-align:right}
+table.t tfoot td{font-weight:700;border-bottom:0}
+.total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:14px;padding:14px 16px;background:var(--ink);color:var(--paper);border-radius:8px}
+.total b{font-family:var(--mono);font-size:24px;font-weight:500}
+.total span{font-size:13px;opacity:.8}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0}
+.tscroll{overflow-x:auto}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:1100px){.two{grid-template-columns:1fr}}
+
+/* Lead */
+.lead{display:grid;gap:10px}
+.okmsg{background:var(--ok-bg);color:var(--ok);padding:10px 12px;border-radius:6px;font-size:14px}
+pre.json{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;font-family:var(--mono);font-size:12px;max-height:260px;overflow:auto;margin:0;white-space:pre}
+
+/* Admin */
+.admin{max-width:1360px;margin:0 auto;padding:20px;display:grid;gap:20px}
+.atabs{display:flex;gap:6px;flex-wrap:wrap}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.src{font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:4px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:760px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px}
+.kpi b{display:block;font-family:var(--mono);font-size:22px;font-weight:500}
+.kpi span{font-size:12px;color:var(--muted)}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper);display:grid}
+.card .ph{aspect-ratio:4/3;background:var(--bg);display:grid;place-items:center;overflow:hidden}
+.card .ph img{width:100%;height:100%;object-fit:cover}
+.card .ph svg{width:70%;height:auto}
+.card .meta{padding:10px;display:grid;gap:6px;font-size:12px}
+.card .meta .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card input,.card select{border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:4px 6px;width:100%;font-size:12px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);display:grid;gap:8px;place-items:center}
+.price-in{width:120px;text-align:right;border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:5px 8px;font-family:var(--mono)}
+.empty{color:var(--muted);font-size:14px;padding:16px 0}
+.hidden{display:none !important}
+/* Chương trình phòng */
+.info-line{color:var(--muted);font-size:12px;display:block}
+.prog{display:grid;gap:10px}
+.prog h4{margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.prow{display:grid;grid-template-columns:1fr auto 74px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.prow.sub{padding-left:14px}
+.prow b{font-size:13px;font-weight:600;display:block}
+.prow small{font-size:11px;color:var(--muted)}
+.prow.off b{color:var(--muted);font-weight:500}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.step button{border:0;background:var(--bg);width:26px;height:28px;cursor:pointer;font-size:15px}
+.step span{width:26px;text-align:center;font-family:var(--mono);font-size:13px}
+.prow .unit input{padding:5px 6px;font-family:var(--mono);font-size:12px}
+.prow .unit em{padding-right:6px;font-size:11px}
+/* Thư viện kéo thả */
+.side{display:grid;gap:12px;align-content:start}
+@media (min-width:901px){.side{position:sticky;top:64px;max-height:calc(100vh - 80px);overflow:auto;padding-bottom:8px}}
+.ltabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
+.ltabs button{border:0;background:transparent;padding:10px 8px;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted)}
+.ltabs button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.svg-wrap,.tile,.seltool{-webkit-user-select:none;user-select:none}
+body.dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
+.pal{display:grid;gap:12px}
+.pal h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 6px}
+.pal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tile{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 4px;display:grid;gap:2px;justify-items:center;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.tile:hover{border-color:var(--accent)}
+.tile svg{height:38px;width:100%}
+.tile b{font-size:11px;font-weight:600;text-align:center;line-height:1.2}
+.tile span{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.dragghost{position:fixed;z-index:50;pointer-events:none;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;transform:translate(-50%,-140%);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.seltool{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:13px}
+.seltool .nm{font-weight:600}
+.seltool input{width:64px;border:1px solid var(--line);border-radius:4px;background:var(--paper);padding:4px 6px;font-family:var(--mono);font-size:12px}
+.seltool .hint{color:var(--muted);font-size:12px;margin-left:auto}
+.mode{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.mode.custom{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#svg svg.edit{touch-action:none}
+#svg .fi{cursor:move}
+.snapbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.snapbar>span{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:11px;margin-right:2px}
+.snapbar .chip{padding:3px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
+.snapbar .chip i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.snapbar em{font-style:normal;color:var(--muted);margin-left:auto}
+.svg-wrap.drop-on{outline:2px dashed var(--accent);outline-offset:-4px}
+.addrule{display:grid;grid-template-columns:repeat(6,1fr) auto;gap:8px;margin-top:12px}
+@media (max-width:900px){.addrule{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){.tab,.chip,.btn,.seg button{transition:background .15s,color .15s}}
+/* ---- giao diện kiểu bảng vẽ ---- */
+.top{background:var(--paper);color:var(--ink);border-bottom:1px solid var(--line);padding:10px 20px}
+.brand b{font-weight:700;font-size:20px;letter-spacing:.22em}
+.brand span{color:var(--muted);opacity:1;font-size:12px;letter-spacing:.04em}
+.nav a{opacity:1;color:var(--muted);border-radius:0;padding:6px 2px;margin-left:18px;border-bottom:2px solid transparent}
+.nav a[aria-current="page"]{background:transparent;color:var(--ink);border-bottom-color:var(--ink)}
+.panel{border-radius:4px}
+.panel>header h2{font-family:var(--body);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.panel>header p{font-size:12px}
+.steps{background:var(--bg)}
+.summary{border-radius:4px}
+.summary b{font-size:18px}
+.summary span{text-transform:uppercase;letter-spacing:.08em;font-size:10.5px}
+.tab{border-radius:2px;background:var(--paper)}
+.tab[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.svg-wrap{background:var(--paper);border-radius:2px}
+.btn{border-radius:2px}
+.ltabs{border-radius:4px}
+.tile{background:var(--paper);border-radius:3px;padding:8px 4px 6px}
+.tile svg{height:44px}
+.tile b{font-weight:500}
+.total{border-radius:3px}
+.legend .ln{width:26px;height:0;display:inline-block}
+.spec{display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:12px;padding-left:10px;border-left:1px solid var(--line)}
+.spec dt{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:10.5px}
+.spec dd{margin:0;font-family:var(--mono)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><b>DECOX</b><span>Mặt bằng &amp; dự toán nhà phố</span></div>
+  <nav class="nav" aria-label="Chính">
+    <a href="#thiet-ke" id="nav-design">Thiết kế cho khách</a>
+    <a href="#quan-tri" id="nav-admin">Quản trị DECOX</a>
+  </nav>
+</div>
+
+<!-- ============ KHÁCH HÀNG ============ -->
+<section id="view-design">
+  <div class="steps" aria-hidden="true">
+    <div class="on"><i>1</i>Thông tin đất</div>
+    <div class="on"><i>2</i>Chọn phương án</div>
+    <div class="on"><i>3</i>Kiểm tra tiêu chuẩn</div>
+    <div class="on"><i>4</i>Dự toán sơ bộ</div>
+    <div id="step5"><i>5</i>Nhận báo giá chi tiết</div>
+  </div>
+
+  <div class="wrap">
+    <aside class="side">
+    <div class="ltabs" role="tablist" id="ltabs">
+      <button type="button" role="tab" aria-selected="true" data-l="lot">Lô đất &amp; nhu cầu</button>
+      <button type="button" role="tab" aria-selected="false" data-l="lib">Thư viện nội thất</button>
+    </div>
+    <div class="panel" id="lp-lot">
+      <header><h2>Thông tin lô đất</h2><p>Bản vẽ cập nhật ngay khi bạn sửa số</p></header>
+      <div class="body">
+        <form class="in" id="f" onsubmit="return false">
+          <div class="sec-t" style="border:0;padding:0">1 · Lô đất</div>
+          <div class="grp">
+            <div class="fld"><label for="w">Chiều rộng</label><div class="unit"><input id="w" type="number" step="0.1" min="3" max="12" value="5"><em>m</em></div></div>
+            <div class="fld"><label for="d">Chiều sâu</label><div class="unit"><input id="d" type="number" step="0.1" min="8" max="40" value="20"><em>m</em></div></div>
+            <div class="fld"><label for="road">Lộ giới / hẻm</label><div class="unit"><input id="road" type="number" step="0.5" min="2" max="60" value="8"><em>m</em></div></div>
+            <div class="fld"><label for="front">Khoảng lùi trước</label><div class="unit"><input id="front" type="number" step="0.1" min="0" max="8" value="0"><em>m</em></div></div>
+            <div class="fld full"><label for="dir">Hướng mặt tiền</label><select id="dir" class="plain"><option>Bắc</option><option>Đông Bắc</option><option>Đông</option><option selected>Đông Nam</option><option>Nam</option><option>Tây Nam</option><option>Tây</option><option>Tây Bắc</option></select></div>
+          </div>
+          <small id="lotinfo" class="info-line"></small>
+
+          <div class="sec-t">2 · Diện tích xây dựng</div>
+          <div class="grp">
+            <div class="fld"><label for="dens">Mật độ xây dựng</label><div class="unit"><input id="dens" type="number" min="30" max="100" step="1" placeholder="Tối đa"><em>%</em></div></div>
+            <div class="fld"><label for="floors">Số tầng</label><select id="floors" class="plain"><option value="auto" selected>Tự tính theo nhu cầu</option><option value="2">2 tầng</option><option value="3">3 tầng</option><option value="4">4 tầng</option><option value="5">5 tầng</option><option value="6">6 tầng</option><option value="7">7 tầng</option></select></div>
+            <div class="fld"><label for="fh">Cao tầng (lầu)</label><div class="unit"><input id="fh" type="number" step="0.1" min="3.0" max="4.5" value="3.4"><em>m</em></div></div>
+          </div>
+          <small id="buildinfo" class="info-line"></small>
+          <div class="checks-in">
+            <label class="tog"><input type="checkbox" id="terrace" checked> Tum + sân thượng</label>
+            <label class="tog"><input type="checkbox" id="elev"> Thang máy</label>
+            <label class="tog"><input type="checkbox" id="business"> Kinh doanh tầng trệt</label>
+          </div>
+
+          <div class="sec-t">3 · Xe</div>
+          <div class="grp">
+            <div class="fld"><label for="cars">Ô tô</label><select id="cars" class="plain"><option value="0">Không có</option><option value="1" selected>1 xe</option><option value="2">2 xe</option><option value="3">3 xe</option></select></div>
+            <div class="fld"><label for="carIn">Đậu ô tô</label><select id="carIn" class="plain"><option value="in" selected>Trong nhà</option><option value="out">Ngoài nhà (sân trước)</option></select></div>
+            <div class="fld"><label for="motos">Xe máy</label><div class="unit"><input id="motos" type="number" min="0" max="12" value="2"><em>xe</em></div></div>
+          </div>
+
+          <div class="sec-t">4 · Phòng chức năng</div>
+          <div id="prog" class="prog"></div>
+          <small class="info-line">Diện tích là mục tiêu cho mỗi phòng; app báo khi thấp hơn mức tối thiểu của quy chuẩn.</small>
+
+          <div class="sec-t">Gói xây dựng</div>
+          <div class="seg" role="group" aria-label="Gói xây dựng" id="pkg"></div>
+        </form>
+      </div>
+    </div>
+    <div class="panel hidden" id="lp-lib">
+      <header><h2>Thư viện nội thất</h2><p>Kéo thả vào mặt bằng, hoặc bấm để thêm vào phòng lớn nhất</p></header>
+      <div class="body pal" id="pal"></div>
+    </div>
+    </aside>
+
+    <div class="res">
+      <div class="summary" id="summary"></div>
+
+      <div class="panel">
+        <header>
+          <h2>Phương án mặt bằng</h2>
+          <div class="tabs" role="tablist" id="vtabs" aria-label="Phương án"></div>
+        </header>
+        <div class="body" style="display:grid;gap:12px">
+          <p class="var-desc" id="vdesc"></p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+            <div class="tabs" role="tablist" id="ftabs" aria-label="Tầng"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <div class="seg" role="group" aria-label="Thu phóng" id="zoom"><button type="button" data-z="-1" aria-label="Thu nhỏ">−</button><button type="button" data-z="0" id="zlab">100%</button><button type="button" data-z="1" aria-label="Phóng to">+</button></div>
+              <label class="tog"><input type="checkbox" id="furn" checked> Hiện nội thất</label>
+            </div>
+          </div>
+          <div class="snapbar" id="snapbar"></div>
+          <div class="seltool" id="seltool"></div>
+          <div class="plan-box">
+            <div class="svg-wrap" id="svg"></div>
+            <div>
+              <div class="legend">
+                <div><span class="ln" style="border-top:3px solid var(--ink)"></span>Tường</div>
+                <div><span class="ln" style="border-top:1px dashed var(--muted)"></span>Ranh không gian mở</div>
+                <div><span class="ln" style="border-top:2px solid var(--blue)"></span>Cửa sổ</div>
+                <div><span class="ln" style="border-top:1px solid var(--ink)"></span>Nội thất</div>
+                <div><span class="ln" style="border-top:1.5px dashed var(--accent);background:transparent"></span>Vùng thông thủy</div>
+                <div><span class="ln" style="border-top:1.5px dashed var(--blue)"></span>Đường gióng bắt điểm</div>
+                <div><s style="background:var(--room-out)"></s>Sân, giếng trời</div>
+              </div>
+              <table class="roomlist" id="rooms"></table>
+            </div>
+          </div>
+          <div id="fwrap">
+            <div class="sec-t" style="margin-bottom:4px">Khoảng thông thủy nội thất · <span id="fname"></span></div>
+            <ul class="chk" id="fchecks"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <header><h2>Kiểm tra tiêu chuẩn</h2><div class="chk-sum" id="chksum"></div></header>
+          <div class="body"><ul class="chk" id="checks"></ul></div>
+        </div>
+        <div class="panel">
+          <header><h2>Dự toán sơ bộ</h2><p id="pkgname"></p></header>
+          <div class="body">
+            <div class="tscroll"><table class="t" id="cost"></table></div>
+            <div class="total"><span>Tổng dự toán (±10%)</span><b id="total"></b></div>
+            <p class="note">Đơn giá đang là số mẫu; DECOX chỉnh lại trong trang Quản trị. Chưa gồm nội thất rời, cọc ép và chi phí xin phép.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <header><h2>Nhận bản vẽ &amp; báo giá chi tiết</h2></header>
+          <div class="body">
+            <form class="lead" id="leadf">
+              <div class="fld"><label for="lname">Họ tên</label><input id="lname" class="plain" required autocomplete="name"></div>
+              <div class="fld"><label for="lphone">Số điện thoại</label><input id="lphone" class="plain" required inputmode="tel" autocomplete="tel" pattern="[0-9 +.]{9,14}"></div>
+              <div class="fld"><label for="laddr">Địa chỉ lô đất</label><input id="laddr" class="plain" placeholder="Ví dụ: hẻm 8 m, Phường Bình Thạnh"></div>
+              <button class="btn" type="submit">Gửi yêu cầu cho DECOX</button>
+              <div id="leadok" class="okmsg hidden"></div>
+            </form>
+          </div>
+        </div>
+        <div class="panel">
+          <header><h2>Xuất sang SketchUp</h2><button class="btn ghost sm" id="copyjson" type="button">Chép JSON</button></header>
+          <div class="body" style="display:grid;gap:10px">
+            <p class="var-desc">File JSON mô tả tường, phòng, cửa và cao độ từng tầng. Plugin SketchUp đọc file này để tự dựng khối 3D; công cụ báo giá DECOX dùng cùng file để bóc khối lượng.</p>
+            <pre class="json" id="json"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUẢN TRỊ ============ -->
+<section id="view-admin" class="hidden">
+  <div class="admin">
+    <div class="kpis" id="kpis"></div>
+    <div class="atabs" role="tablist" id="atabs"></div>
+
+    <div class="panel" id="a-rules">
+      <header><h2>Bảng quy tắc tiêu chuẩn</h2><p>App dùng các dòng này để kiểm tra mặt bằng</p></header>
+      <div class="body" style="display:grid;gap:12px">
+        <div class="filters">
+          <input class="plain" id="rq" placeholder="Tìm: cầu thang, ban công, khoảng lùi…" style="max-width:300px" aria-label="Tìm quy tắc">
+          <div id="rsrc" class="filters"></div>
+        </div>
+        <div class="tscroll"><table class="t" id="rtable"></table></div>
+        <form class="addrule" id="addrule">
+          <select id="ar-src" class="plain" aria-label="Nguồn"></select>
+          <input id="ar-cat" class="plain" placeholder="Hạng mục" required aria-label="Hạng mục">
+          <input id="ar-par" class="plain" placeholder="Thông số" required aria-label="Thông số">
+          <input id="ar-cond" class="plain" placeholder="Điều kiện" aria-label="Điều kiện">
+          <input id="ar-val" class="plain" placeholder="Giá trị" required aria-label="Giá trị">
+          <input id="ar-art" class="plain" placeholder="Điều" aria-label="Điều">
+          <button class="btn sm" type="submit">Thêm quy tắc</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="a-rooms">
+      <header><h2>Quy chuẩn phòng</h2><p>Mức tối thiểu, diện tích mục tiêu và yêu cầu của từng loại phòng. Bộ sinh mặt bằng và phần kiểm tra dùng bảng này.</p></header>
+      <div class="body"><div class="tscroll"><table class="t" id="rstable"></table></div></div>
+    </div>
+
+    <div class="panel hidden" id="a-furn">
+      <header><h2>Thư viện nội thất</h2><p>Kích thước đồ và khoảng thông thủy app dùng để bố trí và kiểm tra. Đây là thông lệ thiết kế (tham khảo Neufert), TCVN không quy định.</p></header>
+      <div class="body two">
+        <div class="tscroll"><table class="t" id="fstable"></table></div>
+        <div class="tscroll"><table class="t" id="fctable"></table></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="a-plans">
+      <header><h2>Kho mặt bằng mẫu</h2><p>Gắn nhãn để app tìm mẫu gần nhất với yêu cầu khách</p></header>
+      <div class="body" style="display:grid;gap:14px">
+        <label class="drop" for="upl">
+          <strong>Kéo thả hoặc bấm để chọn hình mặt bằng</strong>
+          <span>JPG, PNG. Mỗi hình cần: rộng, sâu, số tầng, số phòng ngủ, hướng.</span>
+          <input type="file" id="upl" accept="image/*" multiple class="hidden">
+        </label>
+        <div class="gal" id="gal"></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="a-price">
+      <header><h2>Đơn giá &amp; hệ số diện tích</h2><p>Thay đổi áp dụng ngay cho trang khách</p></header>
+      <div class="body two">
+        <div class="tscroll"><table class="t" id="ptable"></table></div>
+        <div class="tscroll"><table class="t" id="ctable"></table></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="a-leads">
+      <header><h2>Khách tiềm năng</h2><p>Khách gửi yêu cầu từ trang thiết kế</p></header>
+      <div class="body"><div class="tscroll"><table class="t" id="ltable"></table></div></div>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ================= DỮ LIỆU ================= */
+const PKGS = [
+  {id:"tho", name:"Phần thô + nhân công", price:3.8},
+  {id:"tc",  name:"Trọn gói tiêu chuẩn", price:5.8},
+  {id:"kha", name:"Trọn gói khá", price:6.8}
+];
+const COEF = {mong:50, tang:100, lung:100, tum:100, santhuong:50, mai:50};
+const COEF_NAMES = {mong:"Móng (theo diện tích trệt)", tang:"Sàn các tầng", lung:"Sàn lửng", tum:"Tum thang", santhuong:"Sân thượng không mái", mai:"Mái BTCT (khi không có sân thượng)"};
+
+/* Thư viện nội thất: kích thước [dài theo tường, sâu] (m) và khoảng thông thủy (m). Thông lệ thiết kế, tham khảo Neufert — không phải TCVN. */
+const FURN = {
+  s:{ bedDouble:[1.6,2.0], bedSingle:[1.2,2.0], night:[0.45,0.4], wardrobe:[2.4,0.6], sofa:[2.2,0.85], coffee:[1.1,0.6], tv:[1.8,0.45],
+      car:[4.6,1.85], table6:[1.8,0.9], table4:[1.4,0.8], counter:[3.2,0.6], fridge:[0.7,0.7], toilet:[0.4,0.7], lavabo:[0.55,0.45],
+      shower:[0.9,0.9], desk:[1.4,0.7], shelf:[1.6,0.35], altar:[1.6,0.6], washer:[0.6,0.6], display:[3.0,0.45] },
+  c:{ bedSide:0.6, bedFoot:0.6, wardrobeFront:0.9, sofaTable:0.45, tvDist:2.0, walk:0.9, tableChair:0.9, toiletFront:0.6, toiletSide:0.4, carSide:0.6, altarFront:1.2, deskChair:0.9 }
+};
+const FURN_S_NAMES = {bedDouble:"Giường đôi",bedSingle:"Giường đơn",night:"Tab đầu giường",wardrobe:"Tủ áo",sofa:"Sofa 3 chỗ",coffee:"Bàn trà",tv:"Kệ tivi",car:"Ô tô 5 chỗ",table6:"Bàn ăn 6 ghế",table4:"Bàn ăn 4 ghế",counter:"Tủ bếp (tối đa)",fridge:"Tủ lạnh",toilet:"Bồn cầu",lavabo:"Lavabo",shower:"Vách tắm đứng",desk:"Bàn làm việc",shelf:"Kệ sách",altar:"Bàn thờ",washer:"Máy giặt",display:"Kệ trưng bày"};
+const FURN_C_NAMES = {bedSide:"Lối đi hai bên giường",bedFoot:"Lối đi cuối giường",wardrobeFront:"Khoảng mở cửa tủ áo",sofaTable:"Sofa đến bàn trà",tvDist:"Khoảng nhìn sofa – tivi",walk:"Lối đi chính trong phòng",tableChair:"Mép bàn ăn đến tường/quầy (lùi ghế)",toiletFront:"Khoảng trống trước bồn cầu",toiletSide:"Tâm bồn cầu đến vật cản bên",carSide:"Khoảng mở cửa xe",altarFront:"Khoảng trống trước bàn thờ",deskChair:"Khoảng kéo ghế bàn làm việc"};
+
+const SRC = {
+  "13967":"TCVN 13967:2024",
+  "13967-PCCC":"TCVN 13967 – Điều 9 PCCC",
+  "HCM":"QĐ 81/2026 TP.HCM",
+  "9411":"TCVN 9411:2012",
+  "NT":"Thông lệ nội thất"
+};
+// [nguồn, hạng mục, thông số, điều kiện, giá trị, điều]
+let RULES = [
+["13967","Thửa đất (dự án)","Diện tích","tối thiểu","50 m²","5.2.1"],
+["13967","Thửa đất (dự án)","Mặt tiền","đường ≥ 19 m / < 19 m","≥ 5 m / ≥ 4 m","5.2.1"],
+["13967","Thửa đất (hiện hữu)","Diện tích / mặt tiền, chiều sâu","không nên nhỏ hơn","30 m² / 3,0 m","5.2.2"],
+["13967","Mật độ xây dựng thuần","Tối đa theo diện tích thửa","≤ 90 / 100 / 200 / 300 / 500 / ≥ 1 000 m²","100 / 90 / 70 / 60 / 50 / 40 %, nội suy","5.5"],
+["13967","Hệ số sử dụng đất","Tối đa","—","7 lần","5.5"],
+["13967","Khoảng lùi","Theo đường và chiều cao nhà","Bảng 1, khu phát triển mới","0 – 6 m","5.3.1"],
+["13967","Chiều cao thông thủy","Phòng ở, phòng ăn","tối thiểu","2,6 m","5.9"],
+["13967","Chiều cao thông thủy","Bếp, vệ sinh, giặt, kho","tối thiểu","2,3 m","5.9"],
+["13967","Chiều cao thông thủy","Tầng hầm, bán hầm","tối thiểu","2,0 m","5.9"],
+["13967","Phòng ngủ giường đơn / đôi","Diện tích sử dụng","tối thiểu","9 / 12 m²","5.10"],
+["13967","Sinh hoạt chung; tiếp khách","Diện tích sử dụng","tối thiểu","13 m² mỗi loại","5.10"],
+["13967","Bếp, ăn","Diện tích sử dụng","tối thiểu","12 m²","5.10"],
+["13967","Phòng vệ sinh; kho","Diện tích sử dụng","tối thiểu","3 m²","5.10"],
+["13967","Cầu thang","Chiều rộng bản thang","tối thiểu","700 mm","5.11"],
+["13967","Cầu thang","Chiều cao thông thủy","tối thiểu","2 000 mm","5.11"],
+["13967","Bậc thang","Mặt bậc / chiều cao bậc","—","≥ 250 mm / 50 – 190 mm","5.11"],
+["13967","Bậc thang","2 × cao + rộng","trong khoảng","550 – 700 mm","5.11"],
+["13967","Lan can","Chiều cao / khe hở","—","≥ 900 mm / ≤ 100 mm","5.11"],
+["13967","Lối đi","Thông thủy dưới bộ phận nhô ra > 0,1 m","tối thiểu","2 m","5.14"],
+["13967","Sàn khu dùng nước","Độ dốc về phễu thu","tối thiểu","2 %","5.13"],
+["13967","Tầng hầm","Số tầng","không nên quá","1","5.17"],
+["13967-PCCC","Chống cháy lan sang nhà bên","Khoảng cách tường ngoài đến ranh đất","nếu không dùng kết cấu ngăn cháy","> 1,5 m","9.1.6"],
+["13967-PCCC","Tường ngăn cháy chịu lực","Gạch / BTCT","chiều dày tối thiểu","100 mm / 75 mm, hoặc REI 30","9.1.7a"],
+["13967-PCCC","Tường ngăn cháy không chịu lực","Gạch đất nung / gạch bê tông / vách khung thép","chiều dày tối thiểu","75 / 50 / 100 mm, hoặc EI 30","9.1.7b"],
+["13967-PCCC","Lối ra khẩn cấp","Lỗ mở sàn ban công, lô gia","tối thiểu","0,6 × 0,8 m","9.1.9"],
+["13967-PCCC","Khu lánh nạn tạm thời","Kích thước mặt bằng","mọi chiều","≥ 600 mm","9.1.9"],
+["13967-PCCC","Khu lánh nạn tạm thời","Tường ngăn dài / dày","tối thiểu","1 200 mm / 100 mm","9.1.9"],
+["13967-PCCC","Thang ngoài nhà","Bảo vệ (lan can, lồng)","khi cao","≥ 10 m","9.1.10"],
+["13967-PCCC","Hành lang bên","Lỗ mở ra ngoài / diện tích sàn hành lang","có / không ngăn cháy với phòng","≥ 15 % / ≥ 25 %","9.1.4"],
+["13967-PCCC","Nhà chỉ để ở","Thoát nạn","qua cầu thang hở (loại 2)","cho phép","9.2.2.1"],
+["13967-PCCC","Nhà kết hợp, T > 70 %","Được làm như nhà ở","PCCC ≤ 15 m, sàn ≤ 100 m²/tầng, ≤ 20 người/tầng","theo 9.2","9.3.3.1"],
+["13967-PCCC","Nhà kết hợp","Lối ra thoát nạn rộng / cao","tối thiểu","0,8 m / 1,9 m","9.3.3.3.1"],
+["13967-PCCC","Nhà kết hợp","Đường thoát nạn ngang rộng / cao","tối thiểu","1,0 m / 2,0 m","9.3.3.3.1"],
+["13967-PCCC","Nhà kết hợp","Thoát qua cầu thang hở","≤ 3 tầng và PCCC ≤ 15 m","cho phép","9.3.3.3.2"],
+["13967-PCCC","Nhà kết hợp","Buồng thang hoặc thang loại 3","≥ 4 tầng hoặc PCCC > 15 m","bắt buộc (trừ ngoại lệ)","9.3.3.3.3"],
+["13967-PCCC","Tầng hầm","Số lối ra thoát nạn","> 300 m² hoặc > 15 người","2","9.3.3.3.4"],
+["13967-PCCC","Khu để xe ở hầm","Vách ngăn cháy","sàn thấp hơn mặt đất > 0,5 m","EI 45","9.3.3.5.4"],
+["13967-PCCC","Khu nguy cơ cháy ở tầng trệt","Miễn ngăn cháy","diện tích","≤ 10 % sàn tầng","9.3.3.5.2"],
+["13967-PCCC","Nhà kết hợp, T 30–70 %","Khoảng cách cửa phòng đến lối ra","giữa 2 thang / hành lang cụt","≤ 40 m / ≤ 25 m","9.3.4.3.2"],
+["13967-PCCC","Nhà kết hợp, T 30–70 %","Số lối ra mỗi tầng","từ 3 tầng","≥ 2","9.3.4.3.5"],
+["13967-PCCC","Karaoke, vũ trường…","Lối ra / đường thoát nạn","tối thiểu","1,0 m / 1,2 m","9.3.1.4"],
+["HCM","Mật độ xây dựng tối đa","Theo diện tích lô","≤ 50 / 100 / 200 / 300 / 500 / ≥ 1 000 m²","100 / 90 / 70 / 60 / 50 / 40 %, nội suy","Bảng 15-1, 15-2"],
+["HCM","Hệ số sử dụng đất","Z = V/k + Y","tối đa","< 7 lần; k = 82 % nếu không xác định được","15.2c"],
+["HCM","Hệ số cộng/trừ Y","Lộ giới ≥ 25 / 20–25 / 12–20 / 7–12 / 3,5–7 / < 3,5 m","—","+0,75 / +0,5 / +0,25 / 0 / −0,25 / −0,5","Bảng 15-5"],
+["HCM","Khoảng lùi trước","Theo QCVN 01:2021 Bảng 2.7","ban công, ô văng được nằm trong khoảng lùi","—","15.2b"],
+["HCM","Khoảng lùi sau","Chiều sâu lô D","S ≤ 50 m² hoặc D < 12 m","không bắt buộc","Bảng 15-3"],
+["HCM","Khoảng lùi sau","Chiều sâu lô D","12 ≤ D < 18 m / D ≥ 18 m","≥ 1,0 m / ≥ 2,0 m; khoảng trống ≥ 8 % lô và ≥ 4 m²","Bảng 15-3"],
+["HCM","Tum thang","Lùi so với chỉ giới mặt tiền / cao","tối thiểu / tối đa","3,5 m / 3,0 m; ≤ 30 % sàn mái","3.4"],
+["HCM","Tầng lửng","Diện tích sàn","không tính vào số tầng khi","≤ 65 % tầng dưới, 1 tầng lửng","3.4c"],
+["HCM","Tầng hầm","Số tầng / điểm bắt đầu ram dốc","trong ranh đất","1 tầng / cách lộ giới ≥ 3,0 m","15.1d, đ"],
+["HCM","Mái đua","Độ vươn / cao hơn vỉa hè","đường thương mại, vỉa hè > 3 m","≤ 2,0 m / ≥ 3,5 m","15.5b"],
+["HCM","Hàng rào","Cao / chân đặc / độ thoáng","—","≤ 2,6 m / ≤ 1,0 m / ≥ 50 %","18"],
+["HCM","Cổng","Chiều cao","tối đa","1,5 lần hàng rào, ≤ 3,9 m","18"],
+["HCM","Mặt tiền","Số màu / tỷ lệ kính / phản quang","khuyến khích","≤ 3 / < 80 % / < 20 %","19"],
+["9411","Lô đất","Rộng / diện tích","tối thiểu","4,5 m / 45 m² (dự án: 5 m / 50 m²)","5.1.1"],
+["9411","Lô đất","Không được xây","sau giải toả","< 15 m², hoặc rộng/sâu < 3,0 m","5.1.1"],
+["9411","Nhà sâu","Giếng trời, thông gió","chiều sâu","> 18 m thì bắt buộc","5.1.2"],
+["9411","Số tầng","Tối đa","mọi trường hợp / hẻm < 6 m","6 tầng / 4 tầng","5.5.1"],
+["9411","Chiều cao","Chưa có quy hoạch chi tiết","tối đa","4 lần chiều rộng nhà","5.5.2"],
+["9411","Chiều cao theo lô","30–40 m² / 40–50 m² / > 50 m²","kèm điều kiện mặt tiền, sâu > 5 m","4 tầng + tum, 16 m / 5 tầng + tum, 20 m / 6 tầng, 24 m","5.5.4"],
+["9411","Tầng trệt","Chiều cao thông thủy","không / có tầng lửng","≥ 3,6 m / ≥ 2,7 m","5.5.6"],
+["9411","Nền nhà","Cao hơn vỉa hè / mặt đường","tối thiểu","150 mm / 300 mm","6.4.1.1"],
+["9411","Cầu thang thoát người","Chiều rộng","tối thiểu","0,9 m (TCVN 13967: 0,7 m)","6.3.5.1"],
+["9411","Tường chung","Chiều dày","tối thiểu","0,2 m","4.6"],
+["9411","Cửa trên tường bên","Khoảng cách đến ranh đất","được mở cửa khi","≥ 2,0 m","6.4.3.1"],
+["9411","Ban công","Độ vươn theo lộ giới","< 5 / 5–7 / 7–12 / 12–15 / > 15 m","0 / 0,5 / 0,9 / 1,2 / 1,4 m","Bảng 2"],
+["9411","Ban công","Mặt dưới cao hơn vỉa hè","tối thiểu","3,5 m","6.4.4.3"],
+["9411","Ban công trong hẻm","Hẻm < 4 m","nhà hai bên / một bên","không được / ≤ 0,6 m","6.4.4.4"],
+["9411","Mái đón","Vươn quá mép vỉa hè","tối đa","0,6 m, cao ≥ 3,5 m","6.4.2.1"],
+["9411","Phần nhô ra dưới 3,5 m","Gờ chỉ, bậu cửa","từ cao 1,0 m","≤ 0,2 m","6.4.1.2.1"],
+["9411","Nhà góc","Vạt góc theo góc giao","< 45° / ≥ 45° / 90° / ≤ 135° / > 135°","8×8 / 5×5 / 4×4 / 3×3 / 2×2 m","Bảng 1"],
+["9411","Máy lạnh mặt tiền","Chiều cao đặt","tối thiểu","2,7 m","6.4.8.3"],
+["9411","Hàng rào","Cao / chân đặc giữa hai nhà","tối đa","2,6 m / 0,6 m","6.4.6.1"],
+["9411","Sân vườn","Sân trước / sân sau","tối thiểu","2,4 m / 2,0 m","4.7"]
+];
+
+const SAMPLE_PLANS = [
+  {name:"NP-5x20-4T-Q.BinhThanh", w:5, d:20, f:4, b:4, dir:"Đông Nam", demo:true},
+  {name:"NP-4x16-3T-Q.GoVap", w:4, d:16, f:3, b:3, dir:"Tây", demo:true},
+  {name:"NP-6x18-5T-Q.7", w:6, d:18, f:5, b:5, dir:"Nam", demo:true}
+];
+
+let LEADS = [];
+try { LEADS = JSON.parse(localStorage.getItem("decox_leads")||"[]"); } catch(e){ LEADS = []; }
+if(!LEADS.length) LEADS = [{t:"18/11/2026 20:14", name:"Khách mẫu – Ngô Văn A", phone:"0900 000 000", addr:"Hẻm 6 m, Gò Vấp", spec:"4 × 16 m · 3 tầng · 3 PN", total:"≈ 1,62 tỷ", demo:true}];
+
+/* ================= TIỆN ÍCH ================= */
+const $ = s => document.querySelector(s);
+const fmt = (n,dg=1) => n.toLocaleString("vi-VN",{maximumFractionDigits:dg,minimumFractionDigits:0});
+const r2 = n => Math.round(n*100)/100;
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function money(trieu){ return trieu>=1000 ? fmt(trieu/1000,2)+" tỷ" : fmt(trieu,0)+" triệu"; }
+
+let state = {variant:"A", floor:0, pkg:"tc", furn:true, custom:{}, sel:null, zoom:1, snap:{wall:true,item:true,center:true,gap:true,grid:true}, zones:false};
+
+/* ================= QUY CHUẨN PHÒNG ================= */
+// min: tối thiểu (TCVN 13967 Điều 5.10 nếu có), tgt: mục tiêu mặc định, minW: cạnh ngắn tối thiểu, fl: tầng ưu tiên, light: cần cửa sổ
+const ROOM_STD = {
+  khach:   {n:"Phòng khách",        min:13, tgt:20,  minW:3.0, fl:"ground", light:1, type:"live", src:"TCVN 13967 · 5.10"},
+  bep:     {n:"Bếp + ăn",           min:12, tgt:18,  minW:2.6, fl:"ground", light:1, type:"live", src:"TCVN 13967 · 5.10"},
+  master:  {n:"Phòng ngủ master",   min:12, tgt:20,  minW:3.2, fl:"upper",  light:1, type:"bed",  src:"TCVN 13967 · 5.10"},
+  ngu:     {n:"Phòng ngủ",          min:12, tgt:15,  minW:2.8, fl:"upper",  light:1, type:"bed",  src:"TCVN 13967 · 5.10"},
+  wc:      {n:"WC chung",           min:3,  tgt:3.6, minW:1.2, fl:"any",    light:0, type:"wet",  src:"TCVN 13967 · 5.10"},
+  wcr:     {n:"WC trong phòng ngủ", min:3,  tgt:3.6, minW:1.2, fl:"upper",  light:0, type:"wet",  src:"TCVN 13967 · 5.10"},
+  sinhhoat:{n:"Sinh hoạt chung",    min:13, tgt:16,  minW:3.0, fl:"upper",  light:1, type:"live", src:"TCVN 13967 · 5.10"},
+  lamviec: {n:"Phòng làm việc",     min:6,  tgt:9,   minW:2.4, fl:"upper",  light:1, type:"live", src:"Thông lệ"},
+  tho:     {n:"Phòng thờ",          min:6,  tgt:9,   minW:2.4, fl:"top",    light:0, type:"live", src:"Thông lệ"},
+  giat:    {n:"Giặt phơi",          min:3,  tgt:6,   minW:1.5, fl:"top",    light:1, type:"wet",  src:"Thông lệ"},
+  kho:     {n:"Kho",                min:3,  tgt:4,   minW:1.2, fl:"any",    light:0, type:"live", src:"TCVN 13967 · 5.10"},
+  giupviec:{n:"Phòng giúp việc",    min:9,  tgt:9,   minW:2.4, fl:"ground", light:1, type:"bed",  src:"TCVN 13967 · 5.10 (giường đơn)"},
+  gym:     {n:"Phòng gym",          min:12, tgt:16,  minW:3.0, fl:"upper",  light:1, type:"live", src:"Thông lệ"},
+  yoga:    {n:"Phòng yoga",         min:9,  tgt:12,  minW:3.0, fl:"upper",  light:1, type:"live", src:"Thông lệ"},
+  xonghoi: {n:"Phòng xông hơi",     min:3,  tgt:4.5, minW:1.6, fl:"top",    light:0, type:"wet",  src:"Thông lệ"},
+  giaitri: {n:"Giải trí / karaoke", min:12, tgt:18,  minW:3.0, fl:"upper",  light:0, type:"live", src:"Thông lệ"}
+};
+const FL_NAMES = {ground:"Tầng trệt", upper:"Tầng trên", top:"Tum", any:"Bất kỳ"};
+const OPEN_KEYS = ["khach","bep","sinhhoat","garage","business","open"];
+const PROG_GROUPS = [["Phòng chính",["khach","bep","ngu","wc"]],["Phòng phụ",["sinhhoat","lamviec","tho","giat","kho","giupviec"]],["Tiện ích",["gym","yoga","xonghoi","giaitri"]]];
+const MAXC = {khach:2,bep:2,ngu:8,master:8,wcr:8,wc:6,sinhhoat:3,lamviec:2,tho:1,giat:1,kho:2,giupviec:2,gym:1,yoga:1,xonghoi:1,giaitri:1};
+let PROG = {khach:1,bep:1,ngu:4,master:1,wcr:2,wc:1,sinhhoat:1,lamviec:0,tho:1,giat:1,kho:0,giupviec:0,gym:0,yoga:0,xonghoi:0,giaitri:0};
+let AREA = {};
+const tgtA = k => +(AREA[k] ?? ROOM_STD[k].tgt);
+const CW = 1.0;   // bề rộng hành lang / sảnh (m)
+
+function params(){
+  const fl=$("#floors").value;
+  return { W:+$("#w").value||5, D:+$("#d").value||20, road:+$("#road").value||8, F:+$("#front").value||0,
+    dens: $("#dens").value ? +$("#dens").value : null, nMode: fl==="auto"?"auto":+fl, fh:+$("#fh").value||3.4, dir:$("#dir").value,
+    terrace:$("#terrace").checked, business:$("#business").checked, elev:$("#elev").checked,
+    cars:+$("#cars").value, carIn:$("#carIn").value==="in", motos:Math.max(0,Math.round(+$("#motos").value||0)), prog:{...PROG} };
+}
+function rearSetback(p){ const S=p.W*p.D; if(S<=50||p.D<12) return 0; return p.D<18?1.0:2.0; }
+function maxDensity(S){ // nội suy bảng 15-1 TP.HCM
+  const t=[[50,100],[100,90],[200,70],[300,60],[500,50],[1000,40]];
+  if(S<=t[0][0]) return 100; if(S>=1000) return 40;
+  for(let i=0;i<t.length-1;i++){ const [a,va]=t[i],[b,vb]=t[i+1]; if(S<=b) return va+(vb-va)*(S-a)/(b-a); }
+}
+function balcony(road){ if(road<5) return 0; if(road<7) return 0.5; if(road<12) return 0.9; if(road<=15) return 1.2; return 1.4; }
+
+/* cầu thang tính từ chiều cao tầng lớn nhất (TCVN 13967 · 5.11) */
+function stairGeom(p){
+  const H = Math.max(p.business?4.2:3.9, p.fh);
+  const n = Math.ceil(H/0.175), riser = H/n, tread = 0.26, fw = 1.0;
+  if(p.W < 4.2) return {type:"I", n, riser, tread, fw, H, sw:fw, sl:r2((n-1)*tread+0.3)};
+  const per = Math.ceil(n/2);
+  return {type:"U", n, riser, tread, fw, H, sw:r2(2*fw+0.1), sl:r2((per-1)*tread + fw + 0.2)};
+}
+
+/* ================= SINH MẶT BẰNG THEO CHƯƠNG TRÌNH ================= */
+const VARIANTS = {
+  A:"Lõi thang giữa nhà, giếng trời ngay sau lõi. Phòng chia hai khối trước – sau, cả hai đều lấy được sáng.",
+  B:"Lõi thang dồn cuối nhà, giếng trời trước lõi. Khối trước liền mạch, hợp nhà kinh doanh hoặc lô ngắn.",
+  C:"Lõi thang lệch về phía trước. Khối sau lớn hơn cho phòng ngủ yên tĩnh, xa mặt đường."
+};
+function specOf(key, extra){ const s=ROOM_STD[key]; const a=tgtA(key);
+  return {key, name:s.n, type:s.type, light:!!s.light, enc:!OPEN_KEYS.includes(key), tgt:a, min:s.min, minW:s.minW, area:a, ...(extra||{})}; }
+
+function buildProgram(p){
+  const pr=p.prog, ground=[], upper=[], top=[], notes=[];
+  // khu để xe
+  let garage=null;
+  const carsIn = p.carIn ? p.cars : 0;
+  const motoRow = Math.max(1, Math.floor((p.W-0.2)/0.75));
+  if(carsIn>0 || p.motos>0){
+    const perRow = Math.max(1, Math.floor((p.W-0.3)/2.5));
+    const rows = carsIn ? Math.ceil(carsIn/perRow) : 0;
+    const side = carsIn ? p.W-0.3-Math.min(carsIn,perRow)*2.5 : 0;
+    const sideCap = carsIn ? Math.floor(side/0.8)*2 : 0;
+    const extraM = Math.max(0, p.motos - sideCap);
+    let d = rows*5.2 + (extraM ? 2.0*Math.ceil(extraM/motoRow) : 0) + 0.3;
+    if(!rows) d = Math.max(2.3, d);
+    garage = {key:"garage", name: carsIn? "Để xe" : "Để xe máy", type:"live", enc:false, light:false, fixedD:r2(d), area:r2(d*p.W), cars:carsIn, motos:p.motos, perRow, sideCap};
+  }
+  if(p.cars>0 && !p.carIn && p.F<5) notes.push({st:"warn",t:"Không đủ chỗ đậu ô tô ngoài nhà",d:`Khoảng lùi trước ${fmt(p.F)} m < 5 m nên ô tô phải đậu trên vỉa hè hoặc lòng đường.`,c:"Thông lệ"});
+  if(p.business) ground.push({key:"business", name:"Kinh doanh", type:"live", enc:false, light:true, area:Math.max(20,tgtA("khach")+4), tgt:null});
+  for(let i=0;i<pr.khach;i++) ((p.business||i>0)?upper:ground).push(specOf("khach"));
+  for(let i=0;i<pr.bep;i++) (i===0?ground:upper).push(specOf("bep"));
+  for(let i=0;i<pr.giupviec;i++) ground.push(specOf("giupviec"));
+  let wcLeft=pr.wc; if(wcLeft>0){ ground.push(specOf("wc")); wcLeft--; }
+  for(let i=0;i<pr.ngu;i++){ const s=specOf(i<pr.master?"master":"ngu"); if(i<pr.wcr){ s.ensuite=tgtA("wcr"); s.area=r2(s.area+s.ensuite); } upper.push(s); }
+  for(let i=0;i<pr.sinhhoat;i++) upper.push(specOf("sinhhoat"));
+  ["lamviec","gym","yoga","giaitri"].forEach(k=>{ for(let i=0;i<pr[k];i++) upper.push(specOf(k)); });
+  for(let i=0;i<wcLeft;i++) upper.push(specOf("wc"));
+  for(let i=0;i<pr.kho;i++) upper.push(specOf("kho"));
+  ["tho","giat","xonghoi"].forEach(k=>{ for(let i=0;i<pr[k];i++) (p.terrace?top:upper).push(specOf(k)); });
+  return {garage, ground, upper, top, notes};
+}
+
+function genPlan(p, v){
+  const W=p.W, S=W*p.D, notes=[];
+  const Rmin = rearSetback(p), maxD = maxDensity(S);
+  const want = p.dens ? Math.min(p.dens, maxD) : maxD;
+  if(p.dens && p.dens>maxD) notes.push({st:"warn",t:"Mật độ yêu cầu vượt mức cho phép",d:`Bạn chọn ${fmt(p.dens)} %, lô ${fmt(S)} m² tối đa ${fmt(maxD)} %. App dùng ${fmt(maxD)} %.`,c:"QĐ 81 · Bảng 15-1"});
+  const Lmax = p.D - p.F - Rmin;
+  const Lb = r2(Math.max(6, Math.min(Lmax, want/100*S/W)));
+  const R = r2(p.D - p.F - Lb), y0=p.F, y1=r2(p.F+Lb);
+  const st = stairGeom(p);
+  const prog = buildProgram(p); notes.push(...prog.notes);
+  const wellD = Lb>15 ? 1.5 : 0;
+  const slotW = r2(W - st.sw - CW), hasSlot = slotW>=1.2;
+  const liftOK = p.elev && hasSlot && slotW>=1.4;
+  if(p.elev && !liftOK) notes.push({st:"warn",t:"Không đặt được thang máy",d:`Lô rộng ${fmt(W)} m: cạnh cầu thang không đủ ${fmt(1.4+CW,1)} m cho giếng thang và sảnh.`,c:"Thông lệ"});
+  const LAND = 1.2, coreL = r2(st.sl + LAND);   // dải sảnh chiếu nghỉ trước cầu thang + cầu thang
+  const slotLen = r2(st.sl - (liftOK?1.7:0)), slotOK = hasSlot && slotLen>=1.5;
+
+  // vị trí lõi thang (giữ nguyên qua các tầng)
+  const gFront = (prog.garage?prog.garage.fixedD:0) + prog.ground.filter(s=>["khach","business"].includes(s.key)).reduce((a,s)=>a+s.area,0)/W;
+  const free = Lb - coreL - wellD;
+  let coreY;
+  if(v==="B") coreY = y1 - coreL;
+  else { coreY = y0 + Math.max(gFront, free*(v==="A"?0.5:0.36)); coreY = Math.min(coreY, y1 - coreL - wellD - 2.6); coreY = Math.max(coreY, y0+2.5); }
+  coreY = r2(coreY);
+  const Z = v==="B" ? {front:[y0, r2(coreY-wellD)], back:null, well: wellD?[r2(coreY-wellD), coreY]:null, wellSide:"front"}
+                    : {front:[y0, coreY], back:[r2(coreY+coreL+wellD), y1], well: wellD?[r2(coreY+coreL), r2(coreY+coreL+wellD)]:null, wellSide:"back"};
+  const fD = Z.front[1]-Z.front[0], bD = Z.back ? Z.back[1]-Z.back[0] : 0;
+  const capUp = (fD+bD)*W*0.97;
+
+  // ---- phân phòng lên các tầng trên
+  const SLOTK = ["wc","kho","xonghoi"];
+  function pack(list, thr){
+    const fl=[]; let cur=null; const nf=()=>{ cur={specs:[],sum:0,slot:null}; fl.push(cur); }; nf();
+    for(const s of list){
+      if(slotOK && !cur.slot && SLOTK.includes(s.key) && s.area<=slotW*slotLen*1.2){ cur.slot=s; continue; }
+      if(cur.sum+s.area>thr && cur.specs.length) nf();
+      cur.specs.push(s); cur.sum+=s.area;
+    }
+    return fl;
+  }
+  const ups = prog.upper, totalUp = ups.reduce((a,s)=>a+s.area,0);
+  const maxUp = (p.road<6?4:6) - 1;
+  let fl, nUp;
+  if(p.nMode==="auto"){ fl = ups.length ? pack(ups, capUp) : [{specs:[],sum:0,slot:null}]; nUp = Math.min(fl.length, maxUp); }
+  else { nUp = Math.max(1, p.nMode-1); fl = ups.length ? pack(ups, Math.min(capUp*1.08, Math.max(totalUp/nUp*1.15, 8))) : []; while(fl.length<nUp) fl.push({specs:[],sum:0,slot:null}); }
+  const unplaced = fl.slice(nUp).flatMap(f=>[...f.specs, ...(f.slot?[f.slot]:[])]);
+  fl = fl.slice(0,nUp);
+  fl.forEach((f,i)=>{
+    if(!f.specs.length) f.specs.push({...specOf("sinhhoat"), name:"Phòng đa năng", auto:true});
+    const need = f.specs.some(s=>s.type==="bed" && !s.ensuite), has = f.specs.some(s=>s.key==="wc") || (f.slot && f.slot.key==="wc");
+    if(need && !has){ const w={...specOf("wc"), auto:true}; if(slotOK && !f.slot) f.slot=w; else f.specs.push(w); notes.push({st:"info",t:`Tự thêm WC chung ở tầng ${i+2}`,d:"Tầng có phòng ngủ không có WC riêng.",c:"Thông lệ"}); }
+  });
+
+  // ---- dựng hình học
+  const floors=[];
+  const newF=(name,key,h)=>{ const F={name,key,h,rooms:[],doors:[],slot:null}; floors.push(F); return F; };
+  const mk=(F,s,x,y,w,h)=>{ const r={id:F.key+"-"+F.rooms.length, key:s.key, name:s.name, type:s.type, enc:!!s.enc, tgt:s.tgt||null, min:s.min||null, minW:s.minW||null, light:!!s.light, auto:!!s.auto, cars:s.cars, motos:s.motos, perRow:s.perRow, sideCap:s.sideCap,
+      x:r2(x), y:r2(y), w:r2(w), h:r2(h), area:r2(w*h)}; F.rooms.push(r); return r; };
+  const door=(F,r,side,u,w)=>{ let d;
+    if(side==="F") d={x:u,y:r.y,w,h:w};
+    else if(side==="B") d={x:u,y:r.y+r.h-w,w,h:w};
+    else if(side==="R") d={x:r.x+r.w-w,y:u,w,h:w};
+    else d={x:r.x,y:u,w,h:w};
+    F.doors.push({room:r.id, side, ...Object.fromEntries(Object.entries(d).map(([k,v])=>[k,r2(v)]))}); };
+  function core(F){
+    const sy0 = coreY + LAND;
+    mk(F,{key:"sanh",name:"Sảnh",type:"circ"},0,coreY,W,LAND);
+    mk(F,{key:"stair",name:"Cầu thang",type:"core"},0,sy0,st.sw,st.sl);
+    if(hasSlot){
+      let sy=sy0;
+      if(liftOK){ mk(F,{key:"lift",name:"Thang máy",type:"core"},st.sw,sy,slotW,1.7); sy+=1.7; }
+      const sl=r2(sy0+st.sl-sy);
+      if(F.slot && sl>=1.5){
+        const want=Math.max(1.8, (F.slot.tgt||F.slot.area)/slotW), use = sl-want>=0.9 ? r2(want) : sl;
+        const r=mk(F,{...F.slot, enc:true},st.sw,sy,slotW,use); door(F,r,"F",st.sw+0.1,Math.min(0.75,slotW-0.2));
+        if(sl-use>=0.3) mk(F,{key:"tech",name:"Hộp gen kỹ thuật",type:"core"},st.sw,sy+use,slotW,sl-use);
+      } else if(sl>=1.5){ const r=mk(F,{key:"kho",name:"Kho",type:"live",enc:true,min:3},st.sw,sy,slotW,sl); door(F,r,"F",st.sw+0.1,Math.min(0.75,slotW-0.2)); }
+      else if(sl>=0.3) mk(F,{key:"tech",name:"Hộp gen kỹ thuật",type:"core"},st.sw,sy,slotW,sl);
+      mk(F,{key:"corr",name:"Hành lang",type:"circ"},W-CW,sy0,CW,st.sl);
+    } else mk(F,{key:"corr",name:"Hành lang",type:"circ"},st.sw,sy0,W-st.sw,st.sl);
+    if(Z.well){ mk(F,{key:"well",name:"Giếng trời",type:"out"},0,Z.well[0],W-CW,wellD); mk(F,{key:"corr",name:"Hành lang",type:"circ"},W-CW,Z.well[0],CW,wellD); }
+  }
+  function orderZone(list, innerLight, outerLight){
+    // phòng ngủ được ưu tiên vị trí có cửa sổ, sau đó tới phòng lớn
+    const L=list.filter(s=>s.light).sort((a,b)=>((b.type==="bed")-(a.type==="bed")) || (b.area-a.area)), N=list.filter(s=>!s.light);
+    const outer = (outerLight && L.length) ? L.shift() : null, inner = (innerLight && L.length) ? L.shift() : null;
+    const mid=[...N,...L].sort((a,b)=>(a.enc-b.enc));   // phòng mở (sinh hoạt) nằm sát lõi làm không gian chuyển tiếp
+    return [...(inner?[inner]:[]), ...mid, ...(outer?[outer]:[])];
+  }
+  function layZone(F, list, za, zb, dir){
+    const n=list.length; if(!n || zb-za<0.3) return;
+    // phòng kín còn phòng khác phía sau thì chừa hành lang bên cạnh để đi qua
+    const wid=list.map((s,i)=>(s.enc && i<n-1)?W-CW:W);
+    const zoneD=zb-za, fixed=list.reduce((a,s)=>a+(s.fixedD||0),0), flex=list.reduce((a,s,i)=>a+(s.fixedD?0:s.area/wid[i]),0);
+    const k = flex>0 ? Math.max(0.3,(zoneD-fixed)/flex) : 1;
+    let pos = dir>0 ? za : zb;
+    list.forEach((s,i)=>{
+      let d = s.fixedD ? Math.min(s.fixedD, Math.abs(dir>0?zb-pos:pos-za)) : s.area/wid[i]*k;
+      if(i===n-1) d = dir>0 ? zb-pos : pos-za;
+      const ya = dir>0 ? pos : pos-d;
+      const r = mk(F, s, 0, ya, wid[i], d);
+      if(wid[i]<W) mk(F,{key:"corr",name:"Hành lang",type:"circ"},W-CW,ya,CW,d);
+      if(s.enc){
+        if(wid[i]<W) door(F,r,"R", dir>0 ? ya+0.15 : ya+d-1.0, 0.85);
+        else door(F,r, dir>0?"F":"B", W-CW+(CW-0.85)/2, 0.85);
+        if(s.ensuite) ensuite(F,r,s,dir);
+      }
+      pos += dir*d;
+    });
+  }
+  function ensuite(F,r,s,dir){
+    const wcW=r2(Math.min(2.2,Math.max(1.5,r.w*0.4))), wcD=r2(Math.max(1.6,s.ensuite/wcW));
+    if(wcD > r.h-2.4){
+      // phòng nông: đặt WC dọc tường trái, hết chiều sâu phòng
+      const w2=r2(Math.max(1.3, s.ensuite/r.h));
+      if(r.h<1.6 || r.w-w2<2.6){ notes.push({st:"warn",t:`Không đủ chỗ WC riêng cho ${r.name}`,d:`Phòng ${fmt(r.w)} × ${fmt(r.h)} m.`,c:"Quy chuẩn DECOX"}); return; }
+      const w = mk(F,{key:"wcr",name:"WC riêng",type:"wet",enc:true,tgt:s.ensuite,min:3,minW:1.2},0,r.y,w2,r.h);
+      w.parent=r.id; r.ensuite=w.id; r.area=r2(r.area-w.area);
+      r.clear = {x:r2(r.x+w2),y:r.y,w:r2(r.w-w2),h:r.h,doorSide:dir>0?"F":"B"};
+      door(F,w,"R", dir>0 ? r.y+r.h-0.85 : r.y+0.1, 0.75);
+      return;
+    }
+    const ya = dir>0 ? r.y : r.y+r.h-wcD;
+    const w = mk(F,{key:"wcr",name:"WC riêng",type:"wet",enc:true,tgt:s.ensuite,min:3,minW:1.2},0,ya,wcW,wcD);
+    w.parent=r.id; r.ensuite=w.id; r.area=r2(r.area-w.area);
+    r.clear = dir>0 ? {x:r.x,y:r2(r.y+wcD),w:r.w,h:r2(r.h-wcD),doorSide:"F"} : {x:r.x,y:r.y,w:r.w,h:r2(r.h-wcD),doorSide:"B"};
+    door(F,w,"R", dir>0 ? ya+wcD-0.85 : ya+0.1, 0.75);
+  }
+  const split = list => { if(!Z.back) return [list,[]]; const A=[],B=[]; let fa=0,ba=0;
+    const fc=fD*W*0.9, bc=bD*W*0.9;
+    list.slice().sort((a,b)=>b.area-a.area).forEach(s=>{ if((fa+s.area)/fc <= (ba+s.area)/bc){A.push(s);fa+=s.area;} else {B.push(s);ba+=s.area;} });
+    // khối sau trống mà vẫn đủ cho một phòng (≥ mức tối thiểu) thì chuyển sang, tránh bỏ phí diện tích
+    if(!B.length && A.length>1){ const zA=bD*W; const c=A.filter(s=>(s.min||0)<=zA && s.area<=zA*1.2 && !s.fixedD).sort((a,b)=>Math.abs(a.area-zA)-Math.abs(b.area-zA))[0]; if(c){ A.splice(A.indexOf(c),1); B.push(c); } }
+    if(!A.length && B.length>1){ const zA=fD*W; const c=B.filter(s=>(s.min||0)<=zA && s.area<=zA*1.2).sort((a,b)=>Math.abs(a.area-zA)-Math.abs(b.area-zA))[0]; if(c){ B.splice(B.indexOf(c),1); A.push(c); } }
+    return [A,B]; };
+
+  // tầng trệt
+  {
+    const F=newF("Tầng trệt","T1",p.business?4.2:3.9);
+    let gr=prog.ground.slice();
+    const wi=gr.findIndex(s=>s.key==="wc"); if(slotOK && wi>=0){ F.slot=gr[wi]; gr.splice(wi,1); }
+    core(F);
+    if(p.F>0) mk(F,{key:"yard",name:(p.cars>0&&!p.carIn&&p.F>=5)?"Sân trước · đậu xe":"Sân trước",type:"out",cars:(!p.carIn&&p.F>=5)?p.cars:0},0,0,W,p.F);
+    if(R>0) mk(F,{key:"yard",name:"Sân sau",type:"out"},0,y1,W,R);
+    const fr=gr.filter(s=>["khach","business"].includes(s.key)), others=gr.filter(s=>!["khach","business"].includes(s.key));
+    const outer=[...fr, ...(prog.garage?[prog.garage]:[])];
+    if(Z.back){ layZone(F, outer.length?outer:[{...specOf("khach")}], Z.front[0], Z.front[1], -1);
+      layZone(F, others.length?orderZone(others, Z.wellSide==="back", R>0.5):[{key:"open",name:"Không gian mở",type:"live",enc:false,area:10}], Z.back[0], Z.back[1], +1); }
+    else layZone(F, [...orderZone(others, !!Z.well, false), ...outer], Z.front[0], Z.front[1], -1);
+  }
+  // các tầng trên
+  fl.forEach((f,i)=>{
+    const F=newF("Tầng "+(i+2),"T"+(i+2),p.fh); F.bal=balcony(p.road); F.slot=f.slot; core(F);
+    const [A,B]=split(f.specs);
+    const ph = (list)=>list.length?list:[{key:"open",name:"Phòng đa năng",type:"live",enc:false,light:true,area:10,auto:true}];
+    layZone(F, orderZone(ph(A), Z.wellSide==="front", true), Z.front[0], Z.front[1], -1);
+    if(Z.back) layZone(F, orderZone(ph(B), Z.wellSide==="back", R>0.5), Z.back[0], Z.back[1], +1);
+  });
+  // tum + sân thượng
+  let topLeft = prog.top.slice();
+  if(p.terrace){
+    const F=newF("Tum + sân thượng","TUM",3.0); F.roof=true;
+    const sx = topLeft.findIndex(s=>SLOTK.includes(s.key)); if(slotOK && sx>=0){ F.slot=topLeft[sx]; topLeft.splice(sx,1); }
+    core(F);
+    const need = topLeft.reduce((a,s,i)=>a+Math.max(s.minW||1.5, s.area/((s.enc&&i<topLeft.length-1)?W-CW:W)),0);
+    if(Z.back){
+      const za=Z.back[0], zb=Math.min(Z.back[1], za+need);
+      if(topLeft.length) layZone(F, topLeft, za, zb, +1);
+      const used = topLeft.length ? zb : za;
+      if(Z.back[1]-used>0.3) mk(F,{key:"open",name:"Sân phơi",type:"out"},0,used,W,Z.back[1]-used);
+      mk(F,{key:"open",name:"Sân thượng",type:"out"},0,Z.front[0],W,Z.front[1]-Z.front[0]);
+    } else {
+      const zb=Z.front[1], za=Math.max(Z.front[0]+3.5, zb-need);
+      if(topLeft.length) layZone(F, topLeft, za, zb, -1);
+      mk(F,{key:"open",name:"Sân thượng",type:"out"},0,Z.front[0],W,(topLeft.length?za:zb)-Z.front[0]);
+    }
+    if(Z.front[1]-Z.front[0]<3.5) notes.push({st:"warn",t:"Tum chưa lùi đủ 3,5 m",d:`Lõi thang cách mặt tiền ${fmt(Z.front[1]-Z.front[0])} m.`,c:"QĐ 81 · 3.4"});
+  } else if(topLeft.length) unplaced.push(...topLeft);
+
+  // đánh số phòng ngủ, cao độ, nội thất
+  let bn=0; floors.forEach(F=>F.rooms.forEach(r=>{ if(r.key==="ngu") r.name="Phòng ngủ "+(++bn); }));
+  let mn=0; const mc=floors.flatMap(F=>F.rooms).filter(r=>r.key==="master").length;
+  floors.forEach(F=>F.rooms.forEach(r=>{ if(r.key==="master" && mc>1) r.name="Phòng ngủ master "+(++mn); }));
+  let z=0; floors.forEach(F=>{ F.elev=r2(z); z+=F.h; });
+  const plan = {floors, Lb, R, y0, y1, st, wellD, wellA:r2((W-CW)*wellD), coreY, Z, slotOK, liftOK, unplaced, notes,
+    nFloors:floors.filter(f=>!f.roof).length, height:r2(floors.filter(f=>!f.roof).reduce((s,f)=>s+f.h,0)), footprint:r2(W*Lb)};
+  floors.forEach(F=>{ litRooms(F, plan, p); F.rooms.forEach(r=>{ const fu=furnishRoom(r,F,p); r.furn=fu.items; r.fchk=fu.checks; }); F.reach = reachable(F); });
+  return plan;
+}
+
+/* ---- hình học phụ trợ ---- */
+function sharedEdge(a,b){
+  const ov=(p,q,r,s)=>Math.min(q,s)-Math.max(p,r);
+  if(Math.abs(a.y+a.h-b.y)<0.02||Math.abs(b.y+b.h-a.y)<0.02) return {o:ov(a.x,a.x+a.w,b.x,b.x+b.w), horiz:true, y:Math.abs(a.y+a.h-b.y)<0.02?a.y+a.h:a.y};
+  if(Math.abs(a.x+a.w-b.x)<0.02||Math.abs(b.x+b.w-a.x)<0.02) return {o:ov(a.y,a.y+a.h,b.y,b.y+b.h), horiz:false, x:Math.abs(a.x+a.w-b.x)<0.02?a.x+a.w:a.x};
+  return {o:0};
+}
+function litRooms(F, plan, p){
+  const wells=F.rooms.filter(r=>r.key==="well"||(F.roof&&r.type==="out"));
+  F.windows=[];
+  F.rooms.forEach(r=>{
+    if(["out","circ","core"].includes(r.type) || r.parent) return;
+    const segs=[];
+    if(Math.abs(r.y-plan.y0)<0.02) segs.push({horiz:true,y:r.y,a:r.x,b:r.x+r.w});
+    if(Math.abs(r.y+r.h-plan.y1)<0.02 && plan.R>0.5) segs.push({horiz:true,y:r.y+r.h,a:r.x,b:r.x+r.w});
+    wells.forEach(w=>{ const e=sharedEdge(r,w); if(e.o>0.6) segs.push(e.horiz?{horiz:true,y:e.y,a:Math.max(r.x,w.x),b:Math.min(r.x+r.w,w.x+w.w)}:{horiz:false,x:e.x,a:Math.max(r.y,w.y),b:Math.min(r.y+r.h,w.y+w.h)}); });
+    r.lit = segs.length>0;
+    segs.forEach(s=>{ const L=s.b-s.a, m=Math.min(L*0.6, 2.4); F.windows.push({...s, a:s.a+(L-m)/2, b:s.a+(L+m)/2}); });
+  });
+  // phòng mở liền với phòng có sáng cũng tính là có sáng
+  F.rooms.filter(r=>!r.enc && !r.lit && !["out","circ","core"].includes(r.type)).forEach(r=>{
+    if(F.rooms.some(o=>o!==r && o.lit && !o.enc && sharedEdge(r,o).o>1.0)) r.lit=true;
+  });
+}
+function reachable(F){
+  const start=F.rooms.find(r=>r.key==="stair"); if(!start) return new Set();
+  const walk=r=>!r.enc && r.type!=="out" && r.key!=="tech" && r.key!=="lift";
+  const adj=new Map(F.rooms.map(r=>[r.id,[]]));
+  F.rooms.forEach((a,i)=>F.rooms.slice(i+1).forEach(b=>{ if(walk(a)&&walk(b)&&!a.parent&&!b.parent&&sharedEdge(a,b).o>0.6){ adj.get(a.id).push(b.id); adj.get(b.id).push(a.id); } }));
+  F.doors.forEach(d=>{
+    const r=F.rooms.find(x=>x.id===d.room); if(!r) return;
+    const mx=d.side==="F"||d.side==="B" ? d.x+d.w/2 : (d.side==="R"? r.x+r.w+0.1 : r.x-0.1);
+    const my=d.side==="L"||d.side==="R" ? d.y+d.h/2 : (d.side==="B"? r.y+r.h+0.1 : r.y-0.1);
+    const c=F.rooms.filter(o=>o!==r && o.type!=="out" && mx>=o.x&&mx<=o.x+o.w&&my>=o.y&&my<=o.y+o.h).sort((a,b)=>a.area-b.area)[0];
+    if(c){ adj.get(r.id).push(c.id); adj.get(c.id).push(r.id); }
+  });
+  const seen=new Set([start.id]), q=[start.id];
+  while(q.length){ const id=q.shift(); adj.get(id).forEach(n=>{ if(!seen.has(n)){ seen.add(n); q.push(n); } }); }
+  return seen;
+}
+
+/* ================= BỐ TRÍ NỘI THẤT TỰ ĐỘNG ================= */
+function furnishRoom(r, F, p){
+  const S=FURN.s, C=FURN.c, it=[], ck=[];
+  if(["out","circ","core"].includes(r.type) && r.key!=="yard") return {items:it, checks:ck};
+  const box = r.clear || r;
+  const dr = F.doors.find(d=>d.room===r.id);
+  const dside = r.clear ? r.clear.doorSide : (dr ? dr.side : null);
+  const du = (dr && !r.clear) ? ((dr.side==="F"||dr.side==="B") ? [dr.x-box.x, dr.x-box.x+dr.w] : [dr.y-box.y, dr.y-box.y+dr.h]) : null;
+  const put=(wall,u,v,lu,dv,k,n)=>{ let x,y,w,h;
+    if(wall==="B"){x=box.x+u;y=box.y+box.h-v-dv;w=lu;h=dv;}
+    else if(wall==="F"){x=box.x+u;y=box.y+v;w=lu;h=dv;}
+    else if(wall==="L"){x=box.x+v;y=box.y+u;w=dv;h=lu;}
+    else {x=box.x+box.w-v-dv;y=box.y+u;w=dv;h=lu;}
+    it.push({k,n,x:r2(x),y:r2(y),w:r2(w),h:r2(h),wall}); };
+  const len=w=>(w==="B"||w==="F")?box.w:box.h, dep=w=>(w==="B"||w==="F")?box.h:box.w;
+  const OPP={F:"B",B:"F",L:"R",R:"L"}, PERP=w=>(w==="F"||w==="B")?["L","R"]:["F","B"];
+  const chk=(v,min,t)=>ck.push({st:v>=min-0.001?"ok":"bad", t, d:`${fmt(Math.max(v,0),2)} m / cần ≥ ${fmt(min,2)} m`});
+  const k=r.key;
+  const livingSet=()=>{ const L=len("L"), D=dep("L"), sl=Math.min(S.sofa[0],L-1.0);
+    if(sl<1.4||D<2.6){ ck.push({st:"warn",t:"Không đủ chỗ đặt bộ sofa",d:`Phòng ${fmt(box.w)} × ${fmt(box.h)} m`}); return; }
+    put("L",(L-sl)/2,0,sl,S.sofa[1],"sofa","Sofa");
+    const cl=Math.min(S.coffee[0],sl-0.4); put("L",(L-cl)/2,S.sofa[1]+C.sofaTable,cl,S.coffee[1],"table","Bàn trà");
+    const tl=Math.min(S.tv[0],L-0.6); put("R",(L-tl)/2,0,tl,S.tv[1],"tv","Kệ tivi");
+    chk(D-S.sofa[1]-S.tv[1],C.tvDist,"Khoảng nhìn sofa – tivi");
+    chk(D-S.sofa[1]-C.sofaTable-S.coffee[1]-S.tv[1],C.walk,"Lối đi giữa bàn trà và kệ tivi"); };
+  const alongFree=(wall, from, to, item, n, dv)=>{ const wl=Math.min(item, to-from); if(wl>=0.8){ put(wall, from+(to-from-wl)/2, 0, wl, dv, n[0], n[1]); return true; } return false; };
+
+  if(["master","ngu","giupviec"].includes(k)){
+    const single = k==="giupviec" || Math.min(box.w,box.h)<3.0;
+    const [bw,bl] = single?S.bedSingle:S.bedDouble;
+    const order = dside ? [OPP[dside], ...PERP(dside)] : ["L","R","B","F"];
+    const head = order.find(w=>len(w)>=bw+2*S.night[0]+0.1 && dep(w)>=bl+C.bedFoot) || order.find(w=>len(w)>=bw+0.2 && dep(w)>=bl+0.3);
+    if(!head){ ck.push({st:"bad",t:"Phòng quá hẹp để đặt giường",d:`Phòng ${fmt(box.w)} × ${fmt(box.h)} m`}); return {items:it,checks:ck}; }
+    const L=len(head), u0=(L-bw)/2;
+    put(head,u0,0,bw,bl,"bed",single?"Giường đơn":"Giường đôi");
+    if(u0>=S.night[0]+0.05){ put(head,u0-S.night[0],0,S.night[0],S.night[1],"night",""); put(head,u0+bw,0,S.night[0],S.night[1],"night",""); }
+    chk(u0, single?0.6:C.bedSide, "Lối đi hai bên giường");
+    let ok=false; const o=OPP[head];
+    if(o!==dside && dep(head)-bl-S.wardrobe[1]>=C.wardrobeFront){ const wl=Math.min(S.wardrobe[0],len(o)-0.2); put(o,(len(o)-wl)/2,0,wl,S.wardrobe[1],"ward","Tủ áo"); chk(dep(head)-bl-S.wardrobe[1],C.wardrobeFront,"Cuối giường đến tủ áo"); ok=true; }
+    if(!ok) for(const pw of PERP(head)){ if(pw===dside) continue;
+      const headAtStart = (head==="L"&&(pw==="F"||pw==="B")) || (head==="F"&&(pw==="L"||pw==="R"));
+      const a = headAtStart ? bl+0.3 : 0.1, b = headAtStart ? len(pw)-0.1 : len(pw)-bl-0.3;
+      if(alongFree(pw,a,b,S.wardrobe[0],["ward","Tủ áo"],S.wardrobe[1])){ ok=true; chk(u0-S.wardrobe[1]+ (pw==="F"||pw==="L"?0:0), 0, "Tủ áo đặt dọc tường bên, ngoài vùng giường"); ck.pop(); break; } }
+    if(!ok && du){ const segs=[[0.1,du[0]-0.1],[du[1]+0.1,len(dside)-0.1]].sort((x,y)=>(y[1]-y[0])-(x[1]-x[0]));
+      if(alongFree(dside,segs[0][0],segs[0][1],S.wardrobe[0],["ward","Tủ áo"],S.wardrobe[1])){ ok=true; if(dside===o) chk(dep(head)-bl-S.wardrobe[1],C.wardrobeFront,"Cuối giường đến tủ áo"); } }
+    if(!ok) ck.push({st:"warn",t:"Không còn tường trống cho tủ áo",d:"Cân nhắc tủ âm tường hoặc phòng thay đồ"});
+    chk(dep(head)-bl, C.bedFoot, "Lối đi cuối giường");
+  } else if(k==="wc"||k==="wcr"||k==="xonghoi"){
+    const cand=(dside?[OPP[dside],...PERP(dside)]:["B","F","L","R"]).sort((a,b)=>len(b)-len(a));
+    if(k==="xonghoi"){ const w=cand[0]; put(w,0.1,0,Math.min(1.8,len(w)-0.2),0.5,"bench","Ghế xông"); chk(dep(w)-0.5,0.7,"Khoảng đứng trước ghế xông"); return {items:it,checks:ck}; }
+    const w=cand.find(x=>dep(x)>=S.toilet[1]+C.toiletFront && len(x)>=0.1+S.lavabo[0]+2*C.toiletSide) || cand[0];
+    const L=len(w), D=dep(w);
+    put(w,0.1,0,S.lavabo[0],S.lavabo[1],"lav","");
+    const tc=0.1+S.lavabo[0]+C.toiletSide;
+    if(tc+C.toiletSide<=L) put(w,tc-S.toilet[0]/2,0,S.toilet[0],S.toilet[1],"wc","");
+    else ck.push({st:"bad",t:"Không đủ chiều dài đặt bồn cầu",d:`Tường ${fmt(L)} m`});
+    if(L-(tc+C.toiletSide)>=S.shower[0]) put(w,L-S.shower[0],0,S.shower[0],S.shower[1],"shower","Tắm");
+    else ck.push({st:"warn",t:"Không có chỗ vách tắm đứng",d:"Dùng vòi sen tường hoặc tăng diện tích WC"});
+    chk(D-S.toilet[1],C.toiletFront,"Khoảng trống trước bồn cầu");
+  } else if(k==="garage"||(k==="yard"&&r.cars)){
+    const cars=r.cars||0, perRow=r.perRow||Math.max(1,Math.floor((box.w-0.3)/2.5));
+    for(let c=0;c<cars;c++){ const row=Math.floor(c/perRow), col=c%perRow; put("L",0.25+row*5.2,0.3+col*2.5+0.32,S.car[0],S.car[1],"car","Ô tô"); }
+    if(cars) chk(2.5-S.car[1],C.carSide,"Khoảng mở cửa xe");
+    const m=r.motos||0; if(m){
+      const sideX = 0.3+Math.min(cars,perRow)*2.5, sideCap = cars ? Math.floor((box.w-sideX)/0.8)*2 : 0;
+      let placed=0;
+      for(let i=0;i<Math.min(m,sideCap);i++){ const col=Math.floor(i/2), row=i%2; put("L",0.25+row*2.2,sideX+col*0.8,1.9,0.7,"moto","Xe máy"); placed++; }
+      const rowN=Math.max(1,Math.floor((box.w-0.2)/0.75));
+      for(let i=placed;i<m;i++){ const j=i-placed, row=Math.floor(j/rowN), col=j%rowN; put("B",0.1+col*0.75,0.1+row*2.0,0.7,1.9,"moto",""); }
+    }
+  } else if(k==="bep"){
+    const cl=Math.min(S.counter[0],len("L")-0.3);
+    put("L",len("L")-cl-0.05,0,cl,S.counter[1],"counter","Tủ bếp");
+    if(len("L")-cl-0.15-S.fridge[0]>0.4) put("L",len("L")-cl-0.1-S.fridge[0],0,S.fridge[0],S.fridge[1],"fridge","TL");
+    const six=r.area>=20, [tl,td]=six?S.table6:S.table4, ax=S.counter[1], aw=box.w-ax;
+    if(box.h>=tl+0.8){ const tx=box.x+ax+(aw-td)/2, ty=box.y+(box.h-tl)/2; it.push({k:"dtable",n:"Bàn ăn",x:r2(tx),y:r2(ty),w:td,h:tl});
+      const per=six?3:2; for(let i=0;i<per;i++){ const cy=ty+tl*(i+0.5)/per-0.225; it.push({k:"chair",n:"",x:r2(tx-0.5),y:r2(cy),w:0.45,h:0.45},{k:"chair",n:"",x:r2(tx+td+0.05),y:r2(cy),w:0.45,h:0.45}); }
+      chk(tx-box.x-ax,C.tableChair,"Mép bàn ăn đến tủ bếp"); chk(box.x+box.w-(tx+td),C.tableChair,"Mép bàn ăn đến tường"); }
+    else { const tx=box.x+ax+(aw-tl)/2, ty=box.y+(box.h-td)/2; it.push({k:"dtable",n:"Bàn ăn",x:r2(tx),y:r2(ty),w:tl,h:td});
+      const per=six?3:2; for(let i=0;i<per;i++){ const cx=tx+tl*(i+0.5)/per-0.225; it.push({k:"chair",n:"",x:r2(cx),y:r2(ty-0.5),w:0.45,h:0.45},{k:"chair",n:"",x:r2(cx),y:r2(ty+td+0.05),w:0.45,h:0.45}); }
+      chk(ty-box.y,C.tableChair,"Mép bàn ăn đến cạnh phòng"); chk(box.y+box.h-(ty+td),C.tableChair,"Mép bàn ăn đến cạnh phòng"); }
+  } else if(["khach","sinhhoat","giaitri","open"].includes(k)){
+    livingSet();
+  } else if(k==="business"){
+    const dl=Math.min(S.display[0],box.h-1.2);
+    put("L",0.6,0,dl,S.display[1],"shelf","Kệ hàng"); put("R",0.6,0,dl,S.display[1],"shelf","Kệ hàng");
+    chk(box.w-2*S.display[1],C.walk*1.5,"Lối đi khách giữa hai kệ");
+  } else if(k==="lamviec"){
+    const w=dside?OPP[dside]:"L", dl=Math.min(S.desk[0],len(w)-0.4);
+    put(w,(len(w)-dl)/2,0,dl,S.desk[1],"desk","Bàn làm việc");
+    const sw=PERP(w).find(x=>x!==dside)||PERP(w)[0]; put(sw,(len(sw)-Math.min(S.shelf[0],len(sw)-0.4))/2,0,Math.min(S.shelf[0],len(sw)-0.4),S.shelf[1],"shelf","Kệ sách");
+    chk(dep(w)-S.desk[1],C.deskChair,"Khoảng kéo ghế bàn làm việc");
+  } else if(k==="tho"){
+    const w=dside?OPP[dside]:"B", al=Math.min(S.altar[0],len(w)-0.4);
+    put(w,(len(w)-al)/2,0,al,S.altar[1],"altar","Bàn thờ");
+    chk(dep(w)-S.altar[1],C.altarFront,"Khoảng trống trước bàn thờ");
+  } else if(k==="giat"){
+    const w=dside?OPP[dside]:"L"; put(w,0.2,0,S.washer[0],S.washer[1],"washer","MG"); if(len(w)>1.6) put(w,0.9,0,S.washer[0],S.washer[1],"washer","MS");
+    chk(dep(w)-S.washer[1],C.toiletFront,"Khoảng đứng trước máy giặt");
+  } else if(k==="kho"){
+    const ws=["L","R","B","F"].filter(x=>x!==dside).sort((a,b)=>len(b)-len(a)).slice(0,2);
+    ws.forEach(w=>put(w,0.1,0,len(w)-0.2,0.45,"shelf","Kệ"));
+  } else if(k==="gym"){
+    put("L",(len("L")-1.9)/2,0.1,1.9,0.8,"gymeq","Máy chạy");
+    put("R",(len("R")-1.2)/2,0,1.2,0.45,"shelf","Giá tạ");
+    chk(dep("L")-0.9-0.45,1.2,"Khoảng tập giữa máy và giá tạ");
+  } else if(k==="yoga"){
+    const L=len("L"); put("L",(L-1.85)/2,0.6,1.85,0.65,"mat","Thảm"); if(dep("L")>3.2) put("L",(L-1.85)/2,1.6,1.85,0.65,"mat","Thảm");
+    chk(dep("L")-0.6-0.65,1.0,"Khoảng trống quanh thảm");
+  }
+  return {items:it, checks:ck};
+}
+
+/* ================= VẼ SVG ================= */
+// đường kích thước ngang tại y=yy (toạ độ svg), đường dóng tới yRef
+function dimH(x1,x2,yy,yRef,t,c,small){
+  const k=0.09, fs=small?0.19:0.24;
+  return `<line x1="${x1}" x2="${x1}" y1="${yRef+0.08}" y2="${yy+0.12}" stroke="${c}" stroke-width="0.012"/><line x1="${x2}" x2="${x2}" y1="${yRef+0.08}" y2="${yy+0.12}" stroke="${c}" stroke-width="0.012"/>`
+   + `<line x1="${x1-0.12}" x2="${x2+0.12}" y1="${yy}" y2="${yy}" stroke="${c}" stroke-width="0.016"/>`
+   + `<line x1="${x1-k}" y1="${yy+k}" x2="${x1+k}" y2="${yy-k}" stroke="${c}" stroke-width="0.035"/><line x1="${x2-k}" y1="${yy+k}" x2="${x2+k}" y2="${yy-k}" stroke="${c}" stroke-width="0.035"/>`
+   + `<text x="${(x1+x2)/2}" y="${yy-0.08}" text-anchor="middle" font-size="${fs}" font-family="IBM Plex Mono, monospace" fill="${c}">${t}</text>`;
+}
+// đường kích thước dọc tại x=xx, từ y1 đến y2 (svg), đường dóng tới xRef
+function dimV(y1,y2,xx,xRef,t,c,small){
+  const k=0.09, fs=small?0.19:0.24, dir = xx<xRef?-1:1;
+  return `<line y1="${y1}" y2="${y1}" x1="${xRef+dir*0.08}" x2="${xx+dir*0.12}" stroke="${c}" stroke-width="0.012"/><line y1="${y2}" y2="${y2}" x1="${xRef+dir*0.08}" x2="${xx+dir*0.12}" stroke="${c}" stroke-width="0.012"/>`
+   + `<line x1="${xx}" x2="${xx}" y1="${y1-0.12}" y2="${y2+0.12}" stroke="${c}" stroke-width="0.016"/>`
+   + `<line x1="${xx-k}" y1="${y1+k}" x2="${xx+k}" y2="${y1-k}" stroke="${c}" stroke-width="0.035"/><line x1="${xx-k}" y1="${y2+k}" x2="${xx+k}" y2="${y2-k}" stroke="${c}" stroke-width="0.035"/>`
+   + `<text transform="translate(${xx-0.08} ${(y1+y2)/2}) rotate(-90)" text-anchor="middle" font-size="${fs}" font-family="IBM Plex Mono, monospace" fill="${c}">${t}</text>`;
+}
+const FILL = {live:"var(--room-live)", bed:"var(--room-bed)", wet:"var(--room-wet)", core:"var(--room-core)", out:"var(--room-out)", void:"var(--room-void)", circ:"var(--paper)"};
+function drawFloor(p, plan, fi, items){
+  const f = plan.floors[fi];
+  const W=p.W, D=p.D, bal = (f.bal && fi>0 && !f.roof) ? f.bal : 0;
+  const pad=1.8;
+  const vbH = D + pad*2 + bal + 0.6;
+  const Y = y => D - y; // ranh trước nằm dưới cùng
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad-0.6} ${-pad} ${W+pad*2+0.6} ${vbH}" role="img" class="${state.furn?"edit":""}" aria-label="Mặt bằng ${esc(f.name)}" style="aspect-ratio:${(W+pad*2+0.6)/vbH};${state.zoom>1?`height:${Math.round(720*state.zoom)}px;max-height:none;max-width:none;flex:none`:""}">`;
+  s += `<rect x="0" y="0" width="${W}" height="${D}" fill="none" stroke="var(--muted)" stroke-width="0.03" stroke-dasharray="0.25 0.15"/>`;
+  let labels="";
+  // 1. nền phòng
+  f.rooms.forEach(r=>{ s += `<rect x="${r.x}" y="${Y(r.y+r.h)}" width="${r.w}" height="${r.h}" fill="${FILL[r.type]||"var(--paper)"}"/>`; });
+  // 2. chi tiết thang, giếng trời, thang máy
+  f.rooms.forEach(r=>{
+    const yy=Y(r.y+r.h);
+    if(r.key==="stair"){
+      const st=plan.st, tr=st.tread;
+      if(st.type==="I"){ for(let y=r.y+0.15;y<r.y+r.h-0.1;y+=tr) s+=`<line x1="${r.x}" x2="${r.x+r.w}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--ink)" stroke-width="0.012"/>`; }
+      else { const lnd=st.fw; for(let y=r.y+0.15;y<r.y+r.h-lnd;y+=tr) s+=`<line x1="${r.x}" x2="${r.x+r.w}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--ink)" stroke-width="0.012"/>`;
+        s+=`<line x1="${r.x+r.w/2}" x2="${r.x+r.w/2}" y1="${Y(r.y)}" y2="${Y(r.y+r.h-lnd)}" stroke="var(--ink)" stroke-width="0.05"/>`;
+        s+=`<path d="M${r.x+r.w*0.75} ${Y(r.y+0.3)} L${r.x+r.w*0.75} ${Y(r.y+r.h-lnd*0.5)} L${r.x+r.w*0.25} ${Y(r.y+r.h-lnd*0.5)} L${r.x+r.w*0.25} ${Y(r.y+0.6)}" fill="none" stroke="var(--accent)" stroke-width="0.02"/><circle cx="${r.x+r.w*0.75}" cy="${Y(r.y+0.3)}" r="0.05" fill="var(--accent)"/>`; }
+    }
+    if(r.key==="lift") s+=`<line x1="${r.x+0.15}" y1="${yy+0.15}" x2="${r.x+r.w-0.15}" y2="${yy+r.h-0.15}" stroke="var(--ink)" stroke-width="0.015"/><line x1="${r.x+r.w-0.15}" y1="${yy+0.15}" x2="${r.x+0.15}" y2="${yy+r.h-0.15}" stroke="var(--ink)" stroke-width="0.015"/><rect x="${r.x+0.15}" y="${yy+0.15}" width="${r.w-0.3}" height="${r.h-0.3}" fill="none" stroke="var(--ink)" stroke-width="0.015"/>`;
+    if(r.key==="well") s+=`<line x1="${r.x}" y1="${yy}" x2="${r.x+r.w}" y2="${yy+r.h}" stroke="var(--muted)" stroke-width="0.012"/><line x1="${r.x+r.w}" y1="${yy}" x2="${r.x}" y2="${yy+r.h}" stroke="var(--muted)" stroke-width="0.012"/>`;
+  });
+  // 3. tường: phòng mở nét đứt mảnh, phòng kín và lõi nét đậm
+  f.rooms.filter(r=>!r.enc && r.type!=="core").forEach(r=>{ s += `<rect x="${r.x}" y="${Y(r.y+r.h)}" width="${r.w}" height="${r.h}" fill="none" stroke="var(--muted)" stroke-width="0.012" stroke-dasharray="0.1 0.07"/>`; });
+  f.rooms.filter(r=>r.enc || r.key==="stair" || r.key==="lift").forEach(r=>{ s += `<rect x="${r.x}" y="${Y(r.y+r.h)}" width="${r.w}" height="${r.h}" fill="none" stroke="var(--wall)" stroke-width="${r.key==="stair"?0.03:0.11}"/>`; });
+  // vỏ nhà
+  if(!f.roof) s += `<rect x="0" y="${Y(plan.y1)}" width="${W}" height="${plan.Lb}" fill="none" stroke="var(--wall)" stroke-width="0.2"/>`;
+  else f.rooms.filter(r=>r.type!=="out").forEach(r=>{ s += `<rect x="${r.x}" y="${Y(r.y+r.h)}" width="${r.w}" height="${r.h}" fill="none" stroke="var(--wall)" stroke-width="0.11"/>`; });
+  // 4. cửa sổ
+  (f.windows||[]).forEach(w=>{
+    if(w.horiz) s+=`<line x1="${w.a}" x2="${w.b}" y1="${Y(w.y)}" y2="${Y(w.y)}" stroke="var(--paper)" stroke-width="0.17"/><line x1="${w.a}" x2="${w.b}" y1="${Y(w.y)-0.05}" y2="${Y(w.y)-0.05}" stroke="var(--ink)" stroke-width="0.012"/><line x1="${w.a}" x2="${w.b}" y1="${Y(w.y)+0.05}" y2="${Y(w.y)+0.05}" stroke="var(--ink)" stroke-width="0.012"/><line x1="${w.a}" x2="${w.b}" y1="${Y(w.y)}" y2="${Y(w.y)}" stroke="var(--blue)" stroke-width="0.02"/>`;
+    else s+=`<line y1="${Y(w.a)}" y2="${Y(w.b)}" x1="${w.x}" x2="${w.x}" stroke="var(--paper)" stroke-width="0.17"/><line y1="${Y(w.a)}" y2="${Y(w.b)}" x1="${w.x-0.05}" x2="${w.x-0.05}" stroke="var(--ink)" stroke-width="0.012"/><line y1="${Y(w.a)}" y2="${Y(w.b)}" x1="${w.x+0.05}" x2="${w.x+0.05}" stroke="var(--ink)" stroke-width="0.012"/><line y1="${Y(w.a)}" y2="${Y(w.b)}" x1="${w.x}" x2="${w.x}" stroke="var(--blue)" stroke-width="0.02"/>`;
+  });
+  // 5. cửa đi: ô mở trên tường + cánh + cung mở
+  (f.doors||[]).forEach(d=>{
+    const r=f.rooms.find(x=>x.id===d.room); if(!r) return;
+    let A,B,N;
+    if(d.side==="F"){ A=[d.x,r.y]; B=[d.x+d.w,r.y]; N=[0,1]; }
+    else if(d.side==="B"){ A=[d.x,r.y+r.h]; B=[d.x+d.w,r.y+r.h]; N=[0,-1]; }
+    else if(d.side==="R"){ A=[r.x+r.w,d.y]; B=[r.x+r.w,d.y+d.h]; N=[-1,0]; }
+    else { A=[r.x,d.y]; B=[r.x,d.y+d.h]; N=[1,0]; }
+    const w=Math.hypot(B[0]-A[0],B[1]-A[1]), Lf=[A[0]+N[0]*w, A[1]+N[1]*w];
+    const sA=[A[0],Y(A[1])], sB=[B[0],Y(B[1])], sL=[Lf[0],Y(Lf[1])];
+    const ang=(p)=>Math.atan2(p[1]-sA[1],p[0]-sA[0]); let dl=ang(sB)-ang(sL); while(dl<=-Math.PI) dl+=2*Math.PI; while(dl>Math.PI) dl-=2*Math.PI;
+    s+=`<line x1="${sA[0]}" y1="${sA[1]}" x2="${sB[0]}" y2="${sB[1]}" stroke="var(--paper)" stroke-width="0.16"/>`;
+    s+=`<line x1="${sA[0]}" y1="${sA[1]}" x2="${sL[0]}" y2="${sL[1]}" stroke="var(--ink)" stroke-width="0.025"/><path d="M${sL[0]} ${sL[1]} A${w} ${w} 0 0 ${dl>0?1:0} ${sB[0]} ${sB[1]}" fill="none" stroke="var(--ink)" stroke-width="0.012"/>`;
+  });
+  // lối vào chính
+  if(fi===0){ const gy=Y(plan.y0); s+=`<line x1="${W*0.08}" x2="${W*0.92}" y1="${gy}" y2="${gy}" stroke="var(--paper)" stroke-width="0.22"/><line x1="${W*0.08}" x2="${W*0.92}" y1="${gy}" y2="${gy}" stroke="var(--ink)" stroke-width="0.02" stroke-dasharray="0.3 0.1"/><path d="M${W/2} ${gy+0.55} l0 -0.4 m-0.12 0.12 l0.12 -0.12 l0.12 0.12" fill="none" stroke="var(--accent)" stroke-width="0.03"/>`; }
+  // 6. nhãn phòng
+  f.rooms.forEach(r=>{
+    if(r.key==="tech" || (r.key==="corr" && r.h<2)) return;
+    const yy=Y(r.y+r.h), lb=r.clear||r, fs = Math.max(0.2, Math.min(0.36, lb.w/9, lb.h/3.2)) * (state.furn?0.85:1);
+    if(lb.h>0.7 && lb.w>0.8){
+      const cx=lb.x+lb.w/2, cy=Y(lb.y+lb.h)+lb.h/2, isV = r.w<1.3 && r.h>2.5, label = (r.w<1.3 && !isV) ? r.name.split(" ")[0] : r.name;
+      const halo = ` stroke="var(--paper)" stroke-width="${fs*0.35}" paint-order="stroke"`;
+      const vert = isV ? ` transform="rotate(-90 ${cx} ${cy})"` : "";
+      labels += `<text${halo}${vert} x="${cx}" y="${cy-fs*0.2}" text-anchor="middle" font-size="${fs*0.8}" letter-spacing="${fs*0.08}" font-family="Be Vietnam Pro, sans-serif" font-weight="600" fill="var(--ink)">${esc(label.toUpperCase())}</text>`;
+      if(!["out","void","core","circ"].includes(r.type)) labels += `<text${halo} x="${cx}" y="${cy+fs*1.0}" text-anchor="middle" font-size="${fs*0.8}" font-family="IBM Plex Mono, monospace" fill="${r.min&&r.area<r.min?"var(--bad)":"var(--muted)"}">${fmt(r.area)} m²</text>`;
+    }
+  });
+  if(state.furn) items.forEach(i=>{ s += drawFurn(i, Y, i.id===state.sel); });
+  s += labels;
+  // ban công
+  if(bal>0){
+    s += `<rect x="0.3" y="${D}" width="${W-0.6}" height="${bal}" fill="none" stroke="var(--blue)" stroke-width="0.05" stroke-dasharray="0.18 0.1"/>`;
+    s += `<text x="${W/2}" y="${D+bal/2+0.1}" text-anchor="middle" font-size="0.26" font-family="Be Vietnam Pro, sans-serif" fill="var(--blue)">Ban công ${fmt(bal)} m</text>`;
+  }
+  // kích thước kiểu bản vẽ: gạch chéo đầu mút, đường dóng, ghi mm
+  const dimY = D + bal + 0.6;
+  s += dimH(0, W, dimY, D, fmt(W*1000,0), "var(--ink)");
+  s += `<text x="${W/2}" y="${dimY+0.62}" text-anchor="middle" font-size="0.24" letter-spacing="0.06" font-family="Be Vietnam Pro, sans-serif" font-weight="600" fill="var(--accent)">MẶT TIỀN · ĐƯỜNG ${fmt(p.road)} M</text>`;
+  s += dimV(0, D, -0.6, 0, fmt(D*1000,0), "var(--ink)");
+  // chuỗi kích thước theo các phòng sát tường phải
+  const ys=[...new Set([0,D,...f.rooms.filter(r=>Math.abs(r.x+r.w-W)<0.01).flatMap(r=>[r.y,r.y+r.h])].map(v=>Math.round(v*100)/100))].sort((a,b)=>a-b);
+  for(let k=0;k<ys.length-1;k++){ if(ys[k+1]-ys[k]>0.3) s += dimV(D-ys[k+1], D-ys[k], W+0.5, W, fmt((ys[k+1]-ys[k])*1000,0), "var(--muted)", true); }
+  s += `<g id="snapLayer" pointer-events="none"></g></svg>`;
+  return s;
+}
+
+/* ---------- mô hình đồ nội thất: tâm (cx,cy) theo toạ độ lô, dài L dọc tường, sâu D, rot độ (0 = lưng quay về phía sau nhà) ---------- */
+const CATALOG = [
+ {g:"Phòng ngủ", items:[["bedDouble","bed","Giường đôi"],["bedSingle","bed","Giường đơn"],["night","night","Tab đầu giường"],["wardrobe","ward","Tủ áo"],["desk","desk","Bàn làm việc"]]},
+ {g:"Khách & sinh hoạt", items:[["sofa","sofa","Sofa"],["coffee","table","Bàn trà"],["tv","tv","Kệ tivi"],["shelf","shelf","Kệ sách"],["altar","altar","Bàn thờ"],[null,"plant","Cây xanh",[0.5,0.5]]]},
+ {g:"Bếp & ăn", items:[["counter","counter","Tủ bếp"],["fridge","fridge","Tủ lạnh"],["table4","dset","Bàn ăn 4 ghế"],["table6","dset","Bàn ăn 6 ghế"],[null,"chair","Ghế",[0.45,0.45]]]},
+ {g:"Vệ sinh & giặt", items:[["toilet","wc","Bồn cầu"],["lavabo","lav","Lavabo"],["shower","shower","Vách tắm"],["washer","washer","Máy giặt"]]},
+ {g:"Xe & kinh doanh", items:[["car","car","Ô tô"],[null,"moto","Xe máy",[1.9,0.7]],["display","shelf","Kệ hàng"]]}
+];
+function catDims(c){ if(c[3]) return c[3].slice(); const d=FURN.s[c[0]].slice(); if(c[1]==="dset") return [d[0], d[1]+1.0]; return d; }
+function canon(it,id){ let rot=0,L=it.w,D=it.h; if(it.wall==="F")rot=180; else if(it.wall==="L"){rot=270;L=it.h;D=it.w;} else if(it.wall==="R"){rot=90;L=it.h;D=it.w;} return {id,k:it.k,n:it.n,cx:r2(it.x+it.w/2),cy:r2(it.y+it.h/2),L:r2(L),D:r2(D),rot}; }
+function bb(i){ const sw=i.rot%180!==0, w=sw?i.D:i.L, h=sw?i.L:i.D; return {x:i.cx-w/2,y:i.cy-h/2,w,h}; }
+function autoItems(f){ return f.rooms.flatMap(r=>r.furn||[]).map((it,k)=>canon(it,"a"+k)); }
+function doorsOf(r, f){ return (f.doors||[]).filter(d=>d.room===r.id); }
+function drawLocal(k,L,D){
+  const x=-L/2,y=-D/2, st=`fill="var(--paper)" stroke="var(--ink)" stroke-width="0.022"`;
+  const R=(a,b,w,h,rx=0.03,ex="")=>`<rect x="${a}" y="${b}" width="${w}" height="${h}" rx="${rx}" ${st}${ex}/>`;
+  if(k==="car") return `<rect x="${x}" y="${y}" width="${L}" height="${D}" rx="0.35" fill="var(--paper)" fill-opacity="0.6" stroke="var(--blue)" stroke-width="0.04" stroke-dasharray="0.15 0.08"/><line x1="${-L*0.18}" x2="${-L*0.18}" y1="${y+0.15}" y2="${-y-0.15}" stroke="var(--blue)" stroke-width="0.03"/><line x1="${L*0.25}" x2="${L*0.25}" y1="${y+0.15}" y2="${-y-0.15}" stroke="var(--blue)" stroke-width="0.03"/>`;
+  if(k==="moto") return `<ellipse cx="0" cy="0" rx="${L/2}" ry="${D/2}" fill="var(--paper)" stroke="var(--blue)" stroke-width="0.035" stroke-dasharray="0.12 0.06"/>`;
+  if(k==="plant") return `<circle cx="0" cy="0" r="${Math.min(L,D)/2}" fill="var(--ok-bg)" stroke="var(--ok)" stroke-width="0.03"/><circle cx="0" cy="0" r="${Math.min(L,D)/5}" fill="none" stroke="var(--ok)" stroke-width="0.02"/>`;
+  let g=R(x,y,L,D,k==="chair"?0.07:0.03);
+  if(k==="bed"){ const n=L>1.3?2:1; for(let i=0;i<n;i++) g+=R(x+0.1+i*(L-0.2)/n,y+0.08,(L-0.2)/n-0.06,0.35,0.06); g+=`<line x1="${x}" x2="${-x}" y1="${y+0.62}" y2="${y+0.62}" stroke="var(--ink)" stroke-width="0.012"/>`; }
+  else if(k==="wc"){ g=R(x,y,L,0.18)+`<ellipse cx="0" cy="${y+0.18+(D-0.18)/2}" rx="${L*0.45}" ry="${(D-0.18)/2*0.95}" ${st}/>`; }
+  else if(k==="lav") g+=`<ellipse cx="0" cy="0" rx="${L*0.32}" ry="${D*0.3}" ${st}/>`;
+  else if(k==="shower") g+=`<line x1="${x}" y1="${y}" x2="${-x}" y2="${-y}" stroke="var(--ink)" stroke-width="0.012"/><circle cx="0" cy="0" r="0.06" fill="var(--muted)"/>`;
+  else if(k==="counter"){ g+=R(x+L*0.12,y+0.1,Math.min(0.8,L*0.3),D-0.2,0.05); g+=`<circle cx="${L*0.18}" cy="0" r="0.11" ${st}/><circle cx="${L*0.18+0.3}" cy="0" r="0.11" ${st}/>`; }
+  else if(k==="sofa"){ g+=`<line x1="${x+0.2}" x2="${-x-0.2}" y1="${y+0.22}" y2="${y+0.22}" stroke="var(--ink)" stroke-width="0.012"/><line x1="${x+0.2}" x2="${x+0.2}" y1="${y}" y2="${-y}" stroke="var(--ink)" stroke-width="0.012"/><line x1="${-x-0.2}" x2="${-x-0.2}" y1="${y}" y2="${-y}" stroke="var(--ink)" stroke-width="0.012"/>`; }
+  else if(k==="ward") g+=`<line x1="${x}" x2="${-x}" y1="${-y-0.08}" y2="${-y-0.08}" stroke="var(--ink)" stroke-width="0.012"/><line x1="0" x2="0" y1="${y}" y2="${-y}" stroke="var(--ink)" stroke-width="0.012"/>`;
+  else if(k==="washer") g+=`<circle cx="0" cy="0.04" r="${Math.min(L,D)*0.32}" ${st}/>`;
+  else if(k==="dset"){ const td=D-1.0, n=L>=1.7?3:2; g=R(x,-td/2,L,td); for(let i=0;i<n;i++){ const cx=x+L*(i+0.5)/n-0.225; g+=R(cx,y+0.02,0.45,0.42,0.07)+R(cx,-y-0.44,0.45,0.42,0.07); } }
+  return g;
+}
+// vùng thông thủy theo hệ toạ độ của món đồ: front = phía trước (đối diện lưng), side = hai bên
+function zonesOf(i){
+  const C=FURN.c, k=i.k;
+  const z={bed:{front:C.bedFoot,side:C.bedSide}, ward:{front:C.wardrobeFront}, sofa:{front:C.sofaTable}, wc:{front:C.toiletFront,side:Math.max(0,C.toiletSide-i.L/2)},
+    lav:{front:C.toiletFront}, desk:{front:C.deskChair}, dset:{front:Math.max(0,C.tableChair-0.5),back:Math.max(0,C.tableChair-0.5)}, altar:{front:C.altarFront},
+    car:{side:C.carSide}, counter:{front:C.walk}, washer:{front:C.toiletFront}, shelf:{front:C.toiletFront}, tv:{}, fridge:{front:C.walk}}[k];
+  return z||null;
+}
+function zoneRectsLocal(i){
+  const z=zonesOf(i); if(!z) return [];
+  const L=i.L, D=i.D, out=[];
+  if(z.front) out.push([-L/2, D/2, L/2, D/2+z.front]);
+  if(z.back) out.push([-L/2, -D/2-z.back, L/2, -D/2]);
+  if(z.side){ const y1=D/2+(z.front||0); out.push([-L/2-z.side,-D/2,-L/2,y1],[L/2,-D/2,L/2+z.side,y1]); }
+  return out;
+}
+// đổi hình chữ nhật cục bộ sang toạ độ lô (y tăng vào trong lô)
+function zoneRectsPlan(i){
+  const a=i.rot*Math.PI/180, c=Math.round(Math.cos(a)), s_=Math.round(Math.sin(a));
+  return zoneRectsLocal(i).map(([x0,y0,x1,y1])=>{
+    const pts=[[x0,y0],[x1,y1]].map(([lx,ly])=>[i.cx+(lx*c-ly*s_), i.cy-(lx*s_+ly*c)]);
+    return {x:Math.min(pts[0][0],pts[1][0]), y:Math.min(pts[0][1],pts[1][1]), w:Math.abs(pts[0][0]-pts[1][0]), h:Math.abs(pts[0][1]-pts[1][1])};
+  });
+}
+function zoneText(i){
+  const z=zonesOf(i); if(!z) return "Không yêu cầu";
+  const p=[]; if(z.front) p.push(`trước ${fmt(z.front,2)} m`); if(z.side) p.push(`hai bên ${fmt(z.side,2)} m`); if(z.back) p.push(`sau ${fmt(z.back,2)} m`);
+  return p.length?p.join(", "):"Không yêu cầu";
+}
+function drawFurn(i, Y, sel){
+  const b=bb(i);
+  const zs = (sel||state.zones) ? zoneRectsLocal(i).map(([x0,y0,x1,y1])=>`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="var(--accent)" fill-opacity="${sel?0.12:0.07}" stroke="var(--accent)" stroke-width="0.015" stroke-dasharray="0.08 0.05"/>`).join("") : "";
+  let g=`<g class="fi" data-id="${i.id}" transform="translate(${i.cx} ${Y(i.cy)})"><g transform="rotate(${i.rot})">${zs}${drawLocal(i.k,i.L,i.D)}</g>`;
+  if(i.n && !["bed","wc","lav","chair","night","plant"].includes(i.k) && Math.max(b.w,b.h)>0.55){
+    const fs=Math.min(0.2,Math.max(b.w,b.h)/6), rot=b.h>b.w*1.6?` transform="rotate(-90)"`:"";
+    g+=`<text x="0" y="${fs*0.35}" text-anchor="middle" font-size="${fs}" font-family="Be Vietnam Pro, sans-serif" fill="var(--muted)"${rot}>${esc(i.n)}</text>`;
+  }
+  if(sel){
+    g+=`<rect x="${-b.w/2}" y="${-b.h/2}" width="${b.w}" height="${b.h}" fill="none" stroke="var(--accent)" stroke-width="0.04"/>`;
+    g+=dimH(-b.w/2, b.w/2, -b.h/2-0.35, -b.h/2, fmt(b.w*1000,0), "var(--accent)", true);
+    g+=dimV(-b.h/2, b.h/2, b.w/2+0.35, b.w/2, fmt(b.h*1000,0), "var(--accent)", true);
+  }
+  return g+`<rect x="${-b.w/2}" y="${-b.h/2}" width="${b.w}" height="${b.h}" fill="transparent"/></g>`;
+}
+
+/* kiểm tra bố trí do người dùng chỉnh */
+function customChecks(f, items){
+  const C=FURN.c, out=[], core=f.rooms.find(r=>r.type==="core"), cy=core?core.y:0;
+  const inR=(r,x,y)=>x>=r.x-0.001&&x<=r.x+r.w+0.001&&y>=r.y-0.001&&y<=r.y+r.h+0.001;
+  const roomOf=i=>f.rooms.filter(r=>r.type!=="void").filter(r=>inR(r,i.cx,i.cy)).sort((a,b)=>a.area-b.area)[0];
+  const ov=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  const nm=i=>i.n||({chair:"Ghế",night:"Tab",wc:"Bồn cầu",lav:"Lavabo",bed:"Giường",plant:"Cây"}[i.k]||"Đồ");
+  const info = items.map(i=>({i,b:bb(i),r:roomOf(i)}));
+  info.forEach(({i,b,r})=>{
+    if(!r){ out.push({st:"bad",room:"Ngoài nhà",t:`${nm(i)} nằm ngoài khối nhà`,d:"Kéo vào trong một phòng"}); return; }
+    if(r.type==="core") out.push({st:"bad",room:r.name,t:`${nm(i)} đặt vào ô cầu thang`,d:"Cầu thang phải để trống"});
+    if(b.x<r.x-0.02||b.y<r.y-0.02||b.x+b.w>r.x+r.w+0.02||b.y+b.h>r.y+r.h+0.02) out.push({st:"bad",room:r.name,t:`${nm(i)} lấn qua tường`,d:`Đồ ${fmt(b.w,2)} × ${fmt(b.h,2)} m, phòng ${fmt(r.w,2)} × ${fmt(r.h,2)} m`});
+    const dr=doorsOf(r,f).concat(f.rooms.filter(o=>o.parent===r.id).flatMap(o=>doorsOf(o,f))).find(d=>ov(b,d)>0.005); if(dr) out.push({st:"bad",room:r.name,t:`${nm(i)} chắn cánh cửa đi`,d:`Chừa vùng mở cửa ${fmt(dr.w,2)} × ${fmt(dr.h,2)} m`});
+  });
+  const EXEMPT=(a,b)=>["chair","night","plant"].includes(b.k)||(a.k==="dset"&&b.k==="chair")||(a.k==="sofa"&&b.k==="table")||(a.k==="bed"&&b.k==="night");
+  for(let a=0;a<info.length;a++) for(let c=a+1;c<info.length;c++){
+    const A=info[a],B=info[c]; if(!A.r||A.r!==B.r) continue;
+    const o=ov(A.b,B.b);
+    if(o>0.02 && !((A.i.k==="chair"&&B.i.k==="dset")||(B.i.k==="chair"&&A.i.k==="dset"))) out.push({st:"bad",room:A.r.name,t:`${nm(A.i)} chồng lên ${nm(B.i).toLowerCase()}`,d:`Phần chồng ${fmt(o,2)} m²`});
+  }
+  // vùng thông thủy: bị đồ khác hoặc tường lấn
+  info.forEach(A=>{
+    if(!A.r) return;
+    const zr=zoneRectsPlan(A.i); if(!zr.length) return;
+    const W=WALL_HALF, r=A.r;
+    info.forEach(B=>{ if(B===A||B.r!==A.r||EXEMPT(A.i,B.i)) return;
+      const o=zr.reduce((s,z)=>s+ov(z,B.b),0);
+      if(o>0.02) out.push({st:"warn",room:r.name,t:`${nm(B.i)} lấn vào vùng thông thủy của ${nm(A.i).toLowerCase()}`,d:`Cần ${zoneText(A.i)} · đang lấn ${fmt(o,2)} m²`});
+    });
+    const cut=zr.some(z=>z.x<r.x+W-0.03||z.y<r.y+W-0.03||z.x+z.w>r.x+r.w-W+0.03||z.y+z.h>r.y+r.h-W+0.03);
+    if(cut) out.push({st:"warn",room:r.name,t:`Tường chắn vùng thông thủy của ${nm(A.i).toLowerCase()}`,d:`Cần ${zoneText(A.i)}`});
+  });
+  if(!out.length) out.push({st:"ok",room:f.name,t:"Không có đồ chồng nhau, lấn tường hay chắn cửa",d:`${items.length} món đã kiểm tra`});
+  return out;
+}
+const curKey = () => state.variant+"|"+(window.__last?window.__last.plan.floors[state.floor].key:"T1");
+function floorItems(plan, fi){ const k=state.variant+"|"+plan.floors[fi].key; return state.custom[k] || autoItems(plan.floors[fi]); }
+function floorFurnChecks(plan, fi){
+  const f=plan.floors[fi], k=state.variant+"|"+f.key;
+  if(state.custom[k]) return customChecks(f, state.custom[k]);
+  return f.rooms.flatMap(r=>(r.fchk||[]).map(c=>({...c,room:r.name})));
+}
+
+/* ================= KIỂM TRA ================= */
+function runChecks(p, plan){
+  const S = p.W*p.D, out=[];
+  const add=(st,t,d,c)=>out.push({st,t,d,c});
+  const all = plan.floors.flatMap(f=>f.rooms.map(r=>({...r, floor:f.name, reach:f.reach.has(r.id)})));
+  // lô đất
+  if(S<15 || p.W<3) add("bad","Lô đất quá nhỏ để xây mới",`${fmt(S)} m², rộng ${fmt(p.W)} m.`,"9411 · 5.1.1");
+  else if(S<30) add("warn","Lô đất nhỏ hơn mức khuyến nghị",`${fmt(S)} m² < 30 m².`,"13967 · 5.2.2");
+  else add("ok","Diện tích và mặt tiền lô đất",`${fmt(S)} m², rộng ${fmt(p.W)} m.`,"13967 · 5.2.2");
+  // mật độ & hệ số sử dụng đất
+  const dens = plan.footprint/S*100, mx = maxDensity(S);
+  add(dens<=mx+0.01?"ok":"bad","Mật độ xây dựng",`${fmt(dens)} % (${fmt(plan.footprint)} m²), tối đa ${fmt(mx)} %.`,"QĐ 81 · Bảng 15-1");
+  const gross = plan.footprint*plan.nFloors + (plan.floors.find(f=>f.roof)?plan.floors.find(f=>f.roof).rooms.filter(r=>r.type!=="out").reduce((a,r)=>a+r.area,0):0);
+  add(gross/S<=7?"ok":"bad","Hệ số sử dụng đất",`${fmt(gross/S,2)} lần (tổng sàn ${fmt(gross)} m²), tối đa 7 lần.`,"13967 · 5.5");
+  add(plan.R>=rearSetback(p)-0.01?"ok":"bad","Khoảng lùi sau",plan.R>0?`Chừa sân sau ${fmt(plan.R)} m.`:"Lô nông hoặc nhỏ: không bắt buộc sân sau.","QĐ 81 · Bảng 15-3");
+  // tầng cao
+  const n=plan.nFloors, lim=p.road<6?4:6;
+  if(n>=7) add("bad","Cần thẩm duyệt PCCC riêng","Nhà từ 7 tầng vượt phạm vi TCVN 13967, áp dụng QCVN 06:2022.","13967 · 1.3");
+  add(n<=lim?"ok":"bad","Số tầng",`${n} tầng${p.terrace?" + tum":""}${p.nMode==="auto"?" (tự tính theo nhu cầu)":""}; tối đa ${lim} tầng với lộ giới ${fmt(p.road)} m.`,"9411 · 5.5.1");
+  add(plan.height<=4*p.W?"ok":"warn","Chiều cao nhà",`${fmt(plan.height)} m so với 4 × rộng = ${fmt(4*p.W)} m.`,"9411 · 5.5.2");
+  if(p.business && (n>=4 || plan.height>15)) add("warn","Nhà kinh doanh: cần buồng thang","Từ 4 tầng hoặc cao trên 15 m phải có buồng thang hoặc thang loại 3.","13967 · 9.3.3.3.3");
+  // cầu thang
+  const st=plan.st, rs=st.riser*1000, blondel=2*st.riser+st.tread;
+  add(rs<=190 && st.tread>=0.25 && blondel>=0.55 && blondel<=0.70 ? "ok":"bad","Bậc thang",`${st.n} bậc cho tầng cao ${fmt(st.H)} m: cao ${fmt(rs,0)} mm, rộng ${fmt(st.tread*1000,0)} mm, 2h + b = ${fmt(blondel*1000,0)} mm.`,"13967 · 5.11");
+  add(st.fw>=0.9?"ok":"warn","Bề rộng vế thang",`${fmt(st.fw*1000,0)} mm (TCVN 9411 ≥ 900 mm, TCVN 13967 ≥ 700 mm). Thang ${st.type==="U"?"chữ U":"thẳng"} dài ${fmt(st.sl)} m.`,"9411 · 6.3.5.1");
+  if(plan.Lb>18) add(plan.wellD?"ok":"bad","Giếng trời cho nhà sâu",`Khối nhà dài ${fmt(plan.Lb)} m > 18 m.`,"9411 · 5.1.2");
+  // chương trình
+  if(plan.unplaced.length) add("bad","Chưa xếp được hết phòng",`${plan.unplaced.map(s=>s.name).join(", ")}. Tăng số tầng, giảm diện tích mục tiêu hoặc bớt phòng.`,"—");
+  const rooms = all.filter(r=>r.min);
+  const under = rooms.filter(r=>r.area < r.min-0.01);
+  add(under.length?"bad":"ok","Diện tích tối thiểu từng phòng", under.length?under.map(r=>`${r.name} (${r.floor}) ${fmt(r.area)} < ${fmt(r.min)} m²`).join("; "):`${rooms.length} phòng đều đạt mức tối thiểu.`,"13967 · 5.10");
+  const off = rooms.filter(r=>r.tgt && r.area>=r.min && (r.area<r.tgt*0.85 || r.area>r.tgt*1.4));
+  if(off.length) add("warn","Lệch diện tích mục tiêu",off.map(r=>`${r.name} ${fmt(r.area)}/${fmt(r.tgt)} m²`).join("; "),"Quy chuẩn DECOX");
+  const narrow = rooms.filter(r=>r.minW && Math.min((r.clear||r).w,(r.clear||r).h) < r.minW-0.01);
+  if(narrow.length) add("warn","Phòng hẹp hơn cạnh tối thiểu",narrow.map(r=>`${r.name} ${fmt(Math.min((r.clear||r).w,(r.clear||r).h))} < ${fmt(r.minW)} m`).join("; "),"Quy chuẩn DECOX");
+  const dark = all.filter(r=>r.light && !r.lit && !r.parent);
+  add(dark.length?"warn":"ok","Lấy sáng tự nhiên",dark.length?`Không có cửa sổ: ${dark.map(r=>`${r.name} (${r.floor})`).join(", ")}.`:"Mọi phòng cần sáng đều có cửa sổ ra mặt tiền, sân sau hoặc giếng trời.","Quy chuẩn DECOX");
+  const lost = all.filter(r=>!r.reach && !["out"].includes(r.type) && !["tech","lift"].includes(r.key));
+  add(lost.length?"bad":"ok","Lối đi tới các phòng",lost.length?`Không đi tới được: ${lost.map(r=>`${r.name} (${r.floor})`).join(", ")}.`:"Từ cầu thang đi tới được mọi phòng qua sảnh, hành lang và cửa.","Quy chuẩn DECOX");
+  plan.notes.forEach(x=>add(x.st,x.t,x.d,x.c));
+  const b = balcony(p.road);
+  add(b>0?"info":"warn","Ban công mặt tiền",b>0?`Lộ giới ${fmt(p.road)} m: vươn tối đa ${fmt(b)} m, mặt dưới cao ≥ 3,5 m.`:`Lộ giới ${fmt(p.road)} m: không được làm ban công.`,"9411 · Bảng 2");
+  const fc = plan.floors.flatMap((f,fi)=>floorFurnChecks(plan,fi).map(c=>({...c,floor:f.name})));
+  const fb = fc.filter(c=>c.st==="bad");
+  if(fb.length) add("warn","Bố trí nội thất còn chỗ chật",`${fb.length} mục chưa đạt, ví dụ ${fb[0].room} (${fb[0].floor}): ${fb[0].t.toLowerCase()}.`,"Thông lệ nội thất");
+  else add("ok","Bố trí nội thất",`${fc.length} khoảng thông thủy đều đạt.`,"Thông lệ nội thất");
+  add("info","Không mở cửa trên tường bên","Tường cách ranh đất dưới 2 m nên chỉ lấy sáng từ mặt tiền, sân sau và giếng trời.","9411 · 6.4.3.1");
+  return out;
+}
+
+/* ================= DỰ TOÁN ================= */
+function estimate(p, plan){
+  const pkg = PKGS.find(x=>x.id===state.pkg), foot=plan.footprint, rows=[];
+  rows.push(["Móng", foot, COEF.mong]);
+  plan.floors.forEach((f,i)=>{
+    if(f.roof){ const tum=r2(f.rooms.filter(r=>r.type!=="out").reduce((s,r)=>s+r.area,0)); rows.push(["Tum + phòng trên mái", tum, COEF.tum]); rows.push(["Sân thượng", r2(foot-tum), COEF.santhuong]); return; }
+    rows.push([f.name, r2(foot - (i>0?plan.wellA:0)), COEF.tang]);
+  });
+  if(!p.terrace) rows.push(["Mái BTCT", foot, COEF.mai]);
+  const conv = rows.map(([n,a,c])=>({n,a,c,q:r2(a*c/100)}));
+  const sumQ = r2(conv.reduce((s,r)=>s+r.q,0));
+  return {rows:conv, sumQ, total:sumQ*pkg.price, pkg};
+}
+
+/* ================= JSON SKETCHUP ================= */
+function toJSON(p, plan){
+  const fl = plan.floors.map(f=>{
+    const seen = new Set(), walls=[];
+    f.rooms.filter(r=>r.type!=="out"&&r.type!=="void").forEach(r=>{
+      [[r.x,r.y,r.x+r.w,r.y],[r.x+r.w,r.y,r.x+r.w,r.y+r.h],[r.x,r.y+r.h,r.x+r.w,r.y+r.h],[r.x,r.y,r.x,r.y+r.h]].forEach(e=>{
+        const k=e.map(v=>v.toFixed(2)).join(","); if(!seen.has(k)){ seen.add(k); walls.push({a:[r2(e[0]),r2(e[1])],b:[r2(e[2]),r2(e[3])],t:(e[0]===0&&e[2]===0)||(e[0]===p.W&&e[2]===p.W)?0.2:0.1}); }
+      });
+    });
+    return {name:f.name, elevation:f.elev, height:f.h||3.0, rooms:f.rooms.map(r=>({id:r.id,key:r.key,name:r.name,type:r.type,x:r.x,y:r.y,w:r.w,h:r.h,area:r.area,target:r.tgt})), doors:f.doors, windows:f.windows, walls,
+      furniture: floorItems(plan, plan.floors.indexOf(f)).map(i=>({kind:i.k,name:i.n,cx:i.cx,cy:i.cy,length:i.L,depth:i.D,rotation:i.rot}))};
+  });
+  return {schema:"decox-floorplan/0.1", units:"m", origin:"góc trái ranh trước, trục y hướng vào trong lô",
+    lot:{width:p.W, depth:p.D, road:p.road, facing:p.dir}, variant:state.variant, floors:fl};
+}
+
+/* ================= GIAO DIỆN ================= */
+function renderPkg(){
+  $("#pkg").innerHTML = PKGS.map(x=>`<button type="button" aria-pressed="${x.id===state.pkg}" data-p="${x.id}">${esc(x.name.replace("Trọn gói ","TG "))}<br><span class="num" style="font-size:12px;opacity:.8">${fmt(x.price)} tr/m²</span></button>`).join("");
+}
+function render(){
+  const p = params();
+  const plan = genPlan(p, state.variant);
+  $("#lotinfo").textContent = `Diện tích đất ${fmt(p.W*p.D)} m² · mật độ tối đa ${fmt(maxDensity(p.W*p.D))} % · sân sau tối thiểu ${fmt(rearSetback(p))} m`;
+  $("#buildinfo").textContent = `Xây ${fmt(plan.footprint)} m² (${fmt(plan.footprint/(p.W*p.D)*100)} %) · khối nhà dài ${fmt(plan.Lb)} m · ${plan.nFloors} tầng${p.terrace?" + tum":""} · thang ${plan.st.n} bậc`;
+  if(state.floor >= plan.floors.length) state.floor = 0;
+  const checks = runChecks(p, plan);
+  const est = estimate(p, plan);
+  const floorArea = r2(plan.floors.reduce((s,f)=>s+f.rooms.filter(r=>!["out","void"].includes(r.type)).reduce((a,r)=>a+r.area,0),0));
+
+  $("#summary").innerHTML = `
+    <div><b>${fmt(plan.footprint)} m²</b><span>Diện tích xây dựng</span></div>
+    <div><b>${fmt(floorArea)} m²</b><span>Tổng sàn sử dụng</span></div>
+    <div><b>${fmt(est.sumQ)} m²</b><span>Diện tích tính giá</span></div>
+    <div><b>${money(est.total)}</b><span>Dự toán sơ bộ</span></div>`;
+
+  $("#vtabs").innerHTML = Object.keys(VARIANTS).map(k=>`<button class="tab" role="tab" aria-selected="${k===state.variant}" data-v="${k}">Phương án ${k}</button>`).join("");
+  $("#vdesc").textContent = VARIANTS[state.variant];
+  $("#ftabs").innerHTML = plan.floors.map((f,i)=>`<button class="tab" role="tab" aria-selected="${i===state.floor}" data-f="${i}">${esc(f.name)}</button>`).join("");
+  const items = floorItems(plan, state.floor);
+  if(state.sel && !items.find(i=>i.id===state.sel)) state.sel=null;
+  $("#svg").innerHTML = drawFloor(p, plan, state.floor, items);
+  const isCustom = !!state.custom[state.variant+"|"+plan.floors[state.floor].key];
+  const si = items.find(i=>i.id===state.sel);
+  $("#seltool").classList.toggle("hidden", !state.furn);
+  $("#snapbar").classList.toggle("hidden", !state.furn);
+  $("#seltool").innerHTML = `<span class="mode ${isCustom?"custom":""}">${isCustom?"Đã chỉnh tay":"Bố trí tự động"}</span>` + (si ?
+    `<span class="nm">${esc(si.n||"Đồ nội thất")}</span>
+     <label>Dài <input type="number" step="0.05" min="0.2" value="${si.L}" data-sz="L"></label>
+     <label>Sâu <input type="number" step="0.05" min="0.2" value="${si.D}" data-sz="D"></label>
+     <button class="btn ghost sm" type="button" data-act="rot">Xoay 90°</button>
+     <button class="btn ghost sm" type="button" data-act="dup">Nhân bản</button>
+     <button class="btn ghost sm" type="button" data-act="del">Xoá</button>
+     <dl class="spec"><dt>Kích thước</dt><dd>${fmt(si.L*1000,0)} × ${fmt(si.D*1000,0)} mm</dd><dt>Diện tích</dt><dd>${fmt(si.L*si.D,2)} m²</dd><dt>Thông thủy</dt><dd>${esc(zoneText(si))}</dd></dl>`
+    : `<span class="hint" style="margin-left:0">Bấm vào một món để chọn; kéo để di chuyển, đồ tự bắt vào tường, mép đồ và tâm phòng. Mũi tên dịch 5 cm, R xoay, Delete xoá.</span>`)
+    + (isCustom ? `<button class="btn ghost sm" type="button" data-act="reset" style="margin-left:auto">Khôi phục tự động</button>` : "");
+  const order={bad:0,warn:1,ok:2,info:3};
+  const fr = plan.floors[state.floor].rooms.filter(r=>!["void"].includes(r.type));
+  const fcs = floorFurnChecks(plan, state.floor);
+  $("#fwrap").classList.toggle("hidden", !state.furn);
+  $("#fname").textContent = plan.floors[state.floor].name;
+  $("#fchecks").innerHTML = fcs.length ? fcs.sort((a,b)=>order[a.st]-order[b.st]).map(c=>`<li><span class="pill ${c.st}">${{ok:"Đạt",warn:"Lưu ý",bad:"Lỗi"}[c.st]}</span><div><b>${esc(c.room)}: ${esc(c.t)}</b><p class="num">${esc(c.d)}</p></div><cite>Thông lệ</cite></li>`).join("") : `<li class="empty">Tầng này không có phòng cần bố trí nội thất.</li>`;
+  const rst = r => !r.min ? "" : r.area<r.min-0.01 ? "bad" : (r.tgt && (r.area<r.tgt*0.85||r.area>r.tgt*1.4)) ? "warn" : "ok";
+  $("#rooms").innerHTML = `<thead><tr><td style="color:var(--muted);font-size:11px">PHÒNG</td><td style="color:var(--muted);font-size:11px">THỰC / MỤC TIÊU</td></tr></thead><tbody>${fr.filter(r=>!["circ"].includes(r.type)&&r.key!=="tech").map(r=>`<tr><td>${esc(r.name)}${r.auto?` <small style="color:var(--muted)">(tự thêm)</small>`:""}</td><td><span style="color:${{bad:"var(--bad)",warn:"var(--warn)",ok:"var(--ink)","":"var(--muted)"}[rst(r)]}">${fmt(r.area)}</span>${r.tgt?` / ${fmt(r.tgt)}`:""} m²</td></tr>`).join("")}</tbody>`;
+
+  const cnt = {ok:0,warn:0,bad:0};
+  checks.forEach(c=>{ if(cnt[c.st]!==undefined) cnt[c.st]++; });
+  $("#chksum").innerHTML = `<span class="pill ok">${cnt.ok} đạt</span>${cnt.warn?`<span class="pill warn">${cnt.warn} lưu ý</span>`:""}${cnt.bad?`<span class="pill bad">${cnt.bad} chưa đạt</span>`:""}`;
+  $("#checks").innerHTML = checks.sort((a,b)=>order[a.st]-order[b.st]).map(c=>`<li><span class="pill ${c.st}">${{ok:"Đạt",warn:"Lưu ý",bad:"Chưa đạt",info:"Ghi chú"}[c.st]}</span><div><b>${esc(c.t)}</b><p>${esc(c.d)}</p></div><cite>${esc(c.c)}</cite></li>`).join("");
+
+  $("#pkgname").textContent = est.pkg.name + " · " + fmt(est.pkg.price) + " triệu/m²";
+  $("#cost").innerHTML = `<thead><tr><th>Hạng mục</th><th class="r">Diện tích</th><th class="r">Hệ số</th><th class="r">Quy đổi</th></tr></thead>
+    <tbody>${est.rows.map(r=>`<tr><td>${esc(r.n)}</td><td class="r num">${fmt(r.a)}</td><td class="r num">${r.c}%</td><td class="r num">${fmt(r.q)}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td colspan="3">Tổng diện tích tính giá</td><td class="r num">${fmt(est.sumQ)} m²</td></tr></tfoot>`;
+  $("#total").textContent = `${money(est.total*0.9)} – ${money(est.total*1.1)}`;
+
+  $("#json").textContent = JSON.stringify(toJSON(p, plan), null, 1).slice(0, 4000) + "\n…";
+  window.__last = {p, plan, est, items};
+}
+
+function renderProg(){
+  const row=(k,name,sub,cnt,showArea)=>{ const s=ROOM_STD[k]||ROOM_STD.ngu, off=!cnt;
+    return `<div class="prow${sub?" sub":""}${off?" off":""}"><div><b>${esc(name)}</b>${showArea?`<small>tối thiểu ${fmt(s.min)} m² · ${esc(s.src)}</small>`:""}</div>
+      <div class="step"><button type="button" data-pk="${k}" data-d="-1" aria-label="Giảm ${esc(name)}">−</button><span>${cnt}</span><button type="button" data-pk="${k}" data-d="1" aria-label="Tăng ${esc(name)}">+</button></div>
+      ${showArea?`<div class="unit"><input type="number" step="0.5" min="1" value="${tgtA(k)}" data-pa="${k}" aria-label="Diện tích ${esc(name)}"><em>m²</em></div>`:"<div></div>"}</div>`; };
+  $("#prog").innerHTML = PROG_GROUPS.map(([g,keys])=>`<div><h4>${g}</h4>${keys.map(k=>{
+    let h=row(k, ROOM_STD[k].n, false, PROG[k], true);
+    if(k==="ngu") h = row("ngu","Phòng ngủ (tổng)",false,PROG.ngu,true) + row("master","Trong đó master",true,PROG.master,true) + row("wcr","Có WC trong phòng",true,PROG.wcr,true);
+    return h; }).join("")}</div>`).join("");
+}
+$("#prog").addEventListener("click", e=>{
+  const b=e.target.closest("[data-pk]"); if(!b) return;
+  const k=b.dataset.pk; PROG[k]=Math.max(0,Math.min(MAXC[k]||9,PROG[k]+(+b.dataset.d)));
+  if(k==="ngu"){ PROG.master=Math.min(PROG.master,PROG.ngu); PROG.wcr=Math.min(PROG.wcr,PROG.ngu); }
+  if(k==="master"||k==="wcr") PROG[k]=Math.min(PROG[k],PROG.ngu);
+  renderProg(); render();
+});
+$("#prog").addEventListener("input", e=>{ const t=e.target; if(t.dataset.pa && +t.value>0) AREA[t.dataset.pa]=+t.value; });
+
+/* sự kiện khách */
+$("#f").addEventListener("input", render);
+$("#snapbar").addEventListener("click", e=>{ if(e.target.closest("[data-zn]")){ state.zones=!state.zones; renderSnapbar(); render(); return; } const b=e.target.closest("[data-sn]"); if(!b) return; state.snap[b.dataset.sn]=!state.snap[b.dataset.sn]; renderSnapbar(); });
+$("#zoom").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; const z=+b.dataset.z; const L=[1,1.5,2,3];
+  let i=L.indexOf(state.zoom); i = z===0?0:Math.max(0,Math.min(L.length-1,i+z)); state.zoom=L[i]; $("#zlab").textContent=Math.round(state.zoom*100)+"%"; render(); });
+$("#furn").addEventListener("change", e=>{ state.furn=e.target.checked; render(); });
+$("#pkg").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.pkg=b.dataset.p; renderPkg(); render(); });
+$("#vtabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.variant=b.dataset.v; state.sel=null; render(); });
+$("#ftabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.floor=+b.dataset.f; state.sel=null; render(); });
+$("#copyjson").addEventListener("click", async e=>{
+  const {p,plan} = window.__last;
+  try { await navigator.clipboard.writeText(JSON.stringify(toJSON(p,plan),null,2)); e.target.textContent="Đã chép"; }
+  catch(err){ e.target.textContent="Không chép được, hãy bôi đen khung bên dưới"; }
+  setTimeout(()=>e.target.textContent="Chép JSON",2500);
+});
+$("#leadf").addEventListener("submit", e=>{
+  e.preventDefault();
+  const {p,est} = window.__last;
+  const d = new Date();
+  const lead = {t:d.toLocaleDateString("vi-VN")+" "+d.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}), name:$("#lname").value.trim(), phone:$("#lphone").value.trim(), addr:$("#laddr").value.trim(), spec:`${fmt(p.W)} × ${fmt(p.D)} m · ${window.__last.plan.nFloors} tầng · ${p.prog.ngu} PN · ${p.prog.wcr} WC riêng · PA ${state.variant}`, total:"≈ "+money(est.total)};
+  LEADS.unshift(lead);
+  try{ localStorage.setItem("decox_leads", JSON.stringify(LEADS.filter(l=>!l.demo))); }catch(err){}
+  $("#leadok").textContent = `Đã ghi nhận yêu cầu của ${lead.name}. Đây là bản thử: yêu cầu chỉ lưu trên trình duyệt này, chưa gửi tới DECOX.`;
+  $("#leadok").classList.remove("hidden");
+  $("#step5").classList.add("on");
+  e.target.reset(); renderAdmin();
+});
+
+/* ================= HỆ BẮT ĐIỂM ================= */
+const WALL_HALF = 0.06;   // nửa bề dày nét tường trên bản vẽ → mặt trong tường
+const SNAP_KIND = {
+  wall:  {pri:0, col:"var(--accent)", lab:"Sát tường"},
+  gap:   {pri:1, col:"var(--ok)",     lab:""},
+  edge:  {pri:2, col:"var(--blue)",   lab:"Thẳng mép"},
+  mid:   {pri:3, col:"var(--blue)",   lab:"Thẳng tâm"},
+  center:{pri:4, col:"#8a5cc2",       lab:"Tâm phòng"}
+};
+const SNAP_UI = [["wall","Mặt tường","var(--accent)"],["item","Mép & tâm đồ","var(--blue)"],["center","Tâm phòng","#8a5cc2"],["gap","Khoảng thông thủy","var(--ok)"],["grid","Lưới 5 cm","var(--muted)"]];
+function renderSnapbar(){
+  $("#snapbar").innerHTML = `<span>Bắt điểm</span>` + SNAP_UI.map(([k,l,c])=>`<button type="button" class="chip" aria-pressed="${state.snap[k]}" data-sn="${k}"><i style="background:${c}"></i>${l}</button>`).join("") + `<button type="button" class="chip" aria-pressed="${state.zones}" data-zn="1" style="margin-left:8px">Hiện vùng thông thủy</button><em>Giữ Alt khi kéo để tắt tạm</em>`;
+  $("#snapbar").classList.toggle("hidden", !state.furn);
+}
+function buildTargets(f, items, exId){
+  const T={xs:[],ys:[]}, S=state.snap, W=WALL_HALF;
+  f.rooms.filter(r=>r.type!=="void").forEach(r=>{
+    if(S.wall){
+      T.xs.push({v:r.x+W,kind:"wall",role:"min",s0:r.y,s1:r.y+r.h},{v:r.x+r.w-W,kind:"wall",role:"max",s0:r.y,s1:r.y+r.h});
+      T.ys.push({v:r.y+W,kind:"wall",role:"min",s0:r.x,s1:r.x+r.w},{v:r.y+r.h-W,kind:"wall",role:"max",s0:r.x,s1:r.x+r.w});
+    }
+    if(S.center && !["core","out"].includes(r.type)){
+      T.xs.push({v:r.x+r.w/2,kind:"center",role:"mid",s0:r.y,s1:r.y+r.h,room:true});
+      T.ys.push({v:r.y+r.h/2,kind:"center",role:"mid",s0:r.x,s1:r.x+r.w,room:true});
+    }
+  });
+  items.filter(i=>i.id!==exId).forEach(i=>{
+    const b=bb(i);
+    if(S.item){
+      T.xs.push({v:b.x,kind:"edge",role:"any",s0:b.y,s1:b.y+b.h},{v:b.x+b.w,kind:"edge",role:"any",s0:b.y,s1:b.y+b.h},{v:b.x+b.w/2,kind:"mid",role:"mid",s0:b.y,s1:b.y+b.h});
+      T.ys.push({v:b.y,kind:"edge",role:"any",s0:b.x,s1:b.x+b.w},{v:b.y+b.h,kind:"edge",role:"any",s0:b.x,s1:b.x+b.w},{v:b.y+b.h/2,kind:"mid",role:"mid",s0:b.x,s1:b.x+b.w});
+    }
+    if(S.gap) [...new Set([FURN.c.bedSide, FURN.c.wardrobeFront])].forEach(c=>{
+      T.xs.push({v:b.x-c,kind:"gap",role:"max",c,ref:b.x,s0:b.y,s1:b.y+b.h},{v:b.x+b.w+c,kind:"gap",role:"min",c,ref:b.x+b.w,s0:b.y,s1:b.y+b.h});
+      T.ys.push({v:b.y-c,kind:"gap",role:"max",c,ref:b.y,s0:b.x,s1:b.x+b.w},{v:b.y+b.h+c,kind:"gap",role:"min",c,ref:b.y+b.h,s0:b.x,s1:b.x+b.w});
+    });
+  });
+  return T;
+}
+function snapAxis(lo, hi, list, oLo, oHi, tol){
+  const cand={min:lo, mid:(lo+hi)/2, max:hi}, oc=(oLo+oHi)/2;
+  let best=null;
+  for(const t of list){
+    if(t.kind==="wall"||t.kind==="gap"){ if(Math.min(oHi,t.s1)-Math.max(oLo,t.s0) < -0.05) continue; }
+    if(t.room && (oc<t.s0||oc>t.s1)) continue;
+    const roles = t.role==="any"?["min","max"]:[t.role];
+    for(const ro of roles){
+      const d=t.v-cand[ro], a=Math.abs(d);
+      if(a>tol) continue;
+      if(!best || a<best.a-1e-4 || (Math.abs(a-best.a)<1e-4 && SNAP_KIND[t.kind].pri<SNAP_KIND[best.t.kind].pri)) best={d,a,t,ro};
+    }
+  }
+  return best;
+}
+function applySnap(it, T, tol, off){
+  const out={cx:it.cx, cy:it.cy, sx:null, sy:null};
+  if(off){ out.cx=r2(it.cx); out.cy=r2(it.cy); return out; }
+  let b=bb(it);
+  out.sx = snapAxis(b.x,b.x+b.w,T.xs,b.y,b.y+b.h,tol);
+  out.cx = out.sx ? it.cx+out.sx.d : (state.snap.grid ? snap(it.cx) : it.cx);
+  b=bb({...it,cx:out.cx});
+  out.sy = snapAxis(b.y,b.y+b.h,T.ys,b.x,b.x+b.w,tol);
+  out.cy = out.sy ? it.cy+out.sy.d : (state.snap.grid ? snap(it.cy) : it.cy);
+  out.cx=Math.round(out.cx*1000)/1000; out.cy=Math.round(out.cy*1000)/1000;
+  return out;
+}
+function snapGuides(it, res){
+  const Dl=window.__last.p.D, Y=y=>Dl-y, b=bb({...it,cx:res.cx,cy:res.cy}), f=window.__last.plan.floors[state.floor];
+  let g="";
+  const txt=(x,y,t,c,rot)=>`<text x="${x}" y="${y}" font-size="0.2" font-family="Be Vietnam Pro, sans-serif" font-weight="600" fill="${c}" stroke="var(--paper)" stroke-width="0.07" paint-order="stroke"${rot?` transform="rotate(-90 ${x} ${y})"`:""}>${t}</text>`;
+  const lab=s=>s.t.kind==="gap" ? `Cách ${fmt(s.t.c,2)} m` : SNAP_KIND[s.t.kind].lab;
+  if(res.sx){ const t=res.sx.t, c=SNAP_KIND[t.kind].col, y0=Math.min(t.s0,b.y)-0.3, y1=Math.max(t.s1,b.y+b.h)+0.3;
+    g+=`<line x1="${t.v}" x2="${t.v}" y1="${Y(y1)}" y2="${Y(y0)}" stroke="${c}" stroke-width="0.035" stroke-dasharray="0.14 0.08"/>`;
+    if(t.kind==="gap"){ const ym=(Math.max(b.y,t.s0)+Math.min(b.y+b.h,t.s1))/2; g+=`<line x1="${t.v}" x2="${t.ref}" y1="${Y(ym)}" y2="${Y(ym)}" stroke="${c}" stroke-width="0.04"/>`; }
+    g+=txt(t.v+0.08, Y(y1)+0.25, lab(res.sx), c);
+  }
+  if(res.sy){ const t=res.sy.t, c=SNAP_KIND[t.kind].col, x0=Math.min(t.s0,b.x)-0.3, x1=Math.max(t.s1,b.x+b.w)+0.3;
+    g+=`<line x1="${x0}" x2="${x1}" y1="${Y(t.v)}" y2="${Y(t.v)}" stroke="${c}" stroke-width="0.035" stroke-dasharray="0.14 0.08"/>`;
+    if(t.kind==="gap"){ const xm=(Math.max(b.x,t.s0)+Math.min(b.x+b.w,t.s1))/2; g+=`<line x1="${xm}" x2="${xm}" y1="${Y(t.v)}" y2="${Y(t.ref)}" stroke="${c}" stroke-width="0.04"/>`; }
+    g+=txt(x1+0.05, Y(t.v)-0.06, lab(res.sy), c);
+  }
+  // số đo đến mặt tường trong phòng đang đứng
+  const cx=b.x+b.w/2, cy=b.y+b.h/2, r=f.rooms.filter(r=>!["void"].includes(r.type)).find(r=>cx>=r.x&&cx<=r.x+r.w&&cy>=r.y&&cy<=r.y+r.h);
+  if(r){
+    const W=WALL_HALF, col="var(--muted)", seg=(x1,y1,x2,y2,v,vert)=>{ if(v<0.02) return ""; const mx=(x1+x2)/2,my=(y1+y2)/2;
+      return `<line x1="${x1}" y1="${Y(y1)}" x2="${x2}" y2="${Y(y2)}" stroke="${col}" stroke-width="0.02"/><circle cx="${x1}" cy="${Y(y1)}" r="0.03" fill="${col}"/><circle cx="${x2}" cy="${Y(y2)}" r="0.03" fill="${col}"/>` + `<text x="${vert?mx+0.06:mx}" y="${vert?Y(my)+0.06:Y(my)-0.06}" text-anchor="${vert?"start":"middle"}" font-size="0.17" font-family="IBM Plex Mono, monospace" fill="var(--ink)" stroke="var(--paper)" stroke-width="0.06" paint-order="stroke">${fmt(v,2)}</text>`; };
+    g+=seg(r.x+W,cy,b.x,cy,b.x-r.x-W,false);
+    g+=seg(b.x+b.w,cy,r.x+r.w-W,cy,r.x+r.w-W-b.x-b.w,false);
+    g+=seg(cx,r.y+W,cx,b.y,b.y-r.y-W,true);
+    g+=seg(cx,b.y+b.h,cx,r.y+r.h-W,r.y+r.h-W-b.y-b.h,true);
+  }
+  return g;
+}
+function snapTol(){ const svg=$("#svg svg"); const m=svg&&svg.getScreenCTM(); return m ? 10/m.a : 0.15; }
+function setLayer(html){ const L=document.getElementById("snapLayer"); if(L) L.innerHTML=html; }
+
+/* ================= KÉO THẢ NỘI THẤT ================= */
+const snap = v => Math.round(v*20)/20;
+function svgPt(e){ const svg=$("#svg svg"); const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+function ensureCustom(){ const k=curKey(); if(!state.custom[k]) state.custom[k]=window.__last.items.map(i=>({...i})); return state.custom[k]; }
+function selItem(){ return ensureCustom().find(i=>i.id===state.sel); }
+function addItem(c, cx, cy){
+  const [L,D]=catDims(c), list=ensureCustom();
+  const it={id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5), k:c[1], n:c[2], cx:r2(cx), cy:r2(cy), L, D, rot:0};
+  list.push(it); state.sel=it.id; state.furn=true; $("#furn").checked=true; render();
+}
+function defaultSpot(){
+  const f=window.__last.plan.floors[state.floor];
+  const r=f.rooms.filter(r=>!["core","out","void","wet"].includes(r.type)).sort((a,b)=>b.area-a.area)[0]||f.rooms[0];
+  return [r.x+r.w/2, r.y+r.h/2];
+}
+function renderPal(){
+  let k=0;
+  $("#pal").innerHTML = CATALOG.map(g=>`<div><h3>${esc(g.g)}</h3><div class="pal-grid">${g.items.map(c=>{
+    const [L,D]=catDims(c), m=Math.max(L,D)*0.6+0.1;
+    return `<div class="tile" role="button" tabindex="0" data-c="${CATALOG.indexOf(g)}.${g.items.indexOf(c)}" aria-label="Thêm ${esc(c[2])}"><svg viewBox="${-L/2-0.08} ${-D/2-0.08} ${L+0.16} ${D+0.16}" aria-hidden="true">${drawLocal(c[1],L,D)}</svg><b>${esc(c[2])}</b><span>${fmt(L*1000,0)} × ${fmt(D*1000,0)}</span></div>`;
+  }).join("")}</div></div>`).join("");
+}
+const catOf = s => { const [a,b]=s.split(".").map(Number); return CATALOG[a].items[b]; };
+let pdrag=null, idrag=null;
+$("#ltabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return;
+  [...$("#ltabs").children].forEach(x=>x.setAttribute("aria-selected", x===b));
+  $("#lp-lot").classList.toggle("hidden", b.dataset.l!=="lot"); $("#lp-lib").classList.toggle("hidden", b.dataset.l!=="lib"); });
+$("#pal").addEventListener("pointerdown", e=>{
+  const t=e.target.closest(".tile"); if(!t) return; e.preventDefault();
+  const c=catOf(t.dataset.c), gh=document.createElement("div"); gh.className="dragghost"; gh.textContent=c[2]; gh.style.left=e.clientX+"px"; gh.style.top=e.clientY+"px"; gh.style.display="none"; document.body.appendChild(gh);
+  pdrag={c, x:e.clientX, y:e.clientY, gh, moved:false}; document.body.classList.add("dragging");
+});
+$("#pal").addEventListener("keydown", e=>{ const t=e.target.closest(".tile"); if(t&&(e.key==="Enter"||e.key===" ")){ e.preventDefault(); const [x,y]=defaultSpot(); addItem(catOf(t.dataset.c),x,y); }});
+document.addEventListener("pointermove", e=>{
+  if(!pdrag) return;
+  if(Math.hypot(e.clientX-pdrag.x,e.clientY-pdrag.y)>6){ pdrag.moved=true; pdrag.gh.style.display="block"; }
+  pdrag.gh.style.left=e.clientX+"px"; pdrag.gh.style.top=e.clientY+"px";
+  const over = document.elementFromPoint(e.clientX,e.clientY), inSvg = !!(over && over.closest("#svg") && $("#svg svg"));
+  $("#svg").classList.toggle("drop-on", inSvg);
+  if(inSvg && pdrag.moved){
+    const q=svgPt(e), Dl=window.__last.p.D, [L,Dd]=catDims(pdrag.c);
+    if(!pdrag.T) pdrag.T=buildTargets(window.__last.plan.floors[state.floor], window.__last.items, null);
+    const it={k:pdrag.c[1], n:pdrag.c[2], cx:q.x, cy:Dl-q.y, L, D:Dd, rot:0};
+    const res=applySnap(it, pdrag.T, snapTol(), e.altKey); pdrag.pos=[res.cx,res.cy];
+    setLayer(`<g transform="translate(${res.cx} ${Dl-res.cy})" opacity="0.85"><g>${drawLocal(it.k,L,Dd)}</g></g>` + snapGuides(it,res));
+    pdrag.gh.style.display="none";
+  } else { pdrag.pos=null; setLayer(""); if(pdrag.moved) pdrag.gh.style.display="block"; }
+});
+document.addEventListener("pointerup", e=>{
+  if(!pdrag) return; const d=pdrag; pdrag=null; d.gh.remove(); document.body.classList.remove("dragging"); $("#svg").classList.remove("drop-on");
+  if(!d.moved){ const [x,y]=defaultSpot(); addItem(d.c,x,y); return; }
+  const over=document.elementFromPoint(e.clientX,e.clientY);
+  if(d.pos) addItem(d.c, d.pos[0], d.pos[1]);
+  else if(over && over.closest("#svg") && $("#svg svg")){ const q=svgPt(e); addItem(d.c, q.x, window.__last.p.D - q.y); }
+});
+document.addEventListener("pointercancel", ()=>{ if(pdrag){ pdrag.gh.remove(); pdrag=null; $("#svg").classList.remove("drop-on"); } });
+
+const svgBox=$("#svg");
+svgBox.addEventListener("pointerdown", e=>{
+  const g=e.target.closest(".fi");
+  if(!g){ if(state.sel && e.target.closest("svg")){ state.sel=null; render(); } return; }
+  e.preventDefault();
+  const id=g.dataset.id, it=window.__last.items.find(i=>i.id===id); if(!it) return;
+  const q=svgPt(e);
+  idrag={id, g, it, sx:q.x, sy:q.y, cx:it.cx, cy:it.cy, moved:false, Dl:window.__last.p.D, tol:snapTol(),
+         T:buildTargets(window.__last.plan.floors[state.floor], window.__last.items, id)};
+  svgBox.setPointerCapture(e.pointerId);
+});
+svgBox.addEventListener("pointermove", e=>{
+  if(!idrag) return; const q=svgPt(e), dx=q.x-idrag.sx, dy=q.y-idrag.sy;
+  if(Math.abs(dx)+Math.abs(dy)>0.03) idrag.moved=true;
+  if(!idrag.moved) return;
+  const res=applySnap({...idrag.it, cx:idrag.cx+dx, cy:idrag.cy-dy}, idrag.T, idrag.tol, e.altKey);
+  idrag.nx=res.cx; idrag.ny=res.cy;
+  idrag.g.setAttribute("transform",`translate(${res.cx} ${idrag.Dl-res.cy})`);
+  setLayer(snapGuides(idrag.it,res));
+});
+svgBox.addEventListener("pointerup", e=>{
+  if(!idrag) return; const d=idrag; idrag=null;
+  state.sel=d.id;
+  if(d.moved && d.nx!==undefined){ const list=ensureCustom(), it=list.find(i=>i.id===d.id); it.cx=r2(d.nx); it.cy=r2(d.ny); }
+  render();
+});
+$("#seltool").addEventListener("click", e=>{
+  const b=e.target.closest("[data-act]"); if(!b) return; const a=b.dataset.act;
+  if(a==="reset"){ delete state.custom[curKey()]; state.sel=null; render(); return; }
+  const list=ensureCustom(), it=list.find(i=>i.id===state.sel); if(!it) return;
+  if(a==="rot") it.rot=(it.rot+90)%360;
+  if(a==="dup"){ const c={...it,id:"c"+Date.now().toString(36),cx:snap(it.cx+0.3),cy:snap(it.cy-0.3)}; list.push(c); state.sel=c.id; }
+  if(a==="del"){ list.splice(list.indexOf(it),1); state.sel=null; }
+  render();
+});
+$("#seltool").addEventListener("change", e=>{
+  const t=e.target; if(!t.dataset.sz) return; const v=+t.value; if(!(v>=0.2)) return;
+  const it=selItem(); if(it){ it[t.dataset.sz]=r2(v); render(); }
+});
+document.addEventListener("keydown", e=>{
+  if(!state.sel || e.target.closest("input,select,textarea") || $("#view-design").classList.contains("hidden")) return;
+  const st = e.shiftKey?0.25:0.05, mv={ArrowLeft:[-st,0],ArrowRight:[st,0],ArrowUp:[0,st],ArrowDown:[0,-st]}[e.key];
+  if(mv){ e.preventDefault(); const it=selItem(); it.cx=r2(it.cx+mv[0]); it.cy=r2(it.cy+mv[1]); render(); }
+  else if(e.key==="r"||e.key==="R"){ const it=selItem(); it.rot=(it.rot+90)%360; render(); }
+  else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); const l=ensureCustom(); l.splice(l.findIndex(i=>i.id===state.sel),1); state.sel=null; render(); }
+  else if(e.key==="Escape"){ state.sel=null; render(); }
+});
+
+/* ================= QUẢN TRỊ ================= */
+let astate = {tab:"rules", src:"all", q:""};
+let GAL = SAMPLE_PLANS.map(x=>({...x}));
+const ATABS = {rules:"Tiêu chuẩn", rooms:"Quy chuẩn phòng", furn:"Nội thất", plans:"Mặt bằng mẫu", price:"Đơn giá", leads:"Khách tiềm năng"};
+
+function miniPlan(w,d){
+  const s=Math.min(60/w,90/d); const W=w*s, D=d*s;
+  return `<svg viewBox="0 0 ${W+4} ${D+4}" aria-hidden="true"><rect x="2" y="2" width="${W}" height="${D}" fill="var(--room-live)" stroke="var(--wall)" stroke-width="1.2"/><rect x="2" y="${2+D*0.42}" width="${W*0.45}" height="${D*0.18}" fill="var(--room-core)" stroke="var(--wall)" stroke-width="0.8"/><rect x="${2+W*0.45}" y="${2+D*0.42}" width="${W*0.55}" height="${D*0.1}" fill="var(--room-wet)" stroke="var(--wall)" stroke-width="0.8"/><line x1="2" x2="${2+W}" y1="${2+D*0.42}" y2="${2+D*0.42}" stroke="var(--wall)" stroke-width="0.8"/></svg>`;
+}
+
+function renderAdmin(){
+  const labeled = GAL.filter(g=>!g.demo&&g.w&&g.d&&g.f&&g.b).length;
+  $("#kpis").innerHTML = `
+    <div class="kpi"><b>${RULES.length+Object.keys(FURN.c).length}</b><span>Quy tắc tiêu chuẩn</span></div>
+    <div class="kpi"><b>${labeled}<span style="font-size:14px;color:var(--muted)"> / 100</span></b><span>Mặt bằng mẫu đã gắn nhãn</span></div>
+    <div class="kpi"><b>${PKGS.length}</b><span>Gói đơn giá</span></div>
+    <div class="kpi" style="border-left-color:var(--accent)"><b>${LEADS.length}</b><span>Khách tiềm năng</span></div>`;
+  $("#atabs").innerHTML = Object.entries(ATABS).map(([k,v])=>`<button class="tab" role="tab" aria-selected="${k===astate.tab}" data-a="${k}">${v}</button>`).join("");
+  ["rules","rooms","furn","plans","price","leads"].forEach(k=>$("#a-"+k).classList.toggle("hidden", k!==astate.tab));
+
+  // quy tắc
+  $("#rsrc").innerHTML = [["all","Tất cả"],["13967",SRC["13967"]],["13967-PCCC",SRC["13967-PCCC"]],["HCM",SRC["HCM"]],["9411",SRC["9411"]],["NT",SRC["NT"]]].map(([k,v])=>`<button class="chip" aria-pressed="${astate.src===k}" data-s="${k}">${esc(v)}</button>`).join("");
+  const q = astate.q.toLowerCase();
+  const ALL = RULES.concat(Object.entries(FURN.c).map(([k,v])=>["NT","Nội thất",FURN_C_NAMES[k],"khoảng thông thủy tối thiểu",fmt(v,2)+" m","—"]));
+  const rows = ALL.filter(r=>(astate.src==="all"||r[0]===astate.src) && (!q || r.join(" ").toLowerCase().includes(q)));
+  $("#rtable").innerHTML = `<thead><tr><th>Nguồn</th><th>Hạng mục</th><th>Thông số</th><th>Điều kiện</th><th>Giá trị</th><th>Điều</th></tr></thead><tbody>${
+    rows.length ? rows.map(r=>`<tr><td><span class="src">${esc(SRC[r[0]]||r[0])}</span></td><td><b>${esc(r[1])}</b></td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td class="num">${esc(r[4])}</td><td class="num">${esc(r[5])}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">Không có quy tắc khớp với "${esc(astate.q)}".</td></tr>`}</tbody>`;
+  $("#ar-src").innerHTML = Object.entries(SRC).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("");
+
+  // quy chuẩn phòng
+  $("#rstable").innerHTML = `<thead><tr><th>Loại phòng</th><th class="r">Tối thiểu (m²)</th><th class="r">Mục tiêu (m²)</th><th class="r">Cạnh ngắn ≥ (m)</th><th>Tầng ưu tiên</th><th>Cần lấy sáng</th><th>Nguồn mức tối thiểu</th></tr></thead><tbody>${Object.entries(ROOM_STD).map(([k,v])=>`<tr><td><b>${esc(v.n)}</b></td>
+    <td class="r"><input class="price-in" style="width:70px" type="number" step="0.5" value="${v.min}" data-rs="${k}" data-f="min" aria-label="${esc(v.n)} tối thiểu"></td>
+    <td class="r"><input class="price-in" style="width:70px" type="number" step="0.5" value="${v.tgt}" data-rs="${k}" data-f="tgt" aria-label="${esc(v.n)} mục tiêu"></td>
+    <td class="r"><input class="price-in" style="width:70px" type="number" step="0.1" value="${v.minW}" data-rs="${k}" data-f="minW" aria-label="${esc(v.n)} cạnh ngắn"></td>
+    <td>${esc(FL_NAMES[v.fl])}</td>
+    <td><input type="checkbox" ${v.light?"checked":""} data-rs="${k}" data-f="light" aria-label="${esc(v.n)} cần lấy sáng"></td>
+    <td><span class="src">${esc(v.src)}</span></td></tr>`).join("")}</tbody>`;
+
+  // nội thất
+  $("#fstable").innerHTML = `<thead><tr><th>Đồ nội thất</th><th class="r">Dài (m)</th><th class="r">Sâu (m)</th></tr></thead><tbody>${Object.entries(FURN.s).map(([k,v])=>`<tr><td>${esc(FURN_S_NAMES[k])}</td><td class="r"><input class="price-in" style="width:80px" type="number" step="0.05" value="${v[0]}" data-fs="${k}" data-j="0" aria-label="${esc(FURN_S_NAMES[k])} dài"></td><td class="r"><input class="price-in" style="width:80px" type="number" step="0.05" value="${v[1]}" data-fs="${k}" data-j="1" aria-label="${esc(FURN_S_NAMES[k])} sâu"></td></tr>`).join("")}</tbody>`;
+  $("#fctable").innerHTML = `<thead><tr><th>Khoảng thông thủy</th><th class="r">Tối thiểu (m)</th></tr></thead><tbody>${Object.entries(FURN.c).map(([k,v])=>`<tr><td>${esc(FURN_C_NAMES[k])}</td><td class="r"><input class="price-in" style="width:80px" type="number" step="0.05" value="${v}" data-fc="${k}" aria-label="${esc(FURN_C_NAMES[k])}"></td></tr>`).join("")}</tbody>`;
+
+  // mặt bằng mẫu
+  const dirs = ["Bắc","Đông Bắc","Đông","Đông Nam","Nam","Tây Nam","Tây","Tây Bắc"];
+  $("#gal").innerHTML = GAL.map((g,i)=>`<div class="card">
+    <div class="ph">${g.src?`<img src="${g.src}" alt="${esc(g.name)}">`:miniPlan(g.w||5,g.d||20)}</div>
+    <div class="meta">
+      <input value="${esc(g.name)}" data-i="${i}" data-k="name" aria-label="Tên mẫu">
+      <div class="row">
+        <input type="number" step="0.1" value="${g.w||""}" placeholder="Rộng m" data-i="${i}" data-k="w" aria-label="Rộng">
+        <input type="number" step="0.1" value="${g.d||""}" placeholder="Sâu m" data-i="${i}" data-k="d" aria-label="Sâu">
+        <input type="number" value="${g.f||""}" placeholder="Số tầng" data-i="${i}" data-k="f" aria-label="Số tầng">
+        <input type="number" value="${g.b||""}" placeholder="Phòng ngủ" data-i="${i}" data-k="b" aria-label="Phòng ngủ">
+      </div>
+      <select data-i="${i}" data-k="dir" aria-label="Hướng">${dirs.map(d=>`<option ${d===g.dir?"selected":""}>${d}</option>`).join("")}</select>
+      ${g.demo?`<span class="pill info">Mẫu minh hoạ</span>`:(g.w&&g.d&&g.f&&g.b?`<span class="pill ok">Đã gắn nhãn</span>`:`<span class="pill warn">Thiếu nhãn</span>`)}
+    </div></div>`).join("");
+
+  // đơn giá
+  $("#ptable").innerHTML = `<thead><tr><th>Gói</th><th class="r">Đơn giá (triệu/m²)</th></tr></thead><tbody>${PKGS.map((x,i)=>`<tr><td>${esc(x.name)}</td><td class="r"><input class="price-in" type="number" step="0.1" value="${x.price}" data-pi="${i}" aria-label="Đơn giá ${esc(x.name)}"></td></tr>`).join("")}</tbody>`;
+  $("#ctable").innerHTML = `<thead><tr><th>Hệ số diện tích</th><th class="r">%</th></tr></thead><tbody>${Object.entries(COEF).map(([k,v])=>`<tr><td>${esc(COEF_NAMES[k])}</td><td class="r"><input class="price-in" type="number" step="5" value="${v}" data-ck="${k}" aria-label="${esc(COEF_NAMES[k])}"></td></tr>`).join("")}</tbody>`;
+
+  // khách
+  $("#ltable").innerHTML = `<thead><tr><th>Thời gian</th><th>Khách</th><th>Điện thoại</th><th>Lô đất</th><th>Yêu cầu</th><th class="r">Dự toán</th></tr></thead><tbody>${
+    LEADS.map(l=>`<tr><td class="num">${esc(l.t)}</td><td><b>${esc(l.name)}</b>${l.demo?` <span class="pill info">mẫu</span>`:""}</td><td class="num">${esc(l.phone)}</td><td>${esc(l.addr||"—")}</td><td>${esc(l.spec)}</td><td class="r num">${esc(l.total)}</td></tr>`).join("")}</tbody>`;
+}
+
+$("#atabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; astate.tab=b.dataset.a; renderAdmin(); });
+$("#rsrc").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; astate.src=b.dataset.s; renderAdmin(); });
+$("#rq").addEventListener("input", e=>{ astate.q=e.target.value; renderAdmin(); $("#rq").focus(); });
+$("#addrule").addEventListener("submit", e=>{
+  e.preventDefault();
+  RULES.push([$("#ar-src").value,$("#ar-cat").value,$("#ar-par").value,$("#ar-cond").value||"—",$("#ar-val").value,$("#ar-art").value||"—"]);
+  e.target.reset(); renderAdmin();
+});
+$("#upl").addEventListener("change", e=>{
+  [...e.target.files].forEach(file=>{
+    const rd = new FileReader();
+    rd.onload = ev=>{ GAL.unshift({name:file.name.replace(/\.[^.]+$/,""), src:ev.target.result, dir:"Đông Nam"}); renderAdmin(); };
+    rd.readAsDataURL(file);
+  });
+});
+$("#gal").addEventListener("change", e=>{
+  const t=e.target; if(t.dataset.i===undefined) return;
+  const g=GAL[+t.dataset.i]; g[t.dataset.k] = t.type==="number" ? +t.value : t.value; g.demo=false; renderAdmin();
+});
+$("#a-rooms").addEventListener("change", e=>{
+  const t=e.target; if(!t.dataset.rs) return; const R=ROOM_STD[t.dataset.rs];
+  if(t.dataset.f==="light") R.light = t.checked?1:0; else { const v=+t.value; if(v>0) R[t.dataset.f]=v; }
+  if(t.dataset.f==="tgt") delete AREA[t.dataset.rs];
+  renderProg(); render(); renderAdmin(); astate.tab="rooms";
+});
+$("#a-furn").addEventListener("change", e=>{
+  const t=e.target, v=+t.value; if(!(v>=0)) return;
+  if(t.dataset.fs) FURN.s[t.dataset.fs][+t.dataset.j]=v;
+  if(t.dataset.fc) FURN.c[t.dataset.fc]=v;
+  renderPal(); render(); renderAdmin(); astate.tab="furn";
+});
+$("#a-price").addEventListener("change", e=>{
+  const t=e.target;
+  if(t.dataset.pi!==undefined) PKGS[+t.dataset.pi].price = +t.value||0;
+  if(t.dataset.ck) COEF[t.dataset.ck] = +t.value||0;
+  renderPkg(); render();
+});
+
+/* ================= ĐIỀU HƯỚNG ================= */
+function route(){
+  const admin = location.hash==="#quan-tri";
+  $("#view-design").classList.toggle("hidden", admin);
+  $("#view-admin").classList.toggle("hidden", !admin);
+  $("#nav-design").toggleAttribute("aria-current", !admin); if(!admin) $("#nav-design").setAttribute("aria-current","page");
+  $("#nav-admin").toggleAttribute("aria-current", admin); if(admin) $("#nav-admin").setAttribute("aria-current","page");
+}
+window.addEventListener("hashchange", route);
+
+renderPkg(); renderProg(); renderPal(); renderSnapbar(); render(); renderAdmin(); route();
+</script>
+</body>
+</html>

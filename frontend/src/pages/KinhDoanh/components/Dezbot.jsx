@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BugChip } from '../../../components/ui/BugReport'
 import { CaptureChips } from '../../../components/ui/CaptureTools'
 import { AI_KB, AI_TOPIC_PROMPTS, AI_SUGGESTS } from '../../../data/kinhDoanhData'
+import MatBangOverlay from './matbang/MatBang'
 
 /* ===================== Dezbot — trợ lý ảo ===================== */
 
@@ -22,6 +23,7 @@ export function loadAiPanelWidth() {
 function matchTopic(text) {
   const t = text.toLowerCase()
   const has = s => t.indexOf(s) > -1
+  if (has('mặt bằng') || has('mat bang')) return 'matbang'
   if (has('tiến độ') || has('tien do') || has('dự án')) return 'tiendo'
   if (has('chấm công') || has('nhân công') || has('nhân sự') || has('nghỉ phép')) return 'chamcong'
   if (has('dòng tiền') || has('hoá đơn') || has('hóa đơn') || has('thu') || has('chi')) return 'dongtien'
@@ -42,11 +44,14 @@ const TOPICS = [
   { key: 'dongtien', label: 'Dòng tiền', icon: <svg {...iconProps}><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20" /></svg> },
   { key: 'khachhang', label: 'Khách hàng', icon: <svg {...iconProps}><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /><path d="M2 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /><circle cx="8" cy="7" r="4" /></svg> },
   { key: 'tinnhan', label: 'Tin nhắn', icon: <svg {...iconProps}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> },
+  /* Mặt bằng công trình (MarkUp 2026-11-25) */
+  { key: 'matbang', label: 'Mặt bằng', icon: <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M3 12h8V3" /><path d="M11 21v-5h10" /><path d="M15 3v5" /></svg> },
 ]
 
 export default function Dezbot({ open, onToggle, onClose, onResize, onResizingChange }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  const [mbOpen, setMbOpen] = useState(false)   // module Mặt bằng (nút "Mặt bằng" ở màn hình chào)
   const [resizing, setResizing] = useState(false)
   const bodyRef = useRef(null)
   const panelRef = useRef(null)
@@ -96,6 +101,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
 
   return (
     <>
+      <MatBangOverlay open={mbOpen} onClose={() => setMbOpen(false)} />
       {/* Nút tròn bật/tắt panel */}
       <button className="kd-ai-fab" title="Trợ lý ảo Dezbot" onClick={onToggle}>
         <svg width="30" height="30" viewBox="0 0 24 24">
@@ -130,7 +136,7 @@ export default function Dezbot({ open, onToggle, onClose, onResize, onResizingCh
               <div className="kd-ai-topic-grid">
                 {TOPICS.map(t => (
                   <div key={t.key} className={`kd-ai-topic-chip${t.wide ? ' wide' : ''}`}>
-                    <button className="kd-ai-chip" onClick={() => sendMessage(AI_TOPIC_PROMPTS[t.key] || t.label)}>{t.icon}{t.label}</button>
+                    <button className="kd-ai-chip" onClick={() => (t.key === 'matbang' ? setMbOpen(true) : sendMessage(AI_TOPIC_PROMPTS[t.key] || t.label))}>{t.icon}{t.label}</button>
                   </div>
                 ))}
                 <div className="kd-ai-topic-chip"><BugChip className="kd-ai-chip" onBefore={onClose} /></div>

@@ -253,10 +253,12 @@ export const AI_KB = {
   tinnhan: 'Bạn có 6 tin nhắn chưa đọc trong Chat, tập trung ở nhóm "Dự án Riverside" và "Ban giám đốc". Muốn mình tóm tắt nội dung chính không?',
   boctach: 'Bóc tách khối lượng mới nhất từ QS ghi nhận tổng giá trị vật tư khoảng 11.93 triệu trên 5 đơn mua hàng, trong đó 2 đơn chưa đặt hàng.',
   quytrinh: 'Quy trình thi công hiện tại gồm 5 bước: Khảo sát → Thiết kế → Xin phép → Thi công → Nghiệm thu. Bước "Thi công" đang được nhiều dự án thực hiện nhất.',
+  matbang: 'Thông tin mặt bằng công trình nằm ở trang khách hàng: ô "Diện tích / Quy mô" và "Loại hình dự án" ở Hồ sơ khách hàng, địa chỉ kèm link Google Maps, file BOQ và Hình / Tệp đính kèm (bản vẽ mặt bằng, ảnh hiện trạng) ở phần Tài liệu & ghi chú. Muốn bổ sung bản vẽ mặt bằng thì bấm Sửa > 7 · Nâng cao > Tệp đính kèm.',
   default: 'Mình đã tra trong dữ liệu workspace nhưng chưa tìm thấy câu trả lời chính xác cho câu hỏi này — bạn thử hỏi cụ thể hơn về tiến độ, chấm công, dòng tiền, khách hàng, bóc tách hoặc quy trình nhé.',
 }
 export const AI_TOPIC_PROMPTS = {
   tiendo: 'Tiến độ dự án đang thế nào?', chamcong: 'Tình hình chấm công hôm nay?', dongtien: 'Dòng tiền tháng này ra sao?',
   khachhang: 'Khách hàng nào đang tiềm năng?', tinnhan: 'Tôi có tin nhắn nào chưa đọc?',
+  matbang: 'Mặt bằng công trình của khách hàng xem ở đâu?',
 }
 export const AI_SUGGESTS = ['Cơ hội nào sắp chốt hợp đồng?', 'Tóm tắt pipeline kinh doanh tuần này', 'Khách hàng nào cần chăm sóc gấp?']
