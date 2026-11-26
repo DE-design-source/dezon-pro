@@ -6,6 +6,7 @@ import { useKdMap, saveKdOptions } from '../ShortlistSelect'
 import { phoneNorms } from '../../utils'
 import './ai.css'
 import './scoreai2.css'
+import { LiveCoachCards } from './CdLiveCoach'
 
 /* Khối AI của trang khách hàng (Customer Dashboard): 1 Timeline đề xuất · 2 Phân tích chiến lược · 3 Đề xuất hành động
    · Nguồn dữ liệu AI đã phân tích. Dữ liệu: customerApi getInsights / generateInsights (lưu database, máy chủ gọi Gemini
@@ -428,7 +429,7 @@ function ActionsForm({ act, ...p }) {
   )
 }
 
-export default function CdAi({ lead, interactions }) {
+export default function CdAi({ lead, interactions, live, onLive }) {
   const id = lead && lead.id
   const timeline = useKdMap('timeline')[String(id)] || {}
   const start = /^\d{4}-\d{2}-\d{2}$/.test(String(timeline.start || '')) ? timeline.start : ''
@@ -524,7 +525,7 @@ export default function CdAi({ lead, interactions }) {
     /* Lưu vào Tệp đính kèm của khách (kdOptions.attach[mã].file) để lần phân tích sau và hồ sơ khách cùng thấy */
     const key = String(id)
     const cur = attachRef.current[key] || {}
-    const next = { ...attachRef.current, [key]: { img: cur.img || [], file: [...(cur.file || []), ...got] } }
+    const next = { ...attachRef.current, [key]: { ...cur, img: cur.img || [], file: [...(cur.file || []), ...got] } }
     attachRef.current = next
     saveKdOptions('attach', next)
     await run(next)
@@ -584,6 +585,12 @@ export default function CdAi({ lead, interactions }) {
   const busy = running || uploading > 0
   const meta = (
     <div className="cd-ai-meta">
+      {onLive && (
+        <button type="button" className={'cd-ai-live' + (live ? ' on' : '')} aria-pressed={!!live} onClick={onLive}
+          title={live ? 'Đang ghi lại cuộc trò chuyện - bấm để tới khối Live' : 'Live: ghi lại cuộc trò chuyện với khách thành chữ'}>
+          <i aria-hidden="true" />{live ? 'Đang Live' : 'Live'}
+        </button>
+      )}
       {ins && (
         <span className={'cd-ai-engine' + (ins.engine === 'gemini' ? ' gem' : '')} title={ins.warning || ''}>
           {ins.engine === 'gemini' ? 'Gemini' + (ins.model ? ' · ' + ins.model : '') : 'Tự tính theo quy tắc'}
@@ -632,6 +639,7 @@ export default function CdAi({ lead, interactions }) {
               <span className="cd-ai-empty-d">AI đọc lịch sử chăm sóc, chỉ số và hồ sơ khách để đề xuất hành động, nhận định rủi ro và lộ trình chốt.</span>
             </div>
           )}
+        {live && <LiveCoachCards leadId={id} />}
         {toastEl}
       </div>
     )
@@ -745,6 +753,7 @@ export default function CdAi({ lead, interactions }) {
             </div>
           )}
         </div>
+        {live && <LiveCoachCards leadId={id} />}
       </section>
 
       <section className="cd-ai-sec">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getAiConfig, saveAiConfig, previewAiPrompt, testAiPrompt } from '../customerApi'
+import LiveKnowledgeCard from './LiveKnowledgeCard'
 import './AiConfigTab.css'
 
 /* Tab "Cấu hình AI" (admin / super): soạn hướng dẫn + chọn model Gemini cho khối "Đề xuất hành động" ở trang khách hàng,
@@ -354,6 +355,8 @@ export default function AiConfigTab({ leads }) {
               )}
             </div>
           </div>
+
+          <LiveKnowledgeCard />
 
           <div className="kd-aic-card">
             <Section title="Quy tắc cố định" hint="Không sửa được" open={opened.fixed} onToggle={() => setOpened(f => ({ ...f, fixed: !f.fixed }))}>

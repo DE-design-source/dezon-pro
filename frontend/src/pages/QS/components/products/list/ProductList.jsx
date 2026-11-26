@@ -36,6 +36,9 @@ import {
   spBulkApply, spBulkDelete, spBulkRequest, spDelete, spLoadPerm_,
 } from './spActions'
 import './list.css'
+import { qsConfirm } from '../../common/dialogs'
+
+let selSeq = 0   // thứ tự tick sản phẩm (U.sel[k] = số này)
 
 /* Tab Danh sách sản phẩm (renderSanpham và các hàm sp* của PUB/sanpham.js:1-1130, 1488-1848):
    panel trái "Sản phẩm trong dự án", thanh công cụ (tìm, tab trạng thái duyệt, hạng mục, Hoàn tác, Edit, Bộ lọc, Tải Excel,
@@ -88,6 +91,9 @@ export default function ProductList() {
   const [wrapW, setWrapW] = useState(0)
   const [layout, setLayoutSt] = useState(() => { const v = lsJson('qs_splayout', 'table'); return LAYOUTS.some(l => l[0] === v) ? v : 'table' })
   const setLayout = v => { setLayoutSt(v); lsSet('qs_splayout', JSON.stringify(v)) }
+  /* Gộp biến thể (mặc định bật): các SP cùng nhóm biến thể / cùng mã thành 1 dòng có chip "Biến thể N"; tắt = mỗi SP 1 dòng. Nhớ trong máy (qs_spgroup) */
+  const [gopBT, setGopBTSt] = useState(() => lsJson('qs_spgroup', true) !== false)
+  const setGopBT = v => { setGopBTSt(v); lsSet('qs_spgroup', JSON.stringify(v)); setU({ page: 1 }) }
   /* Thanh công cụ luôn 1 dòng; thiếu chỗ thì gọn dần (data-fit, list.css): 1 = nút thao tác chỉ còn biểu tượng, 2 = nút chế độ xem
      chỉ còn biểu tượng, 3 = cho xuống dòng */
   const tbRef = useRef(null)
@@ -287,8 +293,8 @@ export default function ProductList() {
     if (bo.length) setU(s => { const sel = { ...s.sel }; bo.forEach(k => { delete sel[k] }); return { sel } })
   }, [PT, fullKeys, U.sel])
 
-  // xem trùng: mỗi bản 1 dòng riêng (không gộp biến thể) để tick xoá bản dư
-  const groups = useMemo(() => (U.view === 'trung' ? full.map(p => ({ key: '', head: p, kids: [] })) : spVarGroups2_(full)), [full, U.view])
+  // xem trùng / tắt Gộp biến thể: mỗi bản 1 dòng riêng (xem trùng: để tick xoá bản dư)
+  const groups = useMemo(() => (U.view === 'trung' || !gopBT ? full.map(p => ({ key: '', head: p, kids: [] })) : spVarGroups2_(full)), [full, U.view, gopBT])
   const cbData = {}
   Object.keys(U.cbOpen).forEach(k => { const c = combo[k]; if (c && c.list) cbData[k] = c.list; else if (c && c.error) cbData[k] = { err: c.error } })
   const pr = spPageRows_(groups, U.page, U.per, U.btOpen, U.cbOpen, cbData)
@@ -493,12 +499,47 @@ export default function ProductList() {
     setU(s => { const o = { ...s.btOpen }; if (o[key]) delete o[key]; else o[key] = 1; return { btOpen: o } })
     requestAnimationFrame(() => { if (wrap) wrap.scrollTop = t })   // giữ nguyên chỗ đang xem
   }
+  // U.sel[k] = số thứ tự lúc tick (tăng dần): "Tạo biến thể" lấy SP tick đầu tiên làm gốc
   function selAll(on) {
     const sel = {}
-    if (on) pr.rows.forEach(r => { if (r.m.k === 'cb') return; const k = spKey_(r.p); if (k) sel[k] = 1 })
+    if (on) pr.rows.forEach(r => { if (r.m.k === 'cb') return; const k = spKey_(r.p); if (k) sel[k] = ++selSeq })
     setU({ sel })
   }
-  function selToggle(k, on) { setU(s => { const sel = { ...s.sel }; if (on) sel[k] = 1; else delete sel[k]; return { sel } }) }
+  function selToggle(k, on) { const n = ++selSeq; setU(s => { const sel = { ...s.sel }; if (on) sel[k] = n; else delete sel[k]; return { sel } }) }
+  /* Tạo biến thể: SP tick ĐẦU TIÊN làm gốc, các SP tick sau (kèm biến thể sẵn có của chúng) gộp vào nhóm biến thể của gốc.
+     Giữ nguyên biến thể sẵn có của gốc (setBienThe bỏ khỏi nhóm SP nào không có trong danh sách gửi lên). */
+  async function bulkVariants() {
+    const byKey = {}
+    ;(products || []).forEach(p => { const k = spKey_(p); if (k) byKey[k] = p })
+    const picked = Object.keys(U.sel).sort((a, b) => (Number(U.sel[a]) || 0) - (Number(U.sel[b]) || 0)).map(k => byKey[k]).filter(Boolean)
+    if (picked.length < 2) { toast('Tick ít nhất 2 sản phẩm: sản phẩm tick đầu tiên làm gốc, các sản phẩm tick sau thành biến thể'); return }
+    const root = picked[0]
+    if (!root.recordId) { toast('Sản phẩm gốc chưa có mã bản ghi, tải lại trang rồi thử lại'); return }
+    const seen = { [String(root.recordId)]: 1 }, ids = [], moi = []
+    const add = (x, laMoi) => { const id = String(x.recordId || ''); if (id && !seen[id]) { seen[id] = 1; ids.push({ id: x.recordId }); if (laMoi) moi.push(x) } }
+    const cu = spNhomBienThe_(products, root)
+    cu.forEach(x => add(x, false))
+    picked.slice(1).forEach(p => spNhomBienThe_(products, p).forEach(x => add(x, true)))
+    if (!moi.length) { toast('Các sản phẩm đã tick đều đã là biến thể của ' + (root.ten || root.ma)); return }
+    const ten = x => (x.ten || '') + (x.ma ? ' (' + x.ma + ')' : '')
+    const kem = moi.length > picked.length - 1 ? ' (kèm ' + (moi.length - (picked.length - 1)) + ' biến thể sẵn có của chúng)' : ''
+    const ok = await qsConfirm({
+      title: 'Tạo biến thể cho ' + ten(root) + '?',
+      note: 'Gốc: ' + ten(root) + ' - sản phẩm tick đầu tiên. ' + moi.length + ' sản phẩm' + kem + ' sẽ thành biến thể của gốc: '
+        + moi.slice(0, 5).map(ten).join('; ') + (moi.length > 5 ? '; …' : '') + '. Sau khi gộp nhóm có ' + (ids.length + 1) + ' sản phẩm, hiện 1 dòng có chip "Biến thể".',
+      ok: 'Tạo biến thể',
+    })
+    if (!ok) return
+    try {
+      setProg({ t: 'Đang tạo biến thể', i: 0, n: 1 })
+      await api.setBienThe(String(root.recordId), ids)
+      setStore({ products: (await api.getProducts()) || getState().products })
+      clearSel()
+      toast('Đã gộp ' + moi.length + ' sản phẩm thành biến thể của ' + ten(root) + (gopBT ? '' : ' - đang tắt Gộp biến thể nên vẫn hiện từng dòng, bật lại để thấy 1 dòng có chip Biến thể'))
+    } catch (e) {
+      toast('Không tạo được biến thể: ' + String((e && e.message) || e).slice(0, 160))
+    } finally { setProg(null) }
+  }
   function goPage(n) {
     setU({ page: n })
     const wrap = wsRef.current && wsRef.current.querySelector('[data-sp-wrap]')
@@ -623,6 +664,15 @@ export default function ProductList() {
                       {l[2]}<span>{l[1]}</span>
                     </button>
                   ))}
+                </div>
+                <div className="qspl-lay qspl-mod" role="group" aria-label="Gộp biến thể">
+                  <button type="button" className={gopBT ? 'on' : ''} aria-pressed={gopBT} disabled={U.view === 'trung'}
+                    title={U.view === 'trung' ? 'Xem trùng luôn hiện mỗi sản phẩm 1 dòng'
+                      : gopBT ? 'Đang gộp: sản phẩm cùng mã / nhóm biến thể thành 1 dòng (bấm chip Biến thể để xổ ra). Bấm để hiện mỗi sản phẩm 1 dòng'
+                        : 'Đang hiện mỗi sản phẩm 1 dòng. Bấm để gộp sản phẩm cùng mã / nhóm biến thể thành 1 dòng'}
+                    onClick={() => setGopBT(!gopBT)}>
+                    <QsIcon name="layers" size={15} /><span>Gộp biến thể</span>
+                  </button>
                 </div>
                 <div className="qspl-lay qspl-colmod qspl-mod" role="group" aria-label="Cột hiển thị">
                   <button type="button" className={`qspl-colbtn${folded ? '' : ' on'}`} title="Ẩn / hiện các chip cột" onClick={() => (folded ? setFolded(foldColsToggle_()) : closeStrip())}>
@@ -811,6 +861,12 @@ export default function ProductList() {
             <button type="button" className="qspl-bb-b" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbedit' ? null : { kind: 'bbedit', anchor: a })) }} title="Đổi một trường cho tất cả dòng đã chọn">
               <QsIcon name="edit" size={15} /> Sửa hàng loạt <i className="car">▾</i>
             </button>
+            {canEdit && nSel >= 2 && (
+              <button type="button" className="qspl-bb-b" onClick={bulkVariants}
+                title="Sản phẩm tick ĐẦU TIÊN làm gốc, các sản phẩm tick sau gộp thành biến thể của gốc (1 dòng có chip Biến thể)">
+                <QsIcon name="layers" size={15} /> Tạo biến thể
+              </button>
+            )}
             <div className="qspl-bb-sep" />
             <button type="button" className="qspl-bb-ic" onClick={e => { const a = e.currentTarget; setPop(p => (p && p.kind === 'bbmore' ? null : { kind: 'bbmore', anchor: a })) }} title="Thao tác khác">⋯</button>
           </div>

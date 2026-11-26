@@ -1,6 +1,7 @@
 // Package sales: trang Kinh doanh (SiteFlow /kinh-doanh) - khách hàng tiềm năng (pipeline) + lịch sử chăm sóc.
 // Tính năng mới, chỉ bản Go: REST /api/v1/sales/... (không có hàm /api/:fn). Bảng: kd_khach_hang, kd_cham_soc (migration 0015);
-// trang khách hàng dạng dashboard: kd_cham_diem, kd_lich_hen, kd_nhiem_vu_kh, kd_goi_y (migration 0053).
+// trang khách hàng dạng dashboard: kd_cham_diem, kd_lich_hen, kd_nhiem_vu_kh, kd_goi_y (migration 0053);
+// hội thoại ghi lại từ khối Live: kd_ghi_am (migration 0055, service_recording.go).
 package sales
 
 import (
@@ -60,6 +61,7 @@ type Deps struct {
 	Delivery contracts.DeliveryFromLead
 	Notifier contracts.Notifier // báo người vừa được giao phụ trách khách hàng; nil = không báo
 	AI       AIClient           // Gemini (GEMINI_API_KEY); nil = phân tích khách hàng theo quy tắc
+	Files    RecordingStore     // kho file (UPLOAD_DIR) lưu file ghi âm hội thoại; nil = không nhận file ghi âm
 	Repo     Repository
 }
 
@@ -73,12 +75,16 @@ type Service struct {
 	delivery contracts.DeliveryFromLead
 	notifier contracts.Notifier
 	ai       AIClient
+	files    RecordingStore
+	goAI     func(fn func()) // chạy AI nền cho hội thoại (mặc định goroutine; test chạy thẳng)
 	db       *database.DB
 	now      func() time.Time
 	readKeys []readKey // khoá API chỉ đọc (SALES_READ_KEYS, apikey.go)
 	testMu   sync.Mutex
 	testAt   map[string]time.Time // lần chạy thử hướng dẫn AI gần nhất theo người (service_aiconfig.go)
 	chatAt   map[string]time.Time // lần hỏi AI về bản phân tích gần nhất theo người (service_insight_chat.go)
+	liveAt   map[string]time.Time // lần gợi ý Live gần nhất theo người (service_live_coach.go)
+	landAt   map[string]time.Time // lần đọc sổ đỏ gần nhất theo người (service_land_ocr.go)
 }
 
 // New tạo service.
@@ -87,7 +93,8 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	s := &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, db: d.DB, now: time.Now}
+	s := &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, files: d.Files, db: d.DB, now: time.Now,
+		goAI: func(fn func()) { go fn() }}
 	if d.Cfg != nil {
 		s.readKeys = parseReadKeys(d.Cfg.SalesReadKeys)
 	}
@@ -394,11 +401,16 @@ func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (a
 		return nil, err
 	}
 	// gỡ dự án triển khai trước (khoá ngoại chỉ set null), cùng transaction với lệnh xoá
+	var audio []string // file ghi âm của các hội thoại (dòng tự xoá theo khoá ngoại) -> xoá khỏi kho sau khi commit
 	err := s.tx(ctx, func(ctx context.Context) error {
 		if s.delivery != nil {
 			if err := s.delivery.DetachFromLead(ctx, id, "", true); err != nil {
 				return err
 			}
+		}
+		var err error
+		if audio, err = s.repo.RecordingAudio(ctx, id); err != nil {
+			return err
 		}
 		n, err := s.repo.DeleteLead(ctx, id)
 		if err == nil && n == 0 {
@@ -408,6 +420,13 @@ func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (a
 	})
 	if err != nil {
 		return nil, err
+	}
+	if s.files != nil {
+		for _, p := range audio {
+			if err := s.files.Remove(p); err != nil {
+				logger.Error("sales", "xoá khách hàng: xoá file ghi âm lỗi:", err.Error())
+			}
+		}
 	}
 	return omap.Of("ok", true), nil
 }

@@ -43,6 +43,18 @@ type Repository interface {
 	UpdateInsight(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
 	PruneInsights(ctx context.Context, leadID float64, keep int) error
 
+	// hội thoại ghi lại (migration 0055): kd_ghi_am - bảng con, công ty xét qua dòng cha kd_khach_hang. UpdateActivity: sửa
+	// 1 lần chăm sóc theo id (nội dung lấy từ lời thoại). UpdateRecordingIf: chỉ sửa khi dòng còn processing với đúng mốc
+	// cap_nhat = stamp (lượt AI chạy nền không ghi đè sửa tay / lượt mới hơn); không khớp -> nil.
+	ListRecordings(ctx context.Context, leadID float64) ([]*omap.Map, error)
+	GetRecording(ctx context.Context, id float64) (*omap.Map, error)
+	InsertRecording(ctx context.Context, row *omap.Map) (*omap.Map, error)
+	UpdateRecording(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
+	UpdateRecordingIf(ctx context.Context, id float64, stamp string, patch *omap.Map) (*omap.Map, error)
+	DeleteRecording(ctx context.Context, id float64) (int, error)
+	RecordingAudio(ctx context.Context, leadID float64) ([]string, error) // đường dẫn file ghi âm của mọi hội thoại của khách
+	UpdateActivity(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error)
+
 	// đổi tên người phụ trách theo họ tên mới của tài khoản (service_rename.go): mọi dòng của công ty đang làm việc,
 	// chỉ các cột chứa tên người; ids rỗng = mọi dòng (không khoá), có ids = chỉ các dòng đó và KHOÁ chúng (FOR UPDATE, gọi trong Tx).
 	// Accounts gồm cả tài khoản đã khoá (để nhận ra tên trùng)
@@ -186,6 +198,49 @@ func (r *pgRepo) PruneInsights(ctx context.Context, leadID float64, keep int) er
 	}
 	_, err = r.db.Remove(ctx, "kd_goi_y", database.Eq("khach_hang_id", leadID)+"&id=in.("+strings.Join(ids, ",")+")")
 	return err
+}
+
+func (r *pgRepo) ListRecordings(ctx context.Context, leadID float64) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "kd_ghi_am", database.SelectOpt{Filter: database.Eq("khach_hang_id", leadID), Order: "ngay_tao.desc,id.desc", Limit: recListLimit})
+}
+
+func (r *pgRepo) GetRecording(ctx context.Context, id float64) (*omap.Map, error) {
+	return first(r.db.Select(ctx, "kd_ghi_am", database.SelectOpt{Filter: database.Eq("id", id), Limit: 1}))
+}
+
+func (r *pgRepo) InsertRecording(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	return first(r.db.InsertOne(ctx, "kd_ghi_am", row))
+}
+
+func (r *pgRepo) UpdateRecording(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_ghi_am", database.Eq("id", id), patch))
+}
+
+func (r *pgRepo) UpdateRecordingIf(ctx context.Context, id float64, stamp string, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_ghi_am", database.Eq("id", id)+"&"+database.Eq("trang_thai", "processing")+"&"+database.Eq("cap_nhat", stamp), patch))
+}
+
+func (r *pgRepo) DeleteRecording(ctx context.Context, id float64) (int, error) {
+	rows, err := r.db.Remove(ctx, "kd_ghi_am", database.Eq("id", id))
+	return len(rows), err
+}
+
+func (r *pgRepo) RecordingAudio(ctx context.Context, leadID float64) ([]string, error) {
+	rows, err := r.db.Select(ctx, "kd_ghi_am", database.SelectOpt{Select: "am_thanh", Filter: database.Eq("khach_hang_id", leadID)})
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, x := range rows {
+		if p := jsval.Str(x.Val("am_thanh")); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r *pgRepo) UpdateActivity(ctx context.Context, id float64, patch *omap.Map) (*omap.Map, error) {
+	return first(r.db.Update(ctx, "kd_cham_soc", database.Eq("id", id), patch))
 }
 
 func (r *pgRepo) LeadPeople(ctx context.Context, ids []float64) ([]*omap.Map, error) {

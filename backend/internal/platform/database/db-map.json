@@ -787,6 +787,39 @@
    "key": "id"
   }
  },
+ "kd_ghi_am": {
+  "table": "sales_lead_recordings",
+  "columns": {
+   "id": "id",
+   "khach_hang_id": "lead_id",
+   "loai": "kind",
+   "tieu_de": "title",
+   "thoi_luong": "duration_sec",
+   "trang_thai": "status",
+   "engine": "engine",
+   "model": "model",
+   "loi": "error_message",
+   "tom_tat": "summary",
+   "cac_cau": "lines",
+   "cau_truc_tiep": "live_lines",
+   "am_thanh": "audio_path",
+   "am_thanh_mime": "audio_mime",
+   "am_thanh_bytes": "audio_bytes",
+   "am_thanh_du": "audio_complete",
+   "ten_nhan_vien": "staff_name",
+   "ten_khach": "customer_name",
+   "nguoi_viet": "author_name",
+   "cham_soc_id": "activity_id",
+   "nguoi_tao": "created_by",
+   "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  },
+  "tenant": {
+   "via": "lead_id",
+   "parent": "sales_leads",
+   "key": "id"
+  }
+ },
  "tk_du_an": {
   "table": "delivery_projects",
   "columns": {

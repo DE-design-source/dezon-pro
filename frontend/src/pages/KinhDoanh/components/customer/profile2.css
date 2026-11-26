@@ -55,3 +55,22 @@ html[data-theme="dark"] .cd-profile{--pf-acc:#F0A06A; --pf-chip:var(--cd-chip); 
 .cd-profile .pf2-vf-t.off{color:var(--cd-faint, #98A2B3); font-weight:500;}
 html[data-theme="dark"] .cd-profile .pf2-vf-t{color:#47CD89;}
 html[data-theme="dark"] .cd-profile .pf2-vf-t b{background:rgba(18,183,106,.2);}
+/* Link Google Maps / Facebook hiện thẳng trong hồ sơ (1 dòng, dài thì "..."; rê chuột xem đủ) + nút chép link ngay sau */
+.cd-profile .pf2-link{display:flex; align-items:center; gap:6px; min-width:0; width:100%; flex-wrap:nowrap;}
+.cd-profile .pf2-link .pf2-map{flex:0 1 auto; min-width:0; max-width:100%;}
+.cd-profile .pf2-link .pf2-map span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cd-profile .pf2-copy{display:inline-flex; align-items:center; justify-content:center; gap:4px; flex:none; padding:3px 6px; border:1px solid var(--cd-btn-line); border-radius:6px;
+  background:var(--cd-card); color:var(--cd-text3); font:inherit; font-size:11.5px; line-height:1; cursor:pointer;}
+.cd-profile .pf2-copy:hover{border-color:var(--pf-acc); color:var(--pf-acc);}
+.cd-profile .pf2-copy.ok{border-color:var(--cd-green); color:var(--cd-green-d);}
+.cd-profile .pf2-link .cd-reveal{flex:none;}
+/* bấm Hiện: xem đủ link, xuống dòng */
+.cd-profile .pf2-link.full{flex-wrap:wrap; align-items:flex-start;}
+.cd-profile .pf2-link.full .pf2-map{align-items:flex-start;}
+.cd-profile .pf2-link.full .pf2-map svg{margin-top:3px;}
+.cd-profile .pf2-link.full .pf2-map span{white-space:normal; overflow:visible; overflow-wrap:anywhere;}
+/* Ảnh sổ đỏ: ảnh to hơn (giấy tờ nằm ngang, cần nhìn rõ) */
+.cd-profile .cd-imgs.pf2-so{grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));}
+.cd-profile .cd-imgs.pf2-so a{aspect-ratio:4 / 3;}
+.cd-profile .pf2-ai{margin-left:6px; padding:1px 6px; border-radius:5px; background:var(--cd-violet-bg); color:var(--cd-violet); font-style:normal; font-size:10.5px; font-weight:700;}
+.cd-profile .pf2-land{margin-top:6px; font-size:12.5px; color:var(--cd-text3); line-height:1.45;}

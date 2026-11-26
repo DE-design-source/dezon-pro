@@ -38,6 +38,8 @@ export const isSystemEntry = x => !!x && (String(x.by || '').trim() === 'Hệ th
 const OTHER = ['meeting', 'site', 'zalo', 'email', 'quote']
 const TABS = [['all', 'Tất cả'], ['call', 'Gọi điện'], ['note', 'Ghi chú'], ['other', 'Khác']]
 const SYS_IC = 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z'
+/* nội dung nhiều hơn 6 dòng (vd bản ghi Live): thu gọn, bấm Xem hết */
+const isLong = t => String(t).split('\n').length > 6
 const inTab = (x, tab, sub) => tab === 'all' || (tab === 'other' ? (sub ? x.type === sub : OTHER.indexOf(x.type) >= 0) : x.type === tab)
 
 export default function CdCare({ lead, me, interactions, onAddInteraction }) {
@@ -49,10 +51,11 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
   const [q, setQ] = useState('')
   const [qType, setQType] = useState('call')
   const [form, setForm] = useState(null)        // form đầy đủ đang mở (null = đóng)
+  const [open, setOpen] = useState({})          // nội dung dài (vd bản ghi Live) đang mở hết: {id: true}
   const pending = useRef(false)
   const leadId = lead ? lead.id : ''
   /* Ghi âm -> chữ (nút micro): câu nói xong được nối vào ô Nội dung trao đổi của form (đang mở) hoặc ô ghi nhận nhanh */
-  const joinTxt = (a, b) => (a && a.trim() ? a.replace(/s+$/, '') + ' ' + b : b)
+  const joinTxt = (a, b) => (a && a.trim() ? a.replace(/\s+$/, '') + ' ' + b : b)
   const dict = useDictation(text => setForm(f => (f ? { ...f, content: joinTxt(f.content, text) } : f)))
 
   useEffect(() => { setTab('all'); setSub(''); setExpand(false); setQ(''); setForm(null); dict.stop() }, [leadId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -221,7 +224,10 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
                     {o && <em className="cd-tl-out" style={{ '--o': o[1] }}>{o[0]}</em>}
                     <span className="cd-tl-date">{fmtD(x.date)}</span>
                   </div>
-                  {x.content && <p>{x.content}</p>}
+                  {x.content && <p className={isLong(x.content) && !open[x.id] ? 'clip' : undefined}>{x.content}</p>}
+                  {x.content && isLong(x.content) && (
+                    <button type="button" className="cd-tl-more" onClick={() => setOpen(m => ({ ...m, [x.id]: !m[x.id] }))}>{open[x.id] ? 'Thu gọn' : 'Xem hết'}</button>
+                  )}
                   <div className="cd-tl-by">
                     {x.by}
                     {x.next && <span className="cd-tl-next">{x.by ? ' · ' : ''}Hẹn tiếp {fmtDM(x.next)}{x.nextNote ? ': ' + x.nextNote : ''}</span>}

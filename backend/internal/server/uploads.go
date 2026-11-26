@@ -36,6 +36,12 @@ var uploadTypes = map[string]string{
 	".xlsx":    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 	".ppt":     "application/vnd.ms-powerpoint",
 	".pptx":    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	// ghi âm hội thoại Kinh doanh (sales, kd-rec/...): thẻ <audio> cần đúng kiểu để phát / tua
+	".webm": "audio/webm",
+	".ogg":  "audio/ogg",
+	".m4a":  "audio/mp4",
+	".mp3":  "audio/mpeg",
+	".wav":  "audio/wav",
 }
 
 // uploads phục vụ file của kho UPLOAD_DIR: GET / HEAD /files/<path>, công khai (đứng trước mọi route nên không tra phiên).

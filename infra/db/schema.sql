@@ -13624,6 +13624,272 @@ ALTER TABLE ONLY public.sales_lead_tasks
 
 
 --
+-- Name: sales_lead_recordings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_lead_recordings (
+    id bigint NOT NULL,
+    lead_id bigint NOT NULL,
+    kind text DEFAULT 'meeting'::text NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
+    duration_sec integer DEFAULT 0 NOT NULL,
+    status text DEFAULT 'processing'::text NOT NULL,
+    engine text DEFAULT 'live'::text NOT NULL,
+    model text DEFAULT ''::text NOT NULL,
+    error_message text DEFAULT ''::text NOT NULL,
+    summary text DEFAULT ''::text NOT NULL,
+    lines jsonb DEFAULT '[]'::jsonb NOT NULL,
+    live_lines jsonb DEFAULT '[]'::jsonb NOT NULL,
+    audio_path text DEFAULT ''::text NOT NULL,
+    audio_mime text DEFAULT ''::text NOT NULL,
+    audio_bytes bigint DEFAULT 0 NOT NULL,
+    staff_name text DEFAULT ''::text NOT NULL,
+    customer_name text DEFAULT ''::text NOT NULL,
+    author_name text DEFAULT ''::text NOT NULL,
+    activity_id bigint,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    audio_complete boolean DEFAULT false NOT NULL,
+    CONSTRAINT ck_sales_lead_recordings_audio_bytes CHECK ((audio_bytes >= 0)),
+    CONSTRAINT ck_sales_lead_recordings_duration_sec CHECK ((duration_sec >= 0)),
+    CONSTRAINT ck_sales_lead_recordings_engine CHECK ((engine = ANY (ARRAY['gemini'::text, 'live'::text]))),
+    CONSTRAINT ck_sales_lead_recordings_kind CHECK ((kind = ANY (ARRAY['meeting'::text, 'call'::text]))),
+    CONSTRAINT ck_sales_lead_recordings_lines CHECK ((jsonb_typeof(lines) = 'array'::text)),
+    CONSTRAINT ck_sales_lead_recordings_live_lines CHECK ((jsonb_typeof(live_lines) = 'array'::text)),
+    CONSTRAINT ck_sales_lead_recordings_status CHECK ((status = ANY (ARRAY['processing'::text, 'done'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: TABLE sales_lead_recordings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.sales_lead_recordings IS 'Conversations recorded from the Live panel of a sales lead: audio file + speaker-separated transcript (staff / customer) and summary made by Gemini in the background (child of sales_leads, company comes from the lead).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.id IS 'Primary key.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.lead_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.lead_id IS 'Owning lead; rows are deleted with it.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.kind IS 'meeting / call (same values as sales_lead_activities.activity_kind).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.title; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.title IS 'Title shown in the list (same as the linked care activity title).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.duration_sec; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.duration_sec IS 'Recording length in seconds (reported by the browser).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.status IS 'processing (Gemini running in background) / done / failed.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.engine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.engine IS 'gemini (lines from Gemini, or Gemini attempted) / live (lines = browser live transcript, no AI configured).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.model; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.model IS 'Gemini model used; empty when engine = live.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.error_message; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.error_message IS 'Short Vietnamese error of the last failed AI run; empty otherwise.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.summary; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.summary IS 'Short Vietnamese summary from Gemini; empty when none.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.lines; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.lines IS 'Document read/written whole: [{"who": "nv"|"kh", "t": text, "at": seconds}] - final transcript (AI result or manual fix).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.live_lines; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.live_lines IS 'Document read/written whole: same shape as lines - transcript captured live in the browser (kept as the AI hint / fallback).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.audio_path; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.audio_path IS 'Path of the audio file inside the file store (UPLOAD_DIR, served at /files/<path>); empty = no audio.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.audio_mime; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.audio_mime IS 'MIME type of the uploaded audio (without codecs parameter); empty = no audio.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.audio_bytes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.audio_bytes IS 'Size of the audio file in bytes; 0 = no audio.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.staff_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.staff_name IS 'Display name of the staff speaker at the time (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.customer_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.customer_name IS 'Display name of the customer speaker at the time (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.author_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.author_name IS 'Display name of the user who saved the recording (snapshot).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.activity_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.activity_id IS 'Care activity created for this recording (content rewritten when the transcript changes); set null if that activity is deleted.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.created_by IS 'User who created the row; set null if the user is deleted.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.created_at IS 'Row creation time.';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.updated_at IS 'Last change time (set by the service; also used to detect a stuck processing run).';
+
+
+--
+-- Name: COLUMN sales_lead_recordings.audio_complete; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sales_lead_recordings.audio_complete IS 'true = the browser reported the audio file covers the whole conversation (AI transcribes from audio); false = partial or no audio (AI works from live_lines when present).';
+
+
+--
+-- Name: sales_lead_recordings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sales_lead_recordings ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sales_lead_recordings_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: sales_lead_recordings pk_sales_lead_recordings; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_recordings
+    ADD CONSTRAINT pk_sales_lead_recordings PRIMARY KEY (id);
+
+
+--
+-- Name: idx_sales_lead_recordings_activity_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sales_lead_recordings_activity_id ON public.sales_lead_recordings USING btree (activity_id) WHERE (activity_id IS NOT NULL);
+
+
+--
+-- Name: idx_sales_lead_recordings_lead_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sales_lead_recordings_lead_id ON public.sales_lead_recordings USING btree (lead_id);
+
+
+--
+-- Name: sales_lead_recordings fk_sales_lead_recordings_activity_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_recordings
+    ADD CONSTRAINT fk_sales_lead_recordings_activity_id FOREIGN KEY (activity_id) REFERENCES public.sales_lead_activities(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sales_lead_recordings fk_sales_lead_recordings_created_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_recordings
+    ADD CONSTRAINT fk_sales_lead_recordings_created_by FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sales_lead_recordings fk_sales_lead_recordings_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_lead_recordings
+    ADD CONSTRAINT fk_sales_lead_recordings_lead_id FOREIGN KEY (lead_id) REFERENCES public.sales_leads(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 

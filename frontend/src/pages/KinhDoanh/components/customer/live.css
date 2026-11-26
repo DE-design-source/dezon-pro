@@ -1,0 +1,149 @@
+/* Khối "Live" ghi lại cuộc trò chuyện (CdLive.jsx) + nút Live ở đầu phần AI (CdAi.jsx), tiền tố cd-live-.
+   Màu lấy từ biến --cd-* (customer.css), chế độ tối tự đổi theo. */
+.cd2 { --live-red: #D92D20; --live-red-bg: #FEF3F2; --live-nv: #1D4ED8; --live-nv-bg: #EEF4FF; }
+html[data-theme="dark"] .cd2 { --live-red: #F97066; --live-red-bg: rgba(240,68,56,.16); --live-nv: #84ADFF; --live-nv-bg: rgba(41,112,255,.18); }
+
+@keyframes cd-live-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+
+/* Nút Live ở đầu phần AI */
+.cd-ai-live{display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border:1.5px solid var(--live-red); border-radius:999px; background:transparent;
+  color:var(--live-red); font:inherit; font-size:12.5px; font-weight:700; letter-spacing:.04em; cursor:pointer;}
+.cd-ai-live i{width:8px; height:8px; border-radius:50%; background:var(--live-red);}
+.cd-ai-live:hover{background:var(--live-red-bg);}
+.cd-ai-live.on{background:var(--live-red); color:#fff;}
+.cd-ai-live.on i{background:#fff; animation:cd-live-pulse 1.2s infinite;}
+/* chưa có phân tích: Live đứng sát nút Phân tích ngay */
+.cd-ai-meta:has(> .cd-ai-live) + .cd-ai-now{margin-left:0;}
+
+/* Khối Live */
+.cd-card.cd-live{gap:12px; border-color:color-mix(in srgb, var(--live-red) 35%, var(--cd-line));
+  --cc-card:var(--cd-card); --cc-btnline:var(--cd-btn-line); --cc-ink:var(--cd-text); --cc-or:var(--cd-orange);}
+.cd-live .cd-cbtn:disabled{opacity:.5; cursor:not-allowed;}
+.cd-card.cd-live.rec{box-shadow:0 0 0 3px color-mix(in srgb, var(--live-red) 14%, transparent);}
+.cd-live-t{display:inline-flex; align-items:center; gap:8px; font-size:15px; font-weight:800; letter-spacing:.06em; color:var(--live-red);}
+.cd-live-t em{font-style:normal; font-weight:600; letter-spacing:0; font-size:13.5px; color:var(--cd-text2);}
+.cd-live-dot{width:10px; height:10px; border-radius:50%; background:var(--cd-faint);}
+.cd-live.rec .cd-live-dot{background:var(--live-red); animation:cd-live-pulse 1.2s infinite;}
+.cd-live-clock{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--cd-text);}
+.cd-live-warn{margin:0; padding:8px 10px; border-radius:8px; background:var(--live-red-bg); color:var(--cd-red); font-size:12.5px; line-height:1.45;}
+.cd-live-note{margin:0; padding:8px 10px; border-radius:8px; background:var(--cd-amber-bg); color:var(--cd-amber); font-size:12.5px; line-height:1.45;}
+
+/* Người đang nói */
+.cd-live-who{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.cd-live-who-b{display:flex; flex-direction:column; align-items:flex-start; gap:1px; min-width:0; padding:8px 12px; border:1.5px solid var(--cd-btn-line);
+  border-radius:10px; background:var(--cd-card); color:var(--cd-text2); font:inherit; text-align:left; cursor:pointer;}
+.cd-live-who-b span{font-size:13.5px; font-weight:700;}
+.cd-live-who-b small{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11.5px; color:var(--cd-muted);}
+.cd-live-who-b.nv.on{border-color:var(--live-nv); background:var(--live-nv-bg); color:var(--live-nv);}
+.cd-live-who-b.kh.on{border-color:var(--cd-orange); background:var(--cd-orange-bg); color:var(--cd-orange-d);}
+.cd-live-hint{margin:-4px 0 0; font-size:12px; line-height:1.45; color:var(--cd-muted);}
+
+/* Ghi âm: nhắc báo khách + trạng thái */
+.cd-live-audio{display:flex; align-items:center; justify-content:space-between; gap:6px 10px; flex-wrap:wrap; font-size:12px; line-height:1.45;}
+.cd-live-consent{min-width:0; color:var(--cd-amber);}
+.cd-live-recon, .cd-live-recsz{display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums;}
+.cd-live-recon{font-weight:700; color:var(--live-red);}
+.cd-live-recon i{width:8px; height:8px; border-radius:50%; background:var(--live-red); animation:cd-live-pulse 1.2s infinite;}
+.cd-live-recsz{color:var(--cd-muted);}
+
+/* Danh sách câu: nhân viên bên phải (xanh), khách bên trái (cam) */
+.cd-live-list{display:flex; flex-direction:column; gap:10px; min-height:140px; max-height:min(52vh, 460px); overflow:auto; padding:10px;
+  border:1px solid var(--cd-line2); border-radius:10px; background:var(--cd-soft); overscroll-behavior:contain;}
+.cd-live-empty{margin:auto; padding:12px; text-align:center; font-size:12.5px; color:var(--cd-muted); line-height:1.5;}
+.cd-live-row{display:flex; flex-direction:column; gap:3px; max-width:92%; min-width:0;}
+.cd-live-row.nv{align-self:flex-end; align-items:flex-end;}
+.cd-live-row.kh{align-self:flex-start; align-items:flex-start;}
+.cd-live-meta{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--cd-faint); font-variant-numeric:tabular-nums;}
+.cd-live-tag{padding:0; border:0; background:none; font:inherit; font-size:11px; font-weight:700; color:var(--cd-muted); cursor:pointer;}
+button.cd-live-tag:hover{text-decoration:underline;}
+.cd-live-row.nv .cd-live-tag{color:var(--live-nv);}
+.cd-live-row.kh .cd-live-tag{color:var(--cd-orange-d);}
+.cd-live-x{width:18px; height:18px; padding:0; border:0; border-radius:50%; background:none; color:var(--cd-faint); font-size:15px; line-height:1; cursor:pointer; opacity:0;}
+.cd-live-row:hover .cd-live-x, .cd-live-x:focus-visible{opacity:1;}
+.cd-live-x:hover{background:var(--live-red-bg); color:var(--live-red);}
+@media (hover: none){ .cd-live-x{opacity:1;} }
+.cd-live-bub{display:block; max-width:100%; padding:8px 11px; border:1px solid transparent; border-radius:12px; font:inherit; font-size:13.5px; line-height:1.5;
+  text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--cd-text); cursor:text;}
+.cd-live-row.nv .cd-live-bub{background:var(--live-nv-bg); border-bottom-right-radius:4px;}
+.cd-live-row.kh .cd-live-bub{background:var(--cd-card); border-color:var(--cd-line); border-bottom-left-radius:4px;}
+button.cd-live-bub:hover{border-color:var(--cd-btn-line);}
+.cd-live-row.interim .cd-live-bub{opacity:.6; font-style:italic; cursor:default;}
+.cd-live-edit{width:100%; min-width:220px; box-sizing:border-box; padding:8px 10px; border:1.5px solid var(--live-nv); border-radius:10px; background:var(--cd-card);
+  color:var(--cd-text); font:inherit; font-size:13.5px; line-height:1.5; resize:vertical;}
+
+/* Gõ tay + điều khiển */
+.cd-live-type{display:flex; gap:8px;}
+.cd-live-type input{flex:1; min-width:0; padding:8px 10px; border:1px solid var(--cd-btn-line); border-radius:8px; background:var(--cd-card); color:var(--cd-text); font:inherit; font-size:13px;}
+.cd-live-ctl{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+.cd-live-mic{display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border:1.5px solid var(--live-red); border-radius:999px; background:var(--live-red);
+  color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+.cd-live-mic.on{background:transparent; color:var(--live-red);}
+.cd-live-mic:disabled{opacity:.5; cursor:not-allowed;}
+.cd-live-kind{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--cd-muted);}
+.cd-live-kind select{padding:6px 8px; border:1px solid var(--cd-btn-line); border-radius:8px; background:var(--cd-card); color:var(--cd-text); font:inherit; font-size:12.5px;}
+.cd-live-foot{display:flex; justify-content:flex-end; gap:8px; padding-top:10px; border-top:1px solid var(--cd-line2);}
+.cd-live-save{padding:8px 16px; border:0; border-radius:8px; background:var(--cd-orange); color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+.cd-live-save:hover{background:var(--cd-orange-d);}
+.cd-live-save:disabled{opacity:.5; cursor:not-allowed;}
+
+/* Đang Live: khối Live bám theo khi cuộn (thay cho Hỏi AI), quá cao thì tự cuộn bên trong (chừa chỗ nút Dezbot góc dưới); màn hẹp (1 cột) không dính */
+.cd2 .cd-col-side.live > .cd-aic2{position:static; max-height:none; overflow:visible;}
+.cd2 .cd-col-side > .cd-live{position:sticky; top:12px; z-index:2; max-height:calc(100vh - 110px); overflow:auto;}
+@container cd (max-width: 1100px){
+  .cd2 .cd-col-side > .cd-live{position:static; max-height:none; overflow:visible;}
+}
+/* cột có khối "Hội thoại đã ghi" (nằm ngay sau Live): Live không dính, để khỏi che khối đó khi cuộn */
+.cd2 .cd-col-side:has(> .cd-rec) > .cd-live{position:static; max-height:none; overflow:visible;}
+
+/* Lịch sử chăm sóc: nội dung dài (bản ghi Live) thu gọn 6 dòng */
+.cd-tl-b p.clip{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:6; line-clamp:6; overflow:hidden;}
+.cd-tl-more{align-self:flex-start; padding:0; border:0; background:none; color:var(--cd-blue); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.cd-tl-more:hover{text-decoration:underline;}
+
+/* Khối "AI gợi ý" trong Live (CdLiveCoach.jsx): câu trả lời / câu hỏi gợi ý cho nhân viên trong lúc nói chuyện */
+.cd-live-coach{border:1px solid color-mix(in srgb, var(--cd-violet) 35%, var(--cd-line)); border-radius:10px; background:var(--cd-violet-bg); overflow:hidden;}
+.cd-live-coach-h{display:flex; align-items:center; gap:8px; padding:8px 10px; flex-wrap:wrap;}
+.cd-live-coach-t{display:inline-flex; align-items:center; gap:7px; flex:1 1 auto; min-width:0; padding:0; border:0; background:none; font:inherit;
+  font-size:13.5px; font-weight:700; color:var(--cd-text); text-align:left; cursor:pointer;}
+.cd-live-coach-t em{font-style:normal; font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; background:var(--cd-card); color:var(--cd-violet);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px;}
+.cd-live-coach-badge{padding:1px 6px; border-radius:5px; background:var(--cd-violet); color:#fff; font-size:10.5px; font-weight:800;}
+.cd-live-coach-auto{display:inline-flex; align-items:center; gap:4px; font-size:12px; color:var(--cd-text3); cursor:pointer;}
+.cd-live-coach-now{padding:5px 10px; border:1px solid var(--cd-violet); border-radius:999px; background:var(--cd-card); color:var(--cd-violet); font:inherit;
+  font-size:12px; font-weight:700; cursor:pointer;}
+.cd-live-coach-now:disabled{opacity:.55; cursor:not-allowed;}
+.cd-live-coach-b{display:flex; flex-direction:column; gap:8px; padding:2px 12px 10px; max-height:min(40vh, 340px); overflow:auto; font-size:13px; line-height:1.5;
+  color:var(--cd-text);}
+.cd-live-coach-empty, .cd-live-coach-err, .cd-live-coach-ins{margin:0;}
+.cd-live-coach-empty{color:var(--cd-muted); font-size:12.5px;}
+.cd-live-coach-err{color:var(--cd-red); font-size:12.5px;}
+.cd-live-coach-ins{font-weight:600; color:var(--cd-text2);}
+.cd-live-coach-sec{display:flex; flex-direction:column; gap:5px;}
+.cd-live-coach-sec > b{font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--cd-violet);}
+.cd-live-coach-sec ul{margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px;}
+.cd-live-coach-ans{display:flex; flex-direction:column; gap:2px; padding:7px 10px; border-radius:8px; background:var(--cd-card); border:1px solid var(--cd-line2);}
+.cd-live-coach-ans .q{font-size:12px; color:var(--cd-muted);}
+.cd-live-coach-ans .a{overflow-wrap:anywhere;}
+.cd-live-coach-miss{display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:12px;}
+.cd-live-coach-miss b{color:var(--cd-text3); font-weight:600;}
+.cd-live-coach-miss span{padding:2px 8px; border-radius:999px; background:var(--cd-amber-bg); color:var(--cd-amber);}
+.cd-live-coach-at{font-size:11px; color:var(--cd-faint);}
+
+/* Khối Live: phần AI gợi ý thu gọn (ô gợi ý to nằm ở phần GỢI Ý của khối AI) */
+.cd-live-coach.mini .cd-live-coach-st{padding:0 12px 9px; font-size:12px; color:var(--cd-text3); line-height:1.45;}
+/* Phần GỢI Ý của khối AI: ô gợi ý trực tiếp khi Live (LiveCoachCards) */
+.cd-ai-live-w{display:flex; flex-direction:column; gap:10px; margin-top:14px; padding:14px; border:1.5px solid color-mix(in srgb, var(--cd-violet) 45%, var(--cd-line));
+  border-radius:14px; background:var(--cd-violet-bg);}
+.cd-ai-live-cap{display:inline-flex; align-items:center; gap:7px; color:var(--cd-violet);}
+.cd-ai-live-cap i{width:8px; height:8px; border-radius:50%; background:var(--live-red); animation:cd-live-pulse 1.2s infinite;}
+.cd-ai-live-act{display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.cd-ai-live-at{font-size:12px; color:var(--cd-muted);}
+.cd-ai-live-ins{font-size:14px; font-weight:600; color:var(--cd-text2); line-height:1.5;}
+.cd-ai-live-cards .cd-ai-live-card{background:var(--cd-card); gap:7px; transition:opacity .2s;}
+.cd-ai-live-cards.busy .cd-ai-live-card{opacity:.7;}
+.cd-ai-live-card .cd-ai-idea-t{font-size:15px; line-height:1.5; font-weight:600; overflow-wrap:anywhere;}
+.cd-ai-live-card .cd-ai-idea-d{overflow-wrap:anywhere;}
+.cd-ai-live-k{align-self:flex-start; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.03em;}
+.cd-ai-live-card.ans .cd-ai-live-k{background:var(--cd-green-bg); color:var(--cd-green-d);}
+.cd-ai-live-card.ask .cd-ai-live-k{background:var(--cd-violet-bg); color:var(--cd-violet);}
+.cd-ai-live-card.ans{border-color:color-mix(in srgb, var(--cd-green) 40%, var(--cd-line));}

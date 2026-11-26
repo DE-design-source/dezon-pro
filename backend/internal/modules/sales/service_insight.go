@@ -20,10 +20,12 @@ import (
 
 // AIClient: client Gemini (internal/platform/gemini.Client). nil = chỉ dùng quy tắc.
 // Model: model mặc định máy chủ; GenerateJSONWith model "" = mặc định; ListModels: model dùng được (có cache).
+// GenerateJSONParts: nội dung nhiều phần (âm thanh + chữ) cho hội thoại ghi lại (service_recording.go).
 type AIClient interface {
 	Model() string
 	GenerateJSON(ctx context.Context, system, prompt string) (string, error)
 	GenerateJSONWith(ctx context.Context, model, system, prompt string) (string, error)
+	GenerateJSONParts(ctx context.Context, model, system string, parts []gemini.Part) (string, error)
 	ListModels(ctx context.Context) ([]gemini.ModelInfo, error)
 }
 

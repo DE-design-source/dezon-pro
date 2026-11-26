@@ -702,6 +702,7 @@ type fakeAI struct {
 	calls   int
 	models  []gemini.ModelInfo
 	listErr error
+	parts   []gemini.Part // GenerateJSONParts gần nhất (recording_test.go)
 }
 
 func (f *fakeAI) Model() string { return "gemini-test" }
