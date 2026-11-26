@@ -2,12 +2,16 @@ package sales
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"qspro-backend/internal/middleware"
 	"qspro-backend/internal/server/rpc"
 	"qspro-backend/internal/shared/actor"
+	apperr "qspro-backend/internal/shared/errors"
 	"qspro-backend/internal/shared/omap"
 	"qspro-backend/internal/shared/response"
 	"qspro-backend/internal/shared/validator"
@@ -36,6 +40,7 @@ var (
 	idPath   = rpc.GoField{Name: "id", In: "path", Desc: "Mã khách hàng (số)"}
 	apptPath = rpc.GoField{Name: "apptId", In: "path", Desc: "Mã lịch hẹn (số)"}
 	taskPath = rpc.GoField{Name: "taskId", In: "path", Desc: "Mã task (số)"}
+	recPath  = rpc.GoField{Name: "recId", In: "path", Desc: "Mã hội thoại (số)"}
 	apptBody = []rpc.GoField{
 		{Name: "date", In: "body", Desc: "Ngày hẹn yyyy-mm-dd (bắt buộc khi tạo)"},
 		{Name: "start", In: "body", Desc: "Giờ bắt đầu HH:MM (rỗng = chưa đặt)"}, {Name: "end", In: "body", Desc: "Giờ kết thúc HH:MM, sau giờ bắt đầu"},
@@ -114,6 +119,23 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		Fields: []rpc.GoField{idPath, {Name: "messages", In: "body", Type: "array", Required: true, Desc: "Cuộc trò chuyện [{role: user | ai, text}], tin cuối là câu hỏi của người dùng; giữ 20 tin gần nhất, mỗi tin tối đa 2000 ký tự"},
 			{Name: "generatedAt", In: "body", Desc: "generatedAt của bản phân tích đang xem (tuỳ chọn; đề xuất luôn dựa trên bản mới nhất)"}}})
 
+	// hội thoại ghi lại từ khối Live (service_recording.go, migration 0055)
+	recSum := " -> {id, leadId, kind, title, durationSec, status, engine, model, error, summary, lines, liveLines, audioUrl, audioMime, audioBytes, staffName, customerName, authorName, activityId, createdAt, updatedAt}"
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdListRecordings", Method: "GET", Path: "/sales/leads/:id/recordings", Perm: rpc.Login, Tag: tag,
+		Summary: "Hội thoại đã ghi của khách hàng, mới nhất trước: {recordings: [...]}", Fields: []rpc.GoField{idPath}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdAddRecording", Method: "POST", Path: "/sales/leads/:id/recordings", Perm: rpc.Login, Tag: tag,
+		Summary: "Lưu hội thoại (multipart/form-data): tạo lần chăm sóc, AI (Gemini) tách người nói Nhân viên / Khách + tóm tắt chạy nền" + recSum,
+		Fields: []rpc.GoField{idPath,
+			{Name: "meta", In: "body", Required: true, Desc: `Chuỗi JSON {kind: meeting|call, durationSec, staffName, customerName, liveLines: [{who: nv|kh, t, at (giây)}], audioComplete}`},
+			{Name: "audio", In: "body", Desc: "File ghi âm (tuỳ chọn, tối đa 20 MB): audio/webm, ogg, mp4, mpeg, wav"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdUpdateRecording", Method: "PATCH", Path: "/sales/recordings/:recId", Perm: rpc.Login, Tag: tag,
+		Summary: "Sửa tay lời thoại (đổi người nói / sửa chữ), ghi lại nội dung lần chăm sóc" + recSum,
+		Fields:  []rpc.GoField{recPath, {Name: "lines", In: "body", Type: "array", Required: true, Desc: "[{who: nv|kh, t, at (giây)}]"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdReprocessRecording", Method: "POST", Path: "/sales/recordings/:recId/reprocess", Perm: rpc.Login, Tag: tag,
+		Summary: "Chạy lại AI cho hội thoại (đang xử lý chưa quá 10 phút -> 409; chưa cấu hình Gemini -> 400)" + recSum, Fields: []rpc.GoField{recPath}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdDeleteRecording", Method: "DELETE", Path: "/sales/recordings/:recId", Perm: rpc.Login, Tag: tag,
+		Summary: "Xoá hội thoại + file ghi âm (lần chăm sóc giữ nguyên): {ok}", Fields: []rpc.GoField{recPath}})
+
 	// Cấu hình AI (service_aiconfig.go): hướng dẫn cho khối "Đề xuất hành động", lưu ở cài đặt công ty khoá kdAiConfig
 	aiDraft := []rpc.GoField{{Name: "leadId", In: "body", Type: "number", Required: true, Desc: "Mã khách hàng dùng để thử"},
 		{Name: "instructions", In: "body", Desc: "Hướng dẫn nháp (thiếu / null = bản đang lưu; rỗng = mặc định)"}}
@@ -125,6 +147,18 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 			{Name: "model", In: "body", Desc: "Model Gemini (thiếu / null = giữ; rỗng = mặc định máy chủ; sai -> 400)"}}})
 	aiTest := append(append([]rpc.GoField{}, aiDraft...),
 		rpc.GoField{Name: "model", In: "body", Desc: "Model nháp (thiếu / null = model đã lưu; rỗng = mặc định máy chủ; sai -> 400)"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdGetLiveKnowledge", Method: "GET", Path: "/sales/live-knowledge", Perm: rpc.Login, Tag: tag,
+		Summary: "Kiến thức bán hàng cho AI gợi ý khi Live: {text, updatedAt, updatedBy, canEdit, maxLength, aiEnabled}"})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdSaveLiveKnowledge", Method: "PUT", Path: "/sales/live-knowledge", Perm: rpc.Admin, Tag: tag,
+		Summary: "Lưu kiến thức bán hàng (bảng giá, gói dịch vụ, câu trả lời mẫu) cho AI gợi ý khi Live, trả như GET",
+		Fields:  []rpc.GoField{{Name: "text", In: "body", Required: true, Desc: "Nội dung, tối đa 8000 ký tự; rỗng = xoá"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdReadLandCert", Method: "POST", Path: "/sales/land-cert/read", Perm: rpc.Login, Tag: tag,
+		Summary: "AI đọc ảnh sổ đỏ đã tải lên (không lưu): {docType, area (m²), width, length (m), shapeNote, plotNo, mapSheet, purpose, address, note, model}",
+		Fields:  []rpc.GoField{{Name: "url", In: "body", Required: true, Desc: "Đường dẫn ảnh trong kho tệp (/files/...), JPG / PNG / WEBP / GIF, tối đa 15 MB"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdLiveSuggest", Method: "POST", Path: "/sales/leads/:id/live-suggest", Perm: rpc.Login, Tag: tag,
+		Summary: "AI gợi ý cho nhân viên trong lúc Live (không lưu): {stage, insight, answers: [{q, a}], ask, missing, engine, model, at}",
+		Fields: []rpc.GoField{idPath, {Name: "lines", In: "body", Type: "array", Required: true, Desc: "Hội thoại gần nhất [{who: nv | kh, t, at (giây)}]; giữ 60 dòng / 8000 ký tự cuối"},
+			{Name: "elapsedSec", In: "body", Type: "number", Desc: "Số giây đã ghi (tuỳ chọn)"}}})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdPreviewAiPrompt", Method: "POST", Path: "/sales/ai-config/preview", Perm: rpc.Admin, Tag: tag,
 		Summary: "Xem trước {system, prompt} sẽ gửi Gemini cho 1 khách với hướng dẫn nháp; không gọi AI", Fields: aiDraft})
 	reg.RegisterGoRoute(rpc.GoRoute{Name: "kdTestAiPrompt", Method: "POST", Path: "/sales/ai-config/test", Perm: rpc.Admin, Tag: tag,
@@ -182,6 +216,24 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.PATCH("/leads/:id/insights", withParam("id", true, s.UpdateInsight))
 	g.POST("/leads/:id/insights/generate", withParam("id", true, s.GenerateInsights))
 	g.POST("/leads/:id/insights/chat", withParam("id", true, s.ChatInsight))
+	g.GET("/leads/:id/recordings", withParam("id", false, noBody(s.ListRecordings)))
+	g.POST("/leads/:id/recordings", func(c *gin.Context) {
+		id, err := validator.ParamNum(c, "id")
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+		up, err := readRecordingForm(c)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+		r, err := s.CreateRecording(c.Request.Context(), actor.FromGin(c), id, up)
+		response.Result(c, r, err)
+	})
+	g.PATCH("/recordings/:recId", withParam("recId", true, s.UpdateRecording))
+	g.POST("/recordings/:recId/reprocess", withParam("recId", false, noBody(s.ReprocessRecording)))
+	g.DELETE("/recordings/:recId", withParam("recId", false, noBody(s.DeleteRecording)))
 	withBody := func(fn func(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error)) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			body, err := validator.Body(c)
@@ -198,6 +250,13 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		response.Result(c, r, err)
 	})
 	g.PUT("/ai-config", middleware.RequireAdmin(), withBody(s.SaveAiConfig))
+	g.GET("/live-knowledge", func(c *gin.Context) {
+		r, err := s.GetLiveKnowledge(c.Request.Context(), actor.FromGin(c))
+		response.Result(c, r, err)
+	})
+	g.PUT("/live-knowledge", middleware.RequireAdmin(), withBody(s.SaveLiveKnowledge))
+	g.POST("/leads/:id/live-suggest", withParam("id", true, s.LiveSuggest))
+	g.POST("/land-cert/read", withBody(s.ReadLandCert))
 	g.POST("/ai-config/preview", middleware.RequireAdmin(), withBody(s.PreviewAiPrompt))
 	g.POST("/ai-config/test", middleware.RequireAdmin(), withBody(s.TestAiPrompt))
 	g.GET("/leads", func(c *gin.Context) {
@@ -237,4 +296,66 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		}
 		return s.AddActivity(ctx, a, id, body)
 	}))
+}
+
+// readRecordingForm: đọc multipart/form-data của POST /sales/leads/:id/recordings - trường "meta" (chuỗi JSON) + file "audio"
+// (tuỳ chọn, Content-Type của phần file = kiểu ghi âm). Thân tối đa recMaxBody; file quá 20 MB -> 413. Phần khác bỏ qua.
+func readRecordingForm(c *gin.Context) (RecordingUpload, error) {
+	var up RecordingUpload
+	tooBig := apperr.E(http.StatusRequestEntityTooLarge, "File ghi âm quá lớn (tối đa 20 MB)")
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, recMaxBody)
+	mr, err := c.Request.MultipartReader()
+	if err != nil {
+		return up, apperr.BadRequest("Dữ liệu gửi lên phải là multipart/form-data")
+	}
+	read := func(p io.Reader, max int64, over error) ([]byte, error) {
+		b, err := io.ReadAll(io.LimitReader(p, max+1))
+		var mbe *http.MaxBytesError
+		switch {
+		case errors.As(err, &mbe):
+			return nil, tooBig
+		case err != nil:
+			return nil, apperr.BadRequest("Dữ liệu gửi lên không hợp lệ")
+		case int64(len(b)) > max:
+			return nil, over
+		}
+		return b, nil
+	}
+	for {
+		p, err := mr.NextPart()
+		if err == io.EOF {
+			return up, nil
+		}
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return up, tooBig
+		}
+		if err != nil {
+			return up, apperr.BadRequest("Dữ liệu gửi lên không hợp lệ")
+		}
+		switch p.FormName() {
+		case "meta":
+			b, err := read(p, recMaxMeta, apperr.BadRequest("Thông tin hội thoại (meta) quá lớn"))
+			if err != nil {
+				return up, err
+			}
+			v, err := omap.Decode(b)
+			m, ok := v.(*omap.Map)
+			if err != nil || !ok {
+				return up, apperr.BadRequest("Thông tin hội thoại (meta) phải là JSON object")
+			}
+			up.Meta = m
+		case "audio":
+			b, err := read(p, recMaxAudio, tooBig)
+			if err != nil {
+				return up, err
+			}
+			up.Audio, up.AudioMIME = b, p.Header.Get("Content-Type")
+		default:
+			if _, err := read(p, recMaxBody, tooBig); err != nil {
+				return up, err
+			}
+		}
+		_ = p.Close()
+	}
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useKdMap, saveKdOptions } from '../ShortlistSelect'
 import { fmtTy, sourceColor, boqOf } from '../../utils'
 import { mediaUrl } from '../../../QS/api/files'
 import { safeUrl_ } from '../../../QS/lib/format'
+import { fmtM } from '../LandCertFields'
 import DatePicker from '../../../../components/ui/DatePicker'
 import { HANDOFF_CONFIG } from '../../../../data/kinhDoanhData'
 import './profile2.css'
@@ -48,12 +49,50 @@ function handoffText(h) {
   if (h.status === 'self-quoted') return (cfg && cfg.selfLabel) || 'Phòng KD tự đề xuất báo giá'
   return ''
 }
-/* Link Google Maps: chỉ nhận http(s), còn lại (javascript: ...) bỏ */
+/* Link Google Maps / Facebook: chỉ nhận http(s), còn lại (javascript: ...) bỏ */
 const mapHref = u => { const s = String(u || '').trim(); return /^https?:\/\/\S+$/i.test(s) && safeUrl_(s) !== '#' ? s : '' }
 const Ic = ({ d, size = 14 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 const FILE_IC = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6'
 const PEN = 'M4 20h4L19 9l-4-4L4 16v4M13.5 6.5l4 4'
 const PIN = 'M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'
+const COPY = 'M9 9h11v11H9zM5 15H4V4h11v1'
+const CHECK = 'M20 6 9 17l-5-5'
+const FB = 'M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z'
+/* link hiện gọn: bỏ http(s):// và www., giải mã %XX cho dễ đọc (href vẫn giữ link gốc) */
+const shortUrl = u => {
+  let t = String(u).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
+  try { t = decodeURIComponent(t.replace(/\+/g, ' ')) } catch { /* link lỗi mã %: giữ nguyên */ }
+  return t
+}
+/* chép chữ vào bộ nhớ tạm (trình duyệt cũ / không có quyền: dùng ô ẩn) */
+function copyText(t) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t)
+  return new Promise((ok, fail) => {
+    const ta = document.createElement('textarea')
+    ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'
+    document.body.appendChild(ta); ta.select()
+    try { document.execCommand('copy') ? ok() : fail(new Error('copy')) } catch (e) { fail(e) } finally { document.body.removeChild(ta) }
+  })
+}
+/* Link mở tab mới: mặc định 1 dòng "..." (rê chuột xem đủ), bấm Hiện để xem đủ link (xuống dòng), Ẩn để thu lại; + nút chép link */
+function LinkRow({ url, icon, label, copy }) {
+  const [done, setDone] = useState(0)    // 1 = đã chép, -1 = chép lỗi
+  const [full, setFull] = useState(false)
+  useEffect(() => { if (!done) return undefined; const t = setTimeout(() => setDone(0), 1800); return () => clearTimeout(t) }, [done])
+  return (
+    <span className={'pf2-link' + (full ? ' full' : '')}>
+      <a className="pf2-map" href={url} target="_blank" rel="noopener noreferrer" title={url}><Ic d={icon} size={13} /><span>{shortUrl(url)}</span></a>
+      {copy && (
+        <button type="button" className={'pf2-copy' + (done > 0 ? ' ok' : '')} aria-label={'Chép ' + label}
+          title={done > 0 ? 'Đã chép' : done < 0 ? 'Không chép được, bấm giữ link để chép' : 'Chép ' + label}
+          onClick={() => copyText(url).then(() => setDone(1), () => setDone(-1))}>
+          <Ic d={done > 0 ? CHECK : COPY} size={13} />
+        </button>
+      )}
+      <button type="button" className="cd-reveal" aria-expanded={full} onClick={() => setFull(v => !v)}>{full ? 'Ẩn' : 'Hiện'}</button>
+    </span>
+  )
+}
 
 function Row({ k, children }) {
   return <div className="cd-row"><span>{k}</span><span className="cd-row-v">{children}</span></div>
@@ -67,17 +106,20 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
   const cdtMap = useKdMap('cdtContact')
   const attachMap = useKdMap('attach')
   const timelineMap = useKdMap('timeline')
+  const landMap = useKdMap('land')   // thông số đất đọc từ sổ đỏ / gõ tay {area, dai, rong, plotNo, mapSheet, purpose, shapeNote, src}
   const verifiedMap = useKdMap('verified')   // xác nhận Lead có nhu cầu, liên hệ được: { mã khách: { by, at } } (kdOptions, lưu database)
   if (!l) return null
   const id = String(l.id)
   const geo = geoMap[id] || {}
   const tl = timelineMap[id] || {}
+  const land = landMap[id] || {}
   const att = attachMap[id] || {}
-  const imgs = att.img || [], files = att.file || []
+  const imgs = att.img || [], files = att.file || [], soImgs = att.so || []
   const src = splitSource(l.source)
   const sc = src.tag ? sourceColor(src.tag) : null
   const region = geo.tinh || geo.kv || ''
   const mapUrl = mapHref(geo.map)
+  const fbUrl = mapHref(geo.fb)
   const tiles = [
     { k: 'Loại hình dự án', v: l.projectType || l.type || '—' },
     { k: 'Doanh số dự kiến', v: l.value > 0 ? fmtTy(l.value) : '—', acc: true },
@@ -99,7 +141,7 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
   const cdt = cdtMap[id] || {}
   const q = l.quote
   const hText = handoffText(l.handoff)
-  const docCount = (l.boqFile ? 1 : 0) + (l.concept ? 1 : 0) + (l.notes ? 1 : 0) + imgs.length + files.length
+  const docCount = (l.boqFile ? 1 : 0) + (l.concept ? 1 : 0) + (l.notes ? 1 : 0) + imgs.length + files.length + soImgs.length
   return (
     <section className="cd-card cd-profile">
       <div className="cd-card-h">
@@ -156,11 +198,10 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
         {secret('phone', 'Điện thoại', l.phone, maskPhone(l.phone))}
         {secret('email', 'Email', l.email, maskEmail(l.email))}
         <Row k="Địa chỉ">{l.address || '—'}</Row>
-        <Row k="Google Maps">
-          {mapUrl
-            ? <a className="pf2-map" href={mapUrl} target="_blank" rel="noopener noreferrer" title={mapUrl}><Ic d={PIN} size={13} /><span>Mở Google Maps</span></a>
-            : '—'}
-        </Row>
+        <Row k="Google Maps">{mapUrl ? <LinkRow url={mapUrl} icon={PIN} label="link Google Maps" copy /> : '—'}</Row>
+        <Row k="Facebook">{fbUrl ? <LinkRow url={fbUrl} icon={FB} label="link Facebook" copy /> : '—'}</Row>
+        <Row k="Diện tích đất">{land.area ? fmtM(land.area) + ' m²' : '—'}{land.area && land.src === 'ai' ? <em className="pf2-ai" title="Đọc từ ảnh sổ đỏ bằng AI">AI</em> : null}</Row>
+        <Row k="Dài × rộng">{land.dai || land.rong ? [land.dai ? fmtM(land.dai) : '?', land.rong ? fmtM(land.rong) : '?'].join(' × ') + ' m' : '—'}{(land.dai || land.rong) && land.src === 'ai' ? <em className="pf2-ai" title="Đọc từ ảnh sổ đỏ bằng AI">AI</em> : null}</Row>
         <Row k="Tỉnh thành">{[geo.kv, geo.tinh].filter(Boolean).join(' · ') || '—'}</Row>
         <Row k="Hoàn công">{tl.end ? fmtD(tl.end) : '—'}</Row>
         <Row k="Ngày tạo">
@@ -198,6 +239,15 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
             {l.concept && <p className="cd-note"><b>Concept:</b> {l.concept}</p>}
             {l.notes && <div className="cd-note"><b>Ghi chú nội bộ:</b> <RichNote text={l.notes} /></div>}
             {!l.boqFile && !l.concept && !l.notes && <em className="cd-none">Chưa có BOQ, concept hay ghi chú</em>}
+            <div className="pf2-grp">
+              <div className="cd-sub-t">Ảnh sổ đỏ{soImgs.length ? ' (' + soImgs.length + ')' : ''}</div>
+              {soImgs.length ? (
+                <div className="cd-imgs pf2-so">{soImgs.map((it, i) => <a key={i} href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><img src={mediaUrl(it.url)} alt={it.name} /></a>)}</div>
+              ) : <em className="cd-none">Chưa có ảnh sổ đỏ</em>}
+              {(land.plotNo || land.mapSheet || land.purpose || land.shapeNote) && (
+                <div className="pf2-land">{[land.plotNo ? 'Thửa ' + land.plotNo : '', land.mapSheet ? 'tờ bản đồ ' + land.mapSheet : '', land.purpose || '', land.shapeNote || ''].filter(Boolean).join(' · ')}</div>
+              )}
+            </div>
             <div className="pf2-grp">
               <div className="cd-sub-t">Hình đính kèm{imgs.length ? ' (' + imgs.length + ')' : ''}</div>
               {imgs.length ? (

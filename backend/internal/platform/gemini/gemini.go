@@ -6,6 +6,7 @@ package gemini
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -23,7 +25,8 @@ const (
 	DefaultModel   = "gemini-3.8-flash"
 	defaultBaseURL = "https://generativelanguage.googleapis.com/v1beta"
 	defaultTimeout = 60 * time.Second
-	maxBody        = 4 << 20 // trần đọc phản hồi (4 MB)
+	partsTimeout   = 5 * time.Minute // GenerateJSONParts (âm thanh): chờ lâu hơn
+	maxBody        = 4 << 20         // trần đọc phản hồi (4 MB)
 	listTimeout    = 15 * time.Second
 	listTTL        = time.Hour   // danh sách model lấy được: giữ 1 giờ
 	listErrTTL     = time.Minute // lấy lỗi: thử lại sau 1 phút
@@ -43,12 +46,16 @@ type Config struct {
 type Client struct {
 	key, model, base string
 	http             *http.Client
+	httpParts        *http.Client     // timeout dài cho GenerateJSONParts
 	now              func() time.Time // test đổi được để thử hết hạn cache
 
 	listSem   chan struct{} // khoá 1 chỗ cho cache danh sách model; người chờ bỏ cuộc theo ctx của họ
 	listVal   []ModelInfo
 	listErr   error
 	listUntil time.Time
+
+	fastMu sync.Mutex
+	noFast map[string]bool // model không nhận thinkingLevel (GenerateJSONFast gọi thẳng kiểu thường)
 }
 
 // ModelInfo: 1 model Gemini dùng được cho generateContent (ID không có tiền tố "models/").
@@ -74,16 +81,46 @@ func New(c Config) (*Client, error) {
 	if to <= 0 {
 		to = defaultTimeout
 	}
-	return &Client{key: key, model: model, base: base, http: &http.Client{Timeout: to}, now: time.Now,
-		listSem: make(chan struct{}, 1)}, nil
+	long := partsTimeout
+	if to > long {
+		long = to
+	}
+	return &Client{key: key, model: model, base: base, http: &http.Client{Timeout: to},
+		httpParts: &http.Client{Timeout: long}, now: time.Now, listSem: make(chan struct{}, 1)}, nil
 }
 
 // Model: tên model đang dùng.
 func (c *Client) Model() string { return c.model }
 
+// Part: 1 phần của nội dung gửi Gemini: chữ (Text) hoặc dữ liệu nhị phân (MIME + Data, gửi inlineData base64).
+type Part struct {
+	Text string
+	MIME string
+	Data []byte
+}
+
+type inlineData struct {
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"` // base64 chuẩn
+}
+
 type part struct {
-	Text    string `json:"text"`
-	Thought bool   `json:"thought,omitempty"` // phần "suy nghĩ" của model đời mới: không thuộc câu trả lời
+	Text       string      `json:"text"`
+	InlineData *inlineData `json:"inlineData,omitempty"`
+	Thought    bool        `json:"thought,omitempty"` // phần "suy nghĩ" của model đời mới: không thuộc câu trả lời
+}
+
+// MarshalJSON: phần dữ liệu nhị phân chỉ gửi {"inlineData":...} (không kèm "text":""); phần chữ giữ nguyên như cũ.
+func (p part) MarshalJSON() ([]byte, error) {
+	if p.InlineData != nil {
+		return json.Marshal(struct {
+			InlineData *inlineData `json:"inlineData"`
+		}{p.InlineData})
+	}
+	return json.Marshal(struct {
+		Text    string `json:"text"`
+		Thought bool   `json:"thought,omitempty"`
+	}{p.Text, p.Thought})
 }
 
 type content struct {
@@ -120,13 +157,68 @@ func (c *Client) GenerateJSON(ctx context.Context, system, prompt string) (strin
 
 // GenerateJSONWith như GenerateJSON nhưng gọi model chỉ định cho lần này ("" = model mặc định của client).
 func (c *Client) GenerateJSONWith(ctx context.Context, model, system, prompt string) (string, error) {
+	return c.generate(ctx, c.http, model, system, []part{{Text: prompt}}, nil)
+}
+
+// GenerateJSONFast như GenerateJSONWith nhưng bảo model "suy nghĩ" ít (thinkingLevel low) để trả nhanh (gợi ý trực tiếp
+// khi Live: ~3-4 giây thay vì ~8 giây). Model không nhận tham số này (HTTP 400 nói tới thinking) -> gọi lại kiểu thường
+// và nhớ model đó để lần sau gọi thẳng kiểu thường.
+func (c *Client) GenerateJSONFast(ctx context.Context, model, system, prompt string) (string, error) {
+	key := strings.TrimPrefix(strings.TrimSpace(model), "models/")
+	if key == "" {
+		key = c.model
+	}
+	c.fastMu.Lock()
+	no := c.noFast[key]
+	c.fastMu.Unlock()
+	if !no {
+		out, err := c.generate(ctx, c.http, model, system, []part{{Text: prompt}}, map[string]any{"thinkingConfig": map[string]any{"thinkingLevel": "low"}})
+		if err == nil || !strings.Contains(err.Error(), "HTTP 400") || !strings.Contains(strings.ToLower(err.Error()), "think") {
+			return out, err
+		}
+		c.fastMu.Lock()
+		if c.noFast == nil {
+			c.noFast = map[string]bool{}
+		}
+		c.noFast[key] = true
+		c.fastMu.Unlock()
+	}
+	return c.generate(ctx, c.http, model, system, []part{{Text: prompt}}, nil)
+}
+
+// GenerateJSONParts như GenerateJSONWith nhưng nội dung gồm nhiều phần (vd âm thanh + chữ); timeout riêng dài hơn (5 phút).
+func (c *Client) GenerateJSONParts(ctx context.Context, model, system string, parts []Part) (string, error) {
+	ps := make([]part, 0, len(parts))
+	for _, p := range parts {
+		if len(p.Data) > 0 {
+			mime := strings.ToLower(strings.TrimSpace(strings.SplitN(p.MIME, ";", 2)[0]))
+			if mime == "" {
+				return "", errors.New("gemini: thiếu kiểu dữ liệu (MIME) của phần nhị phân")
+			}
+			ps = append(ps, part{InlineData: &inlineData{MimeType: mime, Data: base64.StdEncoding.EncodeToString(p.Data)}})
+			continue
+		}
+		if p.Text != "" {
+			ps = append(ps, part{Text: p.Text})
+		}
+	}
+	if len(ps) == 0 {
+		return "", errors.New("gemini: nội dung gửi đi rỗng")
+	}
+	return c.generate(ctx, c.httpParts, model, system, ps, nil)
+}
+
+func (c *Client) generate(ctx context.Context, hc *http.Client, model, system string, parts []part, extra map[string]any) (string, error) {
 	model = strings.TrimPrefix(strings.TrimSpace(model), "models/")
 	if model == "" {
 		model = c.model
 	}
 	body := request{
-		Contents:         []content{{Role: "user", Parts: []part{{Text: prompt}}}},
+		Contents:         []content{{Role: "user", Parts: parts}},
 		GenerationConfig: map[string]any{"responseMimeType": "application/json", "temperature": 0.4},
+	}
+	for k, v := range extra {
+		body.GenerationConfig[k] = v
 	}
 	if system != "" {
 		body.SystemInstruction = &content{Parts: []part{{Text: system}}}
@@ -142,7 +234,7 @@ func (c *Client) GenerateJSONWith(ctx context.Context, model, system, prompt str
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", c.key)
-	res, err := c.http.Do(req)
+	res, err := hc.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("gemini: không gọi được API: %w", scrub(err, c.key))
 	}

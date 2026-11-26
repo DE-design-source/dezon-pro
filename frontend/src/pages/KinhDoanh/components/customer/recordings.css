@@ -1,0 +1,54 @@
+/* Khối "Hội thoại đã ghi" (CdRecordings.jsx), tiền tố cd-rec-. Màu lấy từ biến --cd-* (customer.css);
+   2 màu riêng cho câu của nhân viên (xanh) khai ở đây, chế độ tối đổi dưới html[data-theme="dark"] .cd. */
+.cd { --rec-nv: #1D4ED8; --rec-nv-bg: #EEF4FF; }
+html[data-theme="dark"] .cd { --rec-nv: #84ADFF; --rec-nv-bg: rgba(41,112,255,.18); }
+
+@keyframes cd-rec-spin { to { transform: rotate(360deg) } }
+
+.cd-card.cd-rec{gap:10px;}
+.cd-rec-n{display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--cd-chip); color:var(--cd-text3); font-size:12px; font-weight:600; vertical-align:2px;}
+.cd-rec-items{display:flex; flex-direction:column; gap:10px; min-width:0;}
+.cd-rec-item{display:flex; flex-direction:column; gap:8px; min-width:0; padding:10px 12px; border:1px solid var(--cd-line2); border-radius:10px; background:var(--cd-card);}
+.cd-rec-item.open{border-color:var(--cd-line);}
+
+.cd-rec-top{display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; width:100%; padding:0; border:0; background:none; font:inherit; color:var(--cd-text2); text-align:left; cursor:pointer;}
+.cd-rec-when{font-size:13px; font-weight:600; color:var(--cd-text); font-variant-numeric:tabular-nums;}
+.cd-rec-kind{font-size:11.5px; font-weight:600; padding:1px 8px; border-radius:999px; background:var(--cd-orange-bg); color:var(--cd-orange-d);}
+.cd-rec-dur{font-size:12px; color:var(--cd-muted); font-variant-numeric:tabular-nums;}
+.cd-rec-caret{margin-left:auto; width:8px; height:8px; border-right:2px solid var(--cd-faint); border-bottom:2px solid var(--cd-faint); transform:rotate(-45deg); transition:transform .15s;}
+.cd-rec-item.open .cd-rec-caret{transform:rotate(45deg) translate(-2px,-2px);}
+
+.cd-rec-st{display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px 8px; align-self:flex-start; max-width:100%; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:500; line-height:1.4; overflow-wrap:anywhere;}
+.cd-rec-st.proc{background:var(--cd-violet-bg); color:var(--cd-violet);}
+.cd-rec-st.ok{background:var(--cd-green-bg); color:var(--cd-green-d);}
+.cd-rec-st.live{background:var(--cd-chip); color:var(--cd-text3);}
+.cd-rec-st.fail{border-radius:10px; background:var(--cd-red-bg); color:var(--cd-red);}
+.cd-rec-st .cd-link-btn:disabled{opacity:.5; cursor:default;}
+.cd-rec-spin{width:12px; height:12px; flex:none; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; animation:cd-rec-spin .8s linear infinite;}
+
+.cd-rec-sum{margin:0; font-size:13px; line-height:1.5; color:var(--cd-text2); white-space:pre-wrap; overflow-wrap:anywhere;}
+.cd-rec-audio{display:block; width:100%; max-width:100%; height:36px;}
+
+/* Hội thoại: nhân viên bên phải (xanh), khách bên trái (cam) */
+.cd-rec-list{display:flex; flex-direction:column; gap:8px; max-height:min(50vh, 420px); overflow:auto; padding:10px; border:1px solid var(--cd-line2); border-radius:10px;
+  background:var(--cd-soft); overscroll-behavior:contain;}
+.cd-rec-row{display:flex; flex-direction:column; gap:3px; max-width:92%; min-width:0;}
+.cd-rec-row.nv{align-self:flex-end; align-items:flex-end;}
+.cd-rec-row.kh{align-self:flex-start; align-items:flex-start;}
+.cd-rec-meta{display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; font-size:11px; color:var(--cd-faint); font-variant-numeric:tabular-nums;}
+.cd-rec-tag{max-width:100%; padding:0; border:0; background:none; font:inherit; font-size:11px; font-weight:700; text-align:left; overflow-wrap:anywhere; cursor:pointer;}
+.cd-rec-tag:hover:not(:disabled){text-decoration:underline;}
+.cd-rec-tag:disabled{cursor:default;}
+.cd-rec-row.nv .cd-rec-tag{color:var(--rec-nv);}
+.cd-rec-row.kh .cd-rec-tag{color:var(--cd-orange-d);}
+.cd-rec-bub{max-width:100%; padding:7px 10px; border:1px solid transparent; border-radius:12px; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--cd-text);}
+.cd-rec-row.nv .cd-rec-bub{background:var(--rec-nv-bg); border-bottom-right-radius:4px;}
+.cd-rec-row.kh .cd-rec-bub{background:var(--cd-orange-bg); border-color:var(--cd-orange-line); border-bottom-left-radius:4px;}
+
+.cd-rec-act{display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px;}
+.cd-btn.cd-rec-del{color:var(--cd-red);}
+.cd-rec-err{margin:0; font-size:12.5px; line-height:1.45; color:var(--cd-red);}
+.cd-rec-more{align-self:flex-start;}
+
+/* Có thẻ Hội thoại đã ghi ngay dưới: Hỏi AI thôi bám theo khi cuộn (nếu không sẽ che thẻ này) */
+.cd2 .cd-col-side:has(> .cd-rec) > .cd-aic2{position:static; max-height:none; overflow:visible;}

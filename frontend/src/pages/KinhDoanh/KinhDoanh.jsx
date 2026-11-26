@@ -18,6 +18,7 @@ import StaffRequestModal from './components/StaffRequestModal'
 import ConfirmDelete from './components/ConfirmDelete'
 import { useKdMap, saveKdOptionsMany } from './components/ShortlistSelect'
 import CustomerDashboard from './components/customer/CustomerDashboard'
+import { useLeadChange } from './customerApi'
 import NotifBell from '../../components/ui/NotifBell'
 import HandoffModal from './components/HandoffModal'
 import TaskModal from './components/TaskModal'
@@ -143,11 +144,29 @@ function KinhDoanhPage() {
     return true
   }
 
-  /* Mở trang khách hàng -> tải lịch sử chăm sóc thật */
+  /* Tải lịch sử chăm sóc của 1 khách. actSeq: chỉ nhận lần tải mới nhất, lần ghi mới (addInteraction) cũng bỏ lần tải đang dở;
+     actPending: lần tải đang dở ({id}), để addInteraction biết mà tải lại sau khi ghi */
+  const actSeq = useRef(0)
+  const actPending = useRef(null)
+  const loadActs = (id, onErr) => {
+    const n = ++actSeq.current
+    const p = { id }
+    actPending.current = p
+    kdApi.listActivities(id).then(list => {
+      if (n === actSeq.current) setInteractions(m => ({ ...m, [id]: list }))
+    }, e => {
+      if (onErr && n === actSeq.current) onErr(e)
+    }).finally(() => { if (actPending.current === p) actPending.current = null })
+  }
+  /* Mở trang khách hàng -> tải lịch sử chăm sóc thật; đã có trong bộ nhớ thì vẫn hiện bản cũ và tải lại ngầm
+     (AI tách giọng xong lúc trang đóng có thể đã sửa mục chăm sóc trên máy chủ) */
   useEffect(() => {
-    if (!detail.open || !detail.id || interactions[detail.id]) return
-    kdApi.listActivities(detail.id).then(list => setInteractions(m => ({ ...m, [detail.id]: list })), e => alert('Lỗi tải lịch sử chăm sóc: ' + e.message))
+    if (!detail.open || !detail.id) return
+    if (interactions[detail.id]) loadActs(detail.id)
+    else loadActs(detail.id, e => alert('Lỗi tải lịch sử chăm sóc: ' + e.message))
   }, [detail.open, detail.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Khối khác báo lịch sử chăm sóc đổi (Live lưu hội thoại, AI tách giọng xong) -> tải lại từ máy chủ; lỗi thì giữ danh sách đang có */
+  useLeadChange(detail.open ? detail.id : '', ['activities'], () => loadActs(detail.id))
 
   const filteredLeads = leads.filter(l => (dept === 'all' || l.dept === dept) && matchesTimeFilter(l, timeFilter))
   const replaceLead = saved => setLeads(prev => prev.map(l => (sameId(l.id, saved.id) ? saved : l)))
@@ -178,6 +197,7 @@ function KinhDoanhPage() {
   const cdtMap = useKdMap('cdtContact')      // Chức vụ / Phòng ban của người phụ trách bên CĐT (MarkUp 2026-11-19)
   const attachMap = useKdMap('attach')       // Hình / tệp đính kèm (MarkUp 2026-11-16 16:20)
   const timelineMap = useKdMap('timeline')   // Thời gian khởi công / hoàn công (MarkUp 2026-11-16 16:48)
+  const landMap = useKdMap('land')           // Thông số đất đọc từ sổ đỏ / gõ tay {area, dai, rong, plotNo, mapSheet, purpose, shapeNote, src}
   /* Kéo thẻ vào "Nhân sự KD phụ trách": hiện phiếu yêu cầu nhân sự trước, xác nhận mới chuyển giai đoạn */
   const [staffReq, setStaffReq] = useState({ open: false, leadId: null, seq: 0 })
   /* final = {list: người phụ trách sau khi giao / gỡ, removed: người bị gỡ} (StaffRequestModal) */
@@ -227,7 +247,7 @@ function KinhDoanhPage() {
   const openLeadModal = id => { setLeadModal(m => ({ open: true, id: id || null, seq: m.seq + 1 })); if (scrollRef.current) scrollRef.current.scrollTop = 0 }
   const closeLeadModal = () => setLeadModal(m => ({ ...m, open: false }))
   async function saveLead(input) {
-    const { _geo: geo, _projName: projName, _investor: investor, _cdt: cdt, _attach: attach, _timeline: timeline, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
+    const { _geo: geo, _projName: projName, _investor: investor, _cdt: cdt, _attach: attach, _timeline: timeline, _land: land, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
@@ -237,7 +257,9 @@ function KinhDoanhPage() {
         const gv = { ...geo }
         const link = String(gv.map || '').trim()
         if (link) gv.map = link; else delete gv.map   // map: link Google Maps công trình, chỉ lưu khi có
-        if (gv.kv || gv.tinh || gv.xa || gv.map) m[String(saved.id)] = gv; else delete m[String(saved.id)]   // geo: {kv, tinh, xa?, map?} (xa = Phường / Xã)
+        const fb = String(gv.fb || '').trim()
+        if (fb) gv.fb = fb; else delete gv.fb   // fb: link Facebook của khách, chỉ lưu khi có
+        if (gv.kv || gv.tinh || gv.xa || gv.map || gv.fb) m[String(saved.id)] = gv; else delete m[String(saved.id)]   // geo: {kv, tinh, xa?, map?, fb?} (xa = Phường / Xã)
         patch.geo = m
       }
       if (projName !== undefined && (projName || projNameMap[String(saved.id)])) {
@@ -259,11 +281,23 @@ function KinhDoanhPage() {
         }
       }
       if (attach) {
-        const has = (attach.img && attach.img.length) || (attach.file && attach.file.length)
+        const has = (attach.img && attach.img.length) || (attach.file && attach.file.length) || (attach.so && attach.so.length)
         if (has || attachMap[String(saved.id)]) {
           const m = { ...attachMap }
-          if (has) m[String(saved.id)] = { img: attach.img || [], file: attach.file || [] }; else delete m[String(saved.id)]
+          if (has) m[String(saved.id)] = { img: attach.img || [], file: attach.file || [], ...(attach.so && attach.so.length ? { so: attach.so } : null) }; else delete m[String(saved.id)]
           patch.attach = m
+        }
+      }
+      if (land) {
+        const clean = {}
+        for (const k of ['area', 'dai', 'rong']) if (Number(land[k]) > 0) clean[k] = Number(land[k])
+        for (const k of ['plotNo', 'mapSheet', 'purpose', 'shapeNote']) if (land[k]) clean[k] = String(land[k])
+        const has = clean.area || clean.dai || clean.rong
+        if (has && land.src) clean.src = land.src
+        if (has || landMap[String(saved.id)]) {
+          const m = { ...landMap }
+          if (has) m[String(saved.id)] = clean; else delete m[String(saved.id)]
+          patch.land = m
         }
       }
       if (timeline) {
@@ -408,10 +442,17 @@ function KinhDoanhPage() {
     saveNavSoon()
   }
 
+  /* trả Promise<boolean>: true = đã lưu (khối Live chỉ xoá bản ghi dở khi lưu được) */
   function addInteraction(lead, x) {
-    kdApi.addActivity(lead.id, x).then(saved => setInteractions(m => ({
-      ...m, [lead.id]: [saved, ...(m[lead.id] || [])].sort((a, b) => b.date.localeCompare(a.date)),
-    })), e => alert('Không lưu được lịch sử chăm sóc: ' + e.message))
+    return kdApi.addActivity(lead.id, x).then(saved => {
+      const p = actPending.current // lần tải đang dở bị bỏ dưới đây -> tải lại sau khi thêm, không mất thay đổi phía máy chủ
+      actSeq.current++
+      setInteractions(m => ({
+        ...m, [lead.id]: [saved, ...(m[lead.id] || [])].sort((a, b) => b.date.localeCompare(a.date)),
+      }))
+      if (p) loadActs(p.id)
+      return true
+    }, e => { alert('Không lưu được lịch sử chăm sóc: ' + e.message); return false })
   }
   /* Form thêm mới báo trùng > "Gộp vào khách này": bổ sung SĐT / email chưa có vào khách cũ, điền các ô khách cũ còn trống
      (địa chỉ, concept, loại dự án, quy mô, giá trị, nguồn, hạng mục; Tỉnh / Tên dự án / Thời gian / đính kèm ở kdOptions),
@@ -458,6 +499,8 @@ function KinhDoanhPage() {
     let ng = null
     if ((g.kv || g.tinh || g.xa) && !g0.kv && !g0.tinh && !g0.xa) ng = { ...g0, kv: g.kv || '', tinh: g.tinh || '', ...(g.xa ? { xa: g.xa } : null) }
     if (gMap && !String(g0.map || '').trim()) ng = { ...(ng || g0), map: gMap }   // link Google Maps: mang theo khi khách đích chưa có
+    const gFb = String(g.fb || '').trim()
+    if (gFb && !String(g0.fb || '').trim()) ng = { ...(ng || g0), fb: gFb }   // link Facebook: như link Google Maps
     if (ng) opt.geo = { ...geoMap, [key]: ng }
     if (info.projName && !projNameMap[key]) opt.projName = { ...projNameMap, [key]: info.projName }
     const t = info.timeline || {}
@@ -468,7 +511,10 @@ function KinhDoanhPage() {
     const addTo = (old, more) => { const urls = (old || []).map(x => x.url); return [...(old || []), ...(more || []).filter(x => x && x.url && urls.indexOf(x.url) < 0 && urls.push(x.url))] }
     const img = addTo(a0.img, a.img)
     const file = addTo(a0.file, a.file)
-    if (img.length !== (a0.img || []).length || file.length !== (a0.file || []).length) opt.attach = { ...attachMap, [key]: { img, file } }
+    const so = addTo(a0.so, a.so)
+    const ld = info.land || {}
+    if ((Number(ld.area) > 0 || Number(ld.dai) > 0 || Number(ld.rong) > 0) && !landMap[key]) opt.land = { ...landMap, [key]: ld }   // thông số đất: mang theo khi khách đích chưa có
+    if (img.length !== (a0.img || []).length || file.length !== (a0.file || []).length || so.length !== (a0.so || []).length) opt.attach = { ...attachMap, [key]: { ...a0, img, file, ...(so.length ? { so } : null) } }
     if (Object.keys(opt).length) saveKdOptionsMany(opt)
     const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     const ddmm = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s || '') }
@@ -483,6 +529,7 @@ function KinhDoanhPage() {
         info.address ? 'Địa chỉ: ' + info.address : '',
         g.tinh || g.kv || g.xa ? 'Tỉnh: ' + [g.xa, g.tinh, g.kv].filter(Boolean).join(' - ') : '',
         gMap ? 'Google Maps: ' + gMap : '',
+        gFb ? 'Facebook: ' + gFb : '',
         info.projName ? 'Tên dự án: ' + info.projName : '',
         info.projectType ? 'Loại dự án: ' + info.projectType : '',
         info.scale ? 'Quy mô: ' + info.scale : '',
@@ -493,6 +540,7 @@ function KinhDoanhPage() {
         info.notes ? 'Ghi chú: ' + info.notes : '',
         names(a.img) ? 'Hình đính kèm: ' + names(a.img) : '',
         names(a.file) ? 'Tệp đính kèm: ' + names(a.file) : '',
+        names(a.so) ? 'Ảnh sổ đỏ: ' + names(a.so) : '',
       ].filter(Boolean).join('\n'),
       outcome: 'good', next: '', nextNote: '',
     }

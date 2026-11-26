@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -211,5 +212,121 @@ func TestListModelsChoTheoCtx(t *testing.T) {
 	}
 	if d := time.Since(start); d > 2*time.Second {
 		t.Errorf("chờ quá lâu: %v", d)
+	}
+}
+
+func TestGenerateJSONParts(t *testing.T) {
+	audio := []byte{0x1a, 0x45, 0xdf, 0xa3, 0x00, 0xff, 'x'}
+	var path string
+	var raw []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		raw, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"nghĩ","thought":true},{"text":"{\"lines\":[]}"}]}}]}`))
+	}))
+	defer srv.Close()
+	c, _ := New(Config{APIKey: "k", Model: "gemini-mac-dinh", BaseURL: srv.URL})
+	text, err := c.GenerateJSONParts(context.Background(), " models/gemini-am-thanh ", "hệ thống", []Part{
+		{MIME: "audio/webm;codecs=opus", Data: audio},
+		{Text: "gợi ý"},
+		{Text: ""},
+	})
+	if err != nil || text != `{"lines":[]}` {
+		t.Fatalf("kết quả %q %v", text, err)
+	}
+	if path != "/models/gemini-am-thanh:generateContent" {
+		t.Errorf("path %q", path)
+	}
+	var body struct {
+		Contents []struct {
+			Parts []map[string]json.RawMessage `json:"parts"`
+		} `json:"contents"`
+		GenerationConfig map[string]any `json:"generationConfig"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.GenerationConfig["responseMimeType"] != "application/json" {
+		t.Errorf("generationConfig %v", body.GenerationConfig)
+	}
+	ps := body.Contents[0].Parts
+	if len(ps) != 2 {
+		t.Fatalf("số phần %d: %s", len(ps), raw)
+	}
+	if _, ok := ps[0]["text"]; ok || len(ps[0]) != 1 {
+		t.Errorf("phần âm thanh không được kèm text: %s", raw)
+	}
+	var inl struct{ MimeType, Data string }
+	_ = json.Unmarshal(ps[0]["inlineData"], &inl)
+	dec, _ := base64.StdEncoding.DecodeString(inl.Data)
+	if inl.MimeType != "audio/webm" || string(dec) != string(audio) {
+		t.Errorf("inlineData %+v", inl)
+	}
+	var txt string
+	_ = json.Unmarshal(ps[1]["text"], &txt)
+	if txt != "gợi ý" || len(ps[1]) != 1 {
+		t.Errorf("phần chữ %s", raw)
+	}
+	if !strings.Contains(string(raw), `"systemInstruction":{"parts":[{"text":"hệ thống"}]}`) {
+		t.Errorf("systemInstruction %s", raw)
+	}
+	if c.httpParts.Timeout != partsTimeout || c.http.Timeout != defaultTimeout {
+		t.Errorf("timeout %v %v", c.httpParts.Timeout, c.http.Timeout)
+	}
+}
+
+func TestGenerateJSONPartsLoi(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(403)
+		_, _ = w.Write([]byte(`{"error":{"code":403,"message":"key bi-mat bị từ chối"}}`))
+	}))
+	defer srv.Close()
+	c, _ := New(Config{APIKey: "bi-mat", BaseURL: srv.URL})
+	_, err := c.GenerateJSONParts(context.Background(), "", "", []Part{{MIME: "audio/ogg", Data: []byte("a")}})
+	if err == nil || !strings.Contains(err.Error(), "HTTP 403: key *** bị từ chối") || strings.Contains(err.Error(), "bi-mat") {
+		t.Errorf("lỗi %v", err)
+	}
+	if _, err := c.GenerateJSONParts(context.Background(), "", "", []Part{{Text: ""}}); err == nil {
+		t.Error("nội dung rỗng phải lỗi")
+	}
+	if _, err := c.GenerateJSONParts(context.Background(), "", "", []Part{{Data: []byte("a")}}); err == nil {
+		t.Error("thiếu MIME phải lỗi")
+	}
+}
+
+func TestPartJSONGiuNguyen(t *testing.T) {
+	b, _ := json.Marshal([]part{{Text: ""}, {Text: "a", Thought: true}})
+	if string(b) != `[{"text":""},{"text":"a","thought":true}]` {
+		t.Errorf("json %s", b)
+	}
+}
+
+func TestGenerateJSONFast(t *testing.T) {
+	var bodies []string
+	reject := true
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		if reject && strings.Contains(string(b), "thinkingConfig") {
+			w.WriteHeader(400)
+			w.Write([]byte(`{"error":{"code":400,"message":"Thinking level is not supported for this model."}}`))
+			return
+		}
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"ok\":1}"}]}}]}`))
+	}))
+	defer srv.Close()
+	c, _ := New(Config{APIKey: "khoa-thu-123", BaseURL: srv.URL})
+	out, err := c.GenerateJSONFast(context.Background(), "m1", "", "p")
+	if err != nil || out != `{"ok":1}` || len(bodies) != 2 || !strings.Contains(bodies[0], `"thinkingLevel":"low"`) || strings.Contains(bodies[1], "thinkingConfig") {
+		t.Fatalf("thử lại kiểu thường: %v %q %v", err, out, bodies)
+	}
+	bodies = nil
+	c.GenerateJSONFast(context.Background(), "m1", "", "p")
+	if len(bodies) != 1 || strings.Contains(bodies[0], "thinkingConfig") {
+		t.Errorf("model đã biết không nhận: gọi thẳng kiểu thường: %v", bodies)
+	}
+	reject, bodies = false, nil
+	if out, err = c.GenerateJSONFast(context.Background(), "m2", "", "p"); err != nil || len(bodies) != 1 || !strings.Contains(bodies[0], `"thinkingLevel":"low"`) {
+		t.Errorf("model nhận thinkingLevel: %v %v", err, bodies)
 	}
 }

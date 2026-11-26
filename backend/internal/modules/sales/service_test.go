@@ -32,7 +32,10 @@ type fakeRepo struct {
 	tasks    map[float64]*omap.Map
 	insights []*omap.Map
 	childID  float64
-	settings map[string]*omap.Map // cai_dat_cong_ty (service_aiconfig_test.go)
+	settings map[string]*omap.Map  // cai_dat_cong_ty (service_aiconfig_test.go)
+	recs     map[float64]*omap.Map // kd_ghi_am (recording_test.go)
+	recID    float64
+	actID    float64
 }
 
 func newFake() *fakeRepo { return &fakeRepo{leads: map[float64]*omap.Map{}, nextID: 1} }
@@ -77,6 +80,10 @@ func (f *fakeRepo) ListActivities(ctx context.Context, leadID float64) ([]*omap.
 	return f.acts, nil
 }
 func (f *fakeRepo) InsertActivity(ctx context.Context, row *omap.Map) (*omap.Map, error) {
+	if !row.Has("id") {
+		f.actID++
+		row.Set("id", f.actID)
+	}
 	f.acts = append(f.acts, row)
 	return row, nil
 }

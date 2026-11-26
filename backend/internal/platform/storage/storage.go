@@ -257,6 +257,25 @@ func (s *Client) Open(p string) (*os.File, fs.FileInfo, error) {
 	return f, st, nil
 }
 
+// Remove xoá 1 file của kho theo đường dẫn tương đối. Không có file -> nil (xoá lặp lại không lỗi); đường dẫn sai -> lỗi.
+func (s *Client) Remove(p string) error {
+	if !ValidPath(p) {
+		return errPath
+	}
+	root, err := os.OpenRoot(s.dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := root.Remove(filepath.FromSlash(p)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
 // PathOf: đường dẫn trong kho của URL công khai "/files/<path>" (bỏ ?query / #..., giải mã %XX).
 // ok = false khi URL không thuộc kho hoặc đường dẫn không hợp lệ.
 func PathOf(u string) (string, bool) {

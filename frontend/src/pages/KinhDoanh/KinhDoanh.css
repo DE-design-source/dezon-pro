@@ -758,6 +758,8 @@ html[data-theme="dark"] .kd-lf{
 .kd-lf-boq b{font-weight:600; color:var(--text);}
 .kd-lf-adv3{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; align-items:start;}
 .kd-lf-adv3 .kd-field > [role="button"]{min-height:96px !important; border-width:1px !important;}
+/* Ảnh sổ đỏ / giấy tờ đất: 1 hàng riêng dưới Concept | Hình | Tệp */
+.kd-lf-so .kd-field > [role="button"]{min-height:96px !important; border-width:1px !important;}
 /* Ô Hình / Tệp (AttachBox, style inline dùng biến chung): đổi biến trong khối để cùng kiểu ô BOQ - viền đứt xám, nền xám nhạt, kéo tệp vào thì cam */
 .kd-lf-adv3{--border:var(--lf-dash); --surface-alt:var(--lf-in); --primary:var(--lf-acc2); --primary-tint:var(--lf-hover);}
 .kd-lf .kd-lf-adv3 textarea.kd-autogrow{min-height:96px;}
@@ -1052,3 +1054,14 @@ html[data-theme="dark"] .kd-req, html[data-theme="dark"] .kd-lf-errmsg, html[dat
 .kd-prov-r.other .bar em{background:color-mix(in srgb, var(--sales) 55%, var(--surface));}
 .kd-prov-r.none .nm{font-weight:500; color:var(--text-muted); font-style:italic;}
 .kd-prov-r.none .bar em{background:var(--text-muted); opacity:.45;}
+
+/* Ảnh sổ đỏ + Diện tích đất / Dài / Rộng (LandCertFields, AI đọc sổ đỏ) */
+.kd-lf-so{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start;}
+.kd-land{display:flex; flex-direction:column; gap:8px; min-width:0;}
+.kd-land-g{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;}
+.kd-land-st{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12.5px; line-height:1.45; color:var(--text-muted);}
+.kd-land-st b{color:var(--text);}
+.kd-land-st .busy{color:var(--primary, #1d4ed8);}
+.kd-land-st .err{color:#D92D20;}
+.kd-land-st button{padding:3px 9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; cursor:pointer;}
+@media (max-width: 720px){ .kd-lf-so{grid-template-columns:minmax(0,1fr);} }

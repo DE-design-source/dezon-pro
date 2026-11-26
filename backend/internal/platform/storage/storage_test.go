@@ -207,3 +207,28 @@ func TestCreateTempLoiDia(t *testing.T) {
 		t.Errorf("lỗi: %v", err)
 	}
 }
+
+func TestRemove(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "kho")
+	s := New(dir)
+	if err := s.Remove("kd-rec/1/a.webm"); err != nil { // kho chưa có thư mục: không lỗi
+		t.Fatalf("kho trống: %v", err)
+	}
+	if _, err := s.Upload(context.Background(), []byte("abc"), "kd-rec/1/a.webm", "audio/webm"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Remove("kd-rec/1/a.webm"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "kd-rec", "1", "a.webm")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("file còn trên đĩa: %v", err)
+	}
+	if err := s.Remove("kd-rec/1/a.webm"); err != nil {
+		t.Errorf("xoá lần 2: %v", err)
+	}
+	for _, p := range []string{"", "../x", "a/../../x", ".tmp/x"} {
+		if err := s.Remove(p); err == nil {
+			t.Errorf("đường dẫn sai %q phải lỗi", p)
+		}
+	}
+}

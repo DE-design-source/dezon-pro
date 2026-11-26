@@ -9,6 +9,7 @@ import { lmInitials, findDuplicates, sourceColor, boqOf } from '../utils'
 import { uploadRaw, mediaUrl } from '../../QS/api/files'
 import ShortlistSelect, { useKdMap, useKdOptions, useMkChannels, saveKdOptions } from './ShortlistSelect'
 import AttachBox, { filesOf } from './AttachBox'
+import LandCertFields from './LandCertFields'
 import { NoteToolbar, noteHotkey } from './RichNote'
 import DatePicker from '../../../components/ui/DatePicker'
 import { OWNER_GROUPS } from './customer/CdOwners'
@@ -170,13 +171,20 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   useEffect(() => { if (cdtKey && !cdt.role && !cdt.dept) setCdt({ role: cdtKey.role || '', dept: cdtKey.dept || '' }) }, [cdtKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const [deptWarn, setDeptWarn] = useState(false)
   const isDA = form.dept === 'du-an'
-  /* Hình / tệp đính kèm (MarkUp 2026-11-16 16:20): kdOptions.attach {mã lead: {img: [{name, url}], file: [...]}} */
+  /* Hình / tệp đính kèm (MarkUp 2026-11-16 16:20) + ảnh sổ đỏ / giấy tờ đất (so):
+     kdOptions.attach {mã lead: {img: [{name, url}], file: [...], so: [...]}} */
   const attachMap = useKdMap('attach')
-  const [attach, setAttach] = useState(() => { const a = lead ? attachMap[String(lead.id)] || {} : {}; return { img: a.img || [], file: a.file || [] } })
+  const [attach, setAttach] = useState(() => { const a = lead ? attachMap[String(lead.id)] || {} : {}; return { img: a.img || [], file: a.file || [], so: a.so || [] } })
   const attachKey = lead ? attachMap[String(lead.id)] : null
-  useEffect(() => { if (attachKey && !attach.img.length && !attach.file.length) setAttach({ img: attachKey.img || [], file: attachKey.file || [] }) }, [attachKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (attachKey && !attach.img.length && !attach.file.length && !attach.so.length) setAttach({ img: attachKey.img || [], file: attachKey.file || [], so: attachKey.so || [] }) }, [attachKey]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Thời gian dự án (MarkUp 2026-11-16 16:48): kdOptions.timeline {mã lead: {start, end}} (YYYY-MM-DD) như geo */
   const timelineMap = useKdMap('timeline')
+  /* Thông số đất (đọc từ ảnh sổ đỏ hoặc gõ tay): kdOptions.land {mã lead: {area, dai, rong, plotNo, mapSheet, purpose, shapeNote, src}} */
+  const landMap = useKdMap('land')
+  const [land, setLand] = useState(() => (lead ? landMap[String(lead.id)] || {} : {}))
+  const landKey = lead ? landMap[String(lead.id)] : null
+  const landTouched = useRef(false)
+  useEffect(() => { if (landKey && !landTouched.current) setLand(landKey) }, [landKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const [tl, setTl] = useState(() => { const t = lead ? timelineMap[String(lead.id)] || {} : {}; return { start: t.start || '', end: t.end || '' } })
   const tlKey = lead ? timelineMap[String(lead.id)] : null
   useEffect(() => { if (tlKey && !tl.start && !tl.end) setTl({ start: tlKey.start || '', end: tlKey.end || '' }) }, [tlKey]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -191,6 +199,10 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   const [mapLink, setMapLink] = useState(geo0.map ? String(geo0.map) : '')
   const mapTouched = useRef(false)
   useEffect(() => { if (geoKey && geoKey.map && !mapTouched.current && !mapLink) setMapLink(String(geoKey.map)) }, [geoKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Link Facebook của khách (geo.fb, cùng chỗ lưu với link Google Maps) */
+  const [fbLink, setFbLink] = useState(geo0.fb ? String(geo0.fb) : '')
+  const fbTouched = useRef(false)
+  useEffect(() => { if (geoKey && geoKey.fb && !fbTouched.current && !fbLink) setFbLink(String(geoKey.fb)) }, [geoKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const foreign = geo.kv === FOREIGN
   /* Gợi ý Phường / Xã: các phường đã nhập ở khách khác (cùng tỉnh nếu đã chọn tỉnh) */
   const xaBase = useMemo(() => [...new Set(Object.values(geoMap).filter(g => g && g.xa && (!geo.tinh || g.tinh === geo.tinh)).map(g => String(g.xa)))]
@@ -249,11 +261,12 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   /* Số tệp đang tải lên ở 2 ô đính kèm: còn tệp chưa tải xong thì chưa cho lưu / gộp (lưu lúc đó sẽ mất tệp) */
   const [imgBusy, setImgBusy] = useState(0)
   const [fileBusy, setFileBusy] = useState(0)
+  const [soBusy, setSoBusy] = useState(0)
   const [boqBusy, setBoqBusy] = useState(0)
   const [boqErr, setBoqErr] = useState('')
   const boqInputRef = useRef(null)
   const notesRef = useRef(null)
-  const uploading = imgBusy + fileBusy + boqBusy > 0
+  const uploading = imgBusy + fileBusy + soBusy + boqBusy > 0
   const UPLOAD_WAIT = 'Đang tải tệp đính kèm lên, vui lòng đợi xong rồi lưu'
 
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }))
@@ -364,11 +377,13 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     })
   }
 
-  /* geo gửi đi: chỉ thêm khoá xa / map khi có (khách cũ giữ đúng dạng {kv, tinh}) */
+  /* geo gửi đi: chỉ thêm khoá xa / map / fb khi có (khách cũ giữ đúng dạng {kv, tinh}) */
   const geoOut = () => {
     const g = geo.xa ? { kv: geo.kv || '', tinh: geo.tinh || '', xa: geo.xa } : { kv: geo.kv || '', tinh: geo.tinh || '' }
     const m = mapLink.trim()
     if (m) g.map = m
+    const f = fbLink.trim()
+    if (f) g.fb = f
     return g
   }
   /* Link Google Maps chỉ nhận http(s) (chặn javascript: ...) */
@@ -379,6 +394,12 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     showErr('map', 'Link Google Maps không hợp lệ: phải bắt đầu bằng http:// hoặc https://')
     return true
   }
+  const fbTrim = fbLink.trim()
+  const fbBad = () => {
+    if (!fbTrim || mapOk(fbTrim)) return false
+    showErr('fb', 'Link Facebook không hợp lệ: phải bắt đầu bằng http:// hoặc https:// (vd https://facebook.com/ten.khach)')
+    return true
+  }
   const mapsQuery = [form.address.trim(), foreign ? '' : geo.xa, geo.tinh].filter(Boolean).join(', ')
   const openUrl = u => { try { window.open(u, '_blank', 'noopener,noreferrer') } catch { /* bỏ qua */ } }
   /* Giá trị dự án quy ra tỷ VND (dùng chung cho Lưu và Gộp vào khách cũ) */
@@ -386,7 +407,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
   /* Gộp vào khách cũ: gửi mọi thông tin đã nhập, KinhDoanh.mergeIntoLead điền chỗ trống / ghi lịch sử chăm sóc */
   function mergeInto(id) {
     if (uploading) { alert(UPLOAD_WAIT); return }
-    if (mapBad()) return
+    if (mapBad() || fbBad()) return
     const type = form.type || ''
     onMergeInto(id, {
       source: form.source,
@@ -403,7 +424,8 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
       value: valueTy(),
       categories: form.categories.slice(),
       timeline: { start: tl.start || '', end: tl.end || '' },
-      attach: { img: attach.img.slice(), file: attach.file.slice() },
+      attach: { img: attach.img.slice(), file: attach.file.slice(), so: attach.so.slice() },
+      land: { ...land },
     })
   }
   /* Câu báo lỗi của máy chủ -> ô tương ứng trên form */
@@ -432,7 +454,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
     if (!form.dept) { setDeptWarn(true); scrollTo(deptRef); return }
     const name = form.name.trim()
     if (!name) { setNameWarn(true); setNameFocusTick(t => t + 1); return }
-    if (mapBad()) return
+    if (mapBad() || fbBad()) return
     if (!lead && strongDups.length && !window.confirm('Khách này trùng SĐT/email với: '
       + strongDups.slice(0, 5).map(d => d.lead.name + (d.lead.source ? ' (' + d.lead.source + ')' : '')).join(', ') + (strongDups.length > 5 ? '...' : '')
       + '\nVẫn lưu thành lead mới? (Bấm Huỷ để quay lại, có thể Gộp vào khách cũ)')) { scrollTo(sec1Ref); return }
@@ -461,6 +483,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
       _cdt: isDA ? { role: cdt.role.trim(), dept: cdt.dept.trim() } : { role: '', dept: '' },
       _attach: attach,
       _timeline: tl,
+      _land: land,
       type: scale ? `${type} (${scale})` : type,
       value: valueTy(),   // quy ra tỷ VND
       stage: !lead && form.stage === 'tiep-can' && finalAssignees.some(a => a && a.role !== ADMIN_KD) ? 'giao-ns' : form.stage,   // tạo mới đã có nhân sự KD phụ trách -> vào thẳng giai đoạn "Nhân sự KD phụ trách"
@@ -634,6 +657,13 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
                   onChange={e => { mapTouched.current = true; setMapLink(e.target.value); if (errOn('map')) setSaveErr(null) }} />
                 {errOn('map') ? <span className="kd-lf-msg" id={fid('mapMsg')} role="alert">{saveErr.msg}</span> : null}
               </div>
+              <div ref={fref('fb')} className={'kd-field' + (errOn('fb') ? ' kd-lf-err' : '')}>
+                <Lb htmlFor={fid('fb')} aside={fbTrim && mapOk(fbTrim) ? <button type="button" title="Mở link Facebook (tab mới)" onClick={() => openUrl(fbTrim)}>Mở</button> : null}>Link Facebook</Lb>
+                <input id={fid('fb')} type="url" inputMode="url" placeholder="Dán link Facebook của khách (https://facebook.com/...)" value={fbLink}
+                  aria-invalid={errOn('fb') || undefined} aria-describedby={errOn('fb') ? fid('fbMsg') : undefined}
+                  onChange={e => { fbTouched.current = true; setFbLink(e.target.value); if (errOn('fb')) setSaveErr(null) }} />
+                {errOn('fb') ? <span className="kd-lf-msg" id={fid('fbMsg')} role="alert">{saveErr.msg}</span> : null}
+              </div>
             </div>
           </Sec>
 
@@ -781,6 +811,11 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
               <AttachBox ref={imgBoxRef} kind="img" label="Hình đính kèm" items={attach.img} onChange={img => setAttach(a => ({ ...a, img }))} onBusy={setImgBusy} />
               <AttachBox ref={fileBoxRef} kind="file" label="Tệp đính kèm" items={attach.file} onChange={file => setAttach(a => ({ ...a, file }))} onBusy={setFileBusy} />
             </div>
+            {/* Ảnh sổ đỏ / giấy tờ đất: riêng với Hình đính kèm để hồ sơ hiện thành mục Sổ đỏ */}
+            <div className="kd-lf-so">
+              <AttachBox kind="img" label="Ảnh sổ đỏ / giấy tờ đất" items={attach.so} onChange={so => setAttach(a => ({ ...a, so }))} onBusy={setSoBusy} />
+              <LandCertFields soItems={attach.so} value={land} onChange={x => { landTouched.current = true; setLand(x) }} />
+            </div>
             <div className="kd-field"><label>Ghi chú nội bộ</label>
               <div className="rn-wrap">
                 <AutoTextarea active={open && advOpen} inputRef={notesRef} placeholder="Ghi chú cho đội kinh doanh / kỹ thuật... (bôi đen chữ rồi bấm B để in đậm)" value={form.notes}
@@ -796,7 +831,7 @@ export default function LeadModal({ open, lead, me, leads, onClose, onSave, onOp
 
           {/* Thanh lưu dính đáy khung cuộn */}
           <div className="kd-lf-foot">
-            {saveErr ? <span className="hint kd-lf-errmsg" role="alert">{saveErr.msg}</span> : <span className="hint">{uploading ? UPLOAD_WAIT : (!advOpen && (attach.img.length || attach.file.length) ? 'Nâng cao (đang thu gọn): ' + [attach.img.length ? attach.img.length + ' hình' : '', attach.file.length ? attach.file.length + ' tệp' : ''].filter(Boolean).join(', ') : (isDA ? 'Phòng ban và người phụ trách (bên CĐT) là bắt buộc' : 'Phòng ban và tên khách hàng là bắt buộc'))}</span>}
+            {saveErr ? <span className="hint kd-lf-errmsg" role="alert">{saveErr.msg}</span> : <span className="hint">{uploading ? UPLOAD_WAIT : (!advOpen && (attach.img.length || attach.file.length || attach.so.length) ? 'Nâng cao (đang thu gọn): ' + [attach.img.length ? attach.img.length + ' hình' : '', attach.file.length ? attach.file.length + ' tệp' : '', attach.so.length ? attach.so.length + ' ảnh sổ đỏ' : ''].filter(Boolean).join(', ') : (isDA ? 'Phòng ban và người phụ trách (bên CĐT) là bắt buộc' : 'Phòng ban và tên khách hàng là bắt buộc'))}</span>}
             <div className="acts">
               <button type="button" className="kd-lf-btn" onClick={onClose}>Huỷ</button>
               <button type="button" className={'kd-lf-btn pri' + (uploading ? ' busy' : '')} onClick={save} title={uploading ? UPLOAD_WAIT : undefined} aria-disabled={uploading || saving}>
