@@ -19,7 +19,8 @@ import {
   BG_MAU_DS, BG_NOI_BO, bgNoiBoXuat_, bgNoiBoBat_, bgBiaCanh_, bgLines_, bgPTRows_, bgPTSecs_, vatOf_, bgOpt_, bgTong_, bgVatParts_, computeQuoteLocal, bgGhiChu_, docSoVN_, bgOrg_,
   bgAn_, bgHidden, coverCosts, coverDepth, coverSortFn, bgSoLaiOn_, coverSoLai_,
 } from '../../lib/quote.js'
-import { bgKy_, bgKyMac_, KY_COT_MAX, bgDocCols_, bgBia_, BG_TT_DS, BG_LOGO_MIN, BG_LOGO_MAX, TD_CO_MIN, TD_CO_MAX, docImg_, bgColHm_ } from './docModel'
+import { bgKy_, bgKyMac_, KY_COT_MAX, bgDocCols_, bgBia_, BG_TT_DS, BG_LOGO_MIN, BG_LOGO_MAX, TD_CO_MIN, TD_CO_MAX, docImg_, bgColHm_, bgColPT_ } from './docModel'
+import { PT_COLS } from '../phantho/ptModel'
 import { nodeName } from '../../lib/tree.js'
 import { bgChu_, bgSoOf_, BG_SO_MIN, BG_SO_MAX, appFontName_, appFontValue_, TT_CO_MIN, TT_CO_MAX, TK_LUI_MAX, khungKeys_, khungW_, KH_W_MIN, KH_W_MAX, BG_HD_NEN, BG_HD_NEN_DS, BG_COT_NEN_DS, BG_TG_NEN_DS, BG_TS_NEN_DS, BG_TS_CHU_DS, BG_TS_VIEN_DS, BG_KIEU_DS, BG_CANH_DS, BG_KHO_DS } from './docCss'
 import { FONT_CATALOG, FONT_CATEGORIES, isFontAvailable } from '../../../../data/fontCatalog'
@@ -878,7 +879,11 @@ function ColHm({ ctx, tk, tkEdit, perSec }) {
   ;(ctx.lines || []).forEach(l => { const c = String(l.nhom || '').trim(); if (c && codes.indexOf(c) < 0) codes.push(c) })
   codes.sort((a, b) => { const k = s => String(s).split('.').map(x => parseInt(x, 10) || 0); const x = k(a), y = k(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d } return 0 })
   Object.keys(hm).forEach(c => { if (codes.indexOf(c) < 0) codes.push(c) })   // hạng mục đã đặt riêng nhưng tạm hết dòng: vẫn hiện để bỏ được
+  // 3.1 Phần thô có hệ chip RIÊNG theo bộ cột của bảng Phần thô (bgCfg.colPT - MarkUp 2026-11-26)
+  const coPT = (ctx.phanTho || []).some(s => (s.items || []).length)
+  if (coPT) codes.unshift(PT_HM)
   const cur = sel && codes.indexOf(sel) >= 0 ? sel : ''
+  if (cur === PT_HM) return <ColPT ctx={ctx} codes={codes} hm={hm} setSel={setSel} />
   const rieng = cur ? hm[cur] : null
   const map = cur ? (rieng || tk.cols) : tk.cols
   const datHm = (code, m) => { const n = { ...hm }; if (m) n[code] = m; else delete n[code]; bgOptSet('colHm', Object.keys(n).length ? n : null) }
@@ -895,7 +900,7 @@ function ColHm({ ctx, tk, tkEdit, perSec }) {
         <div className="qsq-khnhom">
           <b><i className="ic demuc" />Hạng mục<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{Object.keys(hm).length} cột riêng</em></b>
           <SearchSelect className="qsq-colhm-ss" value={cur} allLabel="Chung (mọi hạng mục)" onChange={v => setSel(v || '')}
-            options={codes.map(c => [c, (nodeName(c) || c) + (hm[c] ? ' · cột riêng (' + nOn(hm[c]) + ')' : '')])} />        </div>
+            options={codes.map(c => (c === PT_HM ? [c, PT_HM_LBL] : [c, (nodeName(c) || c) + (hm[c] ? ' · cột riêng (' + nOn(hm[c]) + ')' : '')]))} />        </div>
       )}
       <div className="qsq-khnhom">
       <b><i className="ic cot" />Cột · {cur ? (nodeName(cur) || cur) : 'Chung'}<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{nOn(map)}/{COLS.length}</em></b>
@@ -909,6 +914,37 @@ function ColHm({ ctx, tk, tkEdit, perSec }) {
       <div className="qsq-colstrip">
         <ColsStrip columns={COLS.map(c => ({ key: c[0], label: c[1] }))} cols={map} editing={cur ? false : tkEdit} onToggle={onToggle} />
       </div>
+      </div>
+    </>
+  )
+}
+/* Chip cột của trang Phần thô: bộ cột của bảng Phần thô (bỏ STT), lưu bgCfg.colPT; "Về mặc định" xoá bộ đã đặt */
+const PT_HM = '__pt', PT_HM_LBL = '3.1 Phần thô (chip cột riêng)'
+function ColPT({ ctx, codes, hm, setSel }) {
+  const map = bgColPT_(ctx.bgCfg)
+  const daDat = !!(ctx.bgCfg && ctx.bgCfg.colPT)
+  const cols = PT_COLS.filter(c => c[0] !== 'stt')
+  const nOnPT = cols.filter(c => map[c[0]]).length
+  const onToggle = k => { if (k === 'noidung') return; bgOptSet('colPT', { ...map, [k]: !map[k] }) }
+  return (
+    <>
+      <div className="qsq-khnhom">
+        <b><i className="ic demuc" />Hạng mục<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{Object.keys(hm).length} cột riêng</em></b>
+        <SearchSelect className="qsq-colhm-ss" value={PT_HM} allLabel="Chung (mọi hạng mục)" onChange={v => setSel(v || '')}
+          options={codes.map(c => (c === PT_HM ? [c, PT_HM_LBL] : [c, (nodeName(c) || c) + (hm[c] ? ' · cột riêng' : '')]))} />
+      </div>
+      <div className="qsq-khnhom">
+        <b><i className="ic cot" />Cột · Phần thô<span style={{ flex: 1 }} /><em className="qsq-colhm-n">{nOnPT}/{cols.length}</em></b>
+        <div className={'qsq-colhm-info' + (daDat ? ' on' : '')}>
+          <span>{daDat ? <>Trang <b>Phần thô</b> dùng bộ cột đã đặt · {nOnPT} cột</> : <>Trang <b>Phần thô</b> đang dùng bộ cột mặc định — bấm chip để đổi</>}</span>
+          {daDat && <button type="button" className="qsc-btn" onClick={() => bgOptSet('colPT', null)}>Về mặc định</button>}
+        </div>
+        <p className="qsq-note"><Icon name="alert" size={12} /> Trang Phần thô in đúng các chip đang bật (kể cả cột giá vốn / lợi nhuận - tắt chip đỏ / cam trước khi gửi khách). Áp cho bản xem trước và PDF; file Excel chưa theo chip này.</p>
+        <div className="qsq-colstrip">
+          <ColsStrip columns={cols.map(c => ({ key: c[0] === 'noidung' ? 'ten' : c[0], label: c[1] }))}
+            cols={Object.fromEntries(cols.map(c => [c[0] === 'noidung' ? 'ten' : c[0], c[0] === 'noidung' ? true : !!map[c[0]]]))}
+            editing={false} onToggle={k => onToggle(k === 'ten' ? 'noidung' : k)} />
+        </div>
       </div>
     </>
   )

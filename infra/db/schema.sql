@@ -9988,6 +9988,7 @@ CREATE TABLE public.work_items (
     supplier_name text,
     is_favorite boolean DEFAULT false NOT NULL,
     takeoff_section text,
+    product_code text,
     CONSTRAINT ck_work_items_area CHECK ((area >= (0)::numeric)),
     CONSTRAINT ck_work_items_calculation_mode CHECK ((calculation_mode = ANY (ARRAY['item'::text, 'area'::text, 'area0'::text, 'none'::text]))),
     CONSTRAINT ck_work_items_coefficient CHECK ((coefficient >= (0)::numeric)),
@@ -10201,6 +10202,13 @@ COMMENT ON COLUMN public.work_items.is_favorite IS 'Marked as favourite for the 
 --
 
 COMMENT ON COLUMN public.work_items.takeoff_section IS 'Pinned take-off section code: empty = auto-detect from the category name, ''0'' = rough-work section (3.1) only, e.g. ''3.2.2'' = also shown under that section';
+
+
+--
+-- Name: COLUMN work_items.product_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.work_items.product_code IS 'Product / item code shown in the "Mã sản phẩm" column of the rough-work table (e.g. KSHT); NULL = not entered';
 
 
 --

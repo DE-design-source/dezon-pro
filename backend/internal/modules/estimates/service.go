@@ -66,7 +66,7 @@ func numOrEmpty(v any) any {
 
 // ctToObj (S:1301-1317): dòng cong_tac -> object cho client.
 func ctToObj(r *omap.Map) *omap.Map {
-	return omap.Of(
+	o := omap.Of(
 		"id", r.Val("id"), "loai", sOr(r.Val("loai"), "kt_chitiet"), "mode", sOr(r.Val("che_do"), "item"),
 		"maNhom", jsval.S(r.Val("ma_nhom")), "hangMuc", jsval.S(r.Val("hang_muc")), "deMuc", jsval.S(r.Val("de_muc")),
 		"ten", jsval.S(r.Val("ten")), "dvt", jsval.S(r.Val("dvt")), "ncc", jsval.S(r.Val("nha_cung_cap")),
@@ -82,6 +82,11 @@ func ctToObj(r *omap.Map) *omap.Map {
 		"nguoiSua", jsval.S(r.Val("nguoi_sua")), "ngayCapNhat", jsval.Or(r.Val("ngay_cap_nhat"), ""),
 		"thuTu", qscore.N(r.Val("thu_tu")),
 	)
+	// mã sản phẩm (migration 0055): chỉ thêm khoá khi có giá trị để đầu ra của công tác cũ giữ nguyên
+	if m := jsval.S(r.Val("ma_sp")); m != "" {
+		o.Set("maSP", m)
+	}
+	return o
 }
 
 func ctRows(rows []*omap.Map) []any {
@@ -125,6 +130,10 @@ func ctToRow(d any) (*omap.Map, error) {
 	)
 	if tt := g("thuTu"); !jsval.IsNullish(tt) && !jsval.StrictEquals(tt, "") {
 		r.Set("thu_tu", qscore.N(tt))
+	}
+	// mã sản phẩm: chỉ ghi khi client gửi khoá (form cũ không có ô này thì không xoá mã đã lưu)
+	if m := g("maSP"); !jsval.IsUndefined(m) {
+		r.Set("ma_sp", jsval.Trim(jsval.S(m)))
 	}
 	return r, nil
 }

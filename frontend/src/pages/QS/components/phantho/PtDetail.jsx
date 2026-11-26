@@ -60,7 +60,7 @@ function InfoForm({ a, sec, infoU }) {
   )
 }
 
-export default function PtDetail() {
+export default function PtDetail({ width } = {}) {
   const tpl = usePtTemplate()
   const detail = usePtUi(s => s.detail)
   const infoEdit = usePtUi(s => s.infoEdit)
@@ -100,7 +100,7 @@ export default function PtDetail() {
   const chinh = P.chinh.filter(r => r[1] != null && r[1] !== '')
   const specs = P.inf.ts ? ptSpecRows_(P.inf.ts) : []
   return (
-    <div className="qs-card qs-bd-info qspt-detail">
+    <div className="qs-card qs-bd-info qspt-detail" style={width ? { width } : undefined}>
       <div className="qs-bd-info-head qspt-dhead">
         <span>Thông tin công tác</span>
         {!infoEdit && (ctr0

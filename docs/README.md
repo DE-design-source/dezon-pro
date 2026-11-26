@@ -6,7 +6,7 @@ Mục lục mọi tài liệu trong `docs/`. Cập nhật file này mỗi khi th
 
 | Tài liệu | Nội dung | Loại |
 |---|---|---|
-| [kien-truc-he-thong.md](02-ky-thuat/kien-truc/kien-truc-he-thong.md) | Ảnh chụp kiến trúc hiện tại: khối hệ thống, tầng backend, 18 module, trang gọi server, dữ liệu, triển khai, điểm đáng chú ý. Sinh bằng lệnh `/architecture`, chạy lại để cập nhật | **Hiện hành** |
+| [kien-truc-he-thong.md](02-ky-thuat/kien-truc/kien-truc-he-thong.md) | Ảnh chụp kiến trúc hiện tại: khối hệ thống, tầng backend, 20 module, trang gọi server, dữ liệu, triển khai, điểm đáng chú ý. Sinh bằng lệnh `/architecture`, chạy lại để cập nhật | **Hiện hành** |
 | [phan-quyen.md](02-ky-thuat/kien-truc/phan-quyen.md) | Phân quyền: vai trò super / admin / staff, luồng một request, tách dữ liệu theo công ty, quản lý tài khoản, quyền theo tab, lớp quyền HR, quyền riêng từng module, điểm cần lưu ý (sơ đồ Mermaid) | **Hiện hành** |
 
 ## 02-ky-thuat / database

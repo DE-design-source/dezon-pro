@@ -570,7 +570,8 @@
    "thu_tu": "sort_order",
    "nha_cung_cap": "supplier_name",
    "yeu_thich": "is_favorite",
-   "de_muc": "takeoff_section"
+   "de_muc": "takeoff_section",
+   "ma_sp": "product_code"
   }
  },
  "cong_tac_history": {

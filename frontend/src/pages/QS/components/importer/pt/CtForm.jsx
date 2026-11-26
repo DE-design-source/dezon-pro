@@ -144,6 +144,7 @@ export default function CtForm({ form, set, hmList, congTac }) {
               {MODES.map(x => <option key={x[0]} value={x[0]}>{x[1]}</option>)}
             </select></div></div>
           {inp('maNhom', 'Số hạng mục', 'VD: II')}
+          {inp('maSP', 'Mã sản phẩm', 'VD: KSHT')}
           <div className="qsip-f"><Lbl t="Thứ tự" /><div className="qsip-i"><input type="number" min="0" step="1" value={d.thuTu == null ? '' : d.thuTu} placeholder="VD: 1 — nhỏ đứng trước trong thư viện" onChange={e => upd({ thuTu: e.target.value })} /></div></div>
           {show.kl && <div className="qsip-f"><Lbl t="Khối lượng mẫu" /><div className="qsip-i"><input type="number" step="any" value={d.kl} placeholder="1" onChange={e => upd({ kl: e.target.value })} /></div></div>}
           {show.dt && <div className="qsip-f"><Lbl t="Diện tích mẫu (m²)" /><div className="qsip-i"><input type="number" step="any" value={d.dt} placeholder="0" onChange={e => upd({ dt: e.target.value })} /></div></div>}

@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import QsIcon from '../common/QsIcon'
 import { money, ptN, ptR2, ptQty } from '../../lib/format.js'
-import { PT_ROMAN, ptAutoKL_ } from '../../lib/phantho.js'
+import { PT_ROMAN, ptAutoKL_, ptDims_, ptMkPct_, ptMoTaHien_ } from '../../lib/phantho.js'
 import { qsToast as toast } from '../common/dialogs'
-import { ptVisCols_, ptW_, ptSortItems_, ptRowPass_, ptCfClass_, ptPct, PT_COLS } from './ptModel'
+import { ptVisCols_, ptW_, ptSortItems_, ptRowPass_, ptCfClass_, ptPct, ptInfoImgsRaw_, PT_COLS } from './ptModel'
 import { usePtUi, setPtUi, ptUi } from './ptState'
 import { usePtLoai } from '../breakdown/sheet/ptLoai'
 import * as A from './ptActions'
@@ -305,6 +305,7 @@ export default function PtTable({ data, tpl, showCols, visible }) {
               <span className="qspt-secdel" title="Xoá hạng mục" onClick={() => A.ptDelSection(si)}><QsIcon name="trash" size={13} /></span>
             </>) },
           khoiluong: { cls: 'n', el: klCell },
+          ttCost: { cls: 'n b', el: st.ttCost ? money(st.ttCost) : '' },
           dgnt: { cls: 'n b', el: secDgnt ? money(secDgnt) : '' },
           ttnt: { cls: 'n b', el: st.ttnt ? money(st.ttnt) : '' },
           lnvnd: { cls: 'n b', el: secLn ? money(secLn) : '' },
@@ -324,6 +325,7 @@ export default function PtTable({ data, tpl, showCols, visible }) {
       const lnVnd = isItem ? (tt - ttnt) : 0
       const margin = (isItem && tt) ? (lnVnd / tt * 100) : 0
       const markup = (isItem && ttnt) ? (lnVnd / ttnt * 100) : 0
+      const anh = ptInfoImgsRaw_({ anh: it.anh }), anh0 = anh[0] || ''
       const k = si + '|' + ii, on = !!(ui.sel && ui.sel[k])
       const E = (f, val) => A.ptEdit(si, ii, f, val)
       const dk2 = rowKey(si, ii)
@@ -342,19 +344,34 @@ export default function PtTable({ data, tpl, showCols, visible }) {
                 <input type="checkbox" className="qspt-ck" checked={on} onChange={() => {}} onClick={e => selClick(e, si, ii)} title="Chọn dòng (giữ Shift để chọn cả vùng)" />
                 <span className="qspt-sttn">{pos + 1}</span>
               </span>) },
+            maBanVe: { cls: '', el: <TxtIn v={it.maBanVe} onCommit={v => E('maBanVe', v)} /> },
+            dongSP: { cls: '', el: <span className="qspt-ro">{String(sec.t || '').split('\n')[0]}</span> },
+            maSP: { cls: '', el: <TxtIn v={it.maSP} onCommit={v => E('maSP', v)} /> },
             noidung: { cls: '', el: <TxtIn v={it.n} onCommit={v => E('n', v)} /> },
+            moTa: { cls: 'qspt-mota', el: <TxtIn v={ptMoTaHien_(it.moTa)} placeholder="Mỗi việc 1 dòng" onCommit={v => E('moTa', v)} /> },
+            ncc: { cls: '', el: <TxtIn v={it.ncc} onCommit={v => E('ncc', v)} /> },
+            hinhAnh: { cls: 'c', el: anh0 ? <a href={anh0} target="_blank" rel="noreferrer" title={anh.length + ' ảnh - bấm để mở'}><img className="qspt-cellimg" src={anh0} alt="" /></a> : <span className="qspt-dash">-</span> },
             dvt: { cls: 'c qspt-dvtcell', el: <TxtIn v={it.dvt} onCommit={v => E('dvt', v)} /> },
-            dientich: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.dt} onCommit={v => E('dt', v)} /> : null },
-            heso: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.hs} goiY={ptN(it.dt) > 0 ? '1' : ''} onCommit={v => E('hs', v)} /> : null },
+            dimL: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.cd} onCommit={v => E('cd', v)} /> : null },
+            dimB: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.cr} onCommit={v => E('cr', v)} /> : null },
+            dimH: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.cc} onCommit={v => E('cc', v)} /> : null },
+            heso: { cls: 'n', el: (isArea || isItem) ? <NumIn v={it.hs} goiY={ptAutoKL_(it) ? '1' : ''} onCommit={v => E('hs', v)} /> : null },
             khoiluong: { cls: 'n', el: isArea ? <span className="qspt-ro">{ptQty(it._kl)}</span>
-              : (isItem ? (ptAutoKL_(it) ? <span className="qspt-ro" title="Khối lượng = Diện tích × Hệ số">{ptQty(it._kl)}</span> : <NumIn v={it.kl} onCommit={v => E('kl', v)} />) : null) },
+              : (isItem ? (ptAutoKL_(it) ? <span className="qspt-ro" title={'Khối lượng = ' + (ptDims_(it).length ? 'L × B × H' : 'Diện tích') + ' × Hệ số'}>{ptQty(it._kl)}</span> : <NumIn v={it.kl} onCommit={v => E('kl', v)} />) : null) },
+            giaNCC: { cls: 'n', el: isItem ? <MoneyIn v={it.giaNCC} onCommit={v => E('giaNCC', v)} /> : null },
+            ttCost: { cls: 'n', el: isItem && it._ttCost ? <span className="qspt-ro">{money(it._ttCost)}</span> : null },
+            ckNT: { cls: 'n', el: isItem ? <NumIn className="qspt-pct-in" v={it.ckNT} onCommit={v => E('ckNT', v)} /> : null },
             dgnt: { cls: 'n', el: isItem ? <MoneyIn v={it.dgnt} onCommit={v => E('dgnt', v)} /> : null },
             ttnt: { cls: 'n', el: isItem ? <span className="qspt-ro">{money(ttnt)}</span> : null },
-            lnvnd: { cls: 'n', el: isItem ? <span className="qspt-ro">{money(lnVnd)}</span> : null },
-            margin: { cls: 'n', el: isItem ? <NumIn className="qspt-pct-in" v={(it.lnPct != null && it.lnPct !== '') ? it.lnPct : ptR2(margin)} onCommit={v => E('lnPct', v)} /> : null },
-            markup: { cls: 'n', el: isItem ? <span className="qspt-ro qspt-pctc">{ptPct(markup)}</span> : null },
+            mkPct: { cls: 'n', el: isItem ? <NumIn className="qspt-pct-in" v={ptR2(ptMkPct_(it))} onCommit={v => E('mkPct', v)} /> : null },
             dg: { cls: 'n', el: isItem ? <MoneyIn v={it.dg} onCommit={v => E('dg', v)} /> : null },
+            ckKH: { cls: 'n', el: isItem ? <NumIn className="qspt-pct-in" v={it.ckKH} onCommit={v => E('ckKH', v)} /> : null },
+            dgCK: { cls: 'n', el: isItem ? <span className="qspt-ro">{money(it._dgCK)}</span> : null },
             tt: { cls: 'n', el: isItem ? <span className="qspt-ro b">{money(tt)}</span> : <span className="qspt-dash">-</span> },
+            markup: { cls: 'n', el: isItem ? <span className="qspt-ro qspt-pctc">{ptPct(markup)}</span> : null },
+            margin: { cls: 'n', el: isItem ? <span className="qspt-ro qspt-pctc">{ptPct(margin)}</span> : null },
+            lnvnd: { cls: 'n', el: isItem ? <span className="qspt-ro">{money(lnVnd)}</span> : null },
+            trangThai: { cls: '', el: <TxtIn v={it.trangThai} onCommit={v => E('trangThai', v)} /> },
             ghichu: { cls: 'qspt-gc', el: <TxtIn v={it.gc} onCommit={v => E('gc', v)} /> },
           })}
           <td className="qspt-del">

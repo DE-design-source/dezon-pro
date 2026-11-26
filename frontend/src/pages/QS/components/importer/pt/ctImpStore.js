@@ -43,7 +43,7 @@ export function newForm_(c, ghi, trong) {
     dg: dg ? money(dg) : '', ck: ck === '' ? '' : String(ck), dgnt: dgnt ? money(dgnt) : '', dvt: s_(c.dvt),
     loai: (trong && !c.loai) ? '' : ptLoaiGop_(c.loai), loaiGoc: s_(c.loai), mode: c.mode || (trong ? '' : 'item'), maNhom: s_(c.maNhom),
     kl: c.kl == null ? '' : s_(c.kl), dt: c.dt == null ? '' : s_(c.dt), hs: c.hs == null ? '' : s_(c.hs),
-    gc: s_(c.gc), phamVi: s_(c.phamVi), linkTaiLieu: s_(c.linkTaiLieu), thuTu: c.thuTu == null ? '' : s_(c.thuTu),
+    gc: s_(c.gc), phamVi: s_(c.phamVi), linkTaiLieu: s_(c.linkTaiLieu), thuTu: c.thuTu == null ? '' : s_(c.thuTu), maSP: s_(c.maSP),
   }, '')
   return { seq: ++formSeq, d, grps, main: anh[0] || '', list: anh.slice(1), ghi: !!ghi }
 }

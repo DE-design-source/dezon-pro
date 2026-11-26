@@ -6,26 +6,39 @@
    ptSheetGrid_ / ptSheetSua_ bangtinh.js:306-343 · CT_DEMUC_CHON / ctDeMucNhan_ 541-542 · ctHangMucList_ 721-726 · CT_MODE_LBL 727
    ctGrpParse_ / ctGrpText_ 944-966 · ctPrev_ (phần tính) 1033-1044 · ctFormRead_ (phần dựng dữ liệu) 1086-1100 · spPTAll_ / ptXlsRows_ sanpham.js:1300-1355 */
 import { money, ptN, ptR0, ptR2, ptQty } from '../../lib/format.js'
-import { PT_LOAI, PT_ROMAN, ptLoaiGop_, ptSecLoai_, ptVal_, ptLibDg_, ctOf_, ptCanEditF_, ptHs_, ptAutoKL_ } from '../../lib/phantho.js'
+import { PT_LOAI, PT_ROMAN, ptLoaiGop_, ptSecLoai_, ptVal_, ptLibDg_, ctOf_, ptCanEditF_, ptHs_, ptAutoKL_, ptMkPct_, ptMoTaHien_ } from '../../lib/phantho.js'
 import { nodeName } from '../../lib/tree.js'
 import { ctDeMucOf_, ptLoaiLabel_ } from '../breakdown/catalog/catalogModel'
 
 /* Cột bảng Phần thô: [key, nhãn, canh, rộng] */
+/* Bộ cột đầy đủ theo file mẫu I.Prilem (MarkUp 2026-11-26): [key, nhãn, canh, rộng, mặc định mở, ẩn khi xuất báo giá].
+   Giá: Giá cost × (1 − CK nhà thầu) = Giá đại lý; Đơn giá = Giá đại lý × (1 + LN/giá vốn mục tiêu); Đơn giá sau CK = Đơn giá × (1 − CK khách);
+   Khối lượng = L × B × H × Hệ số (ô trống không nhân). Thông tin chính (việc con) hiện ở panel thông tin công tác, không thành cột. */
 export const PT_COLS = [
-  ['stt', 'STT', 'c', 52], ['noidung', 'Nội dung công việc', 'l', 300], ['dvt', 'ĐVT', 'c', 74],
-  ['dientich', 'Diện tích', 'n', 92], ['heso', 'Hệ số', 'n', 72], ['khoiluong', 'Khối lượng', 'n', 104],
-  ['dgnt', 'Đơn giá (nhà thầu)', 'n', 136], ['ttnt', 'Thành tiền (nhà thầu)', 'n', 148],
-  ['lnvnd', 'Lợi nhuận (VND)', 'n', 124], ['margin', 'Lợi nhuận/giá bán (%)', 'n', 148],
-  ['markup', 'Lợi nhuận/giá vốn (%)', 'n', 148], ['dg', 'Đơn giá', 'n', 134],
-  ['tt', 'Thành tiền', 'n', 140], ['ghichu', 'Ghi chú', 'l', 210],
+  ['stt', 'STT', 'c', 52, 1], ['maBanVe', 'Mã số bản vẽ', 'l', 110, 0], ['dongSP', 'Dòng sản phẩm', 'l', 130, 0],
+  ['maSP', 'Mã sản phẩm', 'l', 130, 0], ['noidung', 'Tên sản phẩm', 'l', 300, 1], ['moTa', 'Mô tả', 'l', 460, 1], ['ncc', 'Nhà cung cấp / nhà thầu', 'l', 160, 1],
+  ['hinhAnh', 'Hình ảnh', 'c', 96, 1], ['dvt', 'Đơn vị tính', 'c', 84, 1],
+  ['dimL', 'L (m)', 'n', 76, 0], ['dimB', 'B (m)', 'n', 76, 0], ['dimH', 'H (m)', 'n', 76, 0], ['heso', 'Hệ số', 'n', 72, 0],
+  ['khoiluong', 'Khối lượng', 'n', 104, 1],
+  ['giaNCC', 'Giá cost nhà thầu', 'n', 136, 0], ['ttCost', 'Thành tiền (giá cost)', 'n', 148, 0],
+  ['ckNT', 'Chiết khấu của nhà thầu (%)', 'n', 136, 0],
+  ['dgnt', 'Giá đại lý (giá Dezon)', 'n', 140, 1, 1], ['ttnt', 'Thành tiền (giá đại lý)', 'n', 148, 0],
+  ['mkPct', 'Lợi nhuận/giá vốn mục tiêu (%)', 'n', 150, 1, 1], ['dg', 'Đơn giá (Dezon)', 'n', 134, 0],
+  ['ckKH', 'Chiết khấu cho khách hàng (%)', 'n', 136, 0], ['dgCK', 'Đơn giá (sau chiết khấu)', 'n', 146, 1],
+  ['tt', 'Thành tiền (sau chiết khấu)', 'n', 156, 0],
+  ['markup', 'LN sau CK/giá vốn - Markup (%)', 'n', 156, 0, 1], ['margin', 'LN sau CK/giá bán - Margin (%)', 'n', 156, 0, 1],
+  ['lnvnd', 'Lợi nhuận (VND)', 'n', 124, 1, 1], ['trangThai', 'Trạng thái', 'l', 120, 0], ['ghichu', 'Ghi chú', 'l', 210, 0],
 ]
-/* Bộ cột dựng sẵn của khung "Chọn nhanh cột" Phần thô: [id, tên, danh sách cột | null = tất cả]; cột Nội dung luôn có */
+export const PT_COLS_MAC_DINH = PT_COLS.filter(c => c[4]).map(c => c[0])
+export const PT_AN_XUAT = PT_COLS.filter(c => c[5]).map(c => c[0])
+/* Bộ cột dựng sẵn của khung "Chọn nhanh cột" Phần thô: [id, tên, danh sách cột | null = tất cả]; cột Tên sản phẩm luôn có */
 export const PT_PRESETS = [
   ['all', 'Hiện tất cả cột', null],
-  ['nt', 'Nhà thầu', ['stt', 'noidung', 'dvt', 'dientich', 'heso', 'khoiluong', 'dgnt', 'ttnt', 'ghichu']],
-  ['kh', 'Báo giá cho khách', ['stt', 'noidung', 'dvt', 'khoiluong', 'dg', 'tt', 'ghichu']],
-  ['ln', 'Giá & lợi nhuận', ['stt', 'noidung', 'khoiluong', 'ttnt', 'lnvnd', 'margin', 'markup', 'dg', 'tt']],
-  ['gon', 'Tối giản', ['stt', 'noidung', 'dvt', 'khoiluong', 'tt']],
+  ['md', 'Mặc định', PT_COLS_MAC_DINH],
+  ['nt', 'Nhà thầu', ['stt', 'noidung', 'ncc', 'dvt', 'dimL', 'dimB', 'dimH', 'heso', 'khoiluong', 'giaNCC', 'ttCost', 'ckNT', 'dgnt', 'ttnt', 'ghichu']],
+  ['kh', 'Báo giá cho khách', ['stt', 'noidung', 'moTa', 'hinhAnh', 'dvt', 'khoiluong', 'dg', 'ckKH', 'dgCK', 'tt', 'ghichu']],
+  ['ln', 'Giá & lợi nhuận', ['stt', 'noidung', 'khoiluong', 'dgnt', 'ttnt', 'mkPct', 'dg', 'ckKH', 'dgCK', 'tt', 'markup', 'margin', 'lnvnd']],
+  ['gon', 'Tối giản', ['stt', 'noidung', 'dvt', 'khoiluong', 'dgCK', 'tt']],
 ]
 export function ptPresetCols_(list) {
   const want = {}; (list || PT_COLS.map(c => c[0])).forEach(k => { want[k] = 1 }); want.noidung = 1
@@ -33,25 +46,28 @@ export function ptPresetCols_(list) {
 }
 export function ptSameCols_(a, b) { return PT_COLS.every(c => !!(a || {})[c[0]] === !!(b || {})[c[0]]) }
 export function ptKeyLabel_(k) { const c = PT_COLS.filter(x => x[0] === k)[0]; return c ? c[1] : k }
-export const PT_BULK_F = [['noidung', 'Nội dung công việc'], ['dvt', 'Đơn vị tính'], ['dientich', 'Diện tích'],
-  ['heso', 'Hệ số'], ['khoiluong', 'Khối lượng'], ['dgnt', 'Đơn giá (nhà thầu)'],
-  ['margin', '% Lợi nhuận / giá bán'], ['dg', 'Đơn giá bán'], ['ghichu', 'Ghi chú']]
-export const PT_CELL_F = { noidung: 'n', dvt: 'dvt', dientich: 'dt', heso: 'hs', khoiluong: 'kl', dgnt: 'dgnt', margin: 'lnPct', dg: 'dg', ghichu: 'gc' }
-export const PT_NUM_K = { dientich: 1, heso: 1, khoiluong: 1, dgnt: 1, ttnt: 1, lnvnd: 1, dg: 1, tt: 1, margin: 1, markup: 1 }
-export const PT_SORTKEY = { noidung: 'n', dvt: 'dvt', dientich: 'dt', heso: 'hs', khoiluong: 'kl', dgnt: 'dgnt', dg: 'dg', ghichu: 'gc' }
+export const PT_BULK_F = [['noidung', 'Tên sản phẩm'], ['moTa', 'Mô tả'], ['maBanVe', 'Mã số bản vẽ'], ['maSP', 'Mã sản phẩm'], ['ncc', 'Nhà cung cấp / nhà thầu'],
+  ['dvt', 'Đơn vị tính'], ['dimL', 'L (m)'], ['dimB', 'B (m)'], ['dimH', 'H (m)'], ['heso', 'Hệ số'], ['khoiluong', 'Khối lượng'],
+  ['giaNCC', 'Giá cost nhà thầu'], ['ckNT', 'Chiết khấu của nhà thầu (%)'], ['dgnt', 'Giá đại lý'],
+  ['mkPct', '% Lợi nhuận / giá vốn mục tiêu'], ['dg', 'Đơn giá (Dezon)'], ['ckKH', 'Chiết khấu cho khách hàng (%)'],
+  ['trangThai', 'Trạng thái'], ['ghichu', 'Ghi chú']]
+export const PT_CELL_F = { noidung: 'n', moTa: 'moTa', maBanVe: 'maBanVe', maSP: 'maSP', ncc: 'ncc', dvt: 'dvt', dimL: 'cd', dimB: 'cr', dimH: 'cc', heso: 'hs',
+  khoiluong: 'kl', giaNCC: 'giaNCC', ckNT: 'ckNT', dgnt: 'dgnt', mkPct: 'mkPct', dg: 'dg', ckKH: 'ckKH', trangThai: 'trangThai', ghichu: 'gc' }
+export const PT_NUM_K = { dimL: 1, dimB: 1, dimH: 1, heso: 1, khoiluong: 1, giaNCC: 1, ttCost: 1, ckNT: 1, dgnt: 1, ttnt: 1, mkPct: 1,
+  dg: 1, ckKH: 1, dgCK: 1, tt: 1, markup: 1, margin: 1, lnvnd: 1 }
+export const PT_SORTKEY = { noidung: 'n', moTa: 'moTa', maBanVe: 'maBanVe', maSP: 'maSP', ncc: 'ncc', dvt: 'dvt', dimL: 'cd', dimB: 'cr', dimH: 'cc', heso: 'hs',
+  khoiluong: 'kl', giaNCC: 'giaNCC', ckNT: 'ckNT', dgnt: 'dgnt', dg: 'dg', ckKH: 'ckKH', trangThai: 'trangThai', ghichu: 'gc' }
+const PT_SORT_NUM = ['cd', 'cr', 'cc', 'hs', 'kl', 'giaNCC', 'ckNT', 'dgnt', 'dg', 'ckKH']
 
 // giá trị 1 ô theo khoá cột (để lọc & sao chép)
 export function ptCellVal_(sec, it, k) {
+  const s = v => (v == null ? '' : String(v))
   switch (k) {
     case 'noidung': return String(it.n || '')
-    case 'dvt': return String(it.dvt || '')
+    case 'dongSP': return String(sec.t || '').split('\n')[0]
+    case 'khoiluong': return s(it._kl)
     case 'ghichu': return String(it.gc || '')
-    case 'dientich': return it.dt == null ? '' : String(it.dt)
-    case 'heso': return it.hs == null ? '' : String(it.hs)
-    case 'khoiluong': return it._kl == null ? '' : String(it._kl)
-    case 'dgnt': return it.dgnt == null ? '' : String(it.dgnt)
-    case 'dg': return it.dg == null ? '' : String(it.dg)
-    default: return ''
+    default: { const f = PT_CELL_F[k]; return f ? s(it[f]) : '' }
   }
 }
 export function ptRowPass_(filter, sec, it) {
@@ -91,7 +107,7 @@ export function ptSortItems_(items, sortKey, sortDir) {
   const arr = items.map((it, i) => ({ it, oi: i }))
   if (!sortKey) return arr
   const f = PT_SORTKEY[sortKey]; if (!f) return arr
-  const dir = sortDir === 'desc' ? -1 : 1, num = ['dt', 'hs', 'kl', 'dgnt', 'dg'].indexOf(f) >= 0
+  const dir = sortDir === 'desc' ? -1 : 1, num = PT_SORT_NUM.indexOf(f) >= 0
   return arr.sort((a, b) => {
     const va = a.it[f], vb = b.it[f]
     if (num) return ((Number(va) || 0) - (Number(vb) || 0)) * dir
@@ -110,24 +126,32 @@ export function ptSheetSecVals_(sec, si, st) {
   sec.items.forEach(it => { dvtSet[String(it.dvt || '').trim()] = 1 })
   const mot = Object.keys(dvtSet).length <= 1
   const sumDG = sec.items.reduce((s, it) => s + ptN(it.dg), 0)
+  const sumDGCK = sec.items.reduce((s, it) => s + ptN(it._dgCK), 0)
   const dgntSet = {}; sec.items.forEach(it => { dgntSet[ptN(it.dgnt)] = 1 })
   const dk = Object.keys(dgntSet), secDgnt = (dk.length === 1 && ptN(dk[0])) ? ptN(dk[0]) : 0
   return {
     stt: PT_ROMAN[si], noidung: String(sec.t || ''), khoiluong: (st.sumKL && mot) ? btQty_(st.sumKL) : '',
-    dgnt: btMoney_(secDgnt), ttnt: btMoney_(st.ttnt), lnvnd: btMoney_(ln),
+    ttCost: btMoney_(st.ttCost), dgnt: btMoney_(secDgnt), ttnt: btMoney_(st.ttnt), lnvnd: btMoney_(ln),
     margin: st.tt ? btPct_(ln / st.tt * 100) : '', markup: st.ttnt ? btPct_(ln / st.ttnt * 100) : '',
-    dg: sec.mode === 'area' ? btMoney_(sec.up) : ((sumDG && mot) ? btMoney_(sumDG) : ''), tt: btMoney_(st.tt),
+    dg: sec.mode === 'area' ? btMoney_(sec.up) : ((sumDG && mot) ? btMoney_(sumDG) : ''),
+    dgCK: sec.mode === 'area' ? '' : ((sumDGCK && mot) ? btMoney_(sumDGCK) : ''), tt: btMoney_(st.tt),
   }
 }
+const btNum_ = v => (v == null || v === '' ? '' : String(v).replace('.', ','))
 /* Ô dòng công tác của bảng tính (ptSheetGrid_, phần v); it đã qua ptSecTotals */
 export function ptSheetItemVals_(sec, it, pos) {
   const isItem = sec.mode === 'item', tt = it._tt, ttnt = it._ttnt, l = isItem ? (tt - ttnt) : 0
+  const anh = ptInfoImgsRaw_({ anh: it.anh })
   return {
-    stt: String(pos + 1), noidung: String(it.n || ''), dvt: String(it.dvt || ''),
-    dientich: it.dt == null || it.dt === '' ? '' : btQty_(ptN(it.dt)), heso: it.hs == null || it.hs === '' ? '' : String(it.hs).replace('.', ','),
-    khoiluong: btQty_(it._kl), dgnt: btMoney_(it.dgnt), ttnt: isItem ? btMoney_(ttnt) : '', lnvnd: isItem ? btMoney_(l) : '',
-    margin: (isItem && tt) ? btPct_(l / tt * 100) : '', markup: (isItem && ttnt) ? btPct_(l / ttnt * 100) : '',
-    dg: btMoney_(it.dg), tt: isItem ? btMoney_(tt) : '', ghichu: String(it.gc || ''),
+    stt: String(pos + 1), maBanVe: String(it.maBanVe || ''), dongSP: String(sec.t || '').split('\n')[0], maSP: String(it.maSP || ''),
+    noidung: String(it.n || ''), moTa: ptMoTaHien_(it.moTa), ncc: String(it.ncc || ''), hinhAnh: anh.length ? (anh.length + ' ảnh') : '', dvt: String(it.dvt || ''),
+    dimL: btNum_(it.cd), dimB: btNum_(it.cr), dimH: btNum_(it.cc), heso: btNum_(it.hs),
+    khoiluong: btQty_(it._kl), giaNCC: isItem ? btMoney_(it.giaNCC) : '', ttCost: isItem ? btMoney_(it._ttCost) : '',
+    ckNT: isItem ? btNum_(it.ckNT) : '', dgnt: btMoney_(it.dgnt), ttnt: isItem ? btMoney_(ttnt) : '',
+    mkPct: isItem ? btPct_(ptMkPct_(it)) : '', dg: btMoney_(it.dg), ckKH: isItem ? btNum_(it.ckKH) : '',
+    dgCK: isItem ? btMoney_(it._dgCK) : '', tt: isItem ? btMoney_(tt) : '',
+    markup: (isItem && ttnt) ? btPct_(l / ttnt * 100) : '', margin: (isItem && tt) ? btPct_(l / tt * 100) : '',
+    lnvnd: isItem ? btMoney_(l) : '', trangThai: String(it.trangThai || ''), ghichu: String(it.gc || ''),
   }
 }
 // Ô này sửa được không (ptSheetSua_): trả tên trường hoặc null. m = {k:'sec'|'it', si}
@@ -136,10 +160,10 @@ export function ptSheetSua_(phanTho, m, key) {
   if (m.k === 'sec') { if (key === 'noidung') return 't'; if (key === 'dg' && sec.mode === 'area') return 'up'; return null }
   const f = PT_CELL_F[key]; if (!f) return null
   if (f === 'n') return f
-  if (f === 'lnPct') return sec.mode === 'item' ? f : null
   return ptCanEditF_(sec, f) ? f : null
 }
-export const PT_NOI_BO = { dgnt: 1, ttnt: 1, lnvnd: 1, margin: 1, markup: 1 }
+// cột chỉ nội bộ (giá vốn, lợi nhuận) - theo cột "Ẩn trong xuất báo giá" của file mẫu
+export const PT_NOI_BO = { giaNCC: 1, ttCost: 1, ckNT: 1, dgnt: 1, ttnt: 1, mkPct: 1, lnvnd: 1, margin: 1, markup: 1 }
 
 /* ═══ THÔNG TIN CÔNG TÁC (panel chi tiết) ═══ PT_INFO dựng sẵn trong code là {} (phantho.js:1739) */
 export const PT_INFO = {}

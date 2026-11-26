@@ -42,7 +42,7 @@ function ctFormRead_(form) {
     ncc: v('ncc'), dvt: v('dvt'), kl: num('kl'), dt: num('dt'), hs: num('hs'),
     dgnt: ptMoneyN_(v('dgnt')), dg: ptMoneyN_(v('dg')),
     gc: v('gc'), thongSo: ctGrpText_(form.grps).trim(), phamVi: v('phamVi'), linkTaiLieu: v('linkTaiLieu'), hinhAnh: anh,
-    thuTu: ctThuTuIn_(d.thuTu) }
+    thuTu: ctThuTuIn_(d.thuTu), maSP: v('maSP') }
 }
 
 export default function ImportPt() {

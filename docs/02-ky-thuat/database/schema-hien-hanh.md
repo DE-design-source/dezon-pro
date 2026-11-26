@@ -740,6 +740,7 @@ Thư viện công tác của công ty. 217 dòng.
 | `supplier_name` | text | có |  |
 | `is_favorite` | boolean | không | false |
 | `takeoff_section` | text | có |  |
+| `product_code` | text | có |  |
 
 ### `work_item_histories` (`cong_tac_history`)
 

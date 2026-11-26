@@ -106,7 +106,7 @@ var (
 	ctLoaiByLabel = ctLabelMap(ctImportLoai)
 	ctModeByLabel = ctLabelMap(ctImportMode)
 	ctColByHeader = func() map[string]string {
-		m := map[string]string{ctKey("Thứ tự"): "thuTu"} // cột tuỳ chọn, file mẫu không có
+		m := map[string]string{ctKey("Thứ tự"): "thuTu", ctKey("Mã sản phẩm"): "maSP"} // cột tuỳ chọn, file mẫu không có
 		for _, c := range ctImportCols {
 			m[ctKey(c[0])] = c[1]
 		}
@@ -238,6 +238,10 @@ func ctImportRows(sr []qscore.SheetRow) (*omap.Map, error) {
 			} else {
 				msgs = append(msgs, "Thứ tự '"+v+"' phải là số nguyên không âm")
 			}
+		}
+		// cột "Mã sản phẩm" (tuỳ chọn, migration 0055): chỉ thêm khoá khi file có cột này
+		if i := idx("maSP"); i >= 0 {
+			o.Set("maSP", cellStr(r, i))
 		}
 		if jsval.S(o.Val("hangMuc")) == "" {
 			msgs = append(msgs, "Thiếu Hạng mục")

@@ -1286,6 +1286,7 @@ Thư viện công tác / đơn giá phần thô theo công ty. 217 dòng.
 | `supplier_name` | `nha_cung_cap` | text | có |  |  | Contractor / supplier name |  |
 | `is_favorite` | `yeu_thich` | boolean | không | false |  | Marked as favourite for the company | **Theo công ty**: Không theo user. |
 | `takeoff_section` | `de_muc` | text | có |  |  | Pinned take-off section code: empty = auto-detect from the category name, '0' = rough-work section (3.1) only, e.g. '3.2.2' = also shown under that section |  |
+| `product_code` | `ma_sp` | text | có |  |  | Product / item code shown in the "Mã sản phẩm" column of the rough-work table (e.g. KSHT); NULL = not entered (migration 0055) |
 
 ## `work_item_histories` (`cong_tac_history`)
 

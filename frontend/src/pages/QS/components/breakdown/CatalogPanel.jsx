@@ -410,7 +410,7 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
   )
 
   return (
-    <div className={`qs-card qs-bd-catalog${popOpen ? ' pop-open' : ''}`} style={{ width }}>
+    <div className={`qs-card qs-bd-catalog${(isPT ? ptSide : popOpen) ? ' pop-open' : ''}`} style={{ width }}>
       <div className="qs-bd-catalog-head">
         <span className="qs-bd-badge qs-bd-badge-pill" title={isPT ? ptCount : undefined}>{isPT ? ((String(ptCount || '').match(/^\d+/) || ['0'])[0] + ' công tác') : countText}</span>
         {isPT && (

@@ -38,7 +38,7 @@ export function PtColsModule() {
   return (
     <div className="qs-bd-strip qs-bd-colmod">
       {PT_COLS.map(c => (
-        <button key={c[0]} className={`qs-bd-strip-chip qs-colchip${ui.cols[c[0]] ? ' on' : ''}`} aria-pressed={!!ui.cols[c[0]]}
+        <button key={c[0]} className={`qs-bd-strip-chip qs-colchip${ui.cols[c[0]] ? ' on' : ''}${PT_VON_DO[c[0]] ? ' vondo' : ''}`} aria-pressed={!!ui.cols[c[0]]}
           onClick={() => setPtUi(s => ({ cols: { ...s.cols, [c[0]]: !s.cols[c[0]] } }))}>{c[1]}</button>
       ))}
       <span className="qs-colchip-sep" aria-hidden="true" />
@@ -78,6 +78,9 @@ export function PtColsModule() {
     </div>
   )
 }
+
+/* Chip giá vốn tô đỏ (Giá cost · Thành tiền giá cost · CK nhà thầu · Giá đại lý · Thành tiền giá đại lý - MarkUp 2026-11-26) */
+const PT_VON_DO = { giaNCC: 1, ttCost: 1, ckNT: 1, dgnt: 1, ttnt: 1 }
 
 function Tag({ icon, cls, title, children }) { return <span className={`qs-tk-quicktag${cls ? ' ' + cls : ''}`} title={title}><Icon name={icon} size={11} /> {children}</span> }
 

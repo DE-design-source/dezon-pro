@@ -37,7 +37,7 @@ function initForm(c) {
     ten: s_(c.ten), hangMuc: s_(c.hangMuc), deMuc: s_(c.deMuc), maNhom: s_(c.maNhom), loai: ptLoaiGop_(c.loai), ncc: s_(c.ncc), dvt: s_(c.dvt),
     mode: c.mode || 'item', kl: s_(c.kl), dt: s_(c.dt), hs: s_(c.hs),
     dg: dg ? money(dg) : '', ck: ck === '' ? '' : String(ck), dgnt: dgnt ? money(dgnt) : '',
-    gc: s_(c.gc), phamVi: s_(c.phamVi), linkTaiLieu: s_(c.linkTaiLieu), hinhAnh: s_(c.hinhAnh), thuTu: s_(c.thuTu),
+    gc: s_(c.gc), phamVi: s_(c.phamVi), linkTaiLieu: s_(c.linkTaiLieu), hinhAnh: s_(c.hinhAnh), thuTu: s_(c.thuTu), maSP: s_(c.maSP),
   }
   return giaSync(f, '')   // ctFormInit_ -> ctModeSync_ -> ctGiaSync_(pre,'')
 }
@@ -166,7 +166,7 @@ export default function CtEditModal({ ctId, onClose, onSaved }) {
       ncc: f.ncc.trim(), dvt: f.dvt.trim(), kl: num(f.kl), dt: num(f.dt), hs: num(f.hs),
       dgnt: ptMoneyN_(f.dgnt.trim()), dg: ptMoneyN_(f.dg.trim()),
       gc: f.gc.trim(), thongSo: ctGrpText_(grps).trim(), phamVi: f.phamVi.trim(), linkTaiLieu: f.linkTaiLieu.trim(), hinhAnh: f.hinhAnh.trim(),
-      thuTu: ctThuTuIn_(f.thuTu),
+      thuTu: ctThuTuIn_(f.thuTu), maSP: (f.maSP || '').trim(),
     }
   }
   async function save() {
@@ -242,6 +242,7 @@ export default function CtEditModal({ ctId, onClose, onSaved }) {
                       <label htmlFor="qsptctmthuTu" title="Thư viện sắp công tác theo số này trong cùng loại báo giá (nhỏ đứng trước)">Thứ tự</label>
                       <input id="qsptctmthuTu" type="number" min="0" step="1" value={f.thuTu} placeholder="0" onChange={e => set('thuTu', e.target.value)} />
                     </div>
+                    {Fld({ span: 5, k: 'maSP', lbl: 'Mã sản phẩm', ph: 'VD: KSHT' })}
                     {Fld({ span: 6, k: 'dvt', lbl: 'Đơn vị tính', ph: 'VD: m · m2 · tim · gói', req: 1, list: 'qspt-dl-dvt' })}
                   </div>
                   <datalist id="qspt-dl-hm">{hmList.map(v => <option key={v} value={v} />)}</datalist>

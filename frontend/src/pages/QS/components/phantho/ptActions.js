@@ -1,5 +1,5 @@
 /* Thao tác dữ liệu của bảng Phần thô (projData.phanTho / ptVat) - port PUB/phantho.js, mỗi hàm giữ đúng chữ báo của bản gốc.
-   Bảng là MẢNG các hạng mục {t, mode, loai, note, up, items:[{n, dvt, kl, dt, hs, dg, dgnt, lnPct, gc}]} lưu qua setProjData
+   Bảng là MẢNG các hạng mục {t, mode, loai, note, up, items:[{n, dvt, kl, dt, hs, cd, cr, cc, giaNCC, ckNT, dg, dgnt, mkPct, ckKH, ncc, anh, maBanVe, maSP, trangThai, gc}]} lưu qua setProjData
    (hàng đợi 1,2 s) + bản dự phòng localStorage pt_<maDA> như ptPersist. Mỗi lần sửa: chép mảng -> sửa bản chép bằng hàm lib
    (ptEdit / ptAddToSec_ ...) -> ghi lại, để store đổi tham chiếu và các tab khác (Bảng điều khiển, Chi phí, Báo giá) tính lại.
    Nguồn: ptAddToSec_ 1662-1677 · ptApplyMau 1679-1689 · ptAddFromLib 1690-1716 · dtSetIn / dtResetIn / dtApply / dtRemove 379-468
@@ -86,6 +86,24 @@ export function ptAddToSec(tsec) {
   const added = libAddToSec(arr, tsec, ptOvrAll_())
   ptPersist(arr)
   toast(added ? ('Đã thêm ' + added + ' công tác của "' + String(tsec.t).split('\n')[0] + '"') : 'Nhóm này đã có đủ trong bảng')
+}
+/* Thêm các công tác đã tick ở hộp chọn của nhóm (MarkUp 2026-11-26): picks = [{a, sl}], sl = số lượng
+   (nhóm "khối lượng × đơn giá" -> Khối lượng; nhóm theo diện tích -> Diện tích); sl trống giữ giá trị mẫu */
+export function ptAddPicked(tsec, picks) {
+  if (!tsec || !picks || !picks.length) return
+  if (!needCur_()) return
+  const arr = clone(ptNow().phanTho), ovr = ptOvrAll_()
+  let sec = ptFindSec_(arr, tsec)
+  if (!sec) { sec = ptNewSec_(tsec); arr.push(sec) }
+  picks.forEach(p => {
+    const it = ptMakeItem_(tsec, p.a, ovr)
+    const sl = ptN(p.sl)
+    if (p.sl !== '' && p.sl != null && sl > 0) { if (tsec.mode === 'item') it.kl = sl; else if (tsec.mode === 'area' || tsec.mode === 'area0') it.dt = sl }
+    sec.items.push(it)
+  })
+  setPtUi({ newRow: { si: arr.indexOf(sec), ii: sec.items.length - 1, t: Date.now() } })
+  ptPersist(arr)
+  toast('Đã thêm ' + picks.length + ' công tác vào "' + String(tsec.t).split('\n')[0] + '"')
 }
 // Lấy nguyên 1 bộ báo giá mẫu (khái toán sơ bộ) vào bảng
 export async function ptApplyMau(m, tpl) {
@@ -180,7 +198,7 @@ export function ptAddItem(si) {
 export function ptDupItem(si, ii) {
   const arr = clone(ptNow().phanTho); const sec = arr[si]; if (!sec || !sec.items[ii]) return
   const ban = JSON.parse(JSON.stringify(sec.items[ii]))
-  ;['_kl', '_tt', '_ttnt'].forEach(k => { delete ban[k] })
+  ;['_kl', '_tt', '_ttnt', '_dgCK', '_ttCost'].forEach(k => { delete ban[k] })
   sec.items.splice(ii + 1, 0, ban); ptPersist(arr)
   toast('Đã nhân bản dòng')
 }
@@ -189,7 +207,7 @@ export function ptDupMany(list) {
   const arr = clone(ptNow().phanTho)
   list.slice().sort((a, b) => b.si - a.si || b.ii - a.ii).forEach(q => {
     const sec = arr[q.si]; if (!sec || !sec.items[q.ii]) return
-    const ban = JSON.parse(JSON.stringify(sec.items[q.ii])); ['_kl', '_tt', '_ttnt'].forEach(k => { delete ban[k] })
+    const ban = JSON.parse(JSON.stringify(sec.items[q.ii])); ['_kl', '_tt', '_ttnt', '_dgCK', '_ttCost'].forEach(k => { delete ban[k] })
     sec.items.splice(q.ii + 1, 0, ban)
   })
   ptPersist(arr); toast('Đã nhân bản dòng')
@@ -227,7 +245,7 @@ export function ptMoveItem(fs, fi, ts, ti, before) {
   if (ti == null || ti < 0 || ti > B.items.length) ti = B.items.length
   // sang hạng mục khác kiểu -> bù các trường còn thiếu để không mất ô nhập
   if (A.mode !== B.mode) { const d = ptBlankItem_(B); Object.keys(d).forEach(k => { if (it[k] == null || it[k] === '') it[k] = d[k] }) }
-  ;['_kl', '_tt', '_ttnt'].forEach(k => { delete it[k] })
+  ;['_kl', '_tt', '_ttnt', '_dgCK', '_ttCost'].forEach(k => { delete it[k] })
   B.items.splice(before ? ti : ti + 1, 0, it)
   ptPersist(arr)
   if (fs !== ts) toast('Đã chuyển sang "' + String(B.t || '').split('\n')[0] + '"')

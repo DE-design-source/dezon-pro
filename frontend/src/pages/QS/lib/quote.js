@@ -10,7 +10,7 @@
 import { tkNum_, ptN } from './format.js'
 import { ttBan_ } from './calc.js'
 import { nodeName } from './tree.js'
-import { ptSecTotals, ptComputeAll } from './phantho.js'
+import { ptSecTotals, ptComputeAll, ptMkPct_ } from './phantho.js'
 
 /* ===== PHẠM VI XUẤT ===== */
 // Phần thô đếm theo bảng ước tính riêng của nó (không nằm trong lines)
@@ -45,7 +45,12 @@ export function bgPTSecs_(ctx){
     return { ten:String(sec.t||'Hạng mục').split('\n')[0], tt:st.tt,
       items:(sec.items||[]).map(function(it){
         return { n:String(it.n||'').split('\n')[0]||String(it.n||''), dvt:it.dvt||'', kl:it._kl,
-          dg:ptN(it.dg), tt:it._tt, dgnt:ptN(it.dgnt), ttnt:it._ttnt, gc:it.gc||'' };
+          // báo giá in đơn giá SAU chiết khấu khách (khớp thành tiền _tt); dòng không phải item giữ dg
+          dg:(it._dgCK!=null?it._dgCK:ptN(it.dg)), tt:it._tt, dgnt:ptN(it.dgnt), ttnt:it._ttnt, gc:it.gc||'',
+          // các cột khác của bảng Phần thô cho chip cột riêng của trang Phần thô (bgCfg.colPT)
+          dgGoc:ptN(it.dg), moTa:it.moTa||'', maBanVe:it.maBanVe||'', maSP:it.maSP||'', ncc:it.ncc||'', anh:it.anh||'',
+          cd:it.cd, cr:it.cr, cc:it.cc, hs:it.hs, giaNCC:ptN(it.giaNCC), ttCost:it._ttCost, ckNT:it.ckNT, mkPct:ptMkPct_(it),
+          ckKH:it.ckKH, trangThai:it.trangThai||'', dongSP:String(sec.t||'').split('\n')[0] };
       }) };
   }).filter(function(x){ return x.items.length; });
 }

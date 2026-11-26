@@ -7,16 +7,16 @@ import { ctSecDeMuc_ } from '../breakdown/catalog/catalogModel'
 import { money, ptQty, ptR0 } from '../../lib/format.js'
 import { nodeName } from '../../lib/tree.js'
 import {
-  PT_LOAI, PT_MAU, DT_BO, ptSecsOfLoai_, ptLoaiCount_, ptLibDg_, ptDaCo_, ctOf_, dtCalc_, dtApplied_, dtTien_,
+  PT_LOAI, PT_MAU, DT_BO, ptSecsOfLoai_, ptLoaiCount_, ptLibDg_, ptDaCo_, ptVal_, ctOf_, dtCalc_, dtApplied_, dtTien_,
   ptNccList_, ptNccKey_, ptSecItemsNcc_, PT_NCC_MAC_DINH,
 } from '../../lib/phantho.js'
 import { useQsStore } from '../../state/store'
 import { qsToast as toast } from '../common/dialogs'
-import { ptInfo_, ptLibCount_ } from './ptModel'
+import { ptInfo_, ptLibCount_, ctGrpParse_ } from './ptModel'
 import { usePtUi, setPtUi, ptOvrAll_, ptInfoUser_ } from './ptState'
 import { usePtTemplate, usePhanTho } from './ptHooks'
 import FilterPopover from '../breakdown/FilterPopover'
-import { ptAddToSec, ptAddFromLib, ptApplyMau, dtSetIn, dtResetIn, dtApply, dtRemove, dtValsOf, ctFavToggle } from './ptActions'
+import { ptAddToSec, ptAddPicked, ptAddFromLib, ptApplyMau, dtSetIn, dtResetIn, dtApply, dtRemove, dtValsOf, ctFavToggle } from './ptActions'
 import './phantho.css'
 
 /* Panel trái của Phần thô (port renderPTLibrary / ptMselPop_ / ptSetContractor / ptLibToggle / dtPanel_ / ptLibDragStart_,
@@ -301,6 +301,7 @@ export function PtLibrary() {
   const favOnly = usePtUi(s => s.favOnly)
   const ncc = loai === 'dt_vattu' ? '' : ncc0 // 2.2 Vật tư lọc theo hạng mục vật tư, không theo nhà thầu
   const [dragK, setDragK] = useState('')
+  const [pick, setPick] = useState(null)   // hộp chọn công tác của nhóm: {sec, el}
   const mroot = useMroot()
   const secs = ptSecsOfLoai_(tpl, loai)
   const meta = PT_LOAI.filter(x => x[0] === loai)[0] || PT_LOAI[0]
@@ -355,7 +356,7 @@ export function PtLibrary() {
               <span className={`qspt-shn${nDaCo ? ' on' : ''}`} title={nDaCo ? ('Đã thêm ' + nDaCo + '/' + sec.items.length + ' công tác') : (sec.items.length + ' công tác')}>
                 {nDaCo ? (nDaCo + '/' + sec.items.length) : sec.items.length}
               </span>
-              {sec.items.length > 0 && <button className="qspt-secadd" title={ncc ? ('Thêm cả nhóm (công tác của ' + ncc + ') vào bảng') : 'Thêm cả nhóm vào bảng'} onClick={e => { e.stopPropagation(); ptAddToSec(sec) }}><QsIcon name="plus" size={14} /></button>}
+              {sec.items.length > 0 && <button className={'qspt-secadd' + (pick && pick.sec.t === sec.t ? ' on' : '')} title="Chọn công tác (tick + số lượng) hoặc thêm cả nhóm vào bảng" onClick={e => { e.stopPropagation(); const el = e.currentTarget; setPick(p => (p && p.sec.t === sec.t ? null : { sec, el })) }}><QsIcon name="plus" size={14} /></button>}
             </div>
             {!col && loai === 'dt_vattu' && vtCat && !shown.length && (
               <div className="qspt-nccempty">Nhóm này không có vật tư "{(VT_HANG_MUC.find(c => c[0] === vtCat) || [])[1]}"</div>
@@ -373,6 +374,8 @@ export function PtLibrary() {
                   const da = ptDaCo_(sec, a, phanTho)
                   const gc = (sec.mode === 'none') ? (a[2] || '') : (a[4] || '')
                   const ctr = ctOf_(a)
+                  /* việc con (Thông số kỹ thuật của công tác, vd Prelim - MarkUp 2026-11-26): chip dưới tên, hiện 3 việc đầu + "+N" */
+                  const viec = ctr && ctr.thongSo ? ctGrpParse_(ctr.thongSo).flatMap(g => g.rows.map(r => (r.k ? r.k + ': ' + r.v : r.v))).filter(Boolean) : []
                   const k = si + ':' + ii
                   return (
                     <div key={ii} className={`qspt-it${on ? ' on' : ''}${da ? ' da' : ''}${dragK === k ? ' dragging' : ''}`}
@@ -388,6 +391,12 @@ export function PtLibrary() {
                         <span className="qspt-it-dg">{dg ? (money(dg) + ' đ') : '—'}</span>
                         {da && <span className="qspt-it-da" title="Công tác này đã có trong bảng">✓ đã thêm</span>}
                       </div>
+                      {viec.length > 0 && (
+                        <div className="qspt-it-chips" title={viec.join('\n')}>
+                          {viec.slice(0, 3).map((v, i) => <span key={i} className="qspt-it-chip">{v}</span>)}
+                          {viec.length > 3 && <span className="qspt-it-chip more">+{viec.length - 3} việc</span>}
+                        </div>
+                      )}
                       <div className="qspt-it-act">
                         {ctr && (
                           <button className={`qspt-it-fav${ctr.yeuThich ? ' on' : ''}`} title={ctr.yeuThich ? 'Bỏ khỏi công tác yêu thích' : 'Thêm vào công tác yêu thích'}
@@ -403,7 +412,55 @@ export function PtLibrary() {
           </div>
         )
       })}
+      {pick && <SecPick sec={pick.sec} anchor={pick.el} phanTho={phanTho} ovr={ovr} onClose={() => setPick(null)} />}
     </div>
+  )
+}
+
+/* Hộp chọn công tác của 1 nhóm (nút + ở tên nhóm - MarkUp 2026-11-26): tick từng công tác + số lượng rồi "Thêm N đã chọn",
+   hoặc "Thêm cả nhóm" (combo, như trước: bỏ qua công tác đã có trong bảng) */
+function SecPick({ sec, anchor, phanTho, ovr, onClose }) {
+  const [sel, setSel] = useState({})   // ii -> số lượng (chuỗi); có khoá = đã tick
+  const qtyMode = sec.mode === 'item' ? 'Khối lượng' : ((sec.mode === 'area' || sec.mode === 'area0') ? 'Diện tích' : '')
+  const goc = a => (sec.mode === 'item' ? ptVal_(sec, a, 'kl', ovr) : ((sec.mode === 'area' || sec.mode === 'area0') ? ptVal_(sec, a, 'dt', ovr) : ''))
+  const ks = Object.keys(sel)
+  const tick = (ii, a) => setSel(s => { const n = { ...s }; if (ii in n) delete n[ii]; else n[ii] = String(goc(a) || (sec.mode === 'item' ? 1 : '')); return n })
+  const allOn = sec.items.length > 0 && ks.length === sec.items.length
+  const tickAll = () => setSel(allOn ? {} : Object.fromEntries(sec.items.map((a, ii) => [ii, String(goc(a) || (sec.mode === 'item' ? 1 : ''))])))
+  const them = () => { ptAddPicked(sec, ks.map(k => ({ a: sec.items[k], sl: sel[k] }))); onClose() }
+  return (
+    <Pop anchor={anchor} width={380} onClose={onClose} className="qspt-pick" keepOpenOn=".qspt-secadd">
+      <PopHead title={'Chọn công tác · ' + String(sec.t).split('\n')[0]} onClose={onClose} />
+      <div className="qspt-pick-hd">
+        <label><input type="checkbox" checked={allOn} onChange={tickAll} /> Chọn tất cả ({sec.items.length})</label>
+        {qtyMode && <span>{qtyMode}</span>}
+      </div>
+      <div className="qspt-pick-ls">
+        {sec.items.map((a, ii) => {
+          const on = ii in sel, da = ptDaCo_(sec, a, phanTho)
+          return (
+            <div key={ii} className={'qspt-pick-it' + (on ? ' on' : '')}>
+              <label>
+                <input type="checkbox" checked={on} onChange={() => tick(ii, a)} />
+                <span className="nm" title={String(a[0])}>{String(a[0]).split('\n')[0]}</span>
+                {da && <em title="Đã có trong bảng - thêm nữa sẽ thành dòng mới">đã thêm</em>}
+              </label>
+              {qtyMode && (
+                <span className="sl">
+                  <input type="number" min="0" step="any" disabled={!on} value={on ? sel[ii] : ''} placeholder={String(goc(a) || '')}
+                    onChange={e => { const v = e.target.value; setSel(s => ({ ...s, [ii]: v })) }} />
+                  <i>{a[1] || ''}</i>
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="qspt-pick-ft">
+        <button type="button" className="qs-modal-btn" onClick={() => { ptAddToSec(sec); onClose() }} title="Thêm mọi công tác của nhóm (bỏ qua công tác đã có trong bảng)">Thêm cả nhóm</button>
+        <button type="button" className="qs-modal-btn primary" disabled={!ks.length} onClick={them}>Thêm {ks.length || ''} đã chọn</button>
+      </div>
+    </Pop>
   )
 }
 

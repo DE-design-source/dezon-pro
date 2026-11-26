@@ -141,23 +141,29 @@ export function ptVal_(sec,a,f,ovr){
   return ptBase_(sec,a,f);
 }
 // Trường nào sửa được ở hạng mục này (đơn giá của nhóm 'area' là giá chung -> không sửa lẻ)
+var PT_TXT_F=['dvt','gc','maBanVe','maSP','ncc','trangThai','moTa'];
+var PT_GIA_F=['kl','dt','hs','cd','cr','cc','dg','dgnt','giaNCC','ckNT','mkPct','ckKH'];
 export function ptCanEditF_(sec,f){
-  if(ctSecOf_(sec)){
-    if(f==='dvt'||f==='gc') return true;
-    if(sec.mode==='item') return ['kl','dt','hs','dg','dgnt'].indexOf(f)>=0;
-    if(sec.mode==='area'||sec.mode==='area0') return ['dt','hs','dg'].indexOf(f)>=0;
-    return false;
-  }
-  if(f==='dvt'||f==='gc') return true;
-  if(sec.mode==='item') return ['kl','dt','hs','dg','dgnt'].indexOf(f)>=0;
-  if(sec.mode==='area'||sec.mode==='area0') return ['dt','hs'].indexOf(f)>=0;
+  if(PT_TXT_F.indexOf(f)>=0) return true;
+  if(sec.mode==='item') return PT_GIA_F.indexOf(f)>=0;
+  if(sec.mode==='area'||sec.mode==='area0') return ['dt','hs','cd','cr','cc'].concat(ctSecOf_(sec)?['dg']:[]).indexOf(f)>=0;
   return false;
 }
+// Cột Mô tả = các việc trong Thông số kỹ thuật của công tác (bỏ dòng tiêu đề "## ..."), mỗi việc 1 dòng (MarkUp 2026-11-26)
+// Mô tả hiện đánh số "1. 2. ..." mỗi dòng; lưu thì bỏ số (người dùng gõ thêm dòng không cần tự đánh số)
+export function ptMoTaHien_(t){ return String(t||'').split(/\r?\n/).filter(function(l){ return l.trim(); }).map(function(l,i){ return (i+1)+'. '+l.trim(); }).join('\n'); }
+export function ptMoTaLuu_(t){ return String(t||'').split(/\r?\n/).map(function(l){ return l.replace(/^\s*\d+\s*[.)]\s*/,'').trim(); }).filter(Boolean).join('\n'); }
+export function ptMoTaTu_(ts){ return String(ts||'').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l && l.indexOf('##')!==0; }).join('\n'); }
 // Dựng 1 dòng item để thêm vào bảng khái toán - luôn lấy giá ĐANG dùng
 export function ptMakeItem_(sec,a,ovr){
-  if(sec.mode==='item') return {n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),kl:ptVal_(sec,a,'kl',ovr),dg:ptVal_(sec,a,'dg',ovr),gc:ptVal_(sec,a,'gc',ovr),dgnt:ptVal_(sec,a,'dgnt',ovr)};
-  if(sec.mode==='area'||sec.mode==='area0') return {n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),dt:ptVal_(sec,a,'dt',ovr),hs:ptVal_(sec,a,'hs',ovr),gc:ptVal_(sec,a,'gc',ovr)};
-  return {n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),gc:ptVal_(sec,a,'gc',ovr)};
+  var it;
+  if(sec.mode==='item') it={n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),kl:ptVal_(sec,a,'kl',ovr),dg:ptVal_(sec,a,'dg',ovr),gc:ptVal_(sec,a,'gc',ovr),dgnt:ptVal_(sec,a,'dgnt',ovr)};
+  else if(sec.mode==='area'||sec.mode==='area0') it={n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),dt:ptVal_(sec,a,'dt',ovr),hs:ptVal_(sec,a,'hs',ovr),gc:ptVal_(sec,a,'gc',ovr)};
+  else it={n:a[0],dvt:ptVal_(sec,a,'dvt',ovr),gc:ptVal_(sec,a,'gc',ovr)};
+  // cột Nhà cung cấp / Hình ảnh của bảng lấy theo công tác CSDL
+  var c=ctOf_(a);
+  if(c){ if(c.ncc) it.ncc=c.ncc; if(c.hinhAnh) it.anh=c.hinhAnh; if(c.maSP) it.maSP=c.maSP; var mt=ptMoTaTu_(c.thongSo); if(mt) it.moTa=mt; }
+  return it;
 }
 // công tác đã có trong bảng của dự án đang mở chưa (so theo tên + đúng hạng mục/loại)
 export function ptDaCo_(sec,a,phanTho){
@@ -203,21 +209,39 @@ export function ptEnsureVals_(projData,cur,localPhanTho,localVat){
    mode: 'item' -> TT = KL × ĐG · 'area' -> KL = DT × HS, TT mục = ΣKL × up · 'area0' / 'none' -> "Chưa bao gồm" (TT = 0)
    Ghi chú: như bản gốc, ptSecTotals GÁN it._kl / it._tt / it._ttnt lên từng dòng. */
 export function ptHs_(it){ var v=it&&it.hs; return (v===''||v==null)?1:ptN(v); }
-export function ptAutoKL_(it){ return ptN(it&&it.dt)>0; }
+/* Kích thước L × B × H (cd / cr / cc, MarkUp 2026-11-26): ô trống hoặc 0 không nhân. Dòng cũ chưa có kích thước dùng Diện tích (dt) như trước */
+export function ptDims_(it){ return ['cd','cr','cc'].map(function(f){ return ptN(it&&it[f]); }).filter(function(v){ return v>0; }); }
+export function ptAutoKL_(it){ return ptDims_(it).length>0 || ptN(it&&it.dt)>0; }
+export function ptKlTu_(it){
+  var d=ptDims_(it);
+  var base=d.length ? d.reduce(function(a,v){ return a*v; },1) : ptN(it&&it.dt);
+  return ptR2(base*ptHs_(it));
+}
+/* Giá (theo file mẫu Prelim): Giá đại lý (dgnt) = Giá cost (giaNCC) × (1 − CK nhà thầu); Đơn giá (dg) = Giá đại lý × (1 + %LN/giá vốn);
+   Đơn giá sau CK = Đơn giá × (1 − CK khách); %LN/giá vốn chưa lưu (dòng cũ) thì suy từ dg và dgnt */
+export function ptDgntTuCost_(it){ return ptR0(ptN(it.giaNCC)*(1-ptN(it.ckNT)/100)); }
+export function ptDgCK_(it){ return ptR0(ptN(it.dg)*(1-ptN(it.ckKH)/100)); }
+export function ptMkPct_(it){
+  if(it && it.mkPct!=null && it.mkPct!=='') return ptN(it.mkPct);
+  var nt=ptN(it&&it.dgnt); return nt?((ptN(it.dg)-nt)/nt*100):0;
+}
 export function ptSecTotals(sec){
-  var sumKL=0, tt=0, ttnt=0;
+  var sumKL=0, tt=0, ttnt=0, ttCost=0;
   sec.items.forEach(function(it){
     var kl;
-    if(sec.mode==='area'||sec.mode==='area0'){ kl=ptR2(ptN(it.dt)*ptHs_(it)); }
-    else if(ptAutoKL_(it)){ kl=ptR2(ptN(it.dt)*ptHs_(it)); }    // dòng item: có diện tích -> khối lượng tự tính
+    if(sec.mode==='area'||sec.mode==='area0'||ptAutoKL_(it)){ kl=ptKlTu_(it); }    // dòng item: có kích thước / diện tích -> khối lượng tự tính
     else { kl=ptN(it.kl); }
     it._kl=kl; sumKL+=kl;
-    if(sec.mode==='item'){ it._tt=ptR0(kl*ptN(it.dg)); tt+=it._tt; it._ttnt=ptR0(kl*ptN(it.dgnt)); ttnt+=it._ttnt; }
-    else { it._tt=null; it._ttnt=null; }
+    if(sec.mode==='item'){
+      it._dgCK=ptDgCK_(it);
+      it._tt=ptR0(kl*it._dgCK); tt+=it._tt; it._ttnt=ptR0(kl*ptN(it.dgnt)); ttnt+=it._ttnt;
+      it._ttCost=ptN(it.giaNCC)?ptR0(kl*ptN(it.giaNCC)):null; ttCost+=it._ttCost||0;
+    }
+    else { it._tt=null; it._ttnt=null; it._dgCK=null; it._ttCost=null; }
   });
   if(sec.mode==='area'){ tt=ptR0(sumKL*ptN(sec.up)); ttnt=0; }
   else if(sec.mode==='area0'||sec.mode==='none'){ tt=0; ttnt=0; }
-  return {sumKL:sumKL,tt:tt,ttnt:ttnt};
+  return {sumKL:sumKL,tt:tt,ttnt:ttnt,ttCost:ttCost};
 }
 export function ptComputeAll(phanTho,ptVat){
   var sections=[],grand=0,contractor=0;
@@ -238,22 +262,32 @@ export function ptDgTuLn_(dgnt,lnPct){
   return ptMround_(dgnt/(1-m),1000);
 }
 export function ptLnTuDg_(dgnt,dg){ dg=ptN(dg); return dg?((dg-ptN(dgnt))/dg*100):0; }
+/* %LN trên GIÁ VỐN (markup, file mẫu Prelim): Đơn giá = MROUND(Giá đại lý × (1 + mk), 1000) */
+export function ptDgTuMk_(dgnt,mkPct){ dgnt=ptN(dgnt); return dgnt?ptMround_(dgnt*(1+ptN(mkPct)/100),1000):0; }
+export function ptMkTuDg_(dgnt,dg){ dgnt=ptN(dgnt); return dgnt?((ptN(dg)-dgnt)/dgnt*100):0; }
 /* Sửa 1 ô của bảng (phần dữ liệu của ptEdit): sửa TẠI CHỖ phanTho; ii<0 = sửa thuộc tính của mục (vd up).
    Trả true nếu đã sửa (người gọi tự lưu projData phanTho/ptVat + vẽ lại). */
 export function ptEdit(phanTho,si,ii,f,val){
   var sec=(phanTho||[])[si]; if(!sec) return false;
-  var numF={dt:1,hs:1,kl:1,dg:1,dgnt:1,up:1,lnPct:1}, moneyF={dg:1,dgnt:1,up:1};
-  var v = moneyF[f]?ptMoneyN_(val):(numF[f]?ptN(val):val);
+  var numF={dt:1,hs:1,kl:1,dg:1,dgnt:1,up:1,lnPct:1,cd:1,cr:1,cc:1,giaNCC:1,ckNT:1,mkPct:1,ckKH:1}, moneyF={dg:1,dgnt:1,up:1,giaNCC:1};
+  // ô số để trống = xoá (L/B/H/hệ số/chiết khấu/giá cost trống khác 0)
+  var trong = (val===''||val==null) && {cd:1,cr:1,cc:1,hs:1,giaNCC:1,ckNT:1,ckKH:1,mkPct:1}[f];
+  var v = trong?'':(moneyF[f]?ptMoneyN_(val):(numF[f]?ptN(val):(f==='moTa'?ptMoTaLuu_(val):val)));
   if(ii<0){ sec[f]=v; }
   else {
     var it=sec.items[ii]; if(!it) return false;
+    var mk0=ptMkPct_(it);                 // %LN/giá vốn trước khi sửa (giữ khi đổi giá vốn)
     it[f]=v;
-    // dòng item có DT+HS -> khối lượng bám theo tích 2 ô (bỏ trống 1 ô là trả lại nhập tay)
-    if((f==='dt'||f==='hs') && sec.mode==='item'){ if(ptAutoKL_(it)) it.kl=ptR2(ptN(it.dt)*ptHs_(it)); }
-    // giữ 3 đại lượng luôn khớp nhau: giá vốn ↔ %LN ↔ giá bán
-    if(f==='lnPct')      it.dg=ptDgTuLn_(it.dgnt,v);
-    else if(f==='dg')    it.lnPct=ptR2(ptLnTuDg_(it.dgnt,v));
-    else if(f==='dgnt'){ if(ptN(it.lnPct)) it.dg=ptDgTuLn_(v,it.lnPct); else it.lnPct=ptR2(ptLnTuDg_(v,it.dg)); }
+    // dòng item có kích thước / diện tích -> khối lượng bám theo tích các ô (xoá hết là trả lại nhập tay)
+    if({dt:1,hs:1,cd:1,cr:1,cc:1}[f] && sec.mode==='item'){ if(ptAutoKL_(it)) it.kl=ptKlTu_(it); }
+    // Giá cost / CK nhà thầu -> Giá đại lý; sửa thẳng Giá đại lý khi có Giá cost -> tính lại CK nhà thầu
+    var doiVon=false;
+    if((f==='giaNCC'||f==='ckNT') && ptN(it.giaNCC)){ it.dgnt=ptDgntTuCost_(it); doiVon=true; }
+    else if(f==='dgnt'){ if(ptN(it.giaNCC)) it.ckNT=ptR2((1-ptN(v)/ptN(it.giaNCC))*100); doiVon=true; }
+    // giữ 3 đại lượng khớp nhau theo %LN trên GIÁ VỐN: giá đại lý ↔ %LN ↔ đơn giá
+    if(f==='mkPct'){ it.dg=(v==='')?it.dg:ptDgTuMk_(it.dgnt,v); delete it.lnPct; }
+    else if(f==='dg'){ it.mkPct=ptR2(ptMkTuDg_(it.dgnt,v)); delete it.lnPct; }
+    else if(doiVon && ptN(it.dgnt)){ it.mkPct=ptR2(mk0); it.dg=ptDgTuMk_(it.dgnt,mk0); delete it.lnPct; }
   }
   return true;
 }

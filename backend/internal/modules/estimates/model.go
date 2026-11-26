@@ -7,6 +7,7 @@ var ctSrc = [][2]string{
 	{"ten", "ten"}, {"dvt", "dvt"}, {"nha_cung_cap", "ncc"}, {"khoi_luong", "kl"}, {"dien_tich", "dt"},
 	{"he_so", "hs"}, {"don_gia_nha_thau", "dgnt"}, {"don_gia", "dg"}, {"ghi_chu", "gc"}, {"hinh_anh", "hinhAnh"},
 	{"thong_so", "thongSo"}, {"pham_vi", "phamVi"}, {"link_tai_lieu", "linkTaiLieu"}, {"thu_tu", "thuTu"},
+	{"ma_sp", "maSP"}, // migration 0055: mã sản phẩm (cột "Mã sản phẩm" của bảng Phần thô)
 }
 
 // ctFieldLbl = CT_FIELD_LBL (store_supa.js:1395-1401): cột -> nhãn trong lịch sử.
@@ -16,6 +17,7 @@ var ctFieldLbl = map[string]string{
 	"dien_tich": "DIỆN TÍCH", "he_so": "HỆ SỐ", "don_gia_nha_thau": "ĐƠN GIÁ NHÀ THẦU", "don_gia": "ĐƠN GIÁ",
 	"ghi_chu": "GHI CHÚ", "hinh_anh": "HÌNH ẢNH", "thong_so": "THÔNG SỐ", "pham_vi": "PHẠM VI",
 	"link_tai_lieu": "LINK TÀI LIỆU", "da_duyet": "TRẠNG THÁI DUYỆT", "yeu_thich": "YÊU THÍCH", "thu_tu": "THỨ TỰ",
+	"ma_sp": "MÃ SẢN PHẨM",
 }
 
 // ctDiffSkip: cột "ai / lúc nào" không ghi vào lịch sử (store_supa.js:1420).

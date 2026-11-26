@@ -8,7 +8,8 @@ import { PT_COLS } from './ptModel'
 
 function lsJson(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v } catch (e) { return d } }
 
-const allCols = () => { const o = {}; PT_COLS.forEach(c => { o[c[0]] = true }); return o }
+// cột mặc định mở theo file mẫu Prelim (cột 5 của PT_COLS); Tên sản phẩm luôn mở
+const allCols = () => { const o = {}; PT_COLS.forEach(c => { o[c[0]] = !!c[4] || c[0] === 'noidung' }); return o }
 
 let st = {
   contractor: '', vtCat: '', favOnly: false, sidePop: null, libCol: {}, detail: null, infoEdit: false, dtVer: 0,

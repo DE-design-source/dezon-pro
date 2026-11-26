@@ -784,7 +784,7 @@ export default function BreakdownTab() {
             onPlus={l => { mutate.updateLine(l.lineId, { soLuong: (Number(l.soLuong) || 0) + 1 }); toast('+1 số lượng: ' + l.ten) }} />
         )}
         {/* #pdPanel của Phần thô vẫn hiện khi ẩn cột trái như bản gốc (#bocGrid.nocat.detail, PUB/index.html:5786) */}
-        {isPT && <PtDetail />}
+        {isPT && <PtDetail width={catalogW} />}
         {isPT && !ptColsFold && <PtPresetDock width={catalogW} onClose={() => foldToggle_('cols')} />}
         {!isPT && !full && presetDock && <PresetDock width={catalogW} cols={colState.cols} onEdit={opts => { setPanel('cols'); startEdit(opts) }} onEndEdit={keep => (keep ? endEdit() : cancelEdit())} onClose={closeColTools} />}
         <div className="qs-bd-right">

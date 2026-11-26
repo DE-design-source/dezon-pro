@@ -1,6 +1,6 @@
 # Roadmap QS Pro
 
-> **Cập nhật:** 2026-11-24 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
+> **Cập nhật:** 2026-11-26 · **Phiên bản mới nhất:** 1.0.0 (số cuối của `package.json` trước khi gỡ app Node; chưa có changelog)
 >
 > **Backlog từ 2026-10-15:** mục 2.1 làm trên server Go (`backend/`) + module QS React (`frontend/src/pages/QS`). Mục "cần chốt nghiệp vụ" được
 > chọn phương án hợp lý nhất từ mã + quy trình QT, giả định ghi ngay trong dòng của mục đó (chủ sản phẩm có thể đổi).
@@ -249,6 +249,12 @@
 - Nhập công tác từ file (M5.1): Nhập dữ liệu > Phần thô có "Tải file mẫu" (`/mau-nhap-cong-tac.xlsx`, byte = bản cuối trong git) và "Chọn file Excel/CSV"; máy chủ Go đọc file (`POST /api/v1/work-items/import/parse`, không ghi gì) rồi đưa vào danh sách chờ, lưu bằng đường lưu công tác sẵn có; dòng lỗi ở lại kèm "Dòng N: lý do" (đúng số dòng trong file), chỉ lưu được sau khi sửa trong form (Loại báo giá / Cách tính đọc không được thì để trống, bắt chọn lại); dòng "Ghi chú:" của file mẫu bị bỏ; file hỏng báo lỗi tiếng Việt. Giả định: cột "Thứ tự" tuỳ chọn; thiếu Hạng mục là lỗi như form nhập tay; số đọc kiểu VN như form ("450.000" = 450000), số âm / chữ là lỗi; tối đa 2000 công tác mỗi file
 - Lọc thư viện theo nhà thầu (M5.2): ô "Tên nhà thầu" ở thư viện 3.1 = 4 nhà thầu cũ (H77, Decox, TTP, Unicons) ∪ nhà thầu có trong công tác của công ty, kèm số công tác theo loại báo giá đang chọn; chọn một nhà thầu thì thư viện chỉ còn công tác của nhà thầu đó (không phân biệt hoa thường / khoảng trắng), nhóm trống ghi "Nhà thầu X chưa có đơn giá cho mục này"; gợi ý ô Nhà thầu ở form nhập và hộp Cập nhật dùng cùng danh sách. Giả định: mỗi công tác gắn 1 nhà thầu với đơn giá riêng; chọn nhà thầu chỉ LỌC, không đổi giá dòng đã có trong bảng; công tác dựng sẵn (không thuộc dữ liệu công ty) không có nhà thầu nên bị ẩn khi chọn nhà thầu
 - Ô "Thứ tự" của công tác (M5.3) ở form Nhập dữ liệu > Phần thô, hộp Cập nhật công tác và cột sửa nhanh ở Danh sách SP 3.1 (số nguyên ≥ 0, chỉ công tác của công ty); thư viện sắp theo loại báo giá rồi Thứ tự như máy chủ, đổi Thứ tự thấy ngay không cần tải lại; nhóm đứng theo công tác có thứ tự nhỏ nhất. Lưu ý: sửa Thứ tự cũng đưa công tác về Chưa duyệt như mọi lần sửa
+- Thẻ công tác ở thư viện 3.1 hiện việc con (Thông số kỹ thuật) thành chip, 3 việc đầu + "+N việc"; bảng Phần thô co lại khi mở khung lọc / yêu thích / dự án mẫu (2026-11-26, chưa thử trên trình duyệt) - 🟡
+- Bảng Phần thô theo bộ cột đầy đủ của file mẫu Prelim (28 cột: Mã số bản vẽ, Dòng / Mã sản phẩm, Nhà cung cấp, Hình ảnh, L / B / H, Giá cost + CK nhà thầu -> Giá đại lý, %LN/giá vốn mục tiêu -> Đơn giá, CK khách -> Đơn giá sau CK, Markup / Margin sau CK, Trạng thái); chip mặc định mở theo file; công thức đổi sang %LN trên giá vốn (Đơn giá = Giá đại lý × (1 + %)), khối lượng = L × B × H × Hệ số (dòng cũ vẫn Diện tích × Hệ số); báo giá in đơn giá sau CK (2026-11-26, chưa thử trên trình duyệt) - 🟡
+- Công tác có ô "Mã sản phẩm" (migration 0055 `work_items.product_code`, form công tác, file nhập cột tuỳ chọn "Mã sản phẩm"); thêm vào bảng Phần thô thì mã vào cột Mã sản phẩm (2026-11-26, chưa thử trên trình duyệt) - 🟡
+- Bảng Phần thô có cột "Mô tả" (sau Tên sản phẩm, mặc định mở) = các việc trong Hạng mục công việc / Thông số của công tác, mỗi việc 1 dòng, sửa được (2026-11-26, chưa thử trên trình duyệt) - 🟡
+- Xuất báo giá: chọn "3.1 Phần thô" ở khung Bật / tắt từng cột -> chip cột riêng theo bộ cột Phần thô (`bgCfg.colPT`, mặc định Tên SP · Mô tả · ĐVT · KL · Đơn giá · Thành tiền · Ghi chú); cột giá vốn / lợi nhuận chỉ in khi xuất kèm cột nội bộ; file Excel chưa theo chip này. Chip giá vốn của bảng Phần thô tô đỏ (2026-11-26, chưa thử trên trình duyệt) - 🟡
+- Nút + ở tên nhóm thư viện 3.1 mở hộp chọn: tick từng công tác + số lượng (Khối lượng / Diện tích) rồi "Thêm N đã chọn", hoặc "Thêm cả nhóm" như cũ (2026-11-26, chưa thử trên trình duyệt) - 🟡
 
 <a id="xong-6"></a>
 #### M6 - Tờ bìa (khái toán)

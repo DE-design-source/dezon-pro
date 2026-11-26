@@ -20,6 +20,8 @@ import {
 import { API_BASE } from '../../api/http'
 import { mediaUrl } from '../../api/files'
 import { bgChu_ } from './docCss'
+import { PT_COLS } from '../phantho/ptModel'
+import { ptMoTaHien_ } from '../../lib/phantho.js'
 
 export const ROMAN_ = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV']
 
@@ -137,8 +139,9 @@ function soDong_(text, px, dam, fam, w) {
 }
 export function bgPerRows_(per, coAnh) { const v = Number(per) || 0; return v > 0 ? v : (coAnh ? 8 : 13) }
 export function bgDocAlign_(k) {
-  if (['soLuong', 'giaNCC', 'giaDaiLy', 'donGia', 'donGiaCK', 'lnVnd', 'thanhTien', 'kl', 'dg', 'tt', 'dgnt', 'ttnt'].indexOf(k) >= 0) return 'num'
-  if (['hinhAnh', 'dvt', 'chietKhau', 'lnPct', 'ckKhach', 'markup', 'margin', 'maBanVe', 'nganh'].indexOf(k) >= 0) return 'ct'
+  if (['soLuong', 'giaNCC', 'giaDaiLy', 'donGia', 'donGiaCK', 'lnVnd', 'thanhTien', 'kl', 'dg', 'tt', 'dgnt', 'ttnt',
+    'khoiluong', 'ttCost', 'dgCK', 'lnvnd', 'dimL', 'dimB', 'dimH', 'heso'].indexOf(k) >= 0) return 'num'
+  if (['hinhAnh', 'dvt', 'chietKhau', 'lnPct', 'ckKhach', 'markup', 'margin', 'maBanVe', 'nganh', 'ckNT', 'mkPct', 'ckKH'].indexOf(k) >= 0) return 'ct'
   return ''
 }
 export function bgDocCell_(l, k) {
@@ -172,30 +175,46 @@ export function bgSecRow_(cols, nhan, tien, keyTT) {
     + '<td class="num">' + (tien ? money(tien) : '-') + '</td>'
     + (sau > 0 ? '<td colspan="' + sau + '"></td>' : '') + '</tr>'
 }
-/* Cột bảng phần thô đi theo chip cột đang bật; giá nhà thầu chỉ in khi "xuất kèm cột nội bộ" */
-export function bgPTCols_(secs, ctx, ui) {
-  const on = {}; visCols(ui.colOrder, ui.cols, ui.nganh).forEach(function (c) { on[c[0]] = 1 })
-  const coGC = (secs || []).some(function (s) { return s.items.some(function (it) { return String(it.gc || '').trim() }) })
-  const cols = [['n', 'Nội dung công việc']]
-  cols.push(['dvt', 'ĐVT'])
-  cols.push(['kl', 'Khối lượng'])
-  const nt = bgNoiBoXuat_(ctx.bgCfg) && (on.giaNCC || on.giaDaiLy)
-  if (nt) cols.push(['dgnt', 'Đơn giá (nhà thầu)'])
-  if (nt) cols.push(['ttnt', 'Thành tiền (nhà thầu)'])
-  cols.push(['dg', 'Đơn giá'])
-  cols.push(['tt', 'Thành tiền'])
-  if (coGC) cols.push(['gc', 'Ghi chú'])
-  return cols
+/* Cột bảng phần thô: chip cột RIÊNG của trang Phần thô (bgCfg.colPT, chọn "3.1 Phần thô" ở khung Bật / tắt từng cột - MarkUp 2026-11-26),
+   theo bộ cột của bảng Phần thô (PT_COLS, bỏ STT vì trang có cột STT riêng). Chưa đặt = bộ mặc định PT_BG_MAC_DINH (không có cột giá vốn / lợi nhuận). */
+export const PT_BG_MAC_DINH = ['noidung', 'moTa', 'dvt', 'khoiluong', 'dgCK', 'tt', 'ghichu']
+export function bgColPT_(bgCfg) {
+  const m = (bgCfg || {}).colPT
+  if (m && typeof m === 'object') return m
+  const o = {}; PT_COLS.forEach(function (c) { o[c[0]] = PT_BG_MAC_DINH.indexOf(c[0]) >= 0 }); return o
 }
+// in ĐÚNG các chip đang bật, cùng tên cột với chip (MarkUp 2026-11-26 "chip chưa link"); cột nội bộ đã tắt sẵn trong bộ mặc định
+export function bgPTCols_(secs, ctx) {
+  const on = bgColPT_(ctx.bgCfg)
+  return PT_COLS.filter(function (c) { return c[0] !== 'stt' && (c[0] === 'noidung' || on[c[0]]) })
+    .map(function (c) { return [c[0], c[1]] })
+}
+const pct_ = v => (v === '' || v == null || !Number(v)) ? '' : (String(Math.round(Number(v) * 100) / 100).replace('.', ',') + '%')
+const so_ = v => (v === '' || v == null || !Number(v)) ? '' : String(v).replace('.', ',')
 export function bgPTCell_(it, k) {
   switch (k) {
-    case 'n': return '<b>' + esc(it.n || '') + '</b>'
-    case 'kl': return it.kl ? ptQty(it.kl) : ''
-    case 'dg': return it.dg ? money(it.dg) : ''
-    case 'tt': return it.tt ? money(it.tt) : '-'
+    case 'noidung': return '<b>' + esc(it.n || '') + '</b>'
+    case 'moTa': return '<span class="qx-desc">' + esc(ptMoTaHien_(it.moTa)).replace(/\n/g, '<br>') + '</span>'
+    case 'hinhAnh': return it.anh ? ('<img class="qx-img" src="' + esc(imgSrc1_(it.anh)) + '" onerror="this.style.display=\'none\'">') : ''
+    case 'dimL': return so_(it.cd)
+    case 'dimB': return so_(it.cr)
+    case 'dimH': return so_(it.cc)
+    case 'heso': return so_(it.hs)
+    case 'khoiluong': return it.kl ? ptQty(it.kl) : ''
+    case 'giaNCC': return it.giaNCC ? money(it.giaNCC) : ''
+    case 'ttCost': return it.ttCost ? money(it.ttCost) : ''
+    case 'ckNT': return pct_(it.ckNT)
     case 'dgnt': return it.dgnt ? money(it.dgnt) : ''
     case 'ttnt': return it.ttnt ? money(it.ttnt) : ''
-    case 'gc': return '<span class="qx-desc">' + esc(it.gc || '') + '</span>'
+    case 'mkPct': return pct_(it.mkPct)
+    case 'dg': return it.dgGoc ? money(it.dgGoc) : ''
+    case 'ckKH': return pct_(it.ckKH)
+    case 'dgCK': return it.dg ? money(it.dg) : ''
+    case 'tt': return it.tt ? money(it.tt) : '-'
+    case 'markup': return it.ttnt ? pct_((it.tt - it.ttnt) / it.ttnt * 100) : ''
+    case 'margin': return it.tt ? pct_((it.tt - it.ttnt) / it.tt * 100) : ''
+    case 'lnvnd': return (it.tt || it.ttnt) ? money((it.tt || 0) - (it.ttnt || 0)) : ''
+    case 'ghichu': return '<span class="qx-desc">' + esc(it.gc || '') + '</span>'
     default: return esc(it[k] == null ? '' : String(it[k]))
   }
 }
@@ -577,7 +596,7 @@ export function bgBuildPages(ctx, ui, ver, me) {
   // ===== PHẦN THÔ (3.1) - bảng ước tính riêng, không nằm trong lines =====
   const ptSecs = bgPTSecs_(ctx); let ptTong = 0
   if (ptSecs.length) {
-    const pcols = bgPTCols_(ptSecs, ctx, ui)
+    const pcols = bgPTCols_(ptSecs, ctx)
     const pcolg = bgColg_(pcols, 30, ui.bgColW); const pthead = bgTh_(pcols, true)
     const pSecRow = function (nhan, tien) { return bgSecRow_(pcols, nhan, tien, 'tt') }
     const flatP = []; const metaP = []
