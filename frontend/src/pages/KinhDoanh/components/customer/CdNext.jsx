@@ -157,6 +157,7 @@ function ApptSheet({ init, seed, focus, people, me, onClose, onSave }) {
               <button type="button" className={'ios-pill' + (open === 'end' ? ' on' : '')}>{a.end || '—'}</button>
             </div>
             {open === 'end' && <div className="ios-wheel-box"><TimeWheel value={a.end || addMin(a.start, 60) || '23:59'} onChange={v => setA(x => ({ ...x, end: v }))} /></div>}
+            {badEnd && <div className="ios-row cd-sheet-err" role="alert">Giờ kết thúc ({a.end}) phải sau giờ bắt đầu ({a.start}) - chỉnh lại giờ để Lưu được</div>}
           </div>
           <div className="ios-group">
             <div className="ios-row cd-sheet-modes">
@@ -177,6 +178,7 @@ function ApptSheet({ init, seed, focus, people, me, onClose, onSave }) {
               <ApptMembers list={a.members} people={people} onChange={m => setA(x => ({ ...x, members: m }))} />
             </div>
           </div>
+          {!ok && !badEnd && <div className="cd-sheet-err">Nhập tiêu đề, địa điểm hoặc mục tiêu để Lưu được</div>}
         </div>
       </div>
     </div>
@@ -268,8 +270,10 @@ export default function CdNext({ lead, me, interactions, people }) {
   const upcoming = planned.filter(a => String(a.date) >= today)
   const overdue = planned.filter(a => String(a.date) < today)
   const past = appts.filter(a => a.status === 'done' || a.status === 'cancelled').sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
-  const next = upcoming[0] || null
+  const next = upcoming[0] || overdue[overdue.length - 1] || null
+  const nextLate = !!next && String(next.date) < today
   const others = upcoming.slice(1)
+  const overdueRest = overdue.filter(a => a !== next)
   // mốc "Hẹn chăm sóc tiếp" ghi ở lịch sử chăm sóc: chưa tới hạn + quá hạn (quá hạn bỏ qua mốc đã có tương tác từ ngày hẹn trở đi)
   const acts = (interactions || []).filter(x => x && !isSystemEntry(x))
   const toFollow = x => ({ date: String(x.next).slice(0, 10), note: x.nextNote || 'Theo dõi sau: ' + x.title, from: x })
@@ -315,7 +319,7 @@ export default function CdNext({ lead, me, interactions, people }) {
     if (phone) window.open('https://zalo.me/' + phone, '_blank', 'noopener,noreferrer')
   }
 
-  const countdown = a => { const n = daysBetween(today, a.date); return n <= 0 ? 'Hôm nay' : n === 1 ? 'Ngày mai' : 'Còn ' + n + ' ngày' }
+  const countdown = a => { const n = daysBetween(today, a.date); return n < 0 ? 'Quá hạn ' + (-n) + ' ngày' : n === 0 ? 'Hôm nay' : n === 1 ? 'Ngày mai' : 'Còn ' + n + ' ngày' }
   // ô ngày của dòng lịch: số ngày lớn + "TH <tháng>"
   const dayBox = iso => (
     <span className="cd-next-rd"><b>{String(iso || '').slice(8, 10) || '--'}</b><em>TH {Number(String(iso || '').slice(5, 7)) || ''}</em></span>
@@ -347,7 +351,8 @@ export default function CdNext({ lead, me, interactions, people }) {
       </span>
     </li>
   )
-  const hasList = others.length || overdue.length || follow.length || followLate.length
+  const hasList = others.length || overdueRest.length || follow.length || followLate.length
+  const listCount = others.length + overdueRest.length + follow.length + followLate.length
 
   return (
     <section className="cd-cc cd-next" aria-label="Việc tiếp theo">
@@ -355,7 +360,7 @@ export default function CdNext({ lead, me, interactions, people }) {
         <div className="cd-next-top">
           <h3 className="cd-cc-t">Việc tiếp theo</h3>
           <span className="cd-cflex" />
-          {next && <span className="cd-next-cd">{countdown(next)}</span>}
+          {next && <span className={'cd-next-cd' + (nextLate ? ' late' : '')}>{countdown(next)}</span>}
           <FoldBtn open={open} onClick={toggle} light />
           {next && (
             <span className="cd-next-menu" ref={menuRef}>
@@ -404,6 +409,7 @@ export default function CdNext({ lead, me, interactions, people }) {
 
       {next && !open && (
         <div className="cd-next-b cd-next-b-fold">
+          {hasList ? <button type="button" className="cd-next-past" onClick={toggle}>Xem {listCount} lịch khác{overdueRest.length + followLate.length ? ' (' + (overdueRest.length + followLate.length) + ' quá hạn)' : ''}</button> : null}
           <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>
         </div>
       )}
@@ -444,7 +450,7 @@ export default function CdNext({ lead, me, interactions, people }) {
             <>
               <span className="cd-next-sub">Lịch khác</span>
               <ul className="cd-next-list">
-                {overdue.map(a => row(a, ['Quá hạn', 'late']))}
+                {overdueRest.map(a => row(a, ['Quá hạn', 'late']))}
                 {followLate.map((f, i) => followRow(f, i, true))}
                 {others.map(a => row(a, null))}
                 {follow.map((f, i) => followRow(f, i, false))}

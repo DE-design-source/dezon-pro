@@ -230,3 +230,9 @@ html[data-theme="dark"] .cd-cc, html[data-theme="dark"] .cd-cmem-pop{ --cc-navy-
 .cd-next-pop em{font-style:normal; font-size:11.5px; color:#98A2B3; padding:6px 10px 2px; border-top:1px solid var(--cc-line, #EEF0F3); margin-top:4px;}
 /* Danh sách Task: nút "Thêm task" cuối danh sách khi đã có task */
 .cd-task-add{display:flex; margin-top:4px;}
+
+/* hộp đặt / dời lịch: lý do chưa Lưu được; lịch quá hạn trên dải xanh */
+.ios-sheet .cd-sheet-err{padding:8px 14px; font-size:12.5px; color:#B42318; background:#FEF3F2;}
+.ios-sheet .ios-row.cd-sheet-err{min-height:0;}
+html[data-theme="dark"] .ios-sheet .cd-sheet-err{background:rgba(180,35,24,.2); color:#FDA29B;}
+.cd-cc.cd-next .cd-next-cd.late{background:#D92D20;}

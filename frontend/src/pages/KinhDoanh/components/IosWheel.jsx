@@ -15,14 +15,12 @@ function Wheel({ items, value, onChange, width, label }) {
     if (el && Math.round(el.scrollTop / ROW) !== idx) el.scrollTop = idx * ROW
   }, [idx, items.length])
   useEffect(() => () => clearTimeout(timer.current), [])
+  // dòng giữa đổi là nhận giá trị ngay (không chờ cuộn xong): lăn chuột rồi bấm Lưu liền vẫn lưu đúng giá trị đang thấy
   const onScroll = () => {
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      const el = ref.current
-      if (!el) return
-      const i = Math.min(items.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)))
-      if (items[i] && items[i].v !== value) onChange(items[i].v)
-    }, 90)
+    const el = ref.current
+    if (!el) return
+    const i = Math.min(items.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)))
+    if (items[i] && items[i].v !== value) onChange(items[i].v)
   }
   return (
     <div className="ios-wheel" ref={ref} style={{ width, height: ROW * VISIBLE }} onScroll={onScroll}
