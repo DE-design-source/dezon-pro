@@ -41,7 +41,7 @@ function range(ky, tuy) {
 function Bars({ title, rows, fmt, best, note }) {
   const max = Math.max(1, ...rows.map(r => r.v || 0))
   return (
-    <div className="mk-ld-chart">
+    <div className="mk-ld-chart bars">
       <div className="ct"><b>{title}</b>{note && <span>{note}</span>}</div>
       {rows.map(r => (
         <div key={r.k} className={'br' + (best && best === r.k ? ' best' : '') + (r.v ? '' : ' zero')} title={r.k + ': ' + (r.v ? fmt(r.v) : '—')}>
