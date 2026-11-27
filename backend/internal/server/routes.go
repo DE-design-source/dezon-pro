@@ -117,12 +117,15 @@ func (s *Server) modules() []Module {
 	sys := system.New(system.Deps{DB: d.DB, Cfg: d.Cfg})
 
 	// Phân quyền 3 cấp (N21): accessSvc cài contracts.AccessChecker (Module > Tab > Thao tác) và contracts.AccessGranter,
-	// không gọi module khác; dựng đầu tiên để module nào cần kiểm quyền chi tiết nhận qua Deps (Access: users - perms admin cấp
-	// không vượt quyền admin + cắt quyền nhân viên khi xoá / hạ admin; sales, delivery, hr, it, chat, purchasing và các
+	// không gọi module khác; dựng đầu tiên để module nào cần kiểm quyền chi tiết nhận qua Deps (Access: users - perms admin /
+	// subadmin cấp không vượt quyền người cấp + cắt quyền nhân viên khi xoá / hạ admin, subadmin + subadmin chỉ quản lý nhân
+	// viên không vượt quyền mình (CheckUserWithin) và ghim người cấp khi tạo / sửa nhân viên (PinGrantedBy); sales, delivery, hr, it, chat, purchasing và các
 	// module QS - projects, takeoff, estimates, quotations, materials)
 	accessSvc := access.New(access.Deps{DB: d.DB, Cfg: d.Cfg})
+	// HR dựng trước users: subadmin không quản lý tài khoản có vai trò HR cao hơn mình (HR: contracts.HRRoleReader, M14.7)
+	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc})
 
-	usersSvc := users.New(users.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc})
+	usersSvc := users.New(users.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc, HR: hrSvc})
 	// notifications dựng trước companies: nhắc gia hạn (M17.3) lấy admin đang hoạt động qua Admins
 	notifSvc := notifications.New(notifications.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, Auditor: usersSvc})
 	compSvc := companies.New(companies.Deps{DB: d.DB, Cfg: d.Cfg, UserCreator: usersSvc, UserFormatter: usersSvc, Auditor: usersSvc,
@@ -161,7 +164,6 @@ func (s *Server) modules() []Module {
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
 	s.OnShutdown(chatSvc.Shutdown)
 	s.chatSched = chatSvc.StartScheduler // worker tin hẹn giờ: cmd/api bật qua Server.StartChatScheduler
-	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc})
 	// cài đặt mặc định toàn hệ thống (super lưu, mọi tài khoản đăng nhập đọc), không gọi module khác
 	settingsSvc := settings.New(settings.Deps{DB: d.DB, Cfg: d.Cfg})
 	// IT: yêu cầu hỗ trợ + thiết bị; báo người được giao qua Notifier, ảnh đính kèm lưu vào kho file

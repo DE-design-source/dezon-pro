@@ -14,6 +14,7 @@ import (
 func TestAdminGate(t *testing.T) {
 	sup := &actor.Actor{UID: "s", R: "super"}
 	adm := &actor.Actor{UID: "a", R: "admin"}
+	sub := &actor.Actor{UID: "m", R: "subadmin"}
 	cases := []struct {
 		n       string
 		a       *actor.Actor
@@ -34,6 +35,28 @@ func TestAdminGate(t *testing.T) {
 		{"admin tự sửa mình (giữ vai trò)", adm, "admin", "admin", true, ""},
 		{"admin tự sửa mình (không gửi vai trò)", adm, "admin", nil, true, ""},
 		{"admin tự hạ mình xuống nhân viên", adm, "admin", "staff", true, msgSelfRole},
+		// M14.7: subadmin chỉ quản lý nhân viên; admin quản lý được subadmin nhưng không nâng lên admin
+		{"subadmin tạo nhân viên", sub, "", "staff", false, ""},
+		{"subadmin tạo (không gửi vai trò)", sub, "", nil, false, ""},
+		{"subadmin tạo admin", sub, "", "admin", false, msgSubStaffOnly},
+		{"subadmin tạo subadmin", sub, "", "subadmin", false, msgSubStaffOnly},
+		{"subadmin tạo super", sub, "", "super", false, msgSubStaffOnly},
+		{"subadmin sửa nhân viên", sub, "staff", "staff", false, ""},
+		{"subadmin sửa nhân viên (không gửi vai trò)", sub, "staff", nil, false, ""},
+		{"subadmin sửa admin", sub, "admin", nil, false, msgSubStaffOnly},
+		{"subadmin sửa subadmin khác", sub, "subadmin", nil, false, msgSubStaffOnly},
+		{"subadmin nâng nhân viên lên subadmin", sub, "staff", "subadmin", false, msgSubStaffOnly},
+		{"subadmin nâng nhân viên lên admin", sub, "staff", "admin", false, msgSubStaffOnly},
+		{"subadmin tự sửa mình (giữ vai trò)", sub, "subadmin", "subadmin", true, ""},
+		{"subadmin tự sửa mình (không gửi vai trò)", sub, "subadmin", nil, true, ""},
+		{"subadmin tự hạ mình xuống nhân viên", sub, "subadmin", "staff", true, msgSelfRole},
+		{"subadmin tự nâng mình lên admin", sub, "subadmin", "admin", true, msgSelfRole},
+		{"admin tạo subadmin", adm, "", "subadmin", false, ""},
+		{"admin sửa subadmin", adm, "subadmin", "subadmin", false, ""},
+		{"admin sửa subadmin (không gửi vai trò)", adm, "subadmin", nil, false, ""},
+		{"admin hạ subadmin xuống nhân viên", adm, "subadmin", "staff", false, ""},
+		{"admin nâng nhân viên lên subadmin", adm, "staff", "subadmin", false, ""},
+		{"admin nâng subadmin lên admin", adm, "subadmin", "admin", false, msgAdminOnlySuper},
 	}
 	for _, c := range cases {
 		err := adminGate(c.a, c.cur, c.newRole, c.self)
@@ -152,18 +175,46 @@ func TestSetProductApproval(t *testing.T) {
 }
 
 // fakeGranter: ghi lại lệnh gọi phân quyền 3 cấp (N21), trả lỗi để dừng trước khi ghi.
-type fakeGranter struct{ calls []string }
+// legacyOK: CheckLegacyPerms cho qua; withinErr / pinErr: lỗi trả của CheckUserWithin / PinGrantedBy (M14.7);
+// freezeOK: FreezeGrantsBy cho qua (mặc định lỗi để dừng trước lệnh lõi).
+type fakeGranter struct {
+	calls             []string
+	legacyOK          bool
+	freezeOK          bool
+	withinErr, pinErr error
+}
+
+func (g *fakeGranter) ReleaseGrantsBy(_ context.Context, a *actor.Actor, granterID any) error {
+	g.calls = append(g.calls, "release:"+jsval.ToString(a.UID)+" "+jsval.ToString(granterID))
+	return nil
+}
 
 func (g *fakeGranter) CheckLegacyPerms(_ context.Context, a *actor.Actor, cur, perms any) error {
 	c, _ := omap.MarshalString(cur)
 	p, _ := omap.MarshalString(perms)
 	g.calls = append(g.calls, "check:"+jsval.ToString(a.UID)+" "+c+" "+p)
+	if g.legacyOK {
+		return nil
+	}
 	return errors.New("vượt quyền")
 }
 
 func (g *fakeGranter) FreezeGrantsBy(_ context.Context, adminID any) error {
 	g.calls = append(g.calls, "freeze:"+jsval.ToString(adminID))
+	if g.freezeOK {
+		return nil
+	}
 	return errors.New("đã cắt")
+}
+
+func (g *fakeGranter) CheckUserWithin(_ context.Context, a *actor.Actor, targetID any) error {
+	g.calls = append(g.calls, "within:"+jsval.ToString(a.UID)+" "+jsval.ToString(targetID))
+	return g.withinErr
+}
+
+func (g *fakeGranter) PinGrantedBy(_ context.Context, a *actor.Actor, userID any) error {
+	g.calls = append(g.calls, "pin:"+jsval.ToString(a.UID)+" "+jsval.ToString(userID))
+	return g.pinErr
 }
 
 // N21: perms admin công ty cấp cho nhân viên qua AccessGranter (super / đích là admin thì không); xoá / hạ / chuyển công ty

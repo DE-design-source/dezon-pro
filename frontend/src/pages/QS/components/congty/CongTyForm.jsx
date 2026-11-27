@@ -11,7 +11,7 @@ import { MauChinhField, MAU_RE, MAU_ERR, EMAIL_RE } from '../admin/CompanyCard'
 import { downscaleImage_, uploadImg_ } from './logoUpload'
 import { GRANT_TABS } from '../../state/store'
 import { SUB_LBL } from '../admin/UserDetail'
-import { ROLE_LBL } from '../admin/adminUtil'
+import { ROLE_LBL, roleCls_ } from '../admin/adminUtil'
 import AccessMatrix from '../admin/AccessMatrix'
 import { expandGrants, legacyCompanySet, sameSet, toGrants } from '../admin/accessUtil'
 import { loadAccessCatalog } from '../../../../services/accessService'
@@ -524,7 +524,8 @@ function CtUsers({ c, seq, onAdded }) {
       <div className="qsco-ulist">
         {st.us.length ? st.us.map(u => {
           const p = u.perms || []
-          const full = u.role !== 'staff'
+          // Admin (subadmin, M14.7) có quyền như nhân viên -> hiện quyền đã cấp, không phải "Toàn quyền"
+          const full = u.role === 'admin' || u.role === 'super'
           const open = openId === u.id
           const av = (u.hoTen || u.username || '?').trim().charAt(0).toUpperCase()
           return (
@@ -532,7 +533,7 @@ function CtUsers({ c, seq, onAdded }) {
               <button type="button" className="qsco-urow-h" aria-expanded={open} onClick={() => setOpenId(open ? null : u.id)}>
                 <span className={`qsco-uav${full ? ' adm' : ''}`}>{av}</span>
                 <span className="qsco-un"><b>{u.hoTen || u.username}</b><i>@{u.username}{u.email ? ' · ' + u.email : ''}</i></span>
-                <span className={`qsa-role ${u.role === 'super' ? 'sup' : (u.role === 'admin' ? 'adm' : 'stf')}`}>{ROLE_LBL[u.role] || u.role}</span>
+                <span className={`qsa-role ${roleCls_(u.role)}`}>{ROLE_LBL[u.role] || u.role}</span>
                 <span className="qsco-up">{full ? <span className="qsa-muted">Toàn quyền</span>
                   : p.length ? <>{p.slice(0, 2).map(k => <span key={k} className="qsa-permchip">{name(k)}</span>)}{p.length > 2 ? <span className="qsa-permmore">+{p.length - 2}</span> : null}</>
                     : <span className="qsa-st-lk">Chưa cấp</span>}</span>

@@ -13,11 +13,28 @@ import (
 // quản trị hệ thống (super) tạo / sửa / đặt mật khẩu / khoá / xoá; admin công ty chỉ quản lý nhân viên của công ty mình
 // và vẫn tự sửa / đặt mật khẩu cho chính mình (không tự đổi vai trò). Hàm lõi Admin* giữ nguyên như bản Node (TestDiffNode);
 // cổng rpc / REST gọi bản Gated.
+// Vai trò subadmin (nhãn "Admin", M14.7; chỉ qua REST /api/v1, hàm /api/admin* vẫn chỉ admin): chỉ tạo / sửa / đặt mật khẩu /
+// khoá / xoá tài khoản nhân viên (staff) cùng công ty mà toàn bộ quyền của đích nằm trong quyền của mình (subTargetGate);
+// quyền cấp thêm không vượt quyền của mình (permsGate, subPermsGate); tự sửa mình thì không đổi vai trò, không đổi perms.
+// Tài khoản subadmin tạo / sửa perms được ghim người cấp = subadmin (AccessGranter.PinGrantedBy).
 
 // adminGate: lỗi nếu actor (không phải super) đụng tới tài khoản admin khác mình, nâng ai lên admin, hoặc tự đổi vai trò.
 // curRole = vai trò hiện tại của tài khoản đích ("" = tạo mới); newRole = vai trò gửi lên (nil = không đổi); self = đích là chính mình.
+// subadmin: chỉ đích là nhân viên (hoặc tạo mới) và vai trò mới là nhân viên; tự sửa mình thì giữ subadmin.
 func adminGate(a *actor.Actor, curRole string, newRole any, self bool) error {
 	if a == nil || a.R == "super" {
+		return nil
+	}
+	if a.IsSubAdmin() {
+		if self {
+			if newRole == nil || jsval.StrictEquals(newRole, actor.RoleSubAdmin) {
+				return nil
+			}
+			return apperr.New(msgSelfRole)
+		}
+		if (curRole != "" && curRole != "staff") || (newRole != nil && !jsval.StrictEquals(newRole, "staff")) {
+			return apperr.New(msgSubStaffOnly)
+		}
 		return nil
 	}
 	if curRole == "admin" && !self {
@@ -45,7 +62,116 @@ func (s *Service) gateTarget(ctx context.Context, a *actor.Actor, id any, newRol
 		return err
 	}
 	self := jsval.ToString(u.Val("id")) == jsval.ToString(a.UID)
-	return adminGate(a, jsval.StrOr(u.Val("role"), ""), newRole, self)
+	if err := adminGate(a, jsval.StrOr(u.Val("role"), ""), newRole, self); err != nil {
+		return err
+	}
+	return s.subTargetGate(ctx, a, u)
+}
+
+// Quyền ngoài ma trận N21 mà subadmin phải có thì mới quản lý / cấp được (M14.7).
+const (
+	permSpEdit  = "sp_edit"
+	permDaDuyet = "da_duyet"
+)
+
+// spLevel: mức quyền sản phẩm của perms - "sp_duyet" (sửa + duyệt), "sp_edit" (sửa chờ duyệt) hoặc "" (chưa cấu hình:
+// materials.SpPerms coi như sửa + duyệt).
+func (s *Service) spLevel(perms any) string {
+	switch {
+	case s.coPerm(perms, permSpDuyet):
+		return permSpDuyet
+	case s.coPerm(perms, permSpEdit):
+		return permSpEdit
+	}
+	return ""
+}
+
+// myPerms: users.perms của chính actor (không tìm thấy -> lỗi msgNotFound).
+func (s *Service) myPerms(ctx context.Context, a *actor.Actor) (any, error) {
+	me, err := s.GetByID(ctx, a.UID)
+	if err != nil {
+		return nil, err
+	}
+	if me == nil {
+		return nil, apperr.New(msgNotFound)
+	}
+	return me.Val("perms"), nil
+}
+
+// subTargetGate (M14.7): subadmin quản lý tài khoản KHÁC u - quyền thực N21 của u phải nằm trong quyền của subadmin
+// (AccessGranter.CheckUserWithin), và u không giữ sp_duyet / da_duyet / mức sản phẩm "" mà subadmin không có
+// và vai trò HR cao hơn của subadmin (contracts.HRRoleReader) (không thì đặt lại mật khẩu rồi đăng nhập thay u là vượt quyền).
+// Không phải subadmin / đích là chính mình -> nil.
+func (s *Service) subTargetGate(ctx context.Context, a *actor.Actor, u *omap.Map) error {
+	if !a.IsSubAdmin() || u == nil || jsval.ToString(u.Val("id")) == jsval.ToString(a.UID) {
+		return nil
+	}
+	if s.access != nil {
+		if err := s.access.CheckUserWithin(ctx, a, u.Val("id")); err != nil {
+			return err
+		}
+	}
+	mine, err := s.myPerms(ctx, a)
+	if err != nil {
+		return err
+	}
+	theirs := u.Val("perms")
+	if (s.coPerm(theirs, permSpDuyet) && !s.coPerm(mine, permSpDuyet)) ||
+		(s.coPerm(theirs, permDaDuyet) && !s.coPerm(mine, permDaDuyet)) ||
+		(s.spLevel(theirs) == "" && s.spLevel(mine) == permSpEdit) {
+		return apperr.New(msgSubTargetPerm)
+	}
+	// vai trò HR (hr_nhan_vien.vai_tro_hr, ngoài N21) của đích cao hơn của mình -> đăng nhập thay đích là mở rộng phạm vi HR
+	if s.hr != nil {
+		theirRank, err := s.hr.HRRoleRank(ctx, u.Val("id"))
+		if err != nil {
+			return err
+		}
+		myRank, err := s.hr.HRRoleRank(ctx, a.UID)
+		if err != nil {
+			return err
+		}
+		if theirRank > myRank {
+			return apperr.New(msgSubTargetHR)
+		}
+	}
+	return nil
+}
+
+// storedPerms: perms gửi lên -> giá trị lệnh lõi sẽ ghi (joinArr: không phải mảng thì ghi ""; nil giữ nil), để cửa ngõ kiểm
+// đúng cái được lưu (chuỗi "sp_edit" gửi thẳng sẽ thành "" = sửa + duyệt).
+func storedPerms(v any) any {
+	if _, ok := v.([]any); ok || v == nil {
+		return v
+	}
+	return ""
+}
+
+// subPermsGate (M14.7): subadmin cấp perms (cur = perms hiện tại, nil khi tạo mới) - cấp MỚI da_duyet cần chính mình có
+// da_duyet; subadmin chỉ ở mức sp_edit thì nhân viên cũng chỉ được mức sp_edit (mức "" = sửa + duyệt). Không phải subadmin -> nil.
+func (s *Service) subPermsGate(ctx context.Context, a *actor.Actor, cur, perms any) error {
+	if !a.IsSubAdmin() {
+		return nil
+	}
+	mine, err := s.myPerms(ctx, a)
+	if err != nil {
+		return err
+	}
+	if s.coPerm(perms, permDaDuyet) && !s.coPerm(cur, permDaDuyet) && !s.coPerm(mine, permDaDuyet) {
+		return apperr.New(msgSubDaDuyet)
+	}
+	if s.spLevel(mine) == permSpEdit && s.spLevel(perms) != permSpEdit {
+		return apperr.New(msgSubSpLevel)
+	}
+	return nil
+}
+
+// pinGrants (M14.7): sau khi subadmin tạo / sửa perms tài khoản id - ghim người cấp = subadmin. Không phải subadmin -> nil.
+func (s *Service) pinGrants(ctx context.Context, a *actor.Actor, id any) error {
+	if s.access == nil || !a.IsSubAdmin() {
+		return nil
+	}
+	return s.access.PinGrantedBy(ctx, a, id)
 }
 
 // permSpDuyet: quyền duyệt sản phẩm của nhân viên (M14.6).
@@ -74,7 +200,8 @@ func (s *Service) spDuyetGate(ctx context.Context, a *actor.Actor, curPerms, new
 	if err != nil {
 		return err
 	}
-	if me != nil && me.Val("duoc_duyet_sp") == true {
+	// cờ giao duyệt chỉ có hiệu lực khi đang là admin công ty (subadmin / admin đã bị hạ còn sót cờ thì không cấp được)
+	if me != nil && me.Val("duoc_duyet_sp") == true && jsval.StrictEquals(me.Val("role"), "admin") {
 		return nil
 	}
 	return apperr.New(msgGrantSpDuyet)
@@ -89,19 +216,23 @@ func (s *Service) permsGate(ctx context.Context, a *actor.Actor, targetRole stri
 	return s.access.CheckLegacyPerms(ctx, a, cur, perms)
 }
 
-// freezeGrants (N21): tài khoản admin công ty sắp bị xoá (fields nil) / đổi vai trò / chuyển công ty -> cắt sẵn quyền của
-// nhân viên do admin này cấp theo quyền cuối của admin (giới hạn không mất theo người cấp). Không đổi gì quyền thực hiện tại,
-// nên chạy trước lệnh lõi (lệnh lõi lỗi cũng không sao).
+// freezeGrants (N21): tài khoản admin công ty / subadmin (M14.7) sắp bị xoá (fields nil) / đổi vai trò / chuyển công ty ->
+// cắt sẵn quyền của nhân viên do tài khoản này cấp theo quyền cuối của nó (giới hạn không mất theo người cấp). Không đổi gì
+// quyền thực hiện tại, nên chạy trước lệnh lõi (lệnh lõi lỗi cũng không sao).
 func (s *Service) freezeGrants(ctx context.Context, id any, fields *omap.Map) error {
 	if s.access == nil {
 		return nil
 	}
 	u, err := s.GetByID(ctx, id)
-	if err != nil || u == nil || !jsval.StrictEquals(u.Val("role"), "admin") {
+	if err != nil || u == nil {
 		return err
 	}
+	curRole := jsval.StrOr(u.Val("role"), "")
+	if curRole != "admin" && curRole != actor.RoleSubAdmin {
+		return nil
+	}
 	if fields != nil {
-		demote := fields.Has("role") && !jsval.StrictEquals(fields.Val("role"), "admin")
+		demote := fields.Has("role") && !jsval.StrictEquals(fields.Val("role"), curRole)
 		move := fields.Has("congTyId") && jsval.ToString(jsval.Or(fields.Val("congTyId"), "")) != jsval.ToString(jsval.Or(u.Val("cong_ty_id"), ""))
 		if !demote && !move {
 			return nil
@@ -120,20 +251,30 @@ func (s *Service) AdminCreateUserGated(ctx context.Context, a *actor.Actor, data
 		return nil, err
 	}
 	if data != nil {
-		perms = data.Val("perms")
+		perms = storedPerms(data.Val("perms"))
 	}
 	if err := s.spDuyetGate(ctx, a, "", perms); err != nil {
+		return nil, err
+	}
+	if err := s.subPermsGate(ctx, a, nil, perms); err != nil {
 		return nil, err
 	}
 	if err := s.permsGate(ctx, a, "", nil, perms); err != nil {
 		return nil, err
 	}
-	return s.AdminCreateUser(ctx, a, data)
+	res, err := s.AdminCreateUser(ctx, a, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.pinGrants(ctx, a, res.Val("id")); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // AdminUpdateUserGated: không sửa admin khác, không nâng lên admin, không tự đổi vai trò; cấp mới sp_duyet cần được giao duyệt.
 func (s *Service) AdminUpdateUserGated(ctx context.Context, a *actor.Actor, id any, fields *omap.Map) (*omap.Map, error) {
-	var role any
+	var role, pinID any
 	if fields != nil && fields.Has("role") {
 		role = fields.Val("role")
 	}
@@ -146,13 +287,42 @@ func (s *Service) AdminUpdateUserGated(ctx context.Context, a *actor.Actor, id a
 		if err := adminGate(a, jsval.StrOr(u.Val("role"), ""), role, self); err != nil {
 			return nil, err
 		}
+		// subadmin tự sửa mình (M14.7): bỏ perms (không tự cấp quyền) và role (đã kiểm: không gửi / giữ subadmin;
+		// role null sẽ bị lệnh lõi hạ về staff)
+		if a.IsSubAdmin() && self && fields != nil {
+			fields = fields.Clone()
+			fields.Delete("perms")
+			fields.Delete("role")
+		}
+		if err := s.subTargetGate(ctx, a, u); err != nil {
+			return nil, err
+		}
 		if fields != nil && fields.Has("perms") {
-			if err := s.spDuyetGate(ctx, a, u.Val("perms"), fields.Val("perms")); err != nil {
+			np := storedPerms(fields.Val("perms"))
+			if err := s.spDuyetGate(ctx, a, u.Val("perms"), np); err != nil {
 				return nil, err
 			}
-			if err := s.permsGate(ctx, a, jsval.StrOr(u.Val("role"), ""), u.Val("perms"), fields.Val("perms")); err != nil {
+			if err := s.subPermsGate(ctx, a, u.Val("perms"), np); err != nil {
 				return nil, err
 			}
+			if err := s.permsGate(ctx, a, jsval.StrOr(u.Val("role"), ""), u.Val("perms"), np); err != nil {
+				return nil, err
+			}
+			if a.IsSubAdmin() {
+				pinID = u.Val("id")
+			}
+		}
+	}
+	// admin công ty bị hạ xuống subadmin (M14.7): sau khi lưu, nhân viên do nó cấp thôi bị giới hạn theo quyền subadmin
+	// (thường nhỏ hơn quyền admin cũ) - FreezeGrantsBy đã cắt sẵn theo quyền admin cuối, quyền thực của họ giữ nguyên
+	var release any
+	if s.access != nil && fields != nil && fields.Has("role") && jsval.StrictEquals(fields.Val("role"), actor.RoleSubAdmin) {
+		cur, err := s.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if cur != nil && jsval.StrictEquals(cur.Val("role"), "admin") {
+			release = cur.Val("id")
 		}
 	}
 	if fields != nil && (fields.Has("role") || fields.Has("congTyId")) {
@@ -160,7 +330,22 @@ func (s *Service) AdminUpdateUserGated(ctx context.Context, a *actor.Actor, id a
 			return nil, err
 		}
 	}
-	return s.AdminUpdateUser(ctx, a, id, fields)
+	res, err := s.AdminUpdateUser(ctx, a, id, fields)
+	if err != nil {
+		return res, err
+	}
+	if release != nil {
+		if err := s.access.ReleaseGrantsBy(ctx, a, release); err != nil {
+			return nil, err
+		}
+	}
+	if pinID == nil {
+		return res, nil
+	}
+	if err := s.pinGrants(ctx, a, pinID); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // AdminSetPasswordGated: không đặt mật khẩu cho admin khác.

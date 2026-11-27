@@ -32,7 +32,7 @@ function progressOf(tasks, stages) {
   return live.length ? Math.round(live.filter(x => k[x.stage]?.done).length / live.length * 100) : 0
 }
 /* Tài khoản -> người trên bảng xử lý (FlowBoard: name, role, dept) */
-const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.it ? 'Phòng IT' : 'Nhân viên')
+const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.role === 'subadmin' ? 'Admin' : e.it ? 'Phòng IT' : 'Nhân viên')
 
 export default function IT() {
   const { theme, toggleTheme } = useTheme()

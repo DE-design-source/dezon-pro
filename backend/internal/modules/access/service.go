@@ -6,7 +6,12 @@
 //	admin    = công ty ∩ dòng của admin (chưa có dòng = mọi thứ trong trần công ty)
 //	nhân viên = công ty ∩ dòng của nhân viên ∩ quyền thực của admin đã cấp (nguoi_cap là admin cùng công ty);
 //	           chưa có dòng = công ty ∩ suy từ users.permissions
+//	subadmin = như nhân viên (nhãn giao diện "Admin", M14.7)
 //	super    = mọi thứ
+//
+// Người cấp là subadmin cùng công ty: dòng của nhân viên còn giao thêm quyền THỰC của subadmin (tính đệ quy, chống vòng,
+// sâu quá maxGranterDepth hoặc gặp vòng = rỗng). Subadmin chỉ xem / phân quyền nhân viên công ty mình (đọc được cả chính
+// mình), chỉ trong quyền thực của mình, không đặt null (theo mặc định cũ) và không chạm nhân viên có quyền vượt mình.
 //
 // Duyệt sản phẩm (M14.6: users.duoc_duyet_sp, quyền sp_duyet) và duyệt sửa dự án KHÔNG thuộc ma trận này.
 // Chỉ bản Go: REST /api/v1/access/..., /companies/:id/access, /users/:id/access (không có hàm /api/:fn).
@@ -40,6 +45,16 @@ const (
 	msgMig          = "Chưa có bảng phân quyền (migration 0052_access_grants). "
 	msgNoGrants     = "Thiếu grants (gửi null để bỏ phân quyền riêng)"
 )
+
+// Thông báo lỗi của vai trò subadmin (nhãn "Admin", M14.7).
+const (
+	msgSubTarget    = "Admin chỉ phân quyền được cho tài khoản nhân viên khác trong công ty"
+	msgSubNoDefault = "Admin phải chọn quyền cụ thể, không đặt được theo mặc định cũ"
+	msgTargetExceed = "Tài khoản này có quyền vượt quá quyền của bạn: "
+)
+
+// maxGranterDepth: số cấp người cấp là subadmin tối đa khi tính quyền thực (sâu hơn = rỗng).
+const maxGranterDepth = 3
 
 // Deps: do internal/server/routes.go truyền vào. Repo chỉ dùng trong test (bỏ trống = Postgres).
 type Deps struct {
@@ -107,6 +122,11 @@ type state struct {
 }
 
 func (s *Service) userState(ctx context.Context, u *omap.Map) (state, error) {
+	return s.userStateD(ctx, u, nil)
+}
+
+// userStateD: userState với seen = các tài khoản đang tính dở trên chuỗi người cấp (chống vòng khi người cấp là subadmin).
+func (s *Service) userStateD(ctx context.Context, u *omap.Map, seen map[string]bool) (state, error) {
 	role := roleOf(u)
 	if role == "super" {
 		return state{eff: fullSet()}, nil
@@ -136,7 +156,8 @@ func (s *Service) userState(ctx context.Context, u *omap.Map) (state, error) {
 	}
 	eff := intersect(ceil, expand(row.Val("quyen")))
 	// admin đã cấp bị thu bớt quyền -> nhân viên mất theo; người cấp là super / không còn là admin cùng công ty -> chỉ trần công ty
-	// (admin bị xoá / hạ vai trò / chuyển công ty: FreezeGrantsBy đã cắt sẵn dòng của nhân viên theo quyền cuối của admin)
+	// (admin bị xoá / hạ vai trò / chuyển công ty: FreezeGrantsBy đã cắt sẵn dòng của nhân viên theo quyền cuối của admin;
+	// hạ xuống subadmin: ReleaseGrantsBy chuyển người cấp sang người hạ, không bị cắt tiếp theo quyền subadmin)
 	if by := jsval.Str(row.Val("nguoi_cap")); by != "" && by != uid {
 		g, err := s.repo.UserByID(ctx, by)
 		if err != nil {
@@ -149,6 +170,22 @@ func (s *Service) userState(ctx context.Context, u *omap.Map) (state, error) {
 			}
 			if gRow != nil {
 				eff = intersect(eff, expand(gRow.Val("quyen")))
+			}
+		} else if g != nil && roleOf(g) == actor.RoleSubAdmin && jsval.Str(g.Val("cong_ty_id")) == ctID {
+			// người cấp là subadmin: giao quyền THỰC của subadmin (kể cả khi nó chưa có dòng riêng); vòng / quá sâu = rỗng
+			if seen[by] || len(seen) >= maxGranterDepth {
+				eff = Set{}
+			} else {
+				next := make(map[string]bool, len(seen)+1)
+				for k := range seen {
+					next[k] = true
+				}
+				next[uid] = true
+				gSt, err := s.userStateD(ctx, g, next)
+				if err != nil {
+					return state{}, err
+				}
+				eff = intersect(eff, gSt.eff)
 			}
 		}
 	}
@@ -234,8 +271,8 @@ func (s *Service) LegacyAny(ctx context.Context, a *actor.Actor, module string) 
 // CatalogOut: danh mục quyền {actions: [{key, label}], modules: [{key, label, tabs: [{key, label, actions}]}]}.
 func (s *Service) CatalogOut() *omap.Map { return catOut }
 
-// Me: {grants: quyền thực, grantable: quyền được phép cấp cho người khác (super: mọi thứ; admin: quyền thực của mình;
-// nhân viên: {})}.
+// Me: {grants: quyền thực, grantable: quyền được phép cấp cho người khác (super: mọi thứ; admin, subadmin: quyền thực của
+// mình; nhân viên: {})}.
 func (s *Service) Me(ctx context.Context, a *actor.Actor) (*omap.Map, error) {
 	if a == nil {
 		return nil, apperr.E(401, msgNoAuth, "NOAUTH")
@@ -245,7 +282,7 @@ func (s *Service) Me(ctx context.Context, a *actor.Actor) (*omap.Map, error) {
 		return nil, err
 	}
 	grantable := omap.New()
-	if a.IsAdmin() {
+	if a.CanManageStaff() {
 		grantable = eff.Out()
 	}
 	return omap.Of("grants", eff.Out(), "grantable", grantable), nil
@@ -293,9 +330,9 @@ func (s *Service) SetCompanyAccess(ctx context.Context, a *actor.Actor, id strin
 }
 
 // UserAccess: quyền của 1 tài khoản -> {grants: dòng đã lưu | null (chưa đặt = cách cũ), effective}.
-// super: mọi tài khoản; admin: tài khoản cùng công ty.
+// super: mọi tài khoản; admin: tài khoản cùng công ty; subadmin: nhân viên cùng công ty và chính mình.
 func (s *Service) UserAccess(ctx context.Context, a *actor.Actor, id string) (*omap.Map, error) {
-	u, err := s.targetUser(ctx, a, id)
+	u, err := s.targetUser(ctx, a, id, false)
 	if err != nil {
 		return nil, err
 	}
@@ -307,10 +344,11 @@ func (s *Service) UserAccess(ctx context.Context, a *actor.Actor, id string) (*o
 }
 
 // SetUserAccess: đặt quyền của 1 tài khoản; grants null / thiếu = xoá (về cách cũ).
-// super: đặt cho admin và nhân viên; admin: chỉ nhân viên cùng công ty, chỉ tập con quyền thực của mình;
-// không ai đặt cho tài khoản super.
+// super: đặt cho admin và nhân viên; admin: chỉ nhân viên (kể cả subadmin) cùng công ty, chỉ tập con quyền thực của mình;
+// subadmin: chỉ nhân viên KHÁC cùng công ty, quyền hiện tại của nhân viên không vượt mình, grants phải cụ thể (không null),
+// chỉ tập con quyền thực của mình; không ai đặt cho tài khoản super.
 func (s *Service) SetUserAccess(ctx context.Context, a *actor.Actor, id string, grants any) (*omap.Map, error) {
-	u, err := s.targetUser(ctx, a, id)
+	u, err := s.targetUser(ctx, a, id, true)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +363,15 @@ func (s *Service) SetUserAccess(ctx context.Context, a *actor.Actor, id string, 
 	if !a.IsSuper() {
 		if role == "admin" {
 			return nil, apperr.Forbidden(msgAdminTarget)
+		}
+		if a.IsSubAdmin() {
+			// null = về users.perms: perms cũ không bị người cấp giới hạn -> subadmin không được đặt
+			if jsval.IsNullish(grants) {
+				return nil, apperr.Forbidden(msgSubNoDefault)
+			}
+			if err := s.CheckUserWithin(ctx, a, u.Val("id")); err != nil {
+				return nil, err
+			}
 		}
 		var want Set
 		if jsval.IsNullish(grants) {
@@ -363,7 +410,7 @@ func (s *Service) within(ctx context.Context, a *actor.Actor, want Set) error {
 	return nil
 }
 
-// CheckLegacyPerms (contracts.AccessGranter): admin công ty (a không phải super) cấp users.perms cho nhân viên công ty mình -
+// CheckLegacyPerms (contracts.AccessGranter): admin / subadmin công ty (a không phải super) cấp users.perms cho nhân viên công ty mình -
 // phần quyền perms cấp THÊM so với cur (nil khi tạo mới), giao trần công ty, phải nằm trong quyền thực của a; không thì 403.
 // perms / cur: mảng của client hoặc chuỗi "a,b" của database. a nil / super -> nil.
 func (s *Service) CheckLegacyPerms(ctx context.Context, a *actor.Actor, cur, perms any) error {
@@ -398,15 +445,19 @@ func permsStr(v any) any {
 // FreezeGrantsBy (contracts.AccessGranter): gọi TRƯỚC khi tài khoản admin công ty adminID bị xoá / đổi vai trò / chuyển
 // công ty. Quyền thực của nhân viên do admin này cấp đang bị giới hạn thêm bởi quyền của admin (đọc lúc tính); sau thao tác
 // đó giới hạn này mất (granted_by thành null hoặc không còn là admin cùng công ty) -> cắt sẵn dòng của nhân viên theo quyền
-// thực cuối của admin. Quyền thực của nhân viên không đổi (giao đã có sẵn). Không phải admin / chưa gắn công ty -> nil.
+// thực cuối của admin. Quyền thực của nhân viên không đổi (giao đã có sẵn). Subadmin (người cấp có giới hạn như admin) cũng
+// vậy. Không phải admin / subadmin, chưa gắn công ty -> nil.
 func (s *Service) FreezeGrantsBy(ctx context.Context, adminID any) error {
 	uid := jsval.Str(adminID)
 	if uid == "" {
 		return nil
 	}
 	u, err := s.repo.UserByID(ctx, uid)
-	if err != nil || u == nil || roleOf(u) != "admin" {
+	if err != nil || u == nil {
 		return err
+	}
+	if r := roleOf(u); r != "admin" && r != actor.RoleSubAdmin {
+		return nil
 	}
 	ctID := jsval.Str(u.Val("cong_ty_id"))
 	if ctID == "" {
@@ -438,12 +489,55 @@ func (s *Service) FreezeGrantsBy(ctx context.Context, adminID any) error {
 	return nil
 }
 
-// targetUser: tài khoản được xem / phân quyền, kiểm người thao tác được chạm tới nó.
-func (s *Service) targetUser(ctx context.Context, a *actor.Actor, id string) (*omap.Map, error) {
+// ReleaseGrantsBy (contracts.AccessGranter, M14.7): gọi SAU khi tài khoản admin công ty granterID đã bị hạ xuống subadmin.
+// Nhân viên do nó cấp đã được FreezeGrantsBy cắt theo quyền admin cuối; nếu vẫn ghi người cấp = nó thì từ nay bị giới hạn thêm
+// theo quyền subadmin (thường nhỏ hơn, vd perms cũ rỗng) -> chuyển người cấp sang a để quyền thực của họ không đổi.
+// a nil / tài khoản không phải subadmin / chưa gắn công ty -> nil.
+func (s *Service) ReleaseGrantsBy(ctx context.Context, a *actor.Actor, granterID any) error {
+	uid := jsval.Str(granterID)
+	if a == nil || uid == "" {
+		return nil
+	}
+	u, err := s.repo.UserByID(ctx, uid)
+	if err != nil || u == nil {
+		return err
+	}
+	if roleOf(u) != actor.RoleSubAdmin {
+		return nil
+	}
+	ctID := jsval.Str(u.Val("cong_ty_id"))
+	if ctID == "" {
+		return nil
+	}
+	rows, err := s.repo.GrantsBy(ctx, ctID, uid)
+	if err != nil {
+		return err
+	}
+	var by any
+	if v := jsval.Str(a.UID); v != "" && v != uid {
+		by = v
+	}
+	for _, r := range rows {
+		tid := jsval.Str(r.Val("tai_khoan_id"))
+		if tid == "" || tid == uid {
+			continue
+		}
+		if err := s.repo.SaveGrant(ctx, ctID, tid, omap.Of("nguoi_cap", by, "nguoi_sua", a.U, "cap_nhat", s.now())); err != nil {
+			return migErr(err)
+		}
+	}
+	reqcache.Forget(ctx, cacheKey)
+	return nil
+}
+
+// targetUser: tài khoản được xem (write false) / phân quyền (write true), kiểm người thao tác được chạm tới nó.
+// Subadmin: xem nhân viên cùng công ty và chính mình; phân quyền nhân viên khác cùng công ty (admin để SetUserAccess báo
+// msgAdminTarget).
+func (s *Service) targetUser(ctx context.Context, a *actor.Actor, id string, write bool) (*omap.Map, error) {
 	if a == nil {
 		return nil, apperr.E(401, msgNoAuth, "NOAUTH")
 	}
-	if !a.IsAdmin() {
+	if !a.CanManageStaff() {
 		return nil, apperr.Forbidden(msgOnlyAdmins)
 	}
 	if id == "" {
@@ -462,7 +556,91 @@ func (s *Service) targetUser(ctx context.Context, a *actor.Actor, id string) (*o
 			return nil, apperr.Forbidden(msgOtherCompany)
 		}
 	}
+	if a.IsSubAdmin() {
+		self := jsval.Str(u.Val("id")) == jsval.Str(a.UID)
+		role := roleOf(u)
+		if write && (self || (role != "staff" && role != "admin")) {
+			return nil, apperr.Forbidden(msgSubTarget)
+		}
+		if !write && !self && role != "staff" {
+			return nil, apperr.Forbidden(msgSubTarget)
+		}
+	}
 	return u, nil
+}
+
+// CheckUserWithin (contracts.AccessGranter): a là subadmin -> quyền thực hiện tại của tài khoản targetID phải nằm trong quyền
+// thực của a, không thì 403 nêu ô đầu tiên vượt (msgTargetExceed). a nil / không phải subadmin -> nil.
+func (s *Service) CheckUserWithin(ctx context.Context, a *actor.Actor, targetID any) error {
+	if a == nil || !a.IsSubAdmin() {
+		return nil
+	}
+	uid := jsval.Str(targetID)
+	if uid == "" {
+		return apperr.NotFound(msgNoUser)
+	}
+	u, err := s.repo.UserByID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return apperr.NotFound(msgNoUser)
+	}
+	eff, _, err := s.userEffective(ctx, u)
+	if err != nil {
+		return err
+	}
+	have, err := s.actorEffective(ctx, a)
+	if err != nil {
+		return err
+	}
+	if m, t, act, bad := firstOutside(eff, have); bad {
+		return apperr.Forbidden(msgTargetExceed + modIdx[m].Label + " > " + tabLabel(modIdx[m], t) + " > " + actionLabel(act))
+	}
+	return nil
+}
+
+// PinGrantedBy (contracts.AccessGranter): a là subadmin vừa tạo / sửa perms nhân viên userID cùng công ty mà nhân viên chưa có
+// dòng phân quyền riêng -> ghi dòng = trần công ty ∩ suy từ users.perms ∩ quyền thực của a, người cấp = a (để sau này vẫn bị
+// giới hạn theo a). Đã có dòng / a nil / không phải subadmin / tài khoản không phải nhân viên khác -> nil.
+func (s *Service) PinGrantedBy(ctx context.Context, a *actor.Actor, userID any) error {
+	if a == nil || !a.IsSubAdmin() {
+		return nil
+	}
+	uid := jsval.Str(userID)
+	if uid == "" || uid == jsval.Str(a.UID) {
+		return nil
+	}
+	u, err := s.repo.UserByID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return apperr.NotFound(msgNoUser)
+	}
+	if roleOf(u) != "staff" {
+		return nil
+	}
+	ctID := jsval.Str(u.Val("cong_ty_id"))
+	if ctID == "" || ctID != jsval.Str(a.CT) {
+		return apperr.Forbidden(msgOtherCompany)
+	}
+	row, err := s.repo.GrantRow(ctx, ctID, uid)
+	if err != nil {
+		return migErr(err)
+	}
+	if row != nil {
+		return nil
+	}
+	ceil, _, err := s.companyCeiling(ctx, ctID)
+	if err != nil || ceil == nil {
+		return err
+	}
+	have, err := s.actorEffective(ctx, a)
+	if err != nil {
+		return err
+	}
+	return s.save(ctx, a, ctID, uid, intersect(ceil, legacyStaff(u.Val("perms")), have).Out())
 }
 
 // save: chuẩn hoá + ghi (grants null / thiếu = xoá dòng).

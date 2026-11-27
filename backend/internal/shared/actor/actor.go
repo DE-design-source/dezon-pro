@@ -15,7 +15,7 @@ import (
 type Actor struct {
 	UID any     `json:"uid"` // users.id (số)
 	U   string  `json:"u"`   // username
-	R   string  `json:"r"`   // role: "user" | "admin" | "super"
+	R   string  `json:"r"`   // role: "staff" | "subadmin" | "admin" | "super"
 	CT  any     `json:"ct"`  // cong_ty_id hoặc nil
 	Exp float64 `json:"exp"` // hạn token (ms)
 	// SID: id phiên (user_sessions.id) trong token - đăng xuất thu hồi đúng phiên này (M1.2).
@@ -28,6 +28,16 @@ func (a *Actor) IsAdmin() bool { return a != nil && (a.R == "admin" || a.R == "s
 
 // IsSuper: r === "super".
 func (a *Actor) IsSuper() bool { return a != nil && a.R == "super" }
+
+// RoleSubAdmin: vai trò "Admin" trên giao diện (roadmap M14.7) - giữa nhân viên và quản trị công ty: chỉ quản lý tài khoản
+// nhân viên của công ty mình trong phạm vi quyền của chính mình. Không phải IsAdmin (quyền dữ liệu như nhân viên).
+const RoleSubAdmin = "subadmin"
+
+// IsSubAdmin: r === "subadmin".
+func (a *Actor) IsSubAdmin() bool { return a != nil && a.R == RoleSubAdmin }
+
+// CanManageStaff: được vào các route quản lý tài khoản nhân viên (admin, super hoặc subadmin).
+func (a *Actor) CanManageStaff() bool { return a.IsAdmin() || a.IsSubAdmin() }
 
 // Map đổi sang object JS (khi mã Node dùng actor như object thường).
 func (a *Actor) Map() *omap.Map {

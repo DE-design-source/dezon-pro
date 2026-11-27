@@ -9756,7 +9756,7 @@ CREATE TABLE public.users (
     email text,
     department text,
     ui_preferences jsonb DEFAULT '{}'::jsonb NOT NULL,
-    CONSTRAINT ck_users_role CHECK ((role = ANY (ARRAY['super'::text, 'admin'::text, 'staff'::text]))),
+    CONSTRAINT ck_users_role CHECK ((role = ANY (ARRAY['super'::text, 'admin'::text, 'subadmin'::text, 'staff'::text]))),
     CONSTRAINT ck_users_username CHECK ((username = lower(username)))
 );
 
@@ -9793,7 +9793,7 @@ COMMENT ON COLUMN public.users.password_hash IS 'bcrypt hash of the password';
 -- Name: COLUMN users.role; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.users.role IS 'Access role: super (system admin), admin (company owner), staff';
+COMMENT ON COLUMN public.users.role IS 'Access role: super (system admin), admin (company owner), subadmin (manages staff accounts within own rights), staff';
 
 
 --

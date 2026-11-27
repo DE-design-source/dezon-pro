@@ -30,7 +30,7 @@ function NavIcon({ pathData }) {
 }
 
 const ALL_NAV = [...NAV_MAIN, ...NAV_BOTTOM]
-const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', subadmin: 'Admin', staff: 'Nhân viên' }
 // chữ đầu của từ đầu + từ cuối: "Trần Anh" -> "TA"
 const initials = s => { const w = String(s || '').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase() }
 /* Bỏ dấu tiếng Việt để gõ "kinh doanh" hay "kinh doanh" không dấu đều tìm ra */

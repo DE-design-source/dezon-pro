@@ -25,6 +25,8 @@ type Deps struct {
 	// Access: phân quyền 3 cấp (N21) - perms admin công ty cấp không vượt quyền của admin, cắt quyền nhân viên trước khi
 	// admin cấp bị xoá / hạ vai trò / chuyển công ty. nil = không kiểm.
 	Access contracts.AccessGranter
+	// HR: vai trò HR của tài khoản (M14.7) - subadmin không quản lý nhân viên có vai trò HR cao hơn mình. nil = không kiểm.
+	HR contracts.HRRoleReader
 }
 
 // Service: nghiệp vụ tài khoản.
@@ -34,6 +36,7 @@ type Service struct {
 	companies contracts.CompanyReader
 	sessions  contracts.SessionInvalidator
 	access    contracts.AccessGranter
+	hr        contracts.HRRoleReader
 }
 
 var (
@@ -44,7 +47,9 @@ var (
 )
 
 // New tạo service.
-func New(d Deps) *Service { return &Service{repo: NewRepository(d.DB), cfg: d.Cfg, access: d.Access} }
+func New(d Deps) *Service {
+	return &Service{repo: NewRepository(d.DB), cfg: d.Cfg, access: d.Access, hr: d.HR}
+}
 
 // SetCompanyReader: users <- companies (getCongTy, A:340).
 func (s *Service) SetCompanyReader(c contracts.CompanyReader) { s.companies = c }
@@ -139,7 +144,23 @@ func (s *Service) AdminListUsers(ctx context.Context, a *actor.Actor) ([]any, er
 	return out, nil
 }
 
-// AdminCreateUser = adminCreateUser (A:319-362).
+// AdminListUsersGated (chỉ bản Go, M14.7): như AdminListUsers; subadmin chỉ thấy nhân viên công ty mình và chính mình.
+func (s *Service) AdminListUsersGated(ctx context.Context, a *actor.Actor) ([]any, error) {
+	out, err := s.AdminListUsers(ctx, a)
+	if err != nil || !a.IsSubAdmin() {
+		return out, err
+	}
+	keep := make([]any, 0, len(out))
+	for _, x := range out {
+		u := jsval.AsMap(x)
+		if jsval.StrictEquals(u.Val("role"), "staff") || jsval.ToString(u.Val("id")) == jsval.ToString(a.UID) {
+			keep = append(keep, x)
+		}
+	}
+	return keep, nil
+}
+
+// AdminCreateUser =adminCreateUser (A:319-362).
 func (s *Service) AdminCreateUser(ctx context.Context, a *actor.Actor, data *omap.Map) (*omap.Map, error) {
 	username := toLowerCase(jsval.Trim(jsval.StrOr(data.Val("username"), "")))
 	if !reUsername.MatchString(username) {
@@ -188,6 +209,8 @@ func (s *Service) AdminCreateUser(ctx context.Context, a *actor.Actor, data *oma
 		}
 	case jsval.StrictEquals(data.Val("role"), "admin"):
 		role = "admin"
+	case jsval.StrictEquals(data.Val("role"), actor.RoleSubAdmin): // chỉ bản Go (M14.7); giữ perms như nhân viên
+		role = actor.RoleSubAdmin
 	}
 	perms := ""
 	if role != "admin" && role != "super" {
@@ -280,6 +303,8 @@ func (s *Service) AdminUpdateUser(ctx context.Context, a *actor.Actor, id any, f
 			}
 		case jsval.StrictEquals(fields.Val("role"), "admin"):
 			role = "admin"
+		case jsval.StrictEquals(fields.Val("role"), actor.RoleSubAdmin): // chỉ bản Go (M14.7)
+			role = actor.RoleSubAdmin
 		default:
 			role = "staff"
 		}

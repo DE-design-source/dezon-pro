@@ -5,6 +5,7 @@ import { mediaUrl } from '../../api/files'
 import { fmtDate } from '../../lib/format'
 import { useQs } from '../../state/QsData'
 import { useQsSession } from '../../session/QsSession'
+import { viewAsCtFromList_ } from '../../state/store'
 import { qsToast, qsAsk } from '../common/dialogs'
 import QsIcon from '../common/QsIcon'
 import CongTyForm from './CongTyForm'
@@ -33,7 +34,7 @@ export default function CongTyTab() {
     if (!vis || !isSuper) return undefined
     const ac = new AbortController()
     setSt(s => ({ ...s, phase: 'loading', err: '' }))
-    api.listCongTy(ac.signal).then(list => setSt({ phase: 'ready', list: list || [], err: '' }),
+    api.listCongTy(ac.signal).then(list => { setSt({ phase: 'ready', list: list || [], err: '' }); viewAsCtFromList_(list) },
       e => { if (!isAbort(e)) setSt({ phase: 'error', list: [], err: e.message }) })
     return () => ac.abort()
   }, [seq, reloadN, isSuper])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -41,7 +42,8 @@ export default function CongTyTab() {
   const reload = () => setReloadN(n => n + 1)
 
   function ctViewAs(id) {
-    setViewAs(id || null)
+    // gửi kèm công ty (có tinhNang) để thanh bên / trang ẩn ngay những tính năng công ty này đã tắt
+    setViewAs(id || null, (st.list || []).filter(x => String(x.id) === String(id))[0] || null)
   }
 
   async function ctDelete(c) {

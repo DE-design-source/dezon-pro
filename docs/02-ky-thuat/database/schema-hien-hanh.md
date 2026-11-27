@@ -18,6 +18,8 @@
 > (phải có phone HOẶC email); `chat_otp_codes.email`, `chat_otp_codes.phone` thôi NOT NULL (đúng MỘT trong hai). Theo catalog của `qspro_chattest`.
 > Cập nhật 2026-11-02 (0020): chat gửi ảnh / video / tệp / tin thoại - bảng mới `chat_media` (`chat_tep`, tệp trên MinIO); `chat_messages`
 > + `media_id` (FK RESTRICT -> `chat_media`), `file_name`; `message_type` thêm `image` / `video` / `file` / `voice`. Theo catalog của `qspro_chattest`.
+> Cập nhật 2026-11-27 (0053, roadmap M14.7): `users.role` thêm giá trị `subadmin` (nhãn giao diện "Admin": quản lý tài khoản nhân viên
+> công ty mình trong phạm vi quyền của chính mình) - tạo lại `ck_users_role`, đổi chú thích cột. Theo catalog của `qspro_gotest`.
 > Ý nghĩa từng cột: chú thích cột trong [infra/db/schema.sql](../../../infra/db/schema.sql).
 > Đây là tài liệu mô tả cấu trúc ĐANG CHẠY. Bối cảnh và lý do: [ket-qua-trien-khai.md](ket-qua-trien-khai.md), [decisions.md](decisions.md).
 
@@ -172,7 +174,7 @@ Tài liệu cấu hình theo công ty (ptInfo, bgOrg). 0 dòng.
 
 Tài khoản, vai trò, quyền. 8 dòng.
 
-- CHECK `ck_users_role`: `CHECK ((role = ANY (ARRAY['super'::text, 'admin'::text, 'staff'::text])))`
+- CHECK `ck_users_role`: `CHECK ((role = ANY (ARRAY['super'::text, 'admin'::text, 'subadmin'::text, 'staff'::text])))` (0053)
 - CHECK `ck_users_username`: `CHECK ((username = lower(username)))`
 - FK `fk_users_company_id`: `FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE`
 - PK `pk_users`: `PRIMARY KEY (id)`

@@ -717,3 +717,268 @@ func TestActorStateCachedPerRequest(t *testing.T) {
 		t.Errorf("không bộ đệm: %d lần", r.n)
 	}
 }
+
+// ---------- subadmin (nhãn "Admin", M14.7) ----------
+
+var subA = &actor.Actor{UID: "m1", U: "sub", R: actor.RoleSubAdmin, CT: "c1"}
+
+// subFake: công ty c1 (không trần), admin a1 (dòng do super cấp), subadmin m1 (dòng do a1 cấp).
+func subFake() *fakeRepo {
+	f := newFake().company("c1", "").company("c2", "").
+		user("a1", "admin", "", "c1").user("m1", "subadmin", "", "c1").user("m2", "subadmin", "", "c1").
+		user("u1", "staff", "", "c1").user("u2", "staff", "", "c1").user("u9", "staff", "", "c2")
+	f.grant("c1", "a1", g("qs.boc:view,edit,delete;hr.employees:view;chat.main:view"), "s1")
+	f.grant("c1", "m1", g("qs.boc:view,edit;hr.employees:view"), "a1")
+	return f
+}
+
+func TestSubAdminMe(t *testing.T) {
+	s := newSvc(subFake())
+	r, err := s.Me(context.Background(), subA)
+	want := `{"hr":{"employees":["view"]},"qs":{"boc":["view","edit"]}}`
+	if err != nil || js(t, r) != `{"grants":`+want+`,"grantable":`+want+`}` {
+		t.Errorf("subadmin = %v %v", js(t, r), err)
+	}
+	if subA.IsAdmin() {
+		t.Error("subadmin không được là admin")
+	}
+}
+
+func TestSubAdminSetUserAccess(t *testing.T) {
+	f := subFake()
+	f.grant("c1", "u2", g("qs.boc:view,delete"), "s1")
+	s := newSvc(f)
+	ctx := context.Background()
+	cases := []struct {
+		name string
+		id   string
+		v    any
+		st   int
+		msg  string
+	}{
+		{"đặt admin", "a1", g("qs.boc:view"), 403, msgAdminTarget},
+		{"đặt subadmin khác", "m2", g("qs.boc:view"), 403, msgSubTarget},
+		{"tự đặt", "m1", g("qs.boc:view"), 403, msgSubTarget},
+		{"tự đặt null", "m1", nil, 403, msgSubTarget},
+		{"null = theo mặc định cũ", "u1", nil, 403, msgSubNoDefault},
+		{"vượt quyền mình", "u1", g("qs.boc:view,delete"), 403, msgExceed + "QS > Bóc tách > Xoá"},
+		{"nhân viên có quyền vượt mình", "u2", g("qs.boc:view"), 403, msgTargetExceed + "QS > Bóc tách > Xoá"},
+		{"công ty khác", "u9", g("qs.boc:view"), 403, msgOtherCompany},
+		{"không có", "zz", g("qs.boc:view"), 404, msgNoUser},
+	}
+	for _, c := range cases {
+		_, err := s.SetUserAccess(ctx, subA, c.id, c.v)
+		if err == nil || err.Error() != c.msg || status(err) != c.st {
+			t.Errorf("%s: lỗi = %v (%d), muốn %d %q", c.name, err, status(err), c.st, c.msg)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Fatalf("lỗi thì không được ghi: %v", f.calls)
+	}
+	r, err := s.SetUserAccess(ctx, subA, "u1", g("qs.boc:view;hr.employees:view"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if js(t, r) != `{"grants":{"hr":{"employees":["view"]},"qs":{"boc":["view"]}},"effective":{"hr":{"employees":["view"]},"qs":{"boc":["view"]}}}` {
+		t.Errorf("sau khi cấp = %s", js(t, r))
+	}
+	if row := f.grants["c1|u1"]; row.Val("nguoi_cap") != "m1" || row.Val("nguoi_sua") != "sub" {
+		t.Errorf("dòng = %s", js(t, row))
+	}
+	// đọc: chính mình và nhân viên (kể cả nhân viên vượt quyền) được; admin / subadmin khác không
+	if _, err := s.UserAccess(ctx, subA, "m1"); err != nil {
+		t.Errorf("tự đọc: %v", err)
+	}
+	if _, err := s.UserAccess(ctx, subA, "u2"); err != nil {
+		t.Errorf("đọc nhân viên: %v", err)
+	}
+	for _, id := range []string{"a1", "m2"} {
+		if _, err := s.UserAccess(ctx, subA, id); status(err) != 403 || err.Error() != msgSubTarget {
+			t.Errorf("đọc %s: %v", id, err)
+		}
+	}
+	// admin phân quyền được cho subadmin (trong quyền của admin)
+	if _, err := s.SetUserAccess(ctx, adminA, "m2", g("qs.boc:view")); err != nil {
+		t.Errorf("admin đặt subadmin: %v", err)
+	}
+}
+
+func TestSubAdminGranterCap(t *testing.T) {
+	f := subFake()
+	f.grant("c1", "u1", g("qs.boc:view,edit,delete;hr.employees:view;chat.main:view"), "m1")
+	s := newSvc(f)
+	// nhân viên do subadmin cấp: cắt theo quyền thực của subadmin
+	if got := eff(t, s, "u1"); got != `{"hr":{"employees":["view"]},"qs":{"boc":["view","edit"]}}` {
+		t.Errorf("nhân viên (m1 cấp) = %s", got)
+	}
+	// admin thu quyền của subadmin -> nhân viên mất theo
+	f.grant("c1", "m1", g("qs.boc:view"), "a1")
+	if got := eff(t, s, "u1"); got != `{"qs":{"boc":["view"]}}` {
+		t.Errorf("sau khi thu quyền subadmin = %s", got)
+	}
+	// chuỗi nhân viên -> subadmin -> admin: dòng của admin cũng giới hạn
+	f.grant("c1", "m1", g("qs.boc:view,edit,delete;hr.employees:view"), "a1")
+	f.grant("c1", "a1", g("qs.boc:view,edit"), "s1")
+	if got := eff(t, s, "u1"); got != `{"qs":{"boc":["view","edit"]}}` {
+		t.Errorf("chuỗi tới admin = %s", got)
+	}
+	// subadmin chưa có dòng (perms cũ) vẫn giới hạn
+	f.user("m2", "subadmin", "chat", "c1")
+	f.grant("c1", "u2", g("qs.boc:view;chat.main:view"), "m2")
+	if got := eff(t, s, "u2"); got != `{"chat":{"main":["view"]}}` {
+		t.Errorf("subadmin chưa có dòng = %s", got)
+	}
+	// vòng m3 <-> m4: dừng, rỗng
+	f.user("m3", "subadmin", "", "c1").user("m4", "subadmin", "", "c1").user("u3", "staff", "", "c1")
+	f.grant("c1", "m3", g("qs.boc:view"), "m4")
+	f.grant("c1", "m4", g("qs.boc:view"), "m3")
+	f.grant("c1", "u3", g("qs.boc:view"), "m3")
+	for _, id := range []string{"m3", "m4", "u3"} {
+		if got := eff(t, s, id); got != `{}` {
+			t.Errorf("vòng %s = %s", id, got)
+		}
+	}
+	// độ sâu: u4 -> ma -> mb -> mc -> a1 vẫn tính; thêm 1 subadmin nữa (mc -> md) = rỗng
+	f.user("ma", "subadmin", "", "c1").user("mb", "subadmin", "", "c1").user("mc", "subadmin", "", "c1").
+		user("md", "subadmin", "", "c1").user("u4", "staff", "", "c1")
+	f.grant("c1", "u4", g("qs.boc:view"), "ma")
+	f.grant("c1", "ma", g("qs.boc:view"), "mb")
+	f.grant("c1", "mb", g("qs.boc:view"), "mc")
+	f.grant("c1", "mc", g("qs.boc:view"), "a1")
+	if got := eff(t, s, "u4"); got != `{"qs":{"boc":["view"]}}` {
+		t.Errorf("3 cấp subadmin = %s", got)
+	}
+	f.grant("c1", "mc", g("qs.boc:view"), "md")
+	f.grant("c1", "md", g("qs.boc:view"), "a1")
+	if got := eff(t, s, "u4"); got != `{}` {
+		t.Errorf("4 cấp subadmin = %s", got)
+	}
+	// subadmin công ty khác không giới hạn (như admin công ty khác)
+	f.user("mx", "subadmin", "", "c2").user("u5", "staff", "", "c1")
+	f.grant("c2", "mx", g("chat.main:view"), "s1")
+	f.grant("c1", "u5", g("qs.boc:view"), "mx")
+	if got := eff(t, s, "u5"); got != `{"qs":{"boc":["view"]}}` {
+		t.Errorf("người cấp công ty khác = %s", got)
+	}
+}
+
+func TestFreezeGrantsBySubAdmin(t *testing.T) {
+	f := subFake()
+	f.grant("c1", "u1", g("qs.boc:view,edit,delete"), "m1")
+	f.grant("c1", "u2", g("qs.boc:view"), "m1")
+	s := newSvc(f)
+	before := eff(t, s, "u1")
+	if err := s.FreezeGrantsBy(context.Background(), "m1"); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(f.calls, ","); got != "save:c1|u1" {
+		t.Errorf("lệnh = %s", got)
+	}
+	if row := f.grants["c1|u1"]; js(t, row.Val("quyen")) != `{"qs":{"boc":["view","edit"]}}` || row.Val("nguoi_cap") != "m1" {
+		t.Errorf("dòng u1 = %s", js(t, row))
+	}
+	f.user("m1", "staff", "", "c1")
+	if got := eff(t, s, "u1"); got != before {
+		t.Errorf("sau khi hạ subadmin: %s -> %s", before, got)
+	}
+}
+
+// admin công ty (không có dòng riêng, perms rỗng) bị hạ xuống subadmin: Freeze + Release -> quyền thực nhân viên nó cấp không đổi.
+func TestReleaseGrantsBy(t *testing.T) {
+	ctx := context.Background()
+	f := newFake().company("c1", "").user("a9", "admin", "", "c1").user("u1", "staff", "", "c1").user("u2", "staff", "", "c1")
+	f.grant("c1", "u1", g("qs.boc:view,edit;hr.employees:view"), "a9")
+	f.grant("c1", "u2", g("qs.boc:view"), "s1")
+	s := newSvc(f)
+	before := eff(t, s, "u1")
+	// chưa phải subadmin / a nil: không ghi
+	if err := s.ReleaseGrantsBy(ctx, superA, "a9"); err != nil || len(f.calls) != 0 {
+		t.Fatalf("còn là admin: %v %v", err, f.calls)
+	}
+	if err := s.FreezeGrantsBy(ctx, "a9"); err != nil {
+		t.Fatal(err)
+	}
+	f.user("a9", "subadmin", "", "c1")
+	if got := eff(t, s, "u1"); got != `{}` {
+		t.Fatalf("chưa release: nhân viên bị giới hạn theo subadmin = %s", got)
+	}
+	if err := s.ReleaseGrantsBy(ctx, nil, "a9"); err != nil || len(f.calls) != 0 {
+		t.Fatalf("a nil: %v %v", err, f.calls)
+	}
+	if err := s.ReleaseGrantsBy(ctx, superA, "a9"); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(f.calls, ","); got != "save:c1|u1" {
+		t.Errorf("lệnh = %s", got)
+	}
+	row := f.grants["c1|u1"]
+	if row.Val("nguoi_cap") != "s1" || row.Val("nguoi_sua") != "sa" || js(t, row.Val("quyen")) != `{"qs":{"boc":["view","edit"]},"hr":{"employees":["view"]}}` {
+		t.Errorf("dòng u1 = %s", js(t, row))
+	}
+	if got := eff(t, s, "u1"); got != before {
+		t.Errorf("quyền thực đổi: %s -> %s", before, got)
+	}
+}
+
+func TestCheckUserWithin(t *testing.T) {
+	f := subFake()
+	f.grant("c1", "u1", g("qs.boc:view"), "s1")
+	f.grant("c1", "u2", g("qs.boc:view,delete"), "s1")
+	s := newSvc(f)
+	ctx := context.Background()
+	if err := s.CheckUserWithin(ctx, subA, "u1"); err != nil {
+		t.Errorf("tập con: %v", err)
+	}
+	if err := s.CheckUserWithin(ctx, subA, "u2"); status(err) != 403 || err.Error() != msgTargetExceed+"QS > Bóc tách > Xoá" {
+		t.Errorf("vượt: %v", err)
+	}
+	if err := s.CheckUserWithin(ctx, subA, "zz"); status(err) != 404 {
+		t.Errorf("không có: %v", err)
+	}
+	for _, a := range []*actor.Actor{nil, adminA, superA, staffA} {
+		if err := s.CheckUserWithin(ctx, a, "u2"); err != nil {
+			t.Errorf("không phải subadmin: %v", err)
+		}
+	}
+}
+
+func TestPinGrantedBy(t *testing.T) {
+	f := subFake()
+	f.user("u1", "staff", "boc,chat", "c1")
+	f.grant("c1", "u2", g("qs.boc:view"), "a1")
+	s := newSvc(f)
+	ctx := context.Background()
+	// không phải subadmin / chính mình / đã có dòng / không phải nhân viên: không ghi
+	for _, a := range []*actor.Actor{nil, adminA, superA} {
+		if err := s.PinGrantedBy(ctx, a, "u1"); err != nil {
+			t.Errorf("không phải subadmin: %v", err)
+		}
+	}
+	for _, id := range []string{"m1", "u2", "m2"} {
+		if err := s.PinGrantedBy(ctx, subA, id); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Fatalf("không được ghi: %v", f.calls)
+	}
+	if err := s.PinGrantedBy(ctx, subA, "u9"); status(err) != 403 {
+		t.Errorf("công ty khác: %v", err)
+	}
+	// nhân viên perms cũ: ghi dòng = perms ∩ quyền của subadmin, người cấp = subadmin
+	if err := s.PinGrantedBy(ctx, subA, "u1"); err != nil {
+		t.Fatal(err)
+	}
+	row := f.grants["c1|u1"]
+	if js(t, row.Val("quyen")) != `{"qs":{"boc":["view","edit"]}}` || row.Val("nguoi_cap") != "m1" {
+		t.Errorf("dòng u1 = %s", js(t, row))
+	}
+	if err := s.PinGrantedBy(ctx, subA, "u1"); err != nil || strings.Join(f.calls, ",") != "save:c1|u1" {
+		t.Errorf("đã có dòng thì không ghi lại: %v %v", err, f.calls)
+	}
+	// sau đó subadmin bị thu quyền -> nhân viên mất theo
+	f.grant("c1", "m1", g("qs.boc:view"), "a1")
+	if got := eff(t, s, "u1"); got != `{"qs":{"boc":["view"]}}` {
+		t.Errorf("sau khi thu quyền subadmin = %s", got)
+	}
+}

@@ -60,9 +60,10 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 
 // RegisterRoutes: REST /api/v1 - gọi đúng phương thức service mà hàm rpc gọi (bản Gated của 5 hàm quản lý tài khoản).
 func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
-	g := v1.Group("/users", middleware.RequireAdmin())
+	// M14.7: group mở cho subadmin (RequireStaffManager, chặn giống hệt RequireAdmin); cửa ngõ Gated giới hạn đích là nhân viên
+	g := v1.Group("/users", middleware.RequireStaffManager())
 	g.GET("", func(c *gin.Context) {
-		r, err := s.AdminListUsers(c.Request.Context(), actor.FromGin(c))
+		r, err := s.AdminListUsersGated(c.Request.Context(), actor.FromGin(c))
 		response.Result(c, r, err)
 	})
 	g.POST("", func(c *gin.Context) {
@@ -81,12 +82,13 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.AdminSetActiveGated(c.Request.Context(), actor.FromGin(c), c.Param("id"), bodyVal(c, "active"))
 		response.Result(c, r, err)
 	})
-	// route chỉ bản Go (M14.6), khai ở RegisterRPC; group đã RequireAdmin, thêm RequireSuper = RequireAdminSuper
-	g.GET("/product-approvers", func(c *gin.Context) {
+	// route chỉ bản Go (M14.6), khai ở RegisterRPC; group chỉ RequireStaffManager nên gắn lại RequireAdmin (subadmin bị chặn),
+	// thêm RequireSuper = RequireAdminSuper
+	g.GET("/product-approvers", middleware.RequireAdmin(), func(c *gin.Context) {
 		r, err := s.ProductApprovers(c.Request.Context())
 		response.Result(c, r, err)
 	})
-	g.PUT("/:id/product-approval", middleware.RequireSuper(), func(c *gin.Context) {
+	g.PUT("/:id/product-approval", middleware.RequireAdmin(), middleware.RequireSuper(), func(c *gin.Context) {
 		r, err := s.SetProductApproval(c.Request.Context(), actor.FromGin(c), c.Param("id"), bodyVal(c, "on"))
 		response.Result(c, r, err)
 	})

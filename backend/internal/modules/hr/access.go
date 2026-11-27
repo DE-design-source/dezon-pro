@@ -204,6 +204,22 @@ func (s *Service) gate(ctx context.Context, a *actor.Actor, module, action strin
 	return x, nil
 }
 
+// hrRank: hạng vai trò HR (rộng hơn = cao hơn), cho HRRoleRank.
+var hrRank = map[string]int{"employee": 1, "manager": 2, "hradmin": 3, "sysadmin": 4}
+
+// HRRoleRank (contracts.HRRoleReader, M14.7): hạng vai trò HR của tài khoản userID theo hồ sơ hr_nhan_vien gắn với nó (công ty
+// đang làm việc, như gate): sysadmin 4, hradmin 3, manager 2, employee 1; chưa gắn hồ sơ / vai trò lạ 0.
+func (s *Service) HRRoleRank(ctx context.Context, userID any) (int, error) {
+	if !jsval.Truthy(userID) {
+		return 0, nil
+	}
+	rows, err := s.db.Select(ctx, "hr_nhan_vien", database.SelectOpt{Select: "vai_tro_hr", Filter: database.Eq("tai_khoan_id", userID), Limit: 1})
+	if err != nil || len(rows) == 0 {
+		return 0, err
+	}
+	return hrRank[jsval.Str(rows[0].Val("vai_tro_hr"))], nil
+}
+
 // n21Of: phân quyền 3 cấp của a theo tab hr -> thao tác (AccessChecker; quyền thực tính 1 lần mỗi request). Super / chưa nối
 // Access -> nil (không giới hạn).
 func (s *Service) n21Of(ctx context.Context, a *actor.Actor) (map[string]map[string]bool, error) {

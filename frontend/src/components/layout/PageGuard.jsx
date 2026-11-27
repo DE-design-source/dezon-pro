@@ -3,6 +3,7 @@ import { useWorkSession } from '../../services/workSession'
 import { useAccess } from '../../services/accessService'
 import { NAV_MAIN, NAV_BOTTOM, permOfPath } from '../../data/navigation'
 import { StatusCard } from './AppGate'
+import * as qsStore from '../../pages/QS/state/store'
 
 /* Trang đầu tiên (theo thứ tự thanh bên) tài khoản được vào; Cài đặt không tính (luôn vào được) */
 export function firstAllowedPath(canPage) {
@@ -22,6 +23,9 @@ export default function PageGuard({ children, inline }) {
   if (perm && s.me && s.me.role !== 'super' && !access.ready && !access.error) {
     return <StatusCard inline={inline} text="Đang tải phân quyền…" />
   }
+  // super "Xem dữ liệu" 1 công ty: chờ biết tính năng công ty đó rồi mới mở trang (không lộ module công ty đã tắt)
+  // (useWorkSession đã theo dõi viewAsCt nên nạp xong là vẽ lại)
+  if (perm && qsStore.viewAsPending_(s.me)) return <StatusCard inline={inline} text="Đang tải tính năng công ty…" />
   if (s.canPage(perm)) return children
   const to = firstAllowedPath(s.canPage)
   if (to) return <Navigate to={to} replace />

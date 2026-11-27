@@ -21,7 +21,7 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	})
 	reg.RegisterGoRoute(rpc.GoRoute{
 		Name: "accessMe", Method: "GET", Path: "/access/me", Perm: rpc.Login, Tag: tag,
-		Summary: "Quyền thực của tài khoản đang đăng nhập -> {grants, grantable} (grantable: super = mọi quyền, admin = quyền của mình, nhân viên = {})",
+		Summary: "Quyền thực của tài khoản đang đăng nhập -> {grants, grantable} (grantable: super = mọi quyền, admin và Admin (subadmin) = quyền của mình, nhân viên = {})",
 	})
 	reg.RegisterGoRoute(rpc.GoRoute{
 		Name: "companyAccess", Method: "GET", Path: "/companies/:id/access", Perm: rpc.Super, Tag: tag,
@@ -35,13 +35,15 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	})
 	reg.RegisterGoRoute(rpc.GoRoute{
 		Name: "userAccess", Method: "GET", Path: "/users/:id/access", Perm: rpc.Admin, Tag: tag,
-		Summary: "Quyền của 1 tài khoản (admin: tài khoản cùng công ty) -> {grants: đã đặt | null (cách cũ), effective}",
-		Fields:  []rpc.GoField{{Name: "id", In: "path", Type: "string", Required: true, Desc: "id tài khoản"}},
+		Summary: "Quyền của 1 tài khoản (admin: tài khoản cùng công ty; Admin (subadmin): nhân viên công ty mình và chính mình) -> " +
+			"{grants: đã đặt | null (cách cũ), effective}",
+		Fields: []rpc.GoField{{Name: "id", In: "path", Type: "string", Required: true, Desc: "id tài khoản"}},
 	})
 	reg.RegisterGoRoute(rpc.GoRoute{
 		Name: "setUserAccess", Method: "PUT", Path: "/users/:id/access", Perm: rpc.Admin, Tag: tag,
 		Summary: "Phân quyền 1 tài khoản -> {grants, effective}. Super: admin và nhân viên; admin: nhân viên công ty mình, " +
-			"chỉ trong quyền của chính mình; không đặt cho tài khoản super",
+			"chỉ trong quyền của chính mình; Admin (subadmin): chỉ nhân viên công ty mình, trong quyền của mình, không đặt null; " +
+			"không đặt cho tài khoản super",
 		Fields: []rpc.GoField{{Name: "id", In: "path", Type: "string", Required: true, Desc: "id tài khoản"}, grantsField},
 	})
 }
@@ -66,11 +68,11 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.SetCompanyAccess(c.Request.Context(), actor.FromGin(c), c.Param("id"), g)
 		response.Result(c, r, err)
 	})
-	v1.GET("/users/:id/access", middleware.RequireAdmin(), func(c *gin.Context) {
+	v1.GET("/users/:id/access", middleware.RequireStaffManager(), func(c *gin.Context) {
 		r, err := s.UserAccess(c.Request.Context(), actor.FromGin(c), c.Param("id"))
 		response.Result(c, r, err)
 	})
-	v1.PUT("/users/:id/access", middleware.RequireAdmin(), func(c *gin.Context) {
+	v1.PUT("/users/:id/access", middleware.RequireStaffManager(), func(c *gin.Context) {
 		g, ok := grantsOf(c)
 		if !ok {
 			return

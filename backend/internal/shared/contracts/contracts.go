@@ -274,13 +274,33 @@ type AccessChecker interface {
 
 // AccessGranter - chủ: access (chỉ bản Go, N21). Gọi từ users (cửa ngõ Admin*Gated).
 //
-//   - CheckLegacyPerms: admin công ty (a không phải super) cấp users.perms cho nhân viên - phần quyền perms cấp THÊM so với
-//     cur (nil khi tạo mới), giao trần công ty, phải nằm trong quyền thực của a; không thì lỗi 403 tiếng Việt.
+//   - CheckLegacyPerms: admin công ty / subadmin (a không phải super) cấp users.perms cho nhân viên - phần quyền perms cấp
+//     THÊM so với cur (nil khi tạo mới), giao trần công ty, phải nằm trong quyền thực của a; không thì lỗi 403 tiếng Việt.
 //     perms / cur: mảng của client hoặc chuỗi "a,b". a nil / super -> nil.
-//   - FreezeGrantsBy: gọi TRƯỚC khi tài khoản admin công ty adminID bị xoá / đổi vai trò / chuyển công ty - cắt dòng phân
-//     quyền của nhân viên do admin này cấp theo quyền thực cuối của admin (giới hạn không mất theo người cấp).
-//     Không phải admin -> nil.
+//   - FreezeGrantsBy: gọi TRƯỚC khi tài khoản admin công ty / subadmin adminID bị xoá / đổi vai trò / chuyển công ty - cắt
+//     dòng phân quyền của nhân viên do tài khoản này cấp theo quyền thực cuối của nó (giới hạn không mất theo người cấp).
+//     Không phải admin / subadmin -> nil.
+//   - CheckUserWithin (M14.7): subadmin a quản lý tài khoản targetID - toàn bộ quyền thực (N21) của đích phải nằm trong quyền
+//     thực của a; không thì lỗi 403 tiếng Việt. a nil / không phải subadmin -> nil.
+//   - PinGrantedBy (M14.7): sau khi subadmin a tạo / sửa perms tài khoản userID - đích chưa có dòng phân quyền riêng thì ghi
+//     dòng theo quyền thực hiện tại (không vượt quyền của a) với người cấp = a, để a giới hạn quyền đích về sau.
+//     a không phải subadmin / đích đã có dòng -> nil.
+//   - ReleaseGrantsBy (M14.7): gọi SAU khi tài khoản admin công ty granterID đã bị hạ xuống subadmin - dòng phân quyền nhân
+//     viên do nó cấp chuyển người cấp sang a, để quyền thực của nhân viên không bị giới hạn thêm theo quyền subadmin (đã cắt
+//     sẵn bằng FreezeGrantsBy). a nil / tài khoản không phải subadmin -> nil.
 type AccessGranter interface {
 	CheckLegacyPerms(ctx context.Context, a *actor.Actor, cur, perms any) error
 	FreezeGrantsBy(ctx context.Context, adminID any) error
+	CheckUserWithin(ctx context.Context, a *actor.Actor, targetID any) error
+	PinGrantedBy(ctx context.Context, a *actor.Actor, userID any) error
+	ReleaseGrantsBy(ctx context.Context, a *actor.Actor, granterID any) error
+}
+
+// HRRoleReader - chủ: hr (chỉ bản Go, M14.7). Gọi từ users (subTargetGate: subadmin không quản lý tài khoản có vai trò HR
+// cao hơn mình).
+//
+//   - HRRoleRank: hạng vai trò HR của tài khoản userID (hr_nhan_vien.vai_tro_hr của hồ sơ gắn tài khoản, công ty đang làm
+//     việc): sysadmin 4, hradmin 3, manager 2, employee 1; chưa gắn hồ sơ / vai trò lạ 0. Lỗi database trả nguyên.
+type HRRoleReader interface {
+	HRRoleRank(ctx context.Context, userID any) (int, error)
 }

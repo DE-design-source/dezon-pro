@@ -58,6 +58,16 @@ func TestPhanQuyen(t *testing.T) {
 	if _, err := sa.SetUserRole(ctx, adm, omap.Of("empId", e2, "userId", uB)); status(err) != 400 {
 		t.Errorf("gắn tài khoản công ty khác phải 400: %v", err)
 	}
+	// HRRoleRank (M14.7): hạng vai trò HR theo hồ sơ gắn tài khoản, trong công ty đang làm việc
+	for uid, want := range map[string]int{uM: 2, uE: 1, uX: 0, uB: 0, "": 0} {
+		if got, err := sa.HRRoleRank(ctx, uid); err != nil || got != want {
+			t.Errorf("HRRoleRank(%s) = %d %v, muốn %d", uid, got, err, want)
+		}
+	}
+	_, octx, _ := svcAs(db, "admin", "", cts[1])
+	if got, err := sa.HRRoleRank(octx, uM); err != nil || got != 0 {
+		t.Errorf("HRRoleRank công ty khác = %d %v", got, err)
+	}
 	codes := func(st any) map[string]*omap.Map {
 		out := map[string]*omap.Map{}
 		for _, x := range st.(*omap.Map).Val("employees").([]any) {

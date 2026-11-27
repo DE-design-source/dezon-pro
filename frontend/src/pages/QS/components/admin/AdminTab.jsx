@@ -28,7 +28,7 @@ import CompanyCard from './CompanyCard'
 import PurDetail from './PurDetail'
 import DxDetail from './DxDetail'
 import {
-  admActionLabel_, fmtDateTime_, PUR_CLS, DRQ_LBL, ROLE_LBL, DX_TEN_, DX_ICO_, dxStatusCls_, LY_DO_MAX,
+  admActionLabel_, fmtDateTime_, PUR_CLS, DRQ_LBL, ROLE_LBL, roleCls_, DX_TEN_, DX_ICO_, dxStatusCls_, LY_DO_MAX,
 } from './adminUtil'
 import './admin.css'
 
@@ -42,7 +42,9 @@ import './admin.css'
 /* view: 'admin' = mọi thẻ trừ yêu cầu và nhật ký; 'nhatky' = mục Nhật ký hoạt động;'yeucau' = mục Yêu cầu của Cài đặt (Yêu cầu xóa sản phẩm + Yêu cầu mua hàng + Đề xuất mua hàng) */
 export default function AdminTab({ view = 'admin' }) {
   const { visibleSeq, panelVisible, consumeIntent, reloadProducts, congTy } = useQsData()
-  const { me, isAdmin, isSuper, viewAs } = useQsSession()
+  /* Admin (subadmin, M14.7): chỉ thẻ Tài khoản - tạo / phân quyền nhân viên trong phạm vi quyền của mình; isAdmin = false
+     (không thẻ công ty, không yêu cầu / nhật ký / HR). canManageUsers = admin | super | subadmin */
+  const { me, isAdmin, isSuper, viewAs, isSubAdmin, canManageUsers } = useQsSession()
   const seq = visibleSeq('admin')
   const vis = panelVisible('admin')
   const [st, setSt] = useState({ phase: 'idle', err: '', d: null })
@@ -115,7 +117,7 @@ export default function AdminTab({ view = 'admin' }) {
   const bodyRef = useRef(null)
 
   useEffect(() => {
-    if (!vis || !isAdmin) return undefined
+    if (!vis || !canManageUsers) return undefined
     // StrictMode chạy effect 2 lần: ý định đọc 1 lần vào ref để lần chạy sau vẫn còn
     const it = consumeIntent('admin')
     if (it && it.purDetail) setPurCode(String(it.purDetail))
@@ -125,6 +127,14 @@ export default function AdminTab({ view = 'admin' }) {
     const sig = ac.signal
     setSt(s => ({ ...s, phase: 'loading', err: '' }))
     ;(async () => {
+      if (isSubAdmin) {
+        // Admin (subadmin): chỉ danh sách tài khoản (máy chủ lọc: nhân viên công ty mình + chính mình) và quyền duyệt SP của mình;
+        // các route yêu cầu / nhật ký / đề xuất / người được giao duyệt chỉ cho quản trị công ty (403) nên không gọi
+        const users = await api.adminListUsers(sig)
+        const rights = await api.getSpApprovalRights(sig).catch(e => { if (isAbort(e)) throw e; return null })
+        return { users: users || [], reqs: [], purs: [], logs: [], dxs: [], cts: [], approvers: {},
+          rights: rights ? { duyet: !!rights.duyet, giaoDuyet: !!rights.giaoDuyet } : { duyet: false, giaoDuyet: false } }
+      }
       const [users, reqs, purs, logs] = await Promise.all([
         api.adminListUsers(sig), api.listDeleteRequests(sig), api.listPurchaseRequests(sig), api.getAuditLog(120, sig),
       ])
@@ -149,7 +159,7 @@ export default function AdminTab({ view = 'admin' }) {
       setSt({ phase: 'error', err: e.message, d: null })
     })
     return () => ac.abort()
-  }, [seq, reloadN, isAdmin])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seq, reloadN, canManageUsers, isSubAdmin])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Thông báo yêu cầu xoá: cuộn tới và nháy sáng đúng thẻ (notifHighlight_, PUB/app.js:56-60) */
   useEffect(() => {
@@ -170,8 +180,9 @@ export default function AdminTab({ view = 'admin' }) {
 
   const reload = () => setReloadN(n => n + 1)
 
-  /* Thẻ Thông tin công ty (M17.1): admin sửa công ty của phiên; super chỉ khi đang xem một công ty, bản lấy từ listCongTy */
-  const coEdit = !isAdmin ? null
+  /* Thẻ Thông tin công ty (M17.1): admin sửa công ty của phiên; super chỉ khi đang xem một công ty, bản lấy từ listCongTy.
+     Admin (subadmin) không sửa cài đặt công ty */
+  const coEdit = !isAdmin || isSubAdmin ? null
     : isSuper ? ((st.d && viewAs && st.d.cts.filter(x => String(x.id) === String(viewAs))[0]) || null)
       : (congTy && me && congTy.id === me.congTyId ? congTy : null)
   function coSaved(r) {
@@ -180,7 +191,7 @@ export default function AdminTab({ view = 'admin' }) {
     if (isSuper) reload()   // super: nạp lại listCongTy, không đổi S.congTy
   }
 
-  if (!isAdmin) {
+  if (!canManageUsers) {
     return (
       <div className="qsa-root">
         <div className="qsa-hd"><h2>Quản trị</h2></div>
@@ -284,11 +295,11 @@ export default function AdminTab({ view = 'admin' }) {
   } else {
     body = (
       <>
-        <Stats d={d} nUsers={coUsers.length} />
+        <Stats d={d} nUsers={coUsers.length} usersOnly={isSubAdmin} />
         {coEdit ? (
           <CompanyCard c={coEdit} onSaved={coSaved} />
         ) : null}
-        <UsersCard meId={me && me.id} users={coUsers} isSuper={isSuper} cts={d.cts} approvers={d.approvers} hrPos={hrPos} hrCt={(congTy && congTy.id) || (me && me.congTyId) || ''} onAppoint={setAptUser}
+        <UsersCard meId={me && me.id} mePerms={(me && me.perms) || []} users={coUsers} isSuper={isSuper} isSubAdmin={isSubAdmin} cts={d.cts} approvers={d.approvers} hrPos={hrPos} hrCt={(congTy && congTy.id) || (me && me.congTyId) || ''} onAppoint={setAptUser}
           onCreate={() => setUserDlg({ user: null })} onEdit={(u, back) => setUserDlg({ user: u, back })}
           onResetPw={admResetPw} onToggle={admToggleActive} onDelete={admDelete} />
       </>
@@ -299,7 +310,8 @@ export default function AdminTab({ view = 'admin' }) {
   return (
     <div className="qsa-root" ref={bodyRef}>
       <div className="qsa-hd"><h2>{view === 'super' ? 'Tài khoản siêu quản trị viên' : view === 'nhatky' ? 'Nhật ký hoạt động' : view === 'yeucau' ? 'Yêu cầu — Xóa sản phẩm, mua hàng & đề xuất' :<>Quản trị — Tài khoản &amp; phân quyền</>}</h2>
-        {view === 'admin' ? <span className="qsa-hd-note">Admin toàn quyền · Nhân viên không mở được trang này.</span> : null}</div>
+        {view === 'admin' ? <span className="qsa-hd-note">{isSubAdmin ? 'Admin chỉ tạo và phân quyền tài khoản nhân viên, trong phạm vi quyền của mình.'
+          : 'Quản trị công ty toàn quyền · Admin tạo và phân quyền nhân viên · Nhân viên không mở được trang này.'}</span> : null}</div>
       {view === 'super' ? (
         /* Vai trò Siêu quản trị viên (MarkUp 2026-11-12 17:47, N17) */
         <p className="qsa-super-note">
@@ -311,7 +323,7 @@ export default function AdminTab({ view = 'admin' }) {
       ) : null}
       {body}
       {userDlg ? (
-        <UserModal user={userDlg.user} superMode={!!userDlg.superMode} isSuper={isSuper} companies={d ? d.cts : []} defaultCt={defaultCt}
+        <UserModal user={userDlg.user} superMode={!!userDlg.superMode} isSuper={isSuper} isSubAdmin={isSubAdmin} viewer={me} companies={d ? d.cts : []} defaultCt={defaultCt}
           rights={d ? d.rights : null} approved={!!(d && userDlg.user && d.approvers[String(userDlg.user.id)])}
           onClose={() => { const b = userDlg.back; setUserDlg(null); if (b) b() }} onSaved={msg => { qsToast(msg); setUserDlg(null); reload() }} />
       ) : null}
@@ -331,7 +343,7 @@ function useQsData() {
   return { ...q, congTy: s.congTy }
 }
 
-function Stats({ d, nUsers }) {
+function Stats({ d, nUsers, usersOnly = false }) {
   const pendDel = d.reqs.filter(r => r.status === 'pending').length
   const pendPur = d.purs.filter(r => r.status === 'Chờ duyệt').length
   const pendDx = d.dxs.filter(r => r.status === 'Chờ duyệt').length
@@ -344,9 +356,12 @@ function Stats({ d, nUsers }) {
   return (
     <div className="qsa-stats">
       {tile('lock', nUsers, 'Tài khoản', false)}
-      {tile('trash', pendDel, 'Yêu cầu xóa chờ duyệt', true)}
-      {tile('cart', pendPur, 'Đơn mua hàng chờ duyệt', true)}
-      {tile('gauge', pendDx, 'Đề xuất chờ duyệt', true)}
+      {/* Admin (subadmin) không duyệt yêu cầu / đơn / đề xuất: chỉ ô Tài khoản */}
+      {usersOnly ? null : <>
+        {tile('trash', pendDel, 'Yêu cầu xóa chờ duyệt', true)}
+        {tile('cart', pendPur, 'Đơn mua hàng chờ duyệt', true)}
+        {tile('gauge', pendDx, 'Đề xuất chờ duyệt', true)}
+      </>}
     </div>
   )
 }
@@ -417,7 +432,7 @@ function RqItem({ cls, clickable, drq, icon, title, meta, badgeCls, badgeText, a
   )
 }
 
-function UsersCard({ meId, users, isSuper, cts, approvers, hrPos, hrCt, onAppoint, addLabel = 'Thêm tài khoản', onCreate, onEdit, onResetPw, onToggle, onDelete }) {
+function UsersCard({ meId, mePerms = [], users, isSuper, isSubAdmin = false, cts, approvers, hrPos, hrCt, onAppoint, addLabel = 'Thêm tài khoản', onCreate, onEdit, onResetPw, onToggle, onDelete }) {
   const lbl = {}
   PERM_TABS.forEach(t => { lbl[t[0]] = t[1] })
   const ctTen = id => { const c = (cts || []).filter(x => x.id === id)[0]; return c ? (c.ten || c.ma || id) : '(công ty đã xoá)' }
@@ -440,8 +455,18 @@ function UsersCard({ meId, users, isSuper, cts, approvers, hrPos, hrCt, onAppoin
     )
   }
   const canApt = u => !!hrPos && u.role !== 'super' && String(u.congTyId || '') === String(hrCt || '')
-  // Không phải super: tài khoản quản trị công ty KHÁC mình chỉ xem, không sửa / đặt MK / khoá / xoá (máy chủ cũng chặn)
-  const ro = u => !isSuper && u.role === 'admin' && String(u.id) !== String(meId)
+  // Không phải super: tài khoản quản trị công ty KHÁC mình chỉ xem, không sửa / đặt MK / khoá / xoá (máy chủ cũng chặn).
+  // Admin (subadmin, M14.7): chỉ quản lý tài khoản nhân viên -> mọi tài khoản không phải nhân viên (trừ chính mình) chỉ xem
+  // Admin (subadmin) cũng không quản lý nhân viên giữ quyền duyệt / mức sửa SP mà mình không có (máy chủ: subTargetGate)
+  const has = (p, k) => (p || []).indexOf(k) >= 0
+  const subLock = u => {
+    if (!isSubAdmin || u.role !== 'staff' || String(u.id) === String(meId)) return ''
+    const p = u.perms || []
+    if ((has(p, 'sp_duyet') && !has(mePerms, 'sp_duyet')) || (has(p, 'da_duyet') && !has(mePerms, 'da_duyet'))) return 'Nhân viên này có quyền duyệt mà bạn không có'
+    if (!has(p, 'sp_duyet') && !has(p, 'sp_edit') && !has(mePerms, 'sp_duyet') && has(mePerms, 'sp_edit')) return 'Nhân viên này được sửa sản phẩm không cần duyệt, bạn chỉ được sửa chờ duyệt'
+    return ''
+  }
+  const ro = u => (!isSuper && (isSubAdmin ? u.role !== 'staff' : u.role === 'admin') && String(u.id) !== String(meId)) || !!subLock(u)
   const apr = u => u.role === 'admin' && !!(approvers && approvers[String(u.id)])
   const du = detail != null ? users.filter(x => x.id === detail)[0] : null
   const noCt = users.filter(u => !u.congTyId).length
@@ -472,7 +497,7 @@ function UsersCard({ meId, users, isSuper, cts, approvers, hrPos, hrCt, onAppoin
                   <td><span className={`qsa-uav${u.role !== 'staff' ? ' adm' : ''}`}>{av}</span><b>{u.username}</b>
                     {u.email ? <span className="qsa-mail">{u.email}</span> : null}</td>
                   {sh('hoTen') ? <td>{u.hoTen || ''}</td> : null}
-                  {sh('role') ? <td><span className={`qsa-role ${u.role === 'super' ? 'sup' : (u.role === 'admin' ? 'adm' : 'stf')}`}>{ROLE_LBL[u.role] || u.role}</span>
+                  {sh('role') ? <td><span className={`qsa-role ${roleCls_(u.role)}`}>{ROLE_LBL[u.role] || u.role}</span>
                     {apr(u) ? <span className="qsa-apr" title="Được quản trị hệ thống giao quyền duyệt sản phẩm">Duyệt SP</span> : null}</td> : null}
                   {sh('perms') ? <td className="qsa-permcol">{permCell(u)}</td> : null}
                   {sh('apt') ? (
@@ -488,7 +513,7 @@ function UsersCard({ meId, users, isSuper, cts, approvers, hrPos, hrCt, onAppoin
                   ) : null}
                   {sh('st') ? <td>{u.active ? <span className="qsa-st-ok">● Hoạt động</span> : <span className="qsa-st-lk">● Đã khóa</span>}</td> : null}
                   {sh('last') ? <td className="qsa-muted">{u.lastLogin ? fmtDateTime_(u.lastLogin) : '—'}</td> : null}
-                  <td title="" onClick={e => e.stopPropagation()}>{ro(u) ? <span className="qsa-muted qsa-ro">Chỉ quản trị hệ thống</span> : <div className="qsa-act">
+                  <td title="" onClick={e => e.stopPropagation()}>{ro(u) ? <span className="qsa-muted qsa-ro" title={subLock(u) || undefined}>{isSubAdmin ? 'Chỉ quản trị công ty' : 'Chỉ quản trị hệ thống'}</span> : <div className="qsa-act">
                     <button type="button" className="qsa-btn ghost xs" onClick={() => onEdit(u)}>Sửa</button>
                     {hrPos && u.role !== 'super' && String(u.congTyId || '') === String(hrCt || '') ? <button type="button" className="qsa-btn ghost xs" title="Bổ nhiệm vào phòng ban / cơ cấu tổ chức (HR)" onClick={() => onAppoint(u)}>Bổ nhiệm</button> : null}
                     <button type="button" className="qsa-btn ghost xs" onClick={() => onResetPw(u.id)}>Đặt MK</button>
@@ -502,7 +527,7 @@ function UsersCard({ meId, users, isSuper, cts, approvers, hrPos, hrCt, onAppoin
         </table>
       </div>
       {du ? (
-        <UserDetail u={du} approved={apr(du)} ctName={du.congTyId ? ctTen(du.congTyId) : ''} apt={hrPos ? hrPos[du.id] || null : null} aptKnown={canApt(du)} canAppoint={canApt(du)} readOnly={ro(du)}
+        <UserDetail u={du} approved={apr(du)} ctName={du.congTyId ? ctTen(du.congTyId) : ''} apt={hrPos ? hrPos[du.id] || null : null} aptKnown={canApt(du)} canAppoint={canApt(du)} readOnly={ro(du)} roWhy={subLock(du)} viewerSub={isSubAdmin}
           onClose={() => setDetail(null)} onEdit={x => onEdit(x, () => setDetail(x.id))} onAppoint={onAppoint} onResetPw={onResetPw} onToggle={onToggle} onDelete={onDelete} />
       ) : null}
     </Card>

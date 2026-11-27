@@ -140,7 +140,8 @@ export function canTab(tab, me = S.me, congTy = S.congTy) {
    Super chỉ thấy dữ liệu khi đang "xem như" 1 công ty (hoặc có công ty) */
 export function legacyCanTab(tab, me = S.me, congTy = S.congTy) {
   if (!me) return false
-  if (me.role === 'super') return !!readViewAs() || !!me.congTyId
+  // super "xem như" 1 công ty: công ty đó tắt tính năng nào thì cũng ẩn như người dùng công ty đó (qsStore.ctHasFeature_)
+  if (me.role === 'super') return (!!readViewAs() || !!me.congTyId) && qsStore.ctHasFeature_(tab, me, null)
   const f = (congTy && congTy.tinhNang) || []
   if (f.length && f.indexOf(tab) < 0) return false
   if (me.role === 'admin') return true
@@ -163,7 +164,11 @@ export function legacyCanPage(perm, me = S.me, congTy = S.congTy) {
   if (!me) return false
   if (!perm) return true
   if (Array.isArray(perm)) return perm.some(p => legacyCanPage(p, me, congTy))
-  if (me.role === 'super') return true
+  if (me.role === 'super') {
+    // đang xem 1 công ty: 'qs' hiện khi công ty còn ít nhất 1 tab QS (như người dùng công ty đó)
+    if (perm === 'qs') return !(readViewAs() && qsStore.viewAsFeatures_()) || qsStore.PERM_TABS.some(x => qsStore.ctHasFeature_(x[0], me, null))
+    return !FEATURE_KEYS.has(perm) || qsStore.ctHasFeature_(perm, me, null)
+  }
   if (perm === 'qs') return qsStore.PERM_TABS.some(x => qsStore.legacyCanTab(x[0], me, congTy))
   const f = (congTy && congTy.tinhNang) || []
   if (FEATURE_KEYS.has(perm) && f.length && f.indexOf(perm) < 0) return false
@@ -176,6 +181,7 @@ const snap = () => S
 export function useWorkSession() {
   const s = useSyncExternalStore(subscribe, snap)
   useSyncExternalStore(subscribeAccess, accessSnap)   // vẽ lại khi quyền thực (N21) nạp xong / đổi
+  qsStore.useQsStore(x => x.viewAsCt)                 // super "xem như": vẽ lại khi nạp xong tính năng công ty đang xem
   return {
     ...s, canTab: tab => canTab(tab, s.me, s.congTy), canPage: perm => canPage(perm, s.me, s.congTy),
     login, logout, retry, saveProfile, changePassword,

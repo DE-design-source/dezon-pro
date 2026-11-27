@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQsSession } from './QsSession'
 import { qsAsk, qsToast } from '../components/common/dialogs'
 
-const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', subadmin: 'Admin', staff: 'Nhân viên' }
 
 /* Nút tài khoản trên thanh trên + menu Đổi mật khẩu / Đăng xuất — port #userChip (PUB/index.html:6597-6604),
    applyRoleUI_ (app.js:2516-2526), openChangePw (app.js:2602-2610), authLogout_ (app.js:8-11). */

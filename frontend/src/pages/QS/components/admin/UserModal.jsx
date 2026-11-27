@@ -25,10 +25,19 @@ const SUB_KEYS = ['sp_edit', 'sp_duyet', 'da_duyet']
    Như #admModal gốc: chỉ đóng bằng ✕ / Huỷ / bấm nền, không đóng bằng Esc để khỏi mất phần đã gõ. */
 /* superMode (mục Tài khoản siêu quản trị viên, MarkUp 2026-11-12 17:55): tạo / sửa tài khoản vai trò super - tài khoản can thiệp
    hệ thống, không phải nhân viên cũng không phải admin công ty: không có lựa chọn vai trò, không có khối quyền */
-export default function UserModal({ user, isSuper, companies, defaultCt, onClose, onSaved, superMode = false, rights = null, approved = false }) {
+/* Vai trò Admin (subadmin, M14.7): quyền dữ liệu như nhân viên (ma trận / khoá cũ), thêm quản lý tài khoản nhân viên.
+   isSubAdmin = người đang đăng nhập là Admin: chỉ tạo / sửa nhân viên, trong phạm vi quyền của mình (ma trận, SP, dự án),
+   không đặt "Theo mặc định cũ", không tự đổi vai trò / quyền. viewer = tài khoản đang đăng nhập (me: id, perms) */
+export default function UserModal({ user, isSuper, isSubAdmin = false, viewer = null, companies, defaultCt, onClose, onSaved, superMode = false, rights = null, approved = false }) {
   const isEdit = !!user
   const u = user || { role: 'staff', perms: [] }
   const perms0 = u.perms || []
+  const isSelf = isEdit && !!viewer && String(u.id) === String(viewer.id)
+  const vPerms = (viewer && viewer.perms) || []
+  // Admin chỉ được sửa sản phẩm (chờ duyệt): không cấp được mức "Không giới hạn" (= sửa + duyệt) cho nhân viên (máy chủ cũng chặn)
+  const lvCap = isSubAdmin && vPerms.indexOf('sp_duyet') < 0 && vPerms.indexOf('sp_edit') >= 0
+  // Admin chưa có quyền duyệt sửa thông tin dự án thì không cấp mới được quyền này
+  const daLock = isSubAdmin && vPerms.indexOf('da_duyet') < 0 && perms0.indexOf('da_duyet') < 0
   const [username, setUsername] = useState(u.username || '')
   const [hoTen, setHoTen] = useState(u.hoTen || '')
   const [phongBan, setPhongBan] = useState(u.phongBan || '')
@@ -37,18 +46,21 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   // mặc định = công ty đang làm việc; super chỉ đổi khi muốn tạo cho công ty khác
   const mac = u.congTyId || defaultCt || ''
   const [ct, setCt] = useState(mac)
-  const [role, setRole] = useState(superMode || u.role === 'super' ? 'super' : (u.role !== 'admin' ? 'staff' : 'admin'))
+  const [role, setRole] = useState(superMode || u.role === 'super' ? 'super' : (u.role === 'admin' || u.role === 'subadmin' ? u.role : 'staff'))
+  // Admin (subadmin) có quyền dữ liệu như nhân viên: cùng khối Phân quyền, khoá cũ, quyền con SP / dự án
+  const staffLike = role === 'staff' || role === 'subadmin'
   // Khoá trang / tab kiểu cũ đã lưu: giữ nguyên khi tài khoản còn "Theo mặc định cũ" (chưa đặt ma trận phân quyền)
   const [perms] = useState(() => GRANT_KEYS.filter(k => perms0.indexOf(k) >= 0))
   // Khoá đã lưu mà giao diện này không biết (bản mới hơn / cũ hơn thêm vào): giữ nguyên khi lưu, không âm thầm xoá
   const [extra] = useState(() => perms0.filter((k, i) => k && GRANT_KEYS.indexOf(k) < 0 && SUB_KEYS.indexOf(k) < 0 && perms0.indexOf(k) === i))
   // Quyền trong tab Danh sách SP: CHỌN MỘT — chỉ sửa, hoặc sửa và duyệt
-  const [lv, setLv] = useState(perms0.indexOf('sp_duyet') >= 0 ? 'sp_duyet' : (perms0.indexOf('sp_edit') >= 0 ? 'sp_edit' : ''))
+  const [lv, setLv] = useState(perms0.indexOf('sp_duyet') >= 0 ? 'sp_duyet' : (perms0.indexOf('sp_edit') >= 0 || lvCap ? 'sp_edit' : ''))
   // Duyệt yêu cầu sửa thông tin dự án (migration 0037, trang chi tiết dự án): quyền riêng, không gắn với tab nào
   const [daDuyet, setDaDuyet] = useState(perms0.indexOf('da_duyet') >= 0)
   // Duyệt sản phẩm theo phân cấp (M14.6): chỉ super hoặc admin được giao duyệt mới cấp được 'sp_duyet' cho nhân viên;
   // nhân viên đã có sẵn 'sp_duyet' thì vẫn chọn được để giữ / bỏ. apr = super giao quyền duyệt cho tài khoản admin
-  const canGrantDuyet = isSuper || !!(rights && rights.giaoDuyet)
+  // Admin (subadmin) không bao giờ cấp được 'sp_duyet' (máy chủ: spDuyetGate)
+  const canGrantDuyet = isSuper || (!isSubAdmin && !!(rights && rights.giaoDuyet))
   const hadDuyet = perms0.indexOf('sp_duyet') >= 0
   const [apr, setApr] = useState(!!approved)
   const [busy, setBusy] = useState(false)
@@ -62,10 +74,11 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const hrOld = useRef(null)
   /* Phân quyền 3 cấp (N21). Không áp cho tài khoản super; admin công ty không tự phân quyền cho mình.
      pq.raw0 = tập quyền đã lưu (null = chưa đặt); pq.mine = quyền được cấp cho người khác của người đang đăng nhập (không phải super);
-     accBy = tập quyền đang sửa theo vai trò (đổi vai trò Nhân viên <-> Quản trị không trộn lẫn); ctCeil = trần quyền công ty (super) */
-  const pqOn = !superMode && u.role !== 'super' && (isSuper || u.role !== 'admin')
+     accBy = tập quyền đang sửa theo vai trò (đổi vai trò Nhân viên <-> Admin <-> Quản trị không trộn lẫn); ctCeil = trần quyền công ty (super).
+     Admin (subadmin) đang đăng nhập: chỉ phân quyền nhân viên khác, không tự phân quyền cho mình */
+  const pqOn = !superMode && u.role !== 'super' && (isSuper || u.role !== 'admin') && !(isSubAdmin && (isSelf || u.role !== 'staff'))
   const [pq, setPq] = useState({ phase: 'loading', cat: null, raw0: null, mine: null, err: '' })
-  const [accBy, setAccBy] = useState({ staff: isEdit ? null : {}, admin: null })
+  const [accBy, setAccBy] = useState({ staff: isEdit ? null : {}, subadmin: isEdit ? null : {}, admin: null })
   const [ctCeil, setCtCeil] = useState({ ct: '', set: null, err: '' })
   const [pqSeq, setPqSeq] = useState(0)
   useEffect(() => {
@@ -74,8 +87,13 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
     setPq(s => ({ ...s, phase: 'loading', err: '' }))
     Promise.all([loadAccessCatalog(), isEdit ? api.getUserAccess(u.id, ac.signal) : null, isSuper ? null : api.getMyAccess(ac.signal)]).then(([cat, r, me]) => {
       const raw0 = r && r.grants ? expandGrants(r.grants, cat) : null
-      setPq({ phase: 'ready', cat, raw0, mine: me ? expandGrants(me.grantable, cat) : null, err: '' })
-      if (isEdit) setAccBy({ staff: u.role === 'staff' ? raw0 : null, admin: u.role === 'admin' ? raw0 : null })
+      const mine = me ? expandGrants(me.grantable, cat) : null
+      setPq({ phase: 'ready', cat, raw0, mine, err: '' })
+      // Admin (subadmin) không đặt được "Theo mặc định cũ": nhân viên chưa có ma trận -> bắt đầu từ quyền kiểu cũ trong phạm vi của mình
+      const start = raw0 == null && isSubAdmin ? clipSet(legacyStaffSet(perms0, cat), mine, cat) : raw0
+      // Nhân viên <-> Admin cùng kiểu quyền (như nhân viên): đổi qua lại giữa hai vai trò này giữ tập quyền đã lưu
+      const sl = u.role === 'staff' || u.role === 'subadmin'
+      if (isEdit) setAccBy({ staff: sl ? start : null, subadmin: sl ? raw0 : null, admin: u.role === 'admin' ? raw0 : null })
     }, e => { if (!isAbort(e)) setPq(s => ({ ...s, phase: 'error', err: e.message })) })
     return () => ac.abort()
   }, [pqSeq])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -88,7 +106,8 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
     return () => ac.abort()
   }, [ct, pqSeq])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!isEdit || String(u.congTyId || '') !== String(defaultCt || '')) return
+    // Admin (subadmin) không gắn hồ sơ HR (việc của quản trị công ty) -> không tải, ẩn ô chọn
+    if (isSubAdmin || !isEdit || String(u.congTyId || '') !== String(defaultCt || '')) return
     hrApi.load().then(st => {
       const list = (st.employees || []).filter(e => e.status !== 'left' || e.userId === u.id)
       const mine = list.find(e => e.userId === u.id)
@@ -98,10 +117,10 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
     }, () => {})
   }, [])
 
-  // Trần ma trận: super -> trần công ty của tài khoản; admin -> quyền của chính mình (máy chủ chặn cấp vượt)
+  // Trần ma trận: super -> trần công ty của tài khoản; admin / Admin (subadmin) -> quyền của chính mình (máy chủ chặn cấp vượt)
   const ceiling = isSuper ? (ctCeil.ct === ct ? ctCeil.set : null) : pq.mine
   const pqReady = pqOn && pq.phase === 'ready' && !!ceiling
-  const accRole = role === 'admin' ? 'admin' : 'staff'
+  const accRole = role === 'admin' ? 'admin' : role === 'subadmin' ? 'subadmin' : 'staff'
   const acc = accBy[accRole]
   const setAcc = v => setAccBy(s => ({ ...s, [accRole]: v }))
   const accEff = pqReady && acc != null ? clipSet(acc, ceiling, pq.cat) : null
@@ -110,7 +129,7 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const accChanged = pqReady && !(isEdit && role === u.role && (acc == null ? pq.raw0 == null : pq.raw0 != null && sameSet(acc, pq.raw0, pq.cat)))
   const staffFallback = pqReady ? clipSet(legacyStaffSet(perms0, pq.cat), ceiling, pq.cat) : null
   // Tab Danh sách SP được xem: theo ma trận nếu đã tuỳ chỉnh, không thì theo khoá cũ
-  const spOn = role === 'staff' && accEff ? setHas(accEff, 'qs', 'sanpham', 'view') : perms.indexOf('sanpham') >= 0
+  const spOn = staffLike && accEff ? setHas(accEff, 'qs', 'sanpham', 'view') : perms.indexOf('sanpham') >= 0
   // Sửa: email không đổi (bỏ qua hoa thường / khoảng trắng) thì không kiểm, không gửi - email cũ sai dạng vẫn sửa được trường khác
   const emailChanged = !isEdit || normEmail(email) !== normEmail(u.email)
   const emailBad = emailChanged && normEmail(email) !== '' && !EMAIL_RE.test(normEmail(email))
@@ -120,10 +139,13 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   function save() {
     // quyền = các tab được tích + mức quyền trong tab Danh sách SP (radio, có thể bỏ trống)
     let ps = []
-    if (role === 'staff') {
+    if (staffLike) {
       // Đã tuỳ chỉnh ma trận: vẫn ghi khoá cũ (trang / tab được xem) để các cổng cũ (canPage / canTab, máy chủ) chạy đúng
       ps = (accEff && accChanged ? legacyKeys(accEff) : perms).concat(extra)
-      if (lv && spOn) ps.push(lv)
+      // Admin chỉ được sửa SP: nhân viên luôn mang 'sp_edit' (không có khoá nào = sửa + duyệt, máy chủ chặn)
+      if (lvCap && lv !== 'sp_duyet') ps.push('sp_edit')
+      // khối SP đang tắt (chưa cấp tab Danh sách SP): giữ nguyên mức đã lưu, không âm thầm bỏ (mất 'sp_edit' = "Không giới hạn")
+      else if (lv && (spOn || perms0.indexOf(lv) >= 0)) ps.push(lv)
       if (daDuyet) ps.push('da_duyet')
     }
     // Email đăng nhập (M14.1): trim + chữ thường, rỗng = không có / xoá; máy chủ kiểm trùng trong công ty khi sửa
@@ -145,6 +167,8 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
     const fail = e => { qsToast('Lỗi: ' + e.message); setBusy(false) }
     if (isEdit) {
       const patch = { hoTen, role, perms: ps, phongBan }
+      // Admin (subadmin) sửa chính mình: không gửi quyền (máy chủ cũng bỏ qua), vai trò giữ nguyên
+      if (isSubAdmin && isSelf) delete patch.perms
       if (isSuper) patch.congTyId = ct
       // chuyển công ty mà giữ email: vẫn gửi để máy chủ kiểm trùng ở công ty mới (không kiểm lại dạng)
       if (emailChanged || (isSuper && em && String(ct || '') !== String(u.congTyId || ''))) patch.email = em
@@ -163,12 +187,12 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   }
 
   const isSup = role === 'super'
-  // admin công ty (không phải super) sửa chính mình: vai trò cố định (máy chủ chặn tự đổi vai trò)
-  const roleLocked = !isSuper && isEdit && u.role === 'admin'
-  const steps = [['info', 'Thông tin', 'Đăng nhập, liên hệ', 'lock'], ['role', 'Vai trò', isSup ? 'Siêu quản trị viên' : 'Nhân viên / Quản trị', 'building']]
-  // Bước Phân quyền: nhân viên; tài khoản quản trị công ty khi super sửa (giới hạn trong trần công ty)
-  const pqStep = pqOn && (role === 'staff' || (isSuper && role === 'admin'))
-  if (pqStep) steps.push(['pq', 'Phân quyền', role === 'staff' ? 'Phân hệ, tab, thao tác' : 'Trong trần công ty', 'layers'])
+  // admin công ty (không phải super) sửa chính mình: vai trò cố định (máy chủ chặn tự đổi vai trò); Admin (subadmin) sửa chính mình cũng vậy
+  const roleLocked = !isSuper && isEdit && (u.role === 'admin' || (isSubAdmin && isSelf))
+  const steps = [['info', 'Thông tin', 'Đăng nhập, liên hệ', 'lock'], ['role', 'Vai trò', isSup ? 'Siêu quản trị viên' : 'Nhân viên / Admin / Quản trị', 'building']]
+  // Bước Phân quyền: nhân viên, Admin (subadmin); tài khoản quản trị công ty khi super sửa (giới hạn trong trần công ty)
+  const pqStep = pqOn && (staffLike || (isSuper && role === 'admin'))
+  if (pqStep) steps.push(['pq', 'Phân quyền', staffLike ? 'Phân hệ, tab, thao tác' : 'Trong trần công ty', 'layers'])
   const idx = Math.max(0, steps.findIndex(s => s[0] === tab))
   const last = idx === steps.length - 1
   // Lỗi từng ô (tạo mới: tên đăng nhập, họ tên, mật khẩu bắt buộc; email đúng dạng nếu có)
@@ -211,8 +235,9 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
   const done = isEdit ? {} : { info: idx > 0 && !stepMsg('info'), role: idx > 1 }
   const sec = {
     info: ['Thông tin tài khoản', 'Tên đăng nhập, họ tên, email và mật khẩu để đăng nhập.'],
-    role: ['Vai trò', isSup ? 'Tài khoản can thiệp hệ thống của nhà phát triển.' : 'Nhân viên chỉ vào được mục được cấp; quản trị công ty có toàn quyền.'],
-    pq: ['Phân quyền', role === 'staff'
+    role: ['Vai trò', isSup ? 'Tài khoản can thiệp hệ thống của nhà phát triển.'
+      : 'Nhân viên chỉ vào được mục được cấp; Admin tạo và phân quyền nhân viên trong phạm vi quyền của mình; quản trị công ty có toàn quyền.'],
+    pq: ['Phân quyền', staffLike
       ? 'Cấp quyền theo Phân hệ > Tab > Thao tác, chỉ trong phạm vi quyền của người cấp. Thu quyền ở cấp trên thì cấp dưới tự mất theo.'
       : 'Giới hạn quyền của quản trị công ty trong trần quyền của công ty; nhân viên do tài khoản này cấp cũng bị giới hạn theo.'],
   }[tab] || ['', '']
@@ -245,10 +270,10 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                   <div className="qsco-sub">{username ? '@' + username : 'tên đăng nhập'}</div>
                 </div>
               </div>
-              <span className={`qsa-role ${isSup ? 'sup' : (role === 'admin' ? 'adm' : 'stf')}`} style={{ alignSelf: 'flex-start' }}>{isSup ? 'Siêu quản trị viên' : role === 'admin' ? 'Quản trị công ty' : 'Nhân viên'}</span>
+              <span className={`qsa-role ${isSup ? 'sup' : (role === 'admin' ? 'adm' : role === 'subadmin' ? 'sub' : 'stf')}`} style={{ alignSelf: 'flex-start' }}>{isSup ? 'Siêu quản trị viên' : role === 'admin' ? 'Quản trị công ty' : role === 'subadmin' ? 'Admin' : 'Nhân viên'}</span>
               {isSuper ? <div className="qsco-pv-row"><span>Công ty</span><b className="qsa-um2-em" title={ctName ? (ctName.ten || ctName.ma) : ''}>{ctName ? (ctName.ten || ctName.ma) : '—'}</b></div> : null}
               <div className="qsco-pv-row"><span>Email</span><b className="qsa-um2-em">{normEmail(email) || '—'}</b></div>
-              <div className="qsco-pv-row"><span>Quyền</span><b>{role === 'staff' ? (accEff ? countModules(accEff) + ' phân hệ' : perms.length + ' / ' + GRANT_KEYS.length)
+              <div className="qsco-pv-row"><span>Quyền</span><b>{staffLike ? (accEff ? countModules(accEff) + ' phân hệ' : perms.length + ' / ' + GRANT_KEYS.length)
                 : role === 'admin' && pqStep && accEff ? countModules(accEff) + ' phân hệ' : 'Toàn quyền'}</b></div>
             </div>
           </div>
@@ -290,7 +315,7 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                       {isEdit && !u.congTyId ? <i className="qsa-f-warn">Tài khoản chưa thuộc công ty nào nên không đăng nhập được — chọn công ty rồi Lưu.</i> : null}
                     </Fld>
                   ) : null}
-                  {hrEmps ? (
+                  {hrEmps && !isSubAdmin ? (
                     <Fld label="Hồ sơ nhân sự (HR)" hint="Cần gắn để dùng tab Nhân sự">
                       <select value={hrEmp} onChange={e => setHrEmp(e.target.value)}>
                         <option value="">— Chưa gắn —</option>
@@ -313,10 +338,16 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
               </div>
             ) : (
               <>
-              <div className="qsa-seg qsa-um2-roles">
+              <div className="qsa-seg qsa-um2-roles c3">
                 <label className={`qsa-seg-i${role === 'staff' ? ' on' : ''}${roleLocked ? ' dis' : ''}`}>
                   <input type="radio" name="qsa_role" value="staff" checked={role === 'staff'} disabled={roleLocked} onChange={() => setRole('staff')} />
                   <span><b>Nhân viên</b><i>Chỉ vào được các mục được cấp. Chọn quyền ở bước Phân quyền.</i></span>
+                </label>
+                {/* Admin (subadmin, M14.7): super / quản trị công ty tạo được; Admin không tạo được Admin khác */}
+                <label className={`qsa-seg-i${role === 'subadmin' ? ' on' : ''}${roleLocked || isSubAdmin ? ' dis' : ''}`}
+                  title={isSubAdmin && !roleLocked ? 'Admin chỉ tạo được tài khoản nhân viên' : undefined}>
+                  <input type="radio" name="qsa_role" value="subadmin" checked={role === 'subadmin'} disabled={roleLocked || isSubAdmin} onChange={() => setRole('subadmin')} />
+                  <span><b>Admin</b><i>Tạo và phân quyền tài khoản nhân viên trong phạm vi quyền của mình. Không sửa cài đặt công ty.</i></span>
                 </label>
                 <label className={`qsa-seg-i${role === 'admin' ? ' on' : ''}${!isSuper && u.role !== 'admin' ? ' dis' : ''}`}
                   title={!isSuper && u.role !== 'admin' ? 'Chỉ quản trị hệ thống tạo được tài khoản quản trị công ty' : undefined}>
@@ -334,7 +365,8 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
               ) : null}
               {!isSuper ? <p className="qsa-um2-note"><QsIcon name="lock" size={13} /> {roleLocked
                 ? 'Bạn không tự đổi được vai trò của tài khoản đang đăng nhập.'
-                : 'Admin công ty chỉ tạo và phân quyền được nhân viên. Tài khoản quản trị công ty do quản trị hệ thống tạo.'}</p> : null}
+                : isSubAdmin ? 'Admin chỉ tạo và phân quyền được nhân viên, trong phạm vi quyền của mình.'
+                  : 'Quản trị công ty tạo được nhân viên và Admin. Tài khoản quản trị công ty do quản trị hệ thống tạo.'}</p> : null}
               </>
             )
           ) : null}
@@ -346,13 +378,13 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                   <button type="button" className="qsa-btn sm" onClick={() => setPqSeq(x => x + 1)}>Thử lại</button></div>
               ) : isSuper && !ct ? <div className="qsa-empty" style={{ padding: 20 }}>Chọn công ty ở bước Thông tin trước.</div>
                 : !pqReady ? <div className="qsa-empty" style={{ padding: 20 }}>Đang tải…</div> : (
-                  <AccessMatrix catalog={pq.cat} value={acc} onChange={setAcc} ceiling={ceiling}
-                    fallback={role === 'staff' ? staffFallback : ceiling}
-                    defaultText={role === 'staff'
+                  <AccessMatrix catalog={pq.cat} value={acc} onChange={setAcc} ceiling={ceiling} allowDefault={!isSubAdmin}
+                    fallback={staffLike ? staffFallback : ceiling}
+                    defaultText={staffLike
                       ? 'Chưa đặt riêng: quyền theo các trang / tab đã cấp kiểu cũ (mỗi trang được cấp = mọi thao tác). Chọn "Tuỳ chỉnh" để cấp đến từng thao tác.'
                       : 'Chưa đặt riêng: quản trị có toàn bộ quyền trong trần của công ty. Chọn "Tuỳ chỉnh" để giới hạn.'} />
                 )}
-              {role === 'staff' ? (
+              {staffLike ? (
                 <div className="qsa-um2-subs">
                   <div className={`qsa-sub${spOn ? '' : ' dis'}`}>
                     <div className="qsa-sub-h">Trong tab Danh sách sản phẩm{spOn ? '' : ' (cần cấp tab này)'}</div>
@@ -360,20 +392,25 @@ export default function UserModal({ user, isSuper, companies, defaultCt, onClose
                       ['sp_edit', 'Chỉ được sửa', 'Sửa xong chuyển về “Chưa duyệt”'],
                       ['sp_duyet', 'Được sửa và duyệt', 'Sửa thẳng, đánh dấu “Đã duyệt”']].map(r => {
                       const noGrant = r[0] === 'sp_duyet' && !canGrantDuyet && !hadDuyet
+                      // Admin chỉ được sửa SP: không cấp được "Không giới hạn" (= sửa + duyệt)
+                      const capped = r[0] === '' && lvCap
+                      const why = noGrant ? (isSubAdmin ? 'Admin không cấp được quyền duyệt sản phẩm' : 'Cần quản trị hệ thống giao quyền duyệt sản phẩm')
+                        : capped ? 'Bạn chỉ được sửa sản phẩm (chờ duyệt) nên không cấp được mức này' : ''
                       return (
-                        <label key={r[0]} className={`qsa-rd${lv === r[0] ? ' on' : ''}${noGrant ? ' dis' : ''}`}
-                          title={noGrant ? 'Cần quản trị hệ thống giao quyền duyệt sản phẩm' : undefined}>
-                          <input type="radio" name="qsa_splv" value={r[0]} checked={lv === r[0]} disabled={!spOn || noGrant} onChange={() => setLv(r[0])} />
+                        <label key={r[0]} className={`qsa-rd${lv === r[0] ? ' on' : ''}${noGrant || capped ? ' dis' : ''}`}
+                          title={why || undefined}>
+                          <input type="radio" name="qsa_splv" value={r[0]} checked={lv === r[0]} disabled={!spOn || noGrant || capped} onChange={() => setLv(r[0])} />
                           <span><b>{r[1]}</b><i>{r[2]}</i>
-                            {noGrant ? <i className="qsa-rd-warn"><QsIcon name="lock" size={11} /> Cần quản trị hệ thống giao quyền duyệt sản phẩm</i> : null}</span>
+                            {why ? <i className="qsa-rd-warn"><QsIcon name="lock" size={11} /> {why}</i> : null}</span>
                         </label>
                       )
                     })}
                   </div>
                   <div className="qsa-sub">
                     <div className="qsa-sub-h">Dự án</div>
-                    <label className={`qsa-ck${daDuyet ? ' on' : ''}`}>
-                      <input type="checkbox" checked={daDuyet} onChange={e => setDaDuyet(e.target.checked)} />
+                    <label className={`qsa-ck${daDuyet ? ' on' : ''}${daLock ? ' dis' : ''}`}
+                      title={daLock ? 'Bạn chưa có quyền duyệt sửa thông tin dự án nên không cấp được quyền này' : undefined}>
+                      <input type="checkbox" checked={daDuyet} disabled={daLock} onChange={e => setDaDuyet(e.target.checked)} />
                       Duyệt yêu cầu sửa thông tin dự án (sửa thẳng, nhận thông báo khi nhân viên gửi yêu cầu)
                     </label>
                   </div>

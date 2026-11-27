@@ -4,7 +4,7 @@ import QsIcon from '../common/QsIcon'
 import AdmDlg from './AdmDlg'
 import '../congty/congty.css'
 import { PERM_TABS, WORK_TABS, PAGE_TABS } from '../../state/store'
-import { ROLE_LBL, fmtDateTime_ } from './adminUtil'
+import { ROLE_LBL, roleCls_, fmtDateTime_ } from './adminUtil'
 import { expandGrants, countModules } from './accessUtil'
 import { loadAccessCatalog } from '../../../../services/accessService'
 
@@ -13,8 +13,9 @@ export const SUB_LBL = { sp_edit: 'SP: chỉ được sửa (chờ duyệt)', sp
 const GROUPS = [['Trang QS Pro', PERM_TABS], ['Nghiệp vụ', WORK_TABS], ['Trang khác', PAGE_TABS]]
 
 /* Hộp chi tiết 1 tài khoản (bấm vào dòng ở bảng Tài khoản): thông tin + toàn bộ quyền theo nhóm + thao tác.
-   Props: u, approved (admin được giao duyệt sản phẩm, M14.6), ctName (tên công ty hoặc ''), apt ({unit, position, head} | null), aptKnown (có dữ liệu bổ nhiệm HR của tài khoản này), canAppoint, các hàm thao tác như UsersCard. */
-export default function UserDetail({ u, approved, ctName, apt, aptKnown, canAppoint, readOnly, onClose, onEdit, onAppoint, onResetPw, onToggle, onDelete }) {
+   Props: u, approved (admin được giao duyệt sản phẩm, M14.6), ctName (tên công ty hoặc ''), apt ({unit, position, head} | null), aptKnown (có dữ liệu bổ nhiệm HR của tài khoản này), canAppoint, các hàm thao tác như UsersCard.
+   viewerSub: người đang xem là Admin (subadmin, M14.7) - chỉ quản lý được tài khoản nhân viên. */
+export default function UserDetail({ u, approved, ctName, apt, aptKnown, canAppoint, readOnly, roWhy = '', viewerSub = false, onClose, onEdit, onAppoint, onResetPw, onToggle, onDelete }) {
   const full = u.role === 'admin' || u.role === 'super'
   const p = u.perms || []
   const av = (u.hoTen || u.username || '?').trim().charAt(0).toUpperCase()
@@ -46,7 +47,7 @@ export default function UserDetail({ u, approved, ctName, apt, aptKnown, canAppo
               <span>@{u.username}</span>
             </div>
           </div>
-          <span className={`qsa-role ${u.role === 'super' ? 'sup' : (u.role === 'admin' ? 'adm' : 'stf')}`} style={{ alignSelf: 'flex-start' }}>{ROLE_LBL[u.role] || u.role}</span>
+          <span className={`qsa-role ${roleCls_(u.role)}`} style={{ alignSelf: 'flex-start' }}>{ROLE_LBL[u.role] || u.role}</span>
           {approved ? <span className="qsa-apr" style={{ alignSelf: 'flex-start', marginLeft: 0 }} title="Được quản trị hệ thống giao quyền duyệt sản phẩm">Duyệt SP</span> : null}
           <div className="qsa-ud-info">
             <div><i>Email</i><b title={u.email || ''}>{u.email || '—'}</b></div>
@@ -65,6 +66,7 @@ export default function UserDetail({ u, approved, ctName, apt, aptKnown, canAppo
               <div className="qsco-sec-h"><h4>Quyền truy cập <span className="qsa-ud-cnt">{countModules(acc.eff)} / {acc.cat.modules.length} phân hệ</span>
                 <span className="qsa-ud-mode">{acc.custom ? 'Tuỳ chỉnh' : 'Theo mặc định cũ'}</span></h4>
                 <p>{u.role === 'admin' ? 'Quản trị công ty: quyền trong trần của công ty' + (acc.custom ? ', đã giới hạn riêng.' : '.')
+                  : u.role === 'subadmin' ? 'Quyền thực = trần công ty ∩ quyền được cấp. Admin cấp quyền cho nhân viên trong phạm vi các quyền này.'
                   : 'Quyền thực = trần công ty ∩ quyền được cấp. Tab chỉ ghi tên = đủ mọi thao tác.'}</p></div>
               {accMods.map(m => (
                 <div key={m.key} className="qsa-ud-grp">
@@ -111,7 +113,9 @@ export default function UserDetail({ u, approved, ctName, apt, aptKnown, canAppo
       </div>
 
       {readOnly ? (
-        <div className="qsco-f-btn"><span className="qsa-muted qsa-ro"><QsIcon name="lock" size={13} /> Tài khoản quản trị công ty — chỉ quản trị hệ thống sửa được</span>
+        <div className="qsco-f-btn"><span className="qsa-muted qsa-ro"><QsIcon name="lock" size={13} /> {roWhy ? roWhy + ' — chỉ quản trị công ty sửa được' : viewerSub
+          ? 'Tài khoản ' + (ROLE_LBL[u.role] || u.role) + ' — Admin chỉ sửa được tài khoản nhân viên'
+          : 'Tài khoản quản trị công ty — chỉ quản trị hệ thống sửa được'}</span>
           <span className="qsco-f-sp" /><button type="button" className="qsa-btn ghost sm" onClick={onClose}>Đóng</button></div>
       ) : (
       <div className="qsco-f-btn">

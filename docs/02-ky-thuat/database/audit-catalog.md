@@ -86,6 +86,7 @@
 **Ràng buộc**
 
 - CHECK `ck_users_role`: `CHECK ((role = ANY (ARRAY['super'::text, 'admin'::text, 'staff'::text])))`
+  - Từ migration 0053 (2026-11-27, M14.7): thêm `'subadmin'::text` (vai trò "Admin" quản lý tài khoản nhân viên), xem [schema-hien-hanh.md](schema-hien-hanh.md).
 - CHECK `ck_users_username`: `CHECK ((username = lower(username)))`
 - FK `fk_users_company_id`: `FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE`
 - PK `pk_users`: `PRIMARY KEY (id)`
