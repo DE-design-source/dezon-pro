@@ -64,7 +64,7 @@ const pageOf = path => PAGE_TABS.find(p => p.path === path)
 export function viewablePageTabKeys(path) {
   const pg = pageOf(path)
   if (!pg) return []
-  return pg.tabs.map(t => t[0]).filter(k => !pg.module || can(pg.module, k, 'view'))
+  return pg.tabs.map(t => t[0]).filter(k => !pg.module || (pg.free && pg.free.indexOf(k) >= 0) || can(pg.module, k, 'view'))
 }
 /* Vẽ lại khi quyền thực / phiên đổi; trả khoá phụ thuộc cho useMemo */
 function useAccessKey() {

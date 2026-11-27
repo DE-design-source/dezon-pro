@@ -4,7 +4,7 @@
    module = khoá module của Phân quyền 3 cấp (N21, backend/internal/modules/access/catalog.json); khoá tab trùng khoá tab trong danh mục.
    Tab không có quyền xem thì không hiện (hooks/usePageTabs.js). */
 import { MAIN_TABS as MK_TABS } from './marketingData'
-import { SALES_TABS } from './kinhDoanhData'
+import { SALES_TABS, SALES_ADMIN_TABS } from './kinhDoanhData'
 import { SX_TABS } from './sanXuatData'
 import { FIN_CATEGORIES } from './taiChinhData'
 
@@ -34,7 +34,8 @@ export const QS_TABS = [['dash', 'Bảng điều khiển'], ['boc', 'Bóc tách'
 const kl = list => list.map(t => [t.key, t.label])
 export const PAGE_TABS = [
   { path: '/marketing', module: 'marketing', label: 'Marketing', tabs: MK_TABS.map(t => [t.id, t.label]) },
-  { path: '/kinh-doanh', module: 'kinhdoanh', label: 'Kinh doanh', tabs: SALES_TABS.map(t => [t[0], t[1]]) },
+  // free: tab không có trong danh mục phân quyền (access/catalog.json) - trang tự giới hạn theo vai trò (Cấu hình AI: quản trị)
+  { path: '/kinh-doanh', module: 'kinhdoanh', label: 'Kinh doanh', tabs: SALES_TABS.map(t => [t[0], t[1]]), free: SALES_ADMIN_TABS },
   { path: '/quan-ly-thiet-ke', module: 'thietke', label: 'Quản lý thiết kế', tabs: kl(TK_TABS) },
   { path: '/du-an', module: 'thicong', label: 'Quản lý dự án', tabs: kl(DA_TABS) },
   { path: '/tai-chinh', module: 'taichinh', label: 'Tài chính', tabs: kl(FIN_CATEGORIES).concat([[TC_COCAU, 'Cơ cấu phòng ban']]) },
