@@ -41,6 +41,95 @@ type dzDetail struct {
 	Category  string            // breadcrumb cuối ("Khách Sạn")
 	Gallery   []dzImage         // dải trượt rồi mục Hình ảnh, đã bỏ trùng (ưu tiên ảnh gốc)
 	Suppliers []dzSupplier      // mục "Nhà cung cấp" (id="dz-sec-suppliers"), theo thứ tự trên trang, bỏ trùng tên
+	Products  []dzProduct       // mục "Sản phẩm dùng trong dự án" (id="dz-sec-productlist"), bỏ trùng link / tên
+}
+
+// dzProduct: 1 sản phẩm dùng trong dự án trên dezon.vn (link trang sản phẩm, ảnh, thương hiệu, nhóm hàng - đều trên *.dezon.vn).
+type dzProduct struct{ Ten, Link, Anh, ThuongHieu, Nhom string }
+
+const dzMaxProducts = 200
+
+var (
+	reDzProdLink = regexp.MustCompile(`(?is)<a\b[^>]*\bclass="dz-proj-prod-link"[^>]*>`)
+	reDzProdName = regexp.MustCompile(`(?is)<span[^>]*\bclass="dz-proj-prod-name"[^>]*>(.*?)</span>`)
+	reDzProdImg  = regexp.MustCompile(`(?is)<span[^>]*\bclass="[^"]*\bdz-proj-prod-img\b[^"]*"[^>]*>`)
+	reDzDataBg   = regexp.MustCompile(`(?i)\bdata-bg="([^"]*)"`)
+	reDzBgURL    = regexp.MustCompile(`(?i)background-image:\s*url\(\s*['"]?([^'")]+)`)
+	reDzProdMeta = regexp.MustCompile(`(?is)<span[^>]*\bclass="dz-proj-prod-meta"[^>]*>(.*?)</span>`)
+)
+
+// dzProducts: sản phẩm trong mục id="dz-sec-productlist" (tới mục dz-sec- kế tiếp). Mỗi sản phẩm: <div class="dz-proj-prod">
+// gồm link + ảnh (data-bg / background-image, bỏ ảnh data:) + tên, dòng meta: link /brand/ = thương hiệu, link khác = nhóm hàng.
+func dzProducts(page string) []dzProduct {
+	const mark = `id="dz-sec-productlist"`
+	seg := dzCut(page, mark)
+	if seg == "" {
+		return nil
+	}
+	seg = seg[len(mark):]
+	seg = seg[:dzFirst(seg, `id="dz-sec-`, `<style`, "related_projects")]
+	parts := strings.Split(seg, `<div class="dz-proj-prod">`)
+	var out []dzProduct
+	seen := map[string]bool{}
+	for _, b := range parts[1:] {
+		n := reDzProdName.FindStringSubmatch(b)
+		if n == nil {
+			continue
+		}
+		p := dzProduct{Ten: dzText(n[1])}
+		if a := reDzProdLink.FindString(b); a != "" {
+			if h := reDzHref.FindStringSubmatch(a); h != nil {
+				p.Link = dzSiteLink(html.UnescapeString(h[1]))
+			}
+		}
+		if im := reDzProdImg.FindString(b); im != "" {
+			if m := reDzDataBg.FindStringSubmatch(im); m != nil {
+				p.Anh = dzSiteLink(html.UnescapeString(m[1]))
+			}
+			if p.Anh == "" {
+				if m := reDzBgURL.FindStringSubmatch(html.UnescapeString(im)); m != nil {
+					p.Anh = dzSiteLink(m[1])
+				}
+			}
+		}
+		if m := reDzProdMeta.FindStringSubmatch(b); m != nil {
+			for _, a := range reDzLink.FindAllStringSubmatch(m[1], -1) {
+				t := dzText(a[2])
+				switch {
+				case t == "":
+				case strings.Contains(a[1], "/brand/") && p.ThuongHieu == "":
+					p.ThuongHieu = t
+				case !strings.Contains(a[1], "/brand/") && p.Nhom == "":
+					p.Nhom = t
+				}
+			}
+		}
+		k := strings.ToLower(p.Ten + "|" + p.Link)
+		if p.Ten == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, p)
+		if len(out) >= dzMaxProducts {
+			break
+		}
+	}
+	return out
+}
+
+// dzSpValue: giá trị khoá spDezon của dự án - [{ten, link, anh, thuongHieu, nhom}] (bỏ khoá rỗng).
+func dzSpValue(list []dzProduct) []any {
+	out := make([]any, 0, len(list))
+	for _, p := range list {
+		o := omap.Of("ten", p.Ten)
+		for _, kv := range [][2]string{{"link", p.Link}, {"anh", p.Anh}, {"thuongHieu", p.ThuongHieu}, {"nhom", p.Nhom}} {
+			if kv[1] != "" {
+				o.Set(kv[0], kv[1])
+			}
+		}
+		out = append(out, o)
+	}
+	return out
 }
 
 // dzSupplier: 1 thẻ nhà cung cấp của dự án trên dezon.vn (link trang nhà cung cấp trên *.dezon.vn, mô tả ngắn).
@@ -253,6 +342,7 @@ func parseDzDetail(page, moreRooms string) dzDetail {
 	}
 	d.Gallery = dzGallery(page, moreRooms)
 	d.Suppliers = dzSuppliers(page)
+	d.Products = dzProducts(page)
 	return d
 }
 

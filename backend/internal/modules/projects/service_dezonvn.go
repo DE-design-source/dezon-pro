@@ -417,7 +417,14 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 	d := parseDzDetail(page, s.dz.moreRooms(ctx, page))
 	fields := dzFields(it, d)
 	coAnh := it.Thumb != "" || len(d.Gallery) > 0
-	coNcc := len(d.Suppliers) > 0 // khoá nccDezon chỉ ghi khi dự án chưa từng có (danh sách rỗng [] = người dùng đã xoá)
+	// nhà cung cấp / sản phẩm ghi trên dezon.vn: mỗi khoá chỉ ghi khi dự án chưa từng có (danh sách rỗng [] = người dùng đã xoá)
+	var them []dzKV
+	if len(d.Suppliers) > 0 {
+		them = append(them, dzKV{"nccDezon", dzNccValue(d.Suppliers)})
+	}
+	if len(d.Products) > 0 {
+		them = append(them, dzKV{"spDezon", dzSpValue(d.Products)})
+	}
 	st.mu.Lock()
 	ma, prev, seen := st.idx[key], st.prev[key], st.seen[key]
 	st.mu.Unlock()
@@ -463,14 +470,10 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 		}
 		// lượt trước: chỉ thêm ảnh khi chưa từng lưu anhDuAn (danh sách rỗng [] = người dùng đã xoá hết ảnh)
 		coAnh = coAnh && dzAnhEmpty(anh) && (!prev || anh == nil)
-		if coNcc {
-			if cur, err := s.dzDataHienTai(ctx, ma, "nccDezon"); err != nil {
-				return r, err
-			} else if cur != nil {
-				coNcc = false
-			}
+		if them, err = s.dzChuaCo(ctx, ma, them); err != nil {
+			return r, err
 		}
-		if patch.Len() == 0 && !coAnh && len(mat) == 0 && len(ngoai) == 0 && !coNcc {
+		if patch.Len() == 0 && !coAnh && len(mat) == 0 && len(ngoai) == 0 && len(them) == 0 {
 			r.status = "skipped"
 			return r, nil
 		}
@@ -494,12 +497,14 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 			}
 		}
 	}
-	if coNcc && !dry {
-		if cur, err := s.dzDataHienTai(ctx, ma, "nccDezon"); err != nil { // đọc lại ngay trước khi ghi
+	if len(them) > 0 && !dry {
+		them, err := s.dzChuaCo(ctx, ma, them) // đọc lại ngay trước khi ghi
+		if err != nil {
 			return r, err
-		} else if cur == nil {
-			if _, err := s.SetProjData(ctx, &actor.Actor{U: user}, ma, "nccDezon", dzNccValue(d.Suppliers)); err != nil {
-				return r, fmt.Errorf("Không lưu được nhà cung cấp của dự án: %w", err)
+		}
+		for _, kv := range them {
+			if _, err := s.SetProjData(ctx, &actor.Actor{U: user}, ma, kv.khoa, kv.giaTri); err != nil {
+				return r, fmt.Errorf("Không lưu được %s của dự án: %w", kv.khoa, err)
 			}
 		}
 	}
@@ -605,6 +610,27 @@ func (s *Service) dzCreate(ctx context.Context, fields *omap.Map) (*omap.Map, er
 // dzAnhHienTai: giá trị anhDuAn đang lưu của dự án (thiếu -> nil).
 func (s *Service) dzAnhHienTai(ctx context.Context, ma string) (any, error) {
 	return s.dzDataHienTai(ctx, ma, "anhDuAn")
+}
+
+// dzKV: 1 khoá dữ liệu rời của dự án định ghi.
+type dzKV struct {
+	khoa   string
+	giaTri any
+}
+
+// dzChuaCo: các khoá trong list mà dự án chưa từng có (giá trị đang lưu nil).
+func (s *Service) dzChuaCo(ctx context.Context, ma string, list []dzKV) ([]dzKV, error) {
+	var out []dzKV
+	for _, kv := range list {
+		cur, err := s.dzDataHienTai(ctx, ma, kv.khoa)
+		if err != nil {
+			return nil, err
+		}
+		if cur == nil {
+			out = append(out, kv)
+		}
+	}
+	return out, nil
 }
 
 // dzDataHienTai: giá trị khoá dữ liệu rời đang lưu của dự án (thiếu -> nil).

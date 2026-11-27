@@ -21,10 +21,11 @@ async function readOne_(x) {
     const anh = Array.isArray(pd && pd.anhDuAn) ? pd.anhDuAn : []
     const nccN = nccN_(ls || [])   // {thương hiệu: số dòng} - trang Nhà cung cấp hiện số sản phẩm của hãng trong từng dự án
     const ncc = nccOf_(nccN)
-    /* nhà cung cấp ghi trên dezon.vn (nccDezon, dự án nhập từ dezon.vn): thêm sau thương hiệu của dòng báo giá (không có số dòng) */
+    /* nhà cung cấp + thương hiệu sản phẩm ghi trên dezon.vn (nccDezon, spDezon): thêm sau thương hiệu của dòng báo giá (không có số dòng) */
     const low = new Set(ncc.map(n => n.toLowerCase()))
-    ;(Array.isArray(pd && pd.nccDezon) ? pd.nccDezon : []).forEach(o => {
-      const n = String((o && o.ten) || '').trim()
+    ;[].concat(Array.isArray(pd && pd.nccDezon) ? pd.nccDezon.map(o => o && o.ten) : [],
+      Array.isArray(pd && pd.spDezon) ? pd.spDezon.map(o => o && o.thuongHieu) : []).forEach(t => {
+      const n = String(t || '').trim()
       if (n && !low.has(n.toLowerCase())) { low.add(n.toLowerCase()); ncc.push(n) }
     })
     statCache[x.maDA] = { n: (ls || []).length, tong: (ls || []).reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0), cover: anhUrl_(anh[0]), nAnh: anh.length, ncc, nccN,
