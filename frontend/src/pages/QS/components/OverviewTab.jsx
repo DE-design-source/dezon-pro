@@ -3,7 +3,7 @@ import { useQs } from '../state/QsData'
 import { dashTotals_, cpTong_ } from '../lib/totals.js'
 import { nodeName } from '../lib/tree.js'
 import { projectGroups } from '../lib/dashModel.js'
-import { statCache, loadStats_ } from './project/projectStats'
+import { statCache, loadStats_, STAT_AUTO_MAX } from './project/projectStats'
 import StatusView from './common/StatusView'
 import ProjectList from './dashboard/ProjectList'
 import DashSummary from './dashboard/DashSummary'
@@ -26,8 +26,15 @@ function readSide_() {
    Panel này luôn được mount nên cũng là nơi vẽ các hộp thoại của phần dự án (<ProjectDialogs/>).
    Danh sách dự án + hộp thoại giữ CÙNG vị trí trong cây ở mọi trạng thái (không mất ô tìm khi cur tạm null).
    Chưa có dữ liệu rời của bản nháp (projData) thì số tiền hiện "Đang tải…", lỗi thì báo + "Thử lại" (usePdState). */
+/* Danh sách lớn (> STAT_AUTO_MAX dự án sau bộ lọc): không tự đọc dòng của mọi dự án khi mở trang; người dùng bấm "Tính tổng"
+   thì đọc (nhớ trong phiên: các lần mở lại / đổi bộ lọc sau đó tự tính) */
+let sumAllSes = false
+
 export default function OverviewTab() {
-  const { cur, lines, projects, projData, status, selectProject } = useQs()
+  const { cur, lines, projects, projData, status, selectProject, panelVisible } = useQs()
+  const vis = panelVisible('dash')
+  const [sumAll, setSumAllSt] = useState(sumAllSes)
+  const setSumAll = () => { sumAllSes = true; setSumAllSt(true) }
   const pd = usePdState(cur, status)
   const T = useMemo(() => {
     if (!cur) return null
@@ -48,10 +55,15 @@ export default function OverviewTab() {
   const curMa = cur ? cur.maDA : ''
   // rời bản đang mở -> bỏ số cũ trong bộ nhớ (có thể vừa sửa), lần sau đọc lại
   useEffect(() => () => { if (curMa) delete statCache[curMa] }, [curMa])
-  // không chặn bằng cờ "alive": bản đang đọc dở từ lần lọc trước vẫn phải vẽ lại khi xong (loadStats_ bỏ qua mã đang đọc)
+  /* Chỉ đọc khi Bảng điều khiển đang hiện (các tab luôn được mount); rời tab / đổi bộ lọc thì huỷ phần chưa đọc
+     (mã đang đọc dở vẫn xong và lần lọc mới vẫn được báo - loadStats_ dùng chung hàng đợi) */
+  const auto = sumAll || fGroups.length <= STAT_AUTO_MAX
   useEffect(() => {
-    loadStats_(fGroups.filter(g => !g.drafts.some(d => d.maDA === curMa)).map(g => g.drafts[g.drafts.length - 1]), () => setStatVer(v => v + 1))
-  }, [fGroups, curMa])
+    if (!vis || !auto) return undefined
+    const ctl = new AbortController()
+    loadStats_(fGroups.filter(g => !g.drafts.some(d => d.maDA === curMa)).map(g => g.drafts[g.drafts.length - 1]), () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal })
+    return () => ctl.abort()
+  }, [fGroups, curMa, vis, auto])
   const A = (() => {
     const r = { n: 0, von: 0, ban: 0, total: 0, ln: 0, done: 0, fail: 0, vats: new Set() }
     const gm = {}
@@ -69,6 +81,7 @@ export default function OverviewTab() {
     r.groups = byG
     r.bien = r.ban > 0 ? r.ln / r.ban * 100 : 0
     r.ready = r.done + r.fail >= fGroups.length
+    r.paused = !r.ready && !auto   // chờ người dùng bấm "Tính tổng"
     return r
   })()
   const nDa = fGroups.length
@@ -130,7 +143,7 @@ export default function OverviewTab() {
           onPointerDown={splitDown} onPointerMove={splitMove} onPointerUp={splitUp} onPointerCancel={splitUp}
           onDoubleClick={() => saveSide(SIDE_DEF)} />
         <div className="qs-dash-side">
-          <DashSummary A={A} nDa={nDa} label={flt ? flt.label : ''} tt={flt ? flt.tt : ''} ttCount={flt ? flt.ttCount : null} onTt={flt ? flt.setTt : null} />
+          <DashSummary A={A} nDa={nDa} label={flt ? flt.label : ''} tt={flt ? flt.tt : ''} ttCount={flt ? flt.ttCount : null} onTt={flt ? flt.setTt : null} onSumAll={setSumAll} />
           <QuickActions />
         </div>
         <ProjectList groups={groups} curMa={has ? cur.maDA : ''} onCreate={() => toCreate(true)} onFilter={setFlt} />

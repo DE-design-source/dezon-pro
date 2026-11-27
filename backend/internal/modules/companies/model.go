@@ -8,7 +8,7 @@ var tenantTablesOrder = []string{
 	"don_mua_hang", "chi_tiet_mua_hang", "notifications", "delete_requests",
 	"audit_log", "sp_combo", "sp_yeu_thich", "cong_tac",
 	"de_xuat", "chi_tiet_de_xuat_ck", "chi_tiet_de_xuat_tt", "cong_tac_history",
-	"du_an_data", "cai_dat_cong_ty", "kd_cham_soc", "kd_cham_diem", "kd_lich_hen", "kd_nhiem_vu_kh", "kd_goi_y", "kd_khach_hang",
+	"du_an_data", "cai_dat_cong_ty", "kd_ghi_am", "kd_cham_soc", "kd_cham_diem", "kd_lich_hen", "kd_nhiem_vu_kh", "kd_goi_y", "kd_khach_hang",
 	"tk_binh_luan", "tk_cong_viec", "tk_giai_doan", "tk_thau_phu", "tk_thanh_vien", "tk_du_an",
 	"hr_kiem_nhiem", "hr_lich_ngay", "hr_lich_tuan", "hr_cham_cong", "hr_don_tu", "hr_dieu_chinh_luong", "hr_dinh_phi", "hr_danh_gia", "hr_ghi_danh", "hr_ung_vien", "hr_tin_tuyen", "hr_jd", "hr_muc_tieu", "hr_nhan_vien", "hr_ca", "hr_don_vi",
 	"hr_cau_hinh_luong", "hr_ky_luong", "hr_bao_mat", "hr_khoa_hoc", "hr_lo_trinh", "hr_dia_diem",

@@ -133,7 +133,7 @@ func (s *Server) modules() []Module {
 		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage})
 	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc})
 	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc, Users: usersSvc, UserFmt: usersSvc,
-		Notifier: notifSvc, Admins: notifSvc})
+		Notifier: notifSvc, Admins: notifSvc, Files: d.Storage})
 	quoteSvc := quotations.New(quotations.Deps{DB: d.DB, Cfg: d.Cfg, Lines: takeoffSvc, Projects: projSvc, Media: filesSvc,
 		Files: d.Storage})
 	estSvc := estimates.New(estimates.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Auditor: usersSvc})

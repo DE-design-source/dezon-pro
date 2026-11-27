@@ -6,8 +6,10 @@ import { safeUrl_, money, qbNorm_ } from '../../lib/format.js'
 import { mediaUrl } from '../../api/files'
 import { dezonUrl_, nenTangOf } from '../../lib/dashModel.js'
 import ProjectDetail from './ProjectDetail'
-import { statCache, loadStats_, onStatsReset } from './projectStats'
+import { statCache, loadStats_, onStatsReset, statCount_, STAT_AUTO_MAX } from './projectStats'
+import { useMoreOnScroll } from '../common/useMoreOnScroll'
 import ProjectCreate from './ProjectCreate'
+import DezonImportButton from './DezonImport'
 import './gallery.css'
 
 /* Trang "Danh sách dự án" (tham khảo dezon.vn/du-an): ô tìm lớn, hàng lọc (Nền tảng · Trạng thái · Khu vực · Phân khúc),
@@ -32,7 +34,7 @@ const hue_ = s => { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.
 const initials_ = s => String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
 export default function ProjectGallery() {
-  const { projects, cur, selectProject, visibleSeq, consumeIntent } = useQs()
+  const { projects, cur, selectProject, visibleSeq, consumeIntent, panelVisible } = useQs()
   const [q, setQ] = useState('')
   const [flt, setFlt] = useState({})
   const [open, setOpen] = useState('')       // nhóm lọc đang mở danh sách
@@ -44,15 +46,26 @@ export default function ProjectGallery() {
   const [cols, setColsSt] = useState(() => { try { return { ...COLS_DEF, ...JSON.parse(localStorage.getItem('qs_pg_cols') || '{}') } } catch (e) { return COLS_DEF } })
   const setCols = n => setColsSt(c => { const x = { ...c, [pgv]: n }; try { localStorage.setItem('qs_pg_cols', JSON.stringify(x)) } catch (e) { /* bỏ qua */ } return x })
   const nCol = cols[pgv] || COLS_DEF[pgv] || 4
+  /* Số liệu thẻ (statCache) chỉ đếm khi trang đang hiện: danh sách nhỏ (<= STAT_AUTO_MAX) đếm hết như cũ; danh sách lớn chỉ đếm
+     các thẻ đang vẽ (PAGE thẻ đầu, kéo xuống vẽ thêm thì đếm thêm), đếm hết khi người dùng dùng bộ lọc cần số mọi dự án
+     (chip "Dự án có báo giá", mở bộ lọc Nhà cung cấp) - needAll. Rời trang / đổi bộ lọc thì huỷ phần chưa đọc. */
+  const PAGE = 60
+  const vis = panelVisible('dsduan')
+  const big = (projects || []).length > STAT_AUTO_MAX
+  const [needAll, setNeedAll] = useState(false)
+  const wantAll = !big || needAll
   const [statVer, setStatVer] = useState(0)
+  const [rv, setRv] = useState(0)   // tăng khi số đã đếm bị xoá (resetStats, về từ trang chi tiết) -> đếm lại phần cần
+  useEffect(() => onStatsReset(() => { setStatVer(v => v + 1); setRv(v => v + 1) }), [])
   useEffect(() => {
-    let alive = true
-    const run = () => loadStats_(projects || [], () => { if (alive) setStatVer(v => v + 1) })
-    run()
-    const off = onStatsReset(() => { if (alive) { setStatVer(v => v + 1); run() } })
-    return () => { alive = false; off() }
-  }, [projects])
+    if (!vis || !wantAll) return undefined
+    setStatVer(v => v + 1)   // số đã do trang khác đếm xong (loadStats_ không báo): bộ lọc theo số tính lại
+    const ctl = new AbortController()
+    loadStats_(projects || [], () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal })
+    return () => ctl.abort()
+  }, [projects, vis, wantAll, rv])
   const statDone = (projects || []).every(x => statCache[x.maDA])
+  const nStat = statDone ? (projects || []).length : statCount_(projects)
   const nCoBG = (projects || []).filter(x => statCache[x.maDA] && statCache[x.maDA].n > 0).length
   const qq = q.trim().toLowerCase()
   const val_ = (g, x) => { const v = g[2](x); return Array.isArray(v) ? v : (v ? [v] : []) }
@@ -73,6 +86,18 @@ export default function ProjectGallery() {
     document.addEventListener('mousedown', down); document.addEventListener('keydown', key)
     return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key) }
   }, [open])
+  useEffect(() => { if (open === 'ncc') setNeedAll(true) }, [open])   // bộ lọc Nhà cung cấp cần thương hiệu của mọi dự án
+  /* Vẽ dần: lim thẻ đầu, mốc cuối lưới vào gần khung nhìn (hoặc bấm "Xem thêm") thì vẽ thêm PAGE thẻ; đổi tìm / lọc về lại đầu */
+  const [lim, setLim] = useState(PAGE)
+  useEffect(() => { setLim(PAGE) }, [qq, flt, coBG])
+  const page = shown.length > lim ? shown.slice(0, lim) : shown
+  const pageKey = page.map(x => x.maDA).join('|')
+  useEffect(() => {
+    if (!vis) return undefined
+    const ctl = new AbortController()
+    loadStats_(page, () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal, front: true })
+    return () => ctl.abort()
+  }, [pageKey, vis, rv])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Bấm thẻ = trang chi tiết dự án (ProjectDetail); nút "Mở ở Bóc tách" trong trang chi tiết mới chuyển dự án + tab */
   const [detail, setDetail] = useState('')
@@ -90,16 +115,20 @@ export default function ProjectGallery() {
   }
   /* Nút "Nhập dự án" mở trang nhập (ProjectCreate); lưu xong vào thẳng trang chi tiết của dự án vừa nhập */
   const [creating, setCreating] = useState(false)
+  const moreRef = useRef(null)
+  useMoreOnScroll(moreRef, () => setLim(l => l + PAGE), [lim, shown.length > lim, vis, detail, creating])
   if (creating) return <ProjectCreate onBack={() => setCreating(false)} onCreated={p => { setCreating(false); showDetail(p.maDA) }} onOpen={ma => { setCreating(false); showDetail(ma) }} />
-  if (dp) return <ProjectDetail p={dp} projects={projects} onBack={() => { delete statCache[detail]; setDetail(''); loadStats_(projects || [], () => setStatVer(v => v + 1)) }} onOpenBoc={openProject} onOpen={x => showDetail(x.maDA)} />
+  if (dp) return <ProjectDetail p={dp} projects={projects} onBack={() => { delete statCache[detail]; setDetail(''); setRv(v => v + 1) }} onOpenBoc={openProject} onOpen={x => showDetail(x.maDA)} />
   return (
     <div className="qs-pg">
       <div className="qs-pg-head">
       <span className="qs-pg-total" title={shown.length + ' dự án đang hiện'}>{shown.length}</span>
       <div className="qs-pg-flt qs-pg-mod">
-        <button type="button" className={`qs-pg-chip${coBG ? ' on' : ''}`} disabled={!statDone && !coBG} aria-pressed={coBG}
-          title={statDone ? 'Chỉ hiện dự án đã có dòng báo giá' : 'Đang đếm dòng báo giá của các dự án…'} onClick={() => setCoBG(v => !v)}>
-          {coBG && <Icon name="check" size={14} />}Dự án có báo giá<small>{statDone ? nCoBG : '…'}</small>
+        {/* danh sách lớn: bấm chip = đếm dòng báo giá của mọi dự án rồi lọc (lưới hiện dần theo số đã đếm) */}
+        <button type="button" className={`qs-pg-chip${coBG ? ' on' : ''}`} disabled={!statDone && !coBG && wantAll} aria-pressed={coBG}
+          title={statDone ? 'Chỉ hiện dự án đã có dòng báo giá' : wantAll ? 'Đang đếm dòng báo giá của các dự án… (' + nStat + '/' + (projects || []).length + ')' : 'Bấm để đếm dòng báo giá của ' + (projects || []).length + ' dự án rồi lọc'}
+          onClick={() => { setNeedAll(true); setCoBG(v => !v) }}>
+          {coBG && <Icon name="check" size={14} />}Dự án có báo giá<small>{statDone ? nCoBG : wantAll ? nStat + '/' + (projects || []).length : '…'}</small>
         </button>
         {GROUPS.map(g => {
           const cnt = {}
@@ -107,7 +136,9 @@ export default function ProjectGallery() {
           const keys = Object.keys(cnt).sort((a, b) => a.localeCompare(b, 'vi'))
           const picked = sel_(g[0])
           picked.forEach(v => { if (keys.indexOf(v) < 0) keys.push(v) })
-          if (!keys.length) return null
+          // Nhà cung cấp lấy từ số đã đếm: chưa đếm xong vẫn hiện nút (mở ra = đếm mọi dự án, needAll)
+          const counting = g[0] === 'ncc' && !statDone
+          if (!keys.length && !counting) return null
           const isOpen = open === g[0]
           const dq = qbNorm_(ddq.trim())   // không phân biệt dấu
           const list = isOpen ? keys.filter(k => !dq || qbNorm_(k).indexOf(dq) >= 0) : []
@@ -122,6 +153,7 @@ export default function ProjectGallery() {
                   {keys.length > 6 && (
                     <div className="qs-pg-ddq"><Icon name="search" size={14} /><input autoFocus placeholder={'Tìm ' + g[1].toLowerCase() + '…'} value={ddq} onChange={e => setDdq(e.target.value)} /></div>
                   )}
+                  {counting && <div className="qs-pg-ddnone">Đang đếm nhà cung cấp {nStat}/{(projects || []).length} dự án…</div>}
                   <div className="qs-pg-ddl">
                     {list.map(k => (
                       <label key={k} className={`qs-pg-ddi${(flt[g[0]] || {})[k] ? ' on' : ''}`}>
@@ -129,7 +161,7 @@ export default function ProjectGallery() {
                         <span>{k}</span><small>{cnt[k] || 0}</small>
                       </label>
                     ))}
-                    {!list.length && <div className="qs-pg-ddnone">Không có kết quả.</div>}
+                    {!list.length && !counting && <div className="qs-pg-ddnone">Không có kết quả.</div>}
                   </div>
                   <div className="qs-pg-ddf">
                     <button type="button" onClick={() => setAll(g[0], list)}>Chọn {dq ? 'kết quả' : 'tất cả'} ({list.length})</button>
@@ -157,15 +189,19 @@ export default function ProjectGallery() {
         </label>
       )}
       <button type="button" className="qs-pg-new" title="Nhập thông tin một dự án vào danh sách" onClick={() => { setCreating(true); const sc = document.querySelector('.qs-scroll'); if (sc) sc.scrollTop = 0 }}><Icon name="plus" size={15} stroke={3} />Nhập dự án</button>
+      <DezonImportButton />
       <div className="qs-pg-search qs-pg-mod">
         <Icon name="search" size={16} />
         <input placeholder="Tìm kiếm dự án, khách hàng, khu vực, phân khúc…" value={q} onChange={e => setQ(e.target.value)} />
         {q && <button type="button" className="qs-pg-x" title="Xoá" onClick={() => setQ('')}><Icon name="x" size={16} /></button>}
       </div>
       </div>
+      {(coBG || sel_('ncc').length > 0) && !statDone && (
+        <div className="qs-pg-ddnone" role="status">Đang đếm dòng báo giá {nStat}/{(projects || []).length} dự án… danh sách lọc sẽ đủ khi đếm xong.</div>
+      )}
       {shown.length ? (
         <div className={'qs-pg-grid ' + pgv} style={pgv !== 'list' ? { '--cols': nCol } : undefined}>
-          {shown.map(x => {
+          {page.map(x => {
             const link = String(x.linkDezon || '').trim()
             const isCur = cur && cur.maDA === x.maDA
             const st = statCache[x.maDA]
@@ -199,7 +235,12 @@ export default function ProjectGallery() {
             )
           })}
         </div>
-      ) : <div className="qs-pg-empty">Không có dự án khớp tìm kiếm / bộ lọc.</div>}
+      ) : <div className="qs-pg-empty">{(coBG || sel_('ncc').length > 0) && !statDone ? 'Đang đếm…' : 'Không có dự án khớp tìm kiếm / bộ lọc.'}</div>}
+      {shown.length > lim && (
+        <div ref={moreRef} style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+          <button type="button" className="qs-pg-chip" onClick={() => setLim(l => l + PAGE)}>Xem thêm ({shown.length - lim} dự án)</button>
+        </div>
+      )}
     </div>
   )
 }

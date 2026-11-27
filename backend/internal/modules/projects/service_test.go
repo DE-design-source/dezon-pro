@@ -660,7 +660,7 @@ func TestDiffDB(t *testing.T) {
 }
 
 // Route REST: đăng ký không panic (trùng tham số / trùng đường dẫn) và đủ 8 route của PORTING_MAP mục A
-// + 3 route chỉ bản Go của yêu cầu sửa dự án (migration 0037).
+// + 3 route chỉ bản Go của yêu cầu sửa dự án (migration 0037) + 2 route nhập dự án từ dezon.vn.
 func TestRESTRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	e := gin.New()
@@ -671,7 +671,8 @@ func TestRESTRoutes(t *testing.T) {
 	}
 	want := []string{"GET /api/v1/bootstrap", "GET /api/v1/projects", "POST /api/v1/projects", "PATCH /api/v1/projects/:id",
 		"DELETE /api/v1/projects/:id", "POST /api/v1/projects/:id/duplicate", "GET /api/v1/projects/:id/data", "PUT /api/v1/projects/:id/data/:khoa",
-		"POST /api/v1/projects/:id/edit-requests", "GET /api/v1/project-edit-requests", "POST /api/v1/project-edit-requests/:rid/resolve"}
+		"POST /api/v1/projects/:id/edit-requests", "GET /api/v1/project-edit-requests", "POST /api/v1/project-edit-requests/:rid/resolve",
+		"POST /api/v1/projects/import-dezonvn", "GET /api/v1/projects/import-dezonvn"}
 	if len(got) != len(want) {
 		t.Errorf("số route = %d, cần %d", len(got), len(want))
 	}

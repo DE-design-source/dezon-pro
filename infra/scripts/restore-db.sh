@@ -9,6 +9,9 @@
 #           -> chạy migration còn thiếu -> bật lại backend.
 # File .dump = pg_dump -Fc (custom); file .sql = pg_dump dạng chữ. Chủ sở hữu / quyền trong file được bỏ qua.
 # File .tar.gz = bản sao lưu kho file do backup-db.sh tạo (qspro-files-<thời điểm>.tar.gz).
+#   Bản này KHÔNG có thư mục dezonvn/ (ảnh nhập từ dezon.vn): khi khôi phục, dezonvn/ đang có trên máy được GIỮ NGUYÊN
+#   (chỉ xoá phần còn lại của kho file). Máy mới / mất dezonvn/: Admin chạy lại POST /api/v1/projects/import-dezonvn -
+#   ảnh còn thiếu được tải lại đúng đường dẫn cũ (dự án đã nhập lần trước không bị tạo lại, ô đã có không bị đè).
 # Thư mục qspro-media = bản chép tệp chat do backup-db.sh tạo (<BACKUP_DIR>/qspro-media), dùng chung cho mọi bản .dump.
 set -euo pipefail
 
@@ -107,7 +110,7 @@ fi
 if [ -n "$FILES_TAR" ]; then
   step "Thay kho file (volume uploads) bằng $FILES_TAR"
   # container tạm từ image api (user app, chủ của /app/uploads), không đụng db / migrate
-  docker compose run --rm --no-deps -T --entrypoint sh api -c 'find /app/uploads -mindepth 1 -delete && tar -C /app/uploads -xzf -' < "$FILES_TAR"
+  docker compose run --rm --no-deps -T --entrypoint sh api -c 'find /app/uploads -mindepth 1 -maxdepth 1 ! -name dezonvn -exec rm -rf {} + && tar -C /app/uploads -xzf -' < "$FILES_TAR"
 fi
 
 if [ -n "$MEDIA_DIR" ]; then

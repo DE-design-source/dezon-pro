@@ -52,6 +52,13 @@ func (s *Service) RegisterRPC(reg *rpc.Registry) {
 		Tag: "Dự án", Summary: "Duyệt (áp thay đổi) / từ chối yêu cầu sửa dự án",
 		Fields: []rpc.GoField{{Name: "rid", In: "path", Desc: "Mã phiếu"}, {Name: "approve", In: "body", Desc: "true = duyệt"},
 			{Name: "lyDo", In: "body", Desc: "Lý do từ chối (tuỳ chọn)"}}})
+	// Nhập dự án từ website dezon.vn (service_dezonvn.go): chạy nền, mỗi công ty 1 lượt; super phải chọn công ty (x-view-company)
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "importDezonvn", Method: "POST", Path: "/projects/import-dezonvn", Perm: rpc.Admin,
+		Tag: "Dự án", Summary: "Bắt đầu nhập dự án từ dezon.vn vào Danh sách dự án (chạy nền) -> trạng thái lượt nhập; đang chạy -> 409",
+		Fields: []rpc.GoField{{Name: "limit", In: "body", Type: "number", Desc: "Số dự án tối đa (0 / bỏ trống = tất cả)"},
+			{Name: "dryRun", In: "body", Type: "boolean", Desc: "true = chỉ đọc và đếm, không ghi gì, không tải ảnh"}}})
+	reg.RegisterGoRoute(rpc.GoRoute{Name: "importDezonvnStatus", Method: "GET", Path: "/projects/import-dezonvn", Perm: rpc.Admin,
+		Tag: "Dự án", Summary: "Trạng thái lượt nhập dự án từ dezon.vn gần nhất của công ty"})
 }
 
 // RegisterRoutes: REST /api/v1 (PORTING_MAP mục A). :id là mã dự án (ma_da); với .../data/:khoa có thể là "__cty".
@@ -60,6 +67,16 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		// tham số query luôn là chuỗi: ?maDA=0 tương đương rpc bootstrap("0") (truthy, mã dự án "0"), không phải bootstrap(0)
 
 		r, err := s.Bootstrap(c.Request.Context(), validator.Query(c, "maDA"))
+		response.Result(c, r, err)
+	})
+	// nhập từ dezon.vn: admin / super (gắn ngoài nhóm /projects: middleware quyền khớp Perm rpc.Admin)
+	v1.POST("/projects/import-dezonvn", middleware.RequireAdmin(), func(c *gin.Context) {
+		b := middleware.BodyMap(c)
+		r, err := s.StartDezonImport(c.Request.Context(), actor.FromGin(c), b.Val("limit"), b.Val("dryRun"))
+		response.Result(c, r, err)
+	})
+	v1.GET("/projects/import-dezonvn", middleware.RequireAdmin(), func(c *gin.Context) {
+		r, err := s.DezonImportStatus(c.Request.Context())
 		response.Result(c, r, err)
 	})
 	g := v1.Group("/projects", middleware.RequireLogin())
