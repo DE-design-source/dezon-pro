@@ -20,7 +20,14 @@ async function readOne_(x) {
     const [ls, pd] = await Promise.all([api.getLines(x.maDA), api.getProjData(x.maDA).catch(() => ({}))])
     const anh = Array.isArray(pd && pd.anhDuAn) ? pd.anhDuAn : []
     const nccN = nccN_(ls || [])   // {thương hiệu: số dòng} - trang Nhà cung cấp hiện số sản phẩm của hãng trong từng dự án
-    statCache[x.maDA] = { n: (ls || []).length, tong: (ls || []).reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0), cover: anhUrl_(anh[0]), nAnh: anh.length, ncc: nccOf_(nccN), nccN,
+    const ncc = nccOf_(nccN)
+    /* nhà cung cấp ghi trên dezon.vn (nccDezon, dự án nhập từ dezon.vn): thêm sau thương hiệu của dòng báo giá (không có số dòng) */
+    const low = new Set(ncc.map(n => n.toLowerCase()))
+    ;(Array.isArray(pd && pd.nccDezon) ? pd.nccDezon : []).forEach(o => {
+      const n = String((o && o.ten) || '').trim()
+      if (n && !low.has(n.toLowerCase())) { low.add(n.toLowerCase()); ncc.push(n) }
+    })
+    statCache[x.maDA] = { n: (ls || []).length, tong: (ls || []).reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0), cover: anhUrl_(anh[0]), nAnh: anh.length, ncc, nccN,
       t: dashTotals_(ls || [], projCtx_(x, pd)) }   // số đủ như Bảng điều khiển (Phần thô, CK báo giá, VAT) - cột trái cộng theo bộ lọc
   } catch (e) { statCache[x.maDA] = { n: 0, tong: 0, err: true, errAt: Date.now() } }
 }

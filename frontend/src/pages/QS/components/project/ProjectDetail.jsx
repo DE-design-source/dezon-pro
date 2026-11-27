@@ -101,6 +101,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const [spv, setSpvSt] = useState(spvGet)
   const setSpv = v => { setSpvSt(v); try { localStorage.setItem(SPV_LS, v) } catch (e) { /* bỏ qua */ } }
   const [boq, setBoq] = useState(null)          // file BOQ đính kèm (mảng {url, name, at})
+  const [nccDz, setNccDz] = useState(null)      // nhà cung cấp ghi trên dezon.vn (khoá nccDezon, lượt nhập dezon.vn): [{ten, link, moTa}]
   const [boqBusy, setBoqBusy] = useState(0)
   const boqRef = useRef(null)
   /* Sửa thông tin (migration 0037): người duyệt lưu thẳng, người khác gửi yêu cầu; phiếu chờ duyệt của dự án hiện ở đầu trang */
@@ -142,12 +143,13 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   useEffect(() => {
     let alive = true
     setLines(null); setErr(''); setTab('info')
-    setAnh(null); setBoq(null); setNganh('')
+    setAnh(null); setBoq(null); setNccDz(null); setNganh('')
     api.getProjData(p.maDA).then(d => {
       if (!alive) return
       setAnh(Array.isArray(d && d.anhDuAn) ? d.anhDuAn : [])
       setBoq(Array.isArray(d && d.boqFiles) ? d.boqFiles : [])
-    }, () => { if (alive) { setAnh([]); setBoq([]) } })
+      setNccDz(Array.isArray(d && d.nccDezon) ? d.nccDezon : [])
+    }, () => { if (alive) { setAnh([]); setBoq([]); setNccDz([]) } })
     api.getLines(p.maDA).then(ls => { if (alive) setLines(ls || []) }, e => { if (alive) { setErr(String((e && e.message) || e)); setLines([]) } })
     return () => { alive = false }
   }, [p.maDA])
@@ -160,6 +162,8 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
     ls.forEach(l => { const k = s_(l.thuongHieu) || 'Chưa rõ thương hiệu'; const o = m[k] || (m[k] = { ten: k, n: 0, sl: 0, tong: 0 }); o.n++; o.sl += Number(l.soLuong) || 0; o.tong += Number(l.thanhTienBan) || 0 })
     return Object.values(m).sort((a, b) => b.tong - a.tong)
   }, [lines])   // eslint-disable-line react-hooks/exhaustive-deps
+  const nccDzL = (nccDz || []).filter(o => o && s_(o.ten))
+  const nccDzMoi = nccDzL.filter(o => !ncc.some(x => x.ten.toLowerCase() === s_(o.ten).toLowerCase()))   // chưa có trong dòng báo giá
   const related = (projects || []).filter(x => x.maDA !== p.maDA && ((s_(p.khachHang) && s_(x.khachHang) === s_(p.khachHang)) || (kv_(p) && kv_(x) === kv_(p))))
   /* Tab Dự án liên quan: đếm ảnh bìa / số ảnh / số dòng của các dự án liên quan (dùng chung statCache với Danh sách dự án) */
   const [, setRelVer] = useState(0)
@@ -328,7 +332,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
 
       <div className="qs-pd-tabs" role="tablist">
         {TABS.map(t => {
-          const n = t[0] === 'img' ? pics.length : t[0] === 'sp' ? ls.length : t[0] === 'ncc' ? ncc.length : t[0] === 'rel' ? related.length : t[0] === 'boq' ? (ls.length ? 1 : 0) + (boq || []).length : null
+          const n = t[0] === 'img' ? pics.length : t[0] === 'sp' ? ls.length : t[0] === 'ncc' ? ncc.length + nccDzMoi.length : t[0] === 'rel' ? related.length : t[0] === 'boq' ? (ls.length ? 1 : 0) + (boq || []).length : null
           return <button type="button" role="tab" key={t[0]} aria-selected={tab === t[0]} className={tab === t[0] ? 'on' : ''} onClick={() => setTab(t[0])}>{t[1]}{n ? <small>{n}</small> : null}</button>
         })}
       </div>
@@ -442,6 +446,20 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
       )}
       {tab === 'ncc' && (
         <div className="qs-pd-sec">
+          {nccDzL.length > 0 && (
+            <div className="qs-pd-nccdz">
+              <div className="h"><b>Nhà cung cấp ghi nhận trên Dezon.vn</b><span>{nccDzL.length} đơn vị cung ứng vật liệu, thiết bị của công trình</span></div>
+              <div className="qs-pd-ncc">
+                {nccDzL.map(o => {
+                  const href = o.link ? safeUrl_(o.link) : '#'
+                  const body = <><b>{o.ten}</b>{s_(o.moTa) && <span>{o.moTa}</span>}{href !== '#' && <span className="lk"><Icon name="link" size={12} /> Xem trên Dezon</span>}</>
+                  return href !== '#'
+                    ? <a key={o.ten} className="qs-pd-nccc dz" href={href} target="_blank" rel="noopener noreferrer" title={'Mở trang ' + o.ten + ' trên Dezon'}>{body}</a>
+                    : <div key={o.ten} className="qs-pd-nccc dz">{body}</div>
+                })}
+              </div>
+            </div>
+          )}
           {ncc.length ? (
             <div className="qs-pd-ncc">
               {ncc.map(o => (
@@ -476,7 +494,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                 ))}
               </div>
             </div>
-          )) : <div className="qs-pd-empty">{lines == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div>}
+          )) : nccDzL.length ? null : <div className="qs-pd-empty">{lines == null || nccDz == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div>}
         </div>
       )}
       {tab === 'rel' && (

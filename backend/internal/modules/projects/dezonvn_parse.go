@@ -35,11 +35,91 @@ type dzImage struct {
 
 // dzDetail: phần đọc được từ trang chi tiết.
 type dzDetail struct {
-	Info     map[string]string // nhãn IN HOA (bỏ dấu ":") -> giá trị chữ
-	Province string            // ĐỊA ĐIỂM: link /khu-vuc/
-	Country  string            // ĐỊA ĐIỂM: link /quoc-gia/
-	Category string            // breadcrumb cuối ("Khách Sạn")
-	Gallery  []dzImage         // dải trượt rồi mục Hình ảnh, đã bỏ trùng (ưu tiên ảnh gốc)
+	Info      map[string]string // nhãn IN HOA (bỏ dấu ":") -> giá trị chữ
+	Province  string            // ĐỊA ĐIỂM: link /khu-vuc/
+	Country   string            // ĐỊA ĐIỂM: link /quoc-gia/
+	Category  string            // breadcrumb cuối ("Khách Sạn")
+	Gallery   []dzImage         // dải trượt rồi mục Hình ảnh, đã bỏ trùng (ưu tiên ảnh gốc)
+	Suppliers []dzSupplier      // mục "Nhà cung cấp" (id="dz-sec-suppliers"), theo thứ tự trên trang, bỏ trùng tên
+}
+
+// dzSupplier: 1 thẻ nhà cung cấp của dự án trên dezon.vn (link trang nhà cung cấp trên *.dezon.vn, mô tả ngắn).
+type dzSupplier struct{ Ten, Link, MoTa string }
+
+const dzMaxSuppliers = 40
+
+var (
+	reDzSupCard = regexp.MustCompile(`(?is)(<a\b[^>]*\bclass="dz-proj-supcard"[^>]*>)(.*?)</a>`)
+	reDzHref    = regexp.MustCompile(`(?i)\bhref="([^"]*)"`)
+	reDzSupName = regexp.MustCompile(`(?is)<span[^>]*\bclass="dz-proj-supname"[^>]*>(.*?)</span>`)
+	reDzSupDesc = regexp.MustCompile(`(?is)<span[^>]*\bclass="dz-proj-supdesc"[^>]*>(.*?)</span>`)
+)
+
+// dzSuppliers: thẻ nhà cung cấp trong mục id="dz-sec-suppliers" (tới mục dz-sec- kế tiếp / khối slider ẩn / <style>).
+// Link chỉ giữ khi là http(s) trên dezon.vn hoặc tên miền con (shop.dezon.vn), khác thì để trống.
+func dzSuppliers(page string) []dzSupplier {
+	const mark = `id="dz-sec-suppliers"`
+	seg := dzCut(page, mark)
+	if seg == "" {
+		return nil
+	}
+	seg = seg[len(mark):]
+	seg = seg[:dzFirst(seg, `id="dz-sec-`, `project_suppliers_container`, `<style`, "related_projects")]
+	var out []dzSupplier
+	seen := map[string]bool{}
+	for _, m := range reDzSupCard.FindAllStringSubmatch(seg, -1) {
+		n := reDzSupName.FindStringSubmatch(m[2])
+		if n == nil {
+			continue
+		}
+		ten := dzText(n[1])
+		k := strings.ToLower(ten)
+		if ten == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		sp := dzSupplier{Ten: ten}
+		if h := reDzHref.FindStringSubmatch(m[1]); h != nil {
+			sp.Link = dzSiteLink(html.UnescapeString(h[1]))
+		}
+		if d := reDzSupDesc.FindStringSubmatch(m[2]); d != nil {
+			sp.MoTa = dzText(d[1])
+		}
+		out = append(out, sp)
+		if len(out) >= dzMaxSuppliers {
+			break
+		}
+	}
+	return out
+}
+
+// dzSiteLink: link http(s) tới dezon.vn / *.dezon.vn (giữ nguyên), khác -> "".
+func dzSiteLink(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
+		return ""
+	}
+	h := strings.ToLower(u.Hostname())
+	if h != "dezon.vn" && !strings.HasSuffix(h, ".dezon.vn") {
+		return ""
+	}
+	return u.String()
+}
+
+// dzNccValue: giá trị khoá nccDezon của dự án - [{ten, link, moTa}] (bỏ khoá rỗng).
+func dzNccValue(list []dzSupplier) []any {
+	out := make([]any, 0, len(list))
+	for _, s := range list {
+		o := omap.Of("ten", s.Ten)
+		if s.Link != "" {
+			o.Set("link", s.Link)
+		}
+		if s.MoTa != "" {
+			o.Set("moTa", s.MoTa)
+		}
+		out = append(out, o)
+	}
+	return out
 }
 
 // parseDzList: mảng JSON của REST. class_list có thể là mảng hoặc object {số: tên}; project_thumb chuỗi / null / false.
@@ -172,6 +252,7 @@ func parseDzDetail(page, moreRooms string) dzDetail {
 		}
 	}
 	d.Gallery = dzGallery(page, moreRooms)
+	d.Suppliers = dzSuppliers(page)
 	return d
 }
 
