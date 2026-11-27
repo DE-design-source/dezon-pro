@@ -1007,3 +1007,27 @@ func TestDezonImportSuppliers(t *testing.T) {
 		t.Errorf("người dùng đã xoá nhà cung cấp: %s", got)
 	}
 }
+
+func TestDzProducts(t *testing.T) {
+	page := `<div class="mb-5 pb-5 dz-proj-block" id="dz-sec-productlist"><h2>Sản phẩm dùng trong dự án</h2><div class="dz-proj-prodgrid">
+<div class="dz-proj-prod"> <a class="dz-proj-prod-link" href="https://shop.dezon.vn/product/cua-di-chinh/" target="_blank"> <span class="lazyload dz-proj-prod-img" data-bg="https://shop.dezon.vn/?attachment_id=41425" style="background-image:url(data:image/svg+xml,%3Csvg%3E%3C/svg%3E)"></span> <span class="dz-proj-prod-name">Cửa đi chính</span> </a> <span class="dz-proj-prod-meta"><a href="https://shop.dezon.vn/brand/tostem/">Tostem</a> · <a href="https://shop.dezon.vn/c/cua-vach-kinh/cua-di/">Cửa đi</a></span></div>
+<div class="dz-proj-prod"> <a class="dz-proj-prod-link" href="https://evil.vn/x"> <span class="dz-proj-prod-img" style="background-image:url('https://shop.dezon.vn/wp-content/uploads/a.png')"></span> <span class="dz-proj-prod-name">Vách &amp; kính</span> </a> <span class="dz-proj-prod-meta"><a href="https://shop.dezon.vn/c/vach/">Vách nhôm kính</a></span></div>
+<div class="dz-proj-prod"> <a class="dz-proj-prod-link" href="https://shop.dezon.vn/product/cua-di-chinh/"> <span class="dz-proj-prod-name">Cửa đi chính</span> </a></div>
+</div></div><div id="dz-sec-suppliers"><div class="dz-proj-prod"><span class="dz-proj-prod-name">Ngoài mục</span></div></div>`
+	got := dzProducts(page)
+	want := []dzProduct{
+		{Ten: "Cửa đi chính", Link: "https://shop.dezon.vn/product/cua-di-chinh/", Anh: "https://shop.dezon.vn/?attachment_id=41425", ThuongHieu: "Tostem", Nhom: "Cửa đi"},
+		{Ten: "Vách & kính", Anh: "https://shop.dezon.vn/wp-content/uploads/a.png", Nhom: "Vách nhôm kính"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("dzProducts: %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("sản phẩm %d: %+v, mong %+v", i, got[i], want[i])
+		}
+	}
+	if got := dzJSON(dzSpValue(want[1:])); got != `[{"ten":"Vách & kính","anh":"https://shop.dezon.vn/wp-content/uploads/a.png","nhom":"Vách nhôm kính"}]` {
+		t.Errorf("dzSpValue: %s", got)
+	}
+}

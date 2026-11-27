@@ -532,11 +532,9 @@
 /* dòng chú thích dưới tiêu đề trang Nhập dự án (vd: ghi danh SP vào dự án sau khi lưu) */
 .qs-pn-note{margin:-10px 0 0; font-size:13px; color:var(--text-muted);}
 .qs-pn-boq > .qs-pn-boqc:only-child{grid-column:1 / -1;}
-/* Tab Nhà cung cấp: nhà cung cấp ghi trên Dezon.vn (dự án nhập từ dezon.vn), thẻ mở trang nhà cung cấp */
-.qs-pd-nccdz{margin-bottom:18px; display:flex; flex-direction:column; gap:10px;}
-.qs-pd-nccdz .h{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px;}
-.qs-pd-nccdz .h span{font-size:13px; color:var(--text-muted);}
-.qs-pd-nccc.dz{cursor:default; padding-bottom:14px;}
-a.qs-pd-nccc.dz{cursor:pointer; color:var(--text); text-decoration:none;}
-.qs-pd-nccc.dz span{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
-.qs-pd-nccc.dz .lk{display:inline-flex; align-items:center; gap:4px; color:var(--dash-accent); font-weight:600;}
+/* Sản phẩm / nhà cung cấp ghi trên Dezon.vn (dự án nhập từ dezon.vn): mô tả ngắn, link mở trang trên Dezon */
+.qs-pd-nccc .mt{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+.qs-pd-nccc .lk, .qs-pd-spcard .ft a{display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:var(--dash-accent); text-decoration:none;}
+.qs-pd-nccc .lk:hover, .qs-pd-spcard .ft a:hover, .qs-pd-sprow a.nm:hover{text-decoration:underline;}
+.qs-pd-nccc.dz{cursor:default;}
+.qs-pd-sprow a.nm{color:inherit; text-decoration:none;}

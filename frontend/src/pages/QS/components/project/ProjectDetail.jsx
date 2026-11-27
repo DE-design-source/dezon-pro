@@ -26,7 +26,24 @@ const img1 = v => (v ? mediaUrl(String(v).split('\n')[0].trim()) : '')
 const s_ = v => String(v == null ? '' : v).trim()
 const TABS = [['info', 'Thông tin'], ['img', 'Hình ảnh'], ['sp', 'Sản phẩm'], ['ncc', 'Nhà cung cấp'], ['rel', 'Dự án liên quan'], ['boq', 'BOQ']]
 /* Ngành hàng của 1 dòng = đề mục cấp 3 của cây hạng mục (3.2.5 Thiết bị vệ sinh, 3.2.6 Thiết bị điện…); đề mục ngắn hơn giữ nguyên */
-const nganh_ = l => { const c = s_(l.nhom); if (!c) return ''; const a = c.split('.'); return a.length > 3 ? a.slice(0, 3).join('.') : c }
+/* Cột Tầng của bảng / thẻ sản phẩm: sản phẩm ghi trên dezon.vn (dz) không có tầng -> nhóm hàng */
+const tangOf_ = l => (l.dz ? (l.nhomDz || 'Trên Dezon.vn') : (l.tang || 'Chưa phân tầng'))
+/* 1 dòng bảng sản phẩm: dòng báo giá, hoặc sản phẩm ghi trên dezon.vn (tên mở trang sản phẩm, không có SL / giá) */
+function SpRow({ l, onView }) {
+  const href = l.dz && l.link ? safeUrl_(l.link) : '#'
+  return (
+    <div className="qs-pd-sprow">
+      <ProductThumb product={l} size={44} src={img1(l.hinhAnh)} onClick={l.hinhAnh ? () => onView(img1(l.hinhAnh)) : undefined} />
+      {href !== '#' ? <a className="nm" href={href} target="_blank" rel="noopener noreferrer" title={'Mở ' + l.ten + ' trên Dezon'}>{l.ten}</a> : <span className="nm" title={l.ten}>{l.ten}</span>}
+      <span>{l.thuongHieu || '—'}</span>
+      <span>{tangOf_(l)}</span>
+      <span className="r">{l.dz ? '—' : Number(l.soLuong) || 0}</span>
+      <span className="r">{l.dz ? '—' : money(l.donGiaBan)}</span>
+      <span className="r b">{l.dz ? '—' : money(l.thanhTienBan)}</span>
+    </div>
+  )
+}
+const nganh_ = l => { if (l.dz) return '__dz'; const c = s_(l.nhom); if (!c) return ''; const a = c.split('.'); return a.length > 3 ? a.slice(0, 3).join('.') : c }
 /* Thu gọn module (ảnh / thông tin) nhớ trong máy */
 const FOLD_LS = 'qs_pd_fold'
 const foldGet = () => { try { return JSON.parse(localStorage.getItem(FOLD_LS) || '{}') || {} } catch (e) { return {} } }
@@ -102,6 +119,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const setSpv = v => { setSpvSt(v); try { localStorage.setItem(SPV_LS, v) } catch (e) { /* bỏ qua */ } }
   const [boq, setBoq] = useState(null)          // file BOQ đính kèm (mảng {url, name, at})
   const [nccDz, setNccDz] = useState(null)      // nhà cung cấp ghi trên dezon.vn (khoá nccDezon, lượt nhập dezon.vn): [{ten, link, moTa}]
+  const [spDz, setSpDz] = useState(null)        // sản phẩm ghi trên dezon.vn (khoá spDezon): [{ten, link, anh, thuongHieu, nhom}]
   const [boqBusy, setBoqBusy] = useState(0)
   const boqRef = useRef(null)
   /* Sửa thông tin (migration 0037): người duyệt lưu thẳng, người khác gửi yêu cầu; phiếu chờ duyệt của dự án hiện ở đầu trang */
@@ -143,13 +161,14 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   useEffect(() => {
     let alive = true
     setLines(null); setErr(''); setTab('info')
-    setAnh(null); setBoq(null); setNccDz(null); setNganh('')
+    setAnh(null); setBoq(null); setNccDz(null); setSpDz(null); setNganh('')
     api.getProjData(p.maDA).then(d => {
       if (!alive) return
       setAnh(Array.isArray(d && d.anhDuAn) ? d.anhDuAn : [])
       setBoq(Array.isArray(d && d.boqFiles) ? d.boqFiles : [])
       setNccDz(Array.isArray(d && d.nccDezon) ? d.nccDezon : [])
-    }, () => { if (alive) { setAnh([]); setBoq([]); setNccDz([]) } })
+      setSpDz(Array.isArray(d && d.spDezon) ? d.spDezon : [])
+    }, () => { if (alive) { setAnh([]); setBoq([]); setNccDz([]); setSpDz([]) } })
     api.getLines(p.maDA).then(ls => { if (alive) setLines(ls || []) }, e => { if (alive) { setErr(String((e && e.message) || e)); setLines([]) } })
     return () => { alive = false }
   }, [p.maDA])
@@ -157,13 +176,24 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const ls = lines || []
   const imgs = useMemo(() => { const seen = {}; const out = []; ls.forEach(l => { const u = img1(l.hinhAnh); if (u && !seen[u]) { seen[u] = 1; out.push(u) } }); return out }, [lines])   // eslint-disable-line react-hooks/exhaustive-deps
   const tong = ls.reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0)
+  /* Sản phẩm ghi trên dezon.vn (spDezon, lượt nhập dezon.vn) hiện như dòng báo giá ở tab Sản phẩm / Nhà cung cấp (dz: true):
+     không có SL / giá / tầng (cột Tầng hiện nhóm hàng), bấm tên mở trang sản phẩm trên Dezon. Số "dòng báo giá" vẫn chỉ đếm ls. */
+  const spL = useMemo(() => ls.concat((spDz || []).filter(o => o && s_(o.ten)).map((o, i) => ({
+    lineId: 'dz' + i, dz: true, ten: s_(o.ten), thuongHieu: s_(o.thuongHieu), hinhAnh: s_(o.anh), nhomDz: s_(o.nhom), link: s_(o.link)
+  }))), [lines, spDz])   // eslint-disable-line react-hooks/exhaustive-deps
+  /* Thẻ nhà cung cấp: gom theo thương hiệu của spL; nhà cung cấp ghi trên dezon.vn (nccDezon) cùng tên thì thêm mô tả / link,
+     chưa có sản phẩm nào thì thành thẻ riêng ở cuối (n = 0) */
   const ncc = useMemo(() => {
     const m = {}
-    ls.forEach(l => { const k = s_(l.thuongHieu) || 'Chưa rõ thương hiệu'; const o = m[k] || (m[k] = { ten: k, n: 0, sl: 0, tong: 0 }); o.n++; o.sl += Number(l.soLuong) || 0; o.tong += Number(l.thanhTienBan) || 0 })
-    return Object.values(m).sort((a, b) => b.tong - a.tong)
-  }, [lines])   // eslint-disable-line react-hooks/exhaustive-deps
-  const nccDzL = (nccDz || []).filter(o => o && s_(o.ten))
-  const nccDzMoi = nccDzL.filter(o => !ncc.some(x => x.ten.toLowerCase() === s_(o.ten).toLowerCase()))   // chưa có trong dòng báo giá
+    spL.forEach(l => { const t = s_(l.thuongHieu) || 'Chưa rõ thương hiệu'; const k = t.toLowerCase(); const o = m[k] || (m[k] = { ten: t, n: 0, dz: 0, sl: 0, tong: 0 }); o.n++; if (l.dz) o.dz++; o.sl += Number(l.soLuong) || 0; o.tong += Number(l.thanhTienBan) || 0 })
+    const out = Object.values(m).sort((a, b) => b.tong - a.tong || b.n - a.n)
+    ;(nccDz || []).forEach(x => {
+      const t = s_(x && x.ten); if (!t) return
+      const o = out.find(y => y.ten.toLowerCase() === t.toLowerCase())
+      if (o) { o.moTa = o.moTa || s_(x.moTa); o.link = o.link || s_(x.link) } else out.push({ ten: t, n: 0, dz: 0, sl: 0, tong: 0, moTa: s_(x.moTa), link: s_(x.link) })
+    })
+    return out
+  }, [spL, nccDz])
   const related = (projects || []).filter(x => x.maDA !== p.maDA && ((s_(p.khachHang) && s_(x.khachHang) === s_(p.khachHang)) || (kv_(p) && kv_(x) === kv_(p))))
   /* Tab Dự án liên quan: đếm ảnh bìa / số ảnh / số dòng của các dự án liên quan (dùng chung statCache với Danh sách dự án) */
   const [, setRelVer] = useState(0)
@@ -219,10 +249,10 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   /* Ngành hàng có trong dự án + số dòng */
   const nganhList = useMemo(() => {
     const m = {}
-    ls.forEach(l => { const k = nganh_(l); m[k] = (m[k] || 0) + 1 })
-    return Object.keys(m).sort().map(k => [k, k ? nodeName(k) : 'Khác', m[k]])
-  }, [lines])   // eslint-disable-line react-hooks/exhaustive-deps
-  const lsShown = nganh ? ls.filter(l => nganh_(l) === (nganh === '__khac' ? '' : nganh)) : ls
+    spL.forEach(l => { const k = nganh_(l); m[k] = (m[k] || 0) + 1 })
+    return Object.keys(m).sort().map(k => [k, k === '__dz' ? 'Trên Dezon.vn' : k ? nodeName(k) : 'Khác', m[k]])
+  }, [spL])
+  const lsShown = nganh ? spL.filter(l => nganh_(l) === (nganh === '__khac' ? '' : nganh)) : spL
   async function saveBoq(list) {
     const old = boq
     setBoq(list)
@@ -332,7 +362,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
 
       <div className="qs-pd-tabs" role="tablist">
         {TABS.map(t => {
-          const n = t[0] === 'img' ? pics.length : t[0] === 'sp' ? ls.length : t[0] === 'ncc' ? ncc.length + nccDzMoi.length : t[0] === 'rel' ? related.length : t[0] === 'boq' ? (ls.length ? 1 : 0) + (boq || []).length : null
+          const n = t[0] === 'img' ? pics.length : t[0] === 'sp' ? spL.length : t[0] === 'ncc' ? ncc.length : t[0] === 'rel' ? related.length : t[0] === 'boq' ? (ls.length ? 1 : 0) + (boq || []).length : null
           return <button type="button" role="tab" key={t[0]} aria-selected={tab === t[0]} className={tab === t[0] ? 'on' : ''} onClick={() => setTab(t[0])}>{t[1]}{n ? <small>{n}</small> : null}</button>
         })}
       </div>
@@ -375,9 +405,9 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
           <div className="qs-pd-spbar">
           {nganhList.length > 1 ? (
             <div className="qs-pd-nganh" role="group" aria-label="Lọc theo ngành hàng">
-              <button type="button" className={!nganh ? 'on' : ''} onClick={() => setNganh('')}>Tất cả<small>{ls.length}</small></button>
+              <button type="button" className={!nganh ? 'on' : ''} onClick={() => setNganh('')}>Tất cả<small>{spL.length}</small></button>
               {nganhList.map(g => (
-                <button type="button" key={g[0] || '__khac'} className={nganh === (g[0] || '__khac') ? 'on' : ''} title={g[0] ? g[0] + '. ' + g[1] : 'Dòng chưa có đề mục'}
+                <button type="button" key={g[0] || '__khac'} className={nganh === (g[0] || '__khac') ? 'on' : ''} title={g[0] === '__dz' ? 'Sản phẩm ghi nhận trên Dezon.vn' : g[0] ? g[0] + '. ' + g[1] : 'Dòng chưa có đề mục'}
                   onClick={() => setNganh(g[0] || '__khac')}>{g[1]}<small>{g[2]}</small></button>
               ))}
             </div>
@@ -390,14 +420,16 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
               ))}
             </div>
           </div>
-          {ls.length ? (spv === 'grid' ? (
+          {spL.length ? (spv === 'grid' ? (
             <div className="qs-pd-spgrid">
               {lsShown.map(l => (
                 <div key={l.lineId} className="qs-pd-spcard">
                   <button type="button" className="img" onClick={() => l.hinhAnh && setView(img1(l.hinhAnh))}><ProductThumb product={l} size={150} src={img1(l.hinhAnh)} /></button>
                   <b title={l.ten}>{l.ten}</b>
-                  <span className="br">{[l.thuongHieu, l.tang || 'Chưa phân tầng'].filter(Boolean).join(' · ')}</span>
-                  <div className="ft"><span>SL <b>{Number(l.soLuong) || 0}</b> × {money(l.donGiaBan)}</span><b className="tt">{money(l.thanhTienBan)} đ</b></div>
+                  <span className="br">{[l.thuongHieu, tangOf_(l)].filter(Boolean).join(' · ')}</span>
+                  {l.dz ? (
+                    <div className="ft">{l.link && safeUrl_(l.link) !== '#' ? <a href={safeUrl_(l.link)} target="_blank" rel="noopener noreferrer"><Icon name="link" size={12} /> Xem trên Dezon</a> : <span>Ghi nhận trên Dezon.vn</span>}</div>
+                  ) : <div className="ft"><span>SL <b>{Number(l.soLuong) || 0}</b> × {money(l.donGiaBan)}</span><b className="tt">{money(l.thanhTienBan)} đ</b></div>}
                 </div>
               ))}
             </div>
@@ -406,20 +438,12 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
               <div className="qs-pd-sprow head"><span>Ảnh</span><span>Sản phẩm</span><span>Thương hiệu</span><span>Tầng</span><span className="r">SL</span><span className="r">Đơn giá</span><span className="r">Thành tiền</span></div>
               {(() => {
                 const g = {}; const ord = []
-                lsShown.forEach(l => { const k = s_(l.tang) || 'Chưa phân tầng'; if (!g[k]) { g[k] = []; ord.push(k) } g[k].push(l) })
+                lsShown.forEach(l => { const k = (l.dz ? 'Trên Dezon.vn · ' : '') + tangOf_(l); if (!g[k]) { g[k] = []; ord.push(k) } g[k].push(l) })
                 return ord.map(k => (
                   <div key={k} className="qs-pd-spgrp">
-                    <div className="qs-pd-spgh"><b>{k}</b><span>{g[k].length} dòng</span><b className="t">{money(g[k].reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0))} đ</b></div>
+                    <div className="qs-pd-spgh"><b>{k}</b>{g[k].every(l => l.dz) ? <span>{g[k].length} sản phẩm trên Dezon.vn</span> : <><span>{g[k].length} dòng</span><b className="t">{money(g[k].reduce((t, l) => t + (Number(l.thanhTienBan) || 0), 0))} đ</b></>}</div>
                     {g[k].map(l => (
-                <div key={l.lineId} className="qs-pd-sprow">
-                  <ProductThumb product={l} size={44} src={img1(l.hinhAnh)} onClick={l.hinhAnh ? () => setView(img1(l.hinhAnh)) : undefined} />
-                  <span className="nm" title={l.ten}>{l.ten}</span>
-                  <span>{l.thuongHieu || '—'}</span>
-                  <span>{l.tang || 'Chưa phân tầng'}</span>
-                  <span className="r">{Number(l.soLuong) || 0}</span>
-                  <span className="r">{money(l.donGiaBan)}</span>
-                  <span className="r b">{money(l.thanhTienBan)}</span>
-                </div>
+                <SpRow key={l.lineId} l={l} onView={setView} />
                     ))}
                   </div>
                 ))
@@ -429,72 +453,50 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
             <div className="qs-pd-sp">
               <div className="qs-pd-sprow head"><span>Ảnh</span><span>Sản phẩm</span><span>Thương hiệu</span><span>Tầng</span><span className="r">SL</span><span className="r">Đơn giá</span><span className="r">Thành tiền</span></div>
               {lsShown.map(l => (
-                <div key={l.lineId} className="qs-pd-sprow">
-                  <ProductThumb product={l} size={44} src={img1(l.hinhAnh)} onClick={l.hinhAnh ? () => setView(img1(l.hinhAnh)) : undefined} />
-                  <span className="nm" title={l.ten}>{l.ten}</span>
-                  <span>{l.thuongHieu || '—'}</span>
-                  <span>{l.tang || 'Chưa phân tầng'}</span>
-                  <span className="r">{Number(l.soLuong) || 0}</span>
-                  <span className="r">{money(l.donGiaBan)}</span>
-                  <span className="r b">{money(l.thanhTienBan)}</span>
-                </div>
+                <SpRow key={l.lineId} l={l} onView={setView} />
               ))}
             </div>
           )
-          ) : <div className="qs-pd-empty">{lines == null ? 'Đang tải…' : 'Dự án chưa có sản phẩm.'}</div>}
+          ) : <div className="qs-pd-empty">{lines == null || spDz == null ? 'Đang tải…' : 'Dự án chưa có sản phẩm.'}</div>}
         </div>
       )}
       {tab === 'ncc' && (
         <div className="qs-pd-sec">
-          {nccDzL.length > 0 && (
-            <div className="qs-pd-nccdz">
-              <div className="h"><b>Nhà cung cấp ghi nhận trên Dezon.vn</b><span>{nccDzL.length} đơn vị cung ứng vật liệu, thiết bị của công trình</span></div>
-              <div className="qs-pd-ncc">
-                {nccDzL.map(o => {
-                  const href = o.link ? safeUrl_(o.link) : '#'
-                  const body = <><b>{o.ten}</b>{s_(o.moTa) && <span>{o.moTa}</span>}{href !== '#' && <span className="lk"><Icon name="link" size={12} /> Xem trên Dezon</span>}</>
-                  return href !== '#'
-                    ? <a key={o.ten} className="qs-pd-nccc dz" href={href} target="_blank" rel="noopener noreferrer" title={'Mở trang ' + o.ten + ' trên Dezon'}>{body}</a>
-                    : <div key={o.ten} className="qs-pd-nccc dz">{body}</div>
-                })}
-              </div>
-            </div>
-          )}
           {ncc.length ? (
             <div className="qs-pd-ncc">
-              {ncc.map(o => (
+              {ncc.map(o => {
+                const href = o.link ? safeUrl_(o.link) : '#'
+                const lk = href !== '#' && <a className="lk" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}><Icon name="link" size={12} /> Xem trên Dezon</a>
+                /* nhà cung cấp ghi trên dezon.vn chưa có sản phẩm: thẻ chỉ có mô tả + link */
+                if (!o.n) return <div key={o.ten} className="qs-pd-nccc dz"><b>{o.ten}</b>{o.moTa && <span className="mt">{o.moTa}</span>}{lk}</div>
+                return (
                 <div key={o.ten} className={`qs-pd-nccc${nccOpen === o.ten ? ' on' : ''}`} role="button" tabIndex={0} aria-expanded={nccOpen === o.ten}
                   title={nccOpen === o.ten ? 'Bấm để xem tất cả nhà cung cấp' : 'Bấm để chỉ xem sản phẩm ' + o.ten}
                   onClick={() => setNccOpen(v => (v === o.ten ? '' : o.ten))} onKeyDown={e => { if (e.key === 'Enter') setNccOpen(v => (v === o.ten ? '' : o.ten)) }}>
                   <b>{o.ten}</b>
-                  <span>{o.n} sản phẩm · SL {o.sl}</span>
-                  <span className="t">{money(o.tong)} đ</span>
-                  <i style={{ width: tong > 0 ? Math.max(3, Math.round(o.tong / tong * 100)) + '%' : 0 }} />
+                  <span>{o.n} sản phẩm{o.n > o.dz ? ' · SL ' + o.sl : ' · trên Dezon.vn'}</span>
+                  {o.n > o.dz && <span className="t">{money(o.tong)} đ</span>}
+                  {o.moTa && <span className="mt">{o.moTa}</span>}
+                  {lk}
+                  {o.n > o.dz && <i style={{ width: tong > 0 ? Math.max(3, Math.round(o.tong / tong * 100)) + '%' : 0 }} />}
                 </div>
-              ))}
+                )
+              })}
             </div>
           ) : null}
           {/* Sản phẩm theo nhà cung cấp: mặc định hiện tất cả, gom theo từng nhà; bấm thẻ = chỉ xem nhà đó */}
-          {ncc.length ? ncc.filter(o => !nccOpen || o.ten === nccOpen).map(o => (
+          {ncc.some(o => o.n) ? ncc.filter(o => o.n && (!nccOpen || o.ten === nccOpen)).map(o => (
             <div key={o.ten} className="qs-pd-nccsp">
-              <div className="h"><b>Sản phẩm {o.ten}</b><span>{o.n} dòng · {money(o.tong)} đ</span>
+              <div className="h"><b>Sản phẩm {o.ten}</b><span>{o.n > o.dz ? o.n + ' dòng · ' + money(o.tong) + ' đ' : o.n + ' sản phẩm trên Dezon.vn'}</span>
                 {nccOpen && <button type="button" className="qs-pd-foldb" title="Xem tất cả nhà cung cấp" onClick={() => setNccOpen('')}><Icon name="x" size={14} /></button>}</div>
               <div className="qs-pd-sp">
                 <div className="qs-pd-sprow head"><span>Ảnh</span><span>Sản phẩm</span><span>Thương hiệu</span><span>Tầng</span><span className="r">SL</span><span className="r">Đơn giá</span><span className="r">Thành tiền</span></div>
-                {ls.filter(l => (s_(l.thuongHieu) || 'Chưa rõ thương hiệu') === o.ten).map(l => (
-                  <div key={l.lineId} className="qs-pd-sprow">
-                    <ProductThumb product={l} size={44} src={img1(l.hinhAnh)} onClick={l.hinhAnh ? () => setView(img1(l.hinhAnh)) : undefined} />
-                    <span className="nm" title={l.ten}>{l.ten}</span>
-                    <span>{l.thuongHieu || '—'}</span>
-                    <span>{l.tang || 'Chưa phân tầng'}</span>
-                    <span className="r">{Number(l.soLuong) || 0}</span>
-                    <span className="r">{money(l.donGiaBan)}</span>
-                    <span className="r b">{money(l.thanhTienBan)}</span>
-                  </div>
+                {spL.filter(l => (s_(l.thuongHieu) || 'Chưa rõ thương hiệu').toLowerCase() === o.ten.toLowerCase()).map(l => (
+                  <SpRow key={l.lineId} l={l} onView={setView} />
                 ))}
               </div>
             </div>
-          )) : nccDzL.length ? null : <div className="qs-pd-empty">{lines == null || nccDz == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div>}
+          )) : ncc.length ? null : <div className="qs-pd-empty">{lines == null || nccDz == null || spDz == null ? 'Đang tải…' : 'Chưa có nhà cung cấp.'}</div>}
         </div>
       )}
       {tab === 'rel' && (
