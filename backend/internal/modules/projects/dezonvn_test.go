@@ -942,3 +942,68 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func dzJSON(v any) string { s, _ := omap.MarshalString(v); return s }
+
+const dzSupSec = `<div id="dz-sec-suppliers"><h2>Nhà cung cấp</h2><div class="dz-proj-supscroll">
+ <a class="dz-proj-supcard" href="https://shop.dezon.vn/nha-cung-cap/dulux-2/" target="_blank"> <span class="dz-proj-supname">Dulux</span>
+ <span class="dz-proj-supdesc">AkzoNobel là công ty &amp; sơn…</span> </a>
+ <a class="dz-proj-supcard" href="https://evil.vn/x"><span class="dz-proj-supname">Việt An</span></a>
+ <a class="dz-proj-supcard" href="https://shop.dezon.vn/nha-cung-cap/dulux-3/"><span class="dz-proj-supname">DULUX</span></a>
+</div></div><div id="project_suppliers_container"><a class="dz-proj-supcard" href="https://shop.dezon.vn/a/"><span class="dz-proj-supname">Ẩn</span></a></div>
+<div id="dz-sec-contractor"><a class="dz-proj-supcard"><span class="dz-proj-supname">Không phải NCC</span></a></div>`
+
+func TestDzSuppliers(t *testing.T) {
+	got := dzSuppliers(`<html>` + dzSupSec + `</html>`)
+	want := []dzSupplier{{Ten: "Dulux", Link: "https://shop.dezon.vn/nha-cung-cap/dulux-2/", MoTa: "AkzoNobel là công ty & sơn…"}, {Ten: "Việt An"}}
+	if len(got) != len(want) {
+		t.Fatalf("dzSuppliers: %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("thẻ %d: %+v, mong %+v", i, got[i], want[i])
+		}
+	}
+	if s := dzSuppliers(`<div id="dz-sec-rooms"></div>`); s != nil {
+		t.Errorf("trang không có mục Nhà cung cấp: %+v", s)
+	}
+	if got := dzJSON(dzNccValue(want)); got != `[{"ten":"Dulux","link":"https://shop.dezon.vn/nha-cung-cap/dulux-2/","moTa":"AkzoNobel là công ty & sơn…"},{"ten":"Việt An"}]` {
+		t.Errorf("dzNccValue: %s", got)
+	}
+}
+
+// nhà cung cấp của dự án trên dezon.vn -> khoá nccDezon: dự án mới / đã nhập lần trước mà chưa có khoá thì ghi;
+// người dùng đã xoá ([]) hoặc đã có thì giữ nguyên.
+func TestDezonImportSuppliers(t *testing.T) {
+	fh := dzNewFake()
+	fh.pages[dzListURL(1)] = `[{"id":401,"link":"https://dezon.vn/du-an/s/","title":{"rendered":"S"},"content":{"rendered":""},"class_list":[],"project_thumb":null},
+		{"id":402,"link":"https://dezon.vn/du-an/t/","title":{"rendered":"T"},"content":{"rendered":""},"class_list":[],"project_thumb":null},
+		{"id":403,"link":"https://dezon.vn/du-an/u/","title":{"rendered":"U"},"content":{"rendered":""},"class_list":[],"project_thumb":null}]`
+	for _, k := range []string{"s", "t", "u"} {
+		fh.pages["https://dezon.vn/du-an/"+k+"/"] = strings.Replace(dzPage("", "", ""), `<div id="dz-sec-suppliers"><img src="`+dzU+`logo-ncc.png"></div>`, dzSupSec, 1)
+	}
+	repo := &dzMemRepo{data: map[string]map[string]any{"DA-T": {"nccDezon": []any{}}}, projects: []*omap.Map{
+		omap.Of("ma_da", "DA-T", "ten_du_an", "T", "link_dezon", "https://dezon.vn/du-an/t/"),
+		omap.Of("ma_da", "DA-U", "ten_du_an", "U", "link_dezon", "https://dezon.vn/du-an/u/"),
+	}, seen: []string{normDezonURL("https://dezon.vn/du-an/t/"), normDezonURL("https://dezon.vn/du-an/u/")}}
+	s := New(Deps{Repo: repo, Files: storage.New(t.TempDir())})
+	s.dz.client = &http.Client{Transport: fh}
+	s.dz.delay, s.dz.retryWait = 0, time.Millisecond
+	ctx := tenant.With(context.Background(), tenant.Ctx{UID: 1.0, Role: "admin", CongTyID: "c1"})
+	if _, err := s.StartDezonImport(ctx, &actor.Actor{U: "admin1"}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	st := dzWait(t, s, ctx)
+	if st.Val("created") != 1.0 || st.Val("updated") != 1.0 || st.Val("skipped") != 1.0 || st.Val("failed") != 0.0 {
+		t.Fatalf("lượt nhập: %v", st)
+	}
+	ncc := `[{"ten":"Dulux","link":"https://shop.dezon.vn/nha-cung-cap/dulux-2/","moTa":"AkzoNobel là công ty & sơn…"},{"ten":"Việt An"}]`
+	newMa := jsval.S(repo.projects[2].Val("ma_da"))
+	if got := dzJSON(repo.data[newMa]["nccDezon"]); got != ncc {
+		t.Errorf("dự án mới: %s", got)
+	}
+	if got := dzJSON(repo.data["DA-U"]["nccDezon"]); got != ncc {
+		t.Errorf("dự án đã nhập lần trước, chưa có nccDezon: %s", got)
+	}
+	if got := dzJSON(repo.data["DA-T"]["nccDezon"]); got != `[]` {
+		t.Errorf("người dùng đã xoá nhà cung cấp: %s", got)
+	}
+}

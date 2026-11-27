@@ -195,7 +195,9 @@ export default function SupplierPage() {
   /* Dự án đang dùng từng thương hiệu (theo dòng báo giá) */
   const projOf = useMemo(() => {
     const m = {}
-    ;(projects || []).forEach(x => { const st = statCache[x.maDA]; ((st && st.ncc) || []).forEach(n => { (m[n] = m[n] || []).push(x) }) })
+    // khoá không phân biệt hoa thường / dấu: nhà cung cấp ghi trên dezon.vn ("Dulux") khớp thương hiệu sản phẩm ("DULUX")
+    // mỗi dự án chỉ 1 lần / khoá ("Dulux" và "DULUX" trong cùng dự án)
+    ;(projects || []).forEach(x => { const st = statCache[x.maDA]; new Set(((st && st.ncc) || []).map(qbNorm_)).forEach(k => { (m[k] = m[k] || []).push(x) }) })
     return m
   }, [projects, statVer])
   const statDone = (projects || []).every(x => statCache[x.maDA])
@@ -208,7 +210,7 @@ export default function SupplierPage() {
   sups.forEach(o => Object.keys(o.nganh).forEach(n => { nganhCnt[n] = (nganhCnt[n] || 0) + 1 }))
 
   const ds = detail ? sups.find(o => o.ten === detail) : null
-  if (ds) return <SupplierDetail o={ds} projs={projOf[ds.ten] || []} statDone={statDone} onBack={() => setDetail('')} L={L} />
+  if (ds) return <SupplierDetail o={ds} projs={projOf[qbNorm_(ds.ten)] || []} statDone={statDone} onBack={() => setDetail('')} L={L} />
 
   return (
     <div className="qs-sup">
@@ -266,7 +268,7 @@ export default function SupplierPage() {
           {shown.map(o => {
             const all = [...new Set(o.sp.map(p => img1(p.hinhAnh)).filter(Boolean))]
             const imgs = all.slice(0, 3)
-            const pj = projOf[o.ten] || []
+            const pj = projOf[qbNorm_(o.ten)] || []
             const ngs = Object.keys(o.nganh).sort((a, b) => o.nganh[b] - o.nganh[a])
             const logo = L.logos[o.ten]
             return (
@@ -358,7 +360,9 @@ function SupplierDetail({ o, projs, statDone, onBack, L }) {
   const NI = useNccInfo()
   const hs = NI.info[o.ten] || {}
   const saveHs = part => NI.patch(o.ten, part)
-  const nOf = x => ((statCache[x.maDA] || {}).nccN || {})[o.ten] || 0   // số dòng sản phẩm của hãng trong dự án
+  const kTen = qbNorm_(o.ten)
+  // số dòng sản phẩm của hãng trong dự án (cộng các cách viết khác hoa thường / dấu của cùng tên, như projOf)
+  const nOf = x => { const m = (statCache[x.maDA] || {}).nccN || {}; return Object.keys(m).reduce((t, k) => t + (qbNorm_(k) === kTen ? m[k] : 0), 0) }
   const TABS = [['sp', 'Sản phẩm', o.sp.length], ['pj', 'Dự án đang dùng', projs.length], ['dist', 'Nhà phân phối', dists.length],
     ['intro', 'Giới thiệu', 0], ['partner', 'Đối tác', (hs.doiTac || []).length], ['cat', 'Catalogue', (hs.catalogue || []).length]]
   return (

@@ -417,6 +417,7 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 	d := parseDzDetail(page, s.dz.moreRooms(ctx, page))
 	fields := dzFields(it, d)
 	coAnh := it.Thumb != "" || len(d.Gallery) > 0
+	coNcc := len(d.Suppliers) > 0 // khoá nccDezon chỉ ghi khi dự án chưa từng có (danh sách rỗng [] = người dùng đã xoá)
 	st.mu.Lock()
 	ma, prev, seen := st.idx[key], st.prev[key], st.seen[key]
 	st.mu.Unlock()
@@ -462,7 +463,14 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 		}
 		// lượt trước: chỉ thêm ảnh khi chưa từng lưu anhDuAn (danh sách rỗng [] = người dùng đã xoá hết ảnh)
 		coAnh = coAnh && dzAnhEmpty(anh) && (!prev || anh == nil)
-		if patch.Len() == 0 && !coAnh && len(mat) == 0 && len(ngoai) == 0 {
+		if coNcc {
+			if cur, err := s.dzDataHienTai(ctx, ma, "nccDezon"); err != nil {
+				return r, err
+			} else if cur != nil {
+				coNcc = false
+			}
+		}
+		if patch.Len() == 0 && !coAnh && len(mat) == 0 && len(ngoai) == 0 && !coNcc {
 			r.status = "skipped"
 			return r, nil
 		}
@@ -483,6 +491,15 @@ func (s *Service) dzImportOne(ctx context.Context, user string, dry bool, it dzI
 			r.images, r.imgFail = r.images+nOK, r.imgFail+nFail
 			if err != nil {
 				return r, err
+			}
+		}
+	}
+	if coNcc && !dry {
+		if cur, err := s.dzDataHienTai(ctx, ma, "nccDezon"); err != nil { // đọc lại ngay trước khi ghi
+			return r, err
+		} else if cur == nil {
+			if _, err := s.SetProjData(ctx, &actor.Actor{U: user}, ma, "nccDezon", dzNccValue(d.Suppliers)); err != nil {
+				return r, fmt.Errorf("Không lưu được nhà cung cấp của dự án: %w", err)
 			}
 		}
 	}
@@ -587,6 +604,11 @@ func (s *Service) dzCreate(ctx context.Context, fields *omap.Map) (*omap.Map, er
 
 // dzAnhHienTai: giá trị anhDuAn đang lưu của dự án (thiếu -> nil).
 func (s *Service) dzAnhHienTai(ctx context.Context, ma string) (any, error) {
+	return s.dzDataHienTai(ctx, ma, "anhDuAn")
+}
+
+// dzDataHienTai: giá trị khoá dữ liệu rời đang lưu của dự án (thiếu -> nil).
+func (s *Service) dzDataHienTai(ctx context.Context, ma, khoa string) (any, error) {
 	rows, err := s.repo.ListProjDataKV(ctx, ma)
 	if err != nil {
 		if daDataThieuBang(err) || daDataCamQuyen(err) {
@@ -595,7 +617,7 @@ func (s *Service) dzAnhHienTai(ctx context.Context, ma string) (any, error) {
 		return nil, err
 	}
 	for _, r := range rows {
-		if jsval.StrictEquals(r.Val("khoa"), "anhDuAn") {
+		if jsval.StrictEquals(r.Val("khoa"), khoa) {
 			return r.Val("gia_tri"), nil
 		}
 	}
