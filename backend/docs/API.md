@@ -263,6 +263,8 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `GET` | `/my-proposals/:code` | `getMyDeXuat` | `rpc.Login` | purchasing | Chi tiết phiếu đề xuất của chính mình (M13.1) |
 | `POST` | `/work-items/import/parse` | `ctImportParse` | `rpc.Login` | estimates | Đọc file nhập công tác -> `{rows, loi}` (M5.1) |
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
+| `POST` | `/projects/import-dezonvn` | `importDezonvn` | `rpc.Admin` | projects | Bắt đầu lượt nhập nền dự án từ website dezon.vn cho công ty đang làm việc, thân `{limit?: số (0 = tất cả), dryRun?: bool}` -> trạng thái lượt nhập; đang chạy -> 409; super chưa chọn công ty (`x-view-company`) -> 400. Xem mục "Nhập dự án từ dezon.vn" |
+| `GET` | `/projects/import-dezonvn` | `importDezonvnStatus` | `rpc.Admin` | projects | Trạng thái lượt nhập gần nhất của công ty (chưa chạy -> số 0, `running: false`) |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
 | `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); bảng route gốc `/mau-nhap-*.xlsx` (`RootRoutes`) đóng băng nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/system-defaults` | `getSystemDefaults` | `rpc.Login` | settings | Cài đặt mặc định toàn hệ thống `{appearance, general, display, updatedAt, updatedBy}` (mục chưa lưu = null; chưa migrate 0047 -> toàn null, ghi log) |
@@ -394,6 +396,41 @@ HR (`hr`, trang `/cham-cong`), migration 0024-0031 (chấm công tháng đã ch�
   khoá khác lưu vào tài liệu `details` (gộp theo khoá khi sửa; tối đa 100 khoá / 512 KB).
 - Service chặn: trùng mã NV, phòng ban / quản lý / trưởng đơn vị / thành viên không thuộc công ty, vòng quản lý, đơn vị nằm dưới chính nó,
   xoá đơn vị còn nhân sự hoặc đơn vị con, tổng kiêm nhiệm của 1 người > 90%.
+
+#### Nhập dự án từ dezon.vn (`/api/v1/projects/import-dezonvn`, module `projects`, `service_dezonvn.go`)
+
+- Trạng thái (POST và GET trả cùng dạng): `{running, dryRun, limit, total, done, created, updated, skipped, failed, images, imagesFailed,
+  startedAt, finishedAt, current, errors: [{title, link, error}]}` (`errors` tối đa 50; `startedAt` / `finishedAt` null khi chưa có).
+  Trạng thái chỉ giữ trong bộ nhớ của tiến trình (khởi động lại server thì mất; lượt đang chạy dừng).
+- Mỗi công ty 1 lượt cùng lúc (409 `Đang nhập dự án từ dezon.vn cho công ty này...`). Lượt chạy nền tối đa 3 giờ, với công ty của
+  người gọi (super: công ty đang xem như).
+- Nguồn: REST `https://dezon.vn/wp-json/wp/v2/project` (100 bài / trang, `orderby=id&order=asc`) rồi trang chi tiết `link` của từng bài.
+  Trang có nút "Xem thêm" phòng (`#btn-ajax-load-more` `data-post-id` / `data-offset`) thì tải thêm các phòng còn lại bằng
+  `POST https://dezon.vn/wp-admin/admin-ajax.php` (form `action=load_more_rooms&post_id&offset`, trả `{success, data: {html, remaining}}`;
+  mỗi lần offset +3, tới khi `remaining <= 0`, tối đa 10 lần, tổng 3 MB; lỗi thì dừng, giữ phần đã có).
+  Chỉ tải từ `dezon.vn` / `www.dezon.vn` (chuyển hướng sang host khác bị chặn), User-Agent `QSPro-Dezon-Import/1.0`, 3 yêu cầu cùng lúc,
+  cách nhau tối thiểu 200 ms, thử lại 2 lần khi lỗi mạng / quá giờ / HTTP 5xx / 429. Giới hạn: trang danh sách 30 s, trang dự án 30 s
+  và 3 MB, ảnh 60 s và 30 MB.
+- Trường dự án: `ten` = tiêu đề; `linkDezon` = link; `nenTang` = `Dezon.vn`; `trangThai` = `Hoàn thành`; `phanKhuc` = breadcrumb cuối
+  (nhiều danh mục -> danh mục đầu; thiếu -> `project_category-*` của `class_list`); `diaChi` = tỉnh / thành (dự án Việt Nam, để bộ lọc
+  Khu vực ra tỉnh), nước ngoài `<tỉnh>, <nước>` hoặc `<nước>`; `tongDT` / `kienTrucSu` (KIẾN TRÚC SƯ, thiếu thì KIẾN TRÚC SƯ CHỦ TRÌ) /
+  `nhaThauThiCong` / `studio` (CÔNG TY) / `namHoanThien` / `nhomThietKe` / `nhiepAnhGia` theo bảng thông tin (mẫu trang cũ: bảng
+  `jtable` trong `project_content`, ô nhãn không có `fw-bold`); `ghiChu` = phần giới thiệu (bỏ HTML, mỗi đoạn 1 dòng, tối đa 4000 ký tự).
+  `khachHang` để trống.
+- Ghép với dự án có sẵn theo link dezon.vn đã chuẩn hoá (bỏ scheme, `www.`, `?query`, `/` cuối; chữ thường): có thì CHỈ điền ô còn trống,
+  không thì tạo mới. Chạy lại không tạo trùng. Dòng dự án và `anhDuAn` đọc lại từ database ngay trước khi tính phần điền / ghi ảnh
+  (người dùng sửa trong lúc lượt nhập chạy thì không bị đè; dự án đã xoá trong lúc chạy -> `skipped`).
+- Ảnh (`anhDuAn`, chỉ ghi khi dự án chưa có ảnh): ảnh bìa (`project_thumb`, có trong thư viện thì lấy bản gốc; không có thì ảnh đầu của
+  thư viện) + 6 ảnh đầu của thư viện (dải trượt đầu trang rồi mục Hình ảnh, không lấy ảnh của khối dự án liên quan; bỏ trùng bản thu nhỏ
+  `-WxH` và ảnh `-scaled`) được tải, xoay theo EXIF, thu cạnh dài về 1280 px, lưu JPEG chất lượng 78 ở
+  `UPLOAD_DIR/dezonvn/<id bài>/<16 hex>.jpg` (tên = 16 hex đầu của sha1 khoá ảnh gốc, không theo vị trí; URL `/files/dezonvn/...`);
+  file của đúng ảnh đó đã có thì không tải lại. Ảnh còn lại giữ link `https://dezon.vn/wp-content/uploads/...`. Phần tử có phòng thì là
+  `{url, phong}`. Ảnh tải hỏng thì giữ link dezon.vn (đếm vào `imagesFailed`); chạy lại lượt nhập sẽ tải lại các ô ảnh bìa / 6 ảnh đầu
+  còn giữ đúng link dezon.vn đó và chỉ thay các ô ấy (ô người dùng đã thay giữ nguyên).
+- Dự án đã có `anhDuAn` trỏ tới `/files/dezonvn/<id bài>/<16 hex>.jpg` mà file không còn (khôi phục bản sao lưu:
+  `infra/scripts/backup-db.sh` KHÔNG sao lưu thư mục `dezonvn/`) -> chạy lại lượt nhập sẽ tải lại đúng file đó (tìm ảnh nguồn theo tên
+  file trong ảnh bìa + thư viện hiện tại), `anhDuAn` giữ nguyên.
+- `dryRun: true`: đọc danh sách + trang chi tiết, đếm `created` / `updated` / `skipped`, không ghi database, không tải ảnh.
 
 #### Chat (`/api/v1/chat`, module `chat`, migration 0018 - 0023, 0045, 0049)
 

@@ -11,6 +11,7 @@ import { statCache, loadStats_ } from '../project/projectStats'
 import ProjectCard from './ProjectCard'
 import { ProjectRow, ProjectTile, BarHeader, BAR_COLS, BAR_DENSITY } from './ProjectViews'
 import { useFitLevel } from '../common/useFitLevel'
+import { useMoreOnScroll } from '../common/useMoreOnScroll'
 
 /* Chế độ xem danh sách: Thẻ (mặc định, như bản gốc) / Dạng thanh / Biểu tượng; nhớ lựa chọn ở localStorage qs_dash_view */
 const VIEWS = [
@@ -97,6 +98,8 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const me = useQsStore(s => s.me)
   const congTy = useQsStore(s => s.congTy)
   const kdOk = canTab('kinhdoanh', me, congTy)
+  const { lines, panelVisible } = useQs()
+  const vis = panelVisible('dash')
   useEffect(() => {
     let off = false
     if (!kdOk) { setKdMa(null); return undefined }
@@ -137,7 +140,17 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const dem = v => inYear.filter(g => !v || groupStatus_(g) === v).length
   const shown = inYear.filter(g => !tt || groupStatus_(g) === tt)
   // khối theo năm, năm mới trước; dự án không có ngày tạo vào khối "Chưa rõ năm"
-  const blocks = years.map(y => ({ y, ds: shown.filter(g => groupYear_(g) === y) })).filter(b => b.ds.length)
+  const blocks0 = years.map(y => ({ y, ds: shown.filter(g => groupYear_(g) === y) })).filter(b => b.ds.length)
+  /* Vẽ dần (danh sách lớn, vd sau khi nhập dự án dezon.vn): lim dự án đầu (tính qua các khối năm), mốc cuối danh sách vào gần
+     khung nhìn / bấm "Xem thêm" thì vẽ thêm PAGE; đổi tìm / lọc / chế độ xem về lại đầu */
+  const PAGE = 60
+  const [lim, setLim] = useState(PAGE)
+  useEffect(() => { setLim(PAGE) }, [query, src, time.k, time.from, time.to, tt, view])
+  let left = lim
+  const blocks = blocks0.map(b => { const ds = b.ds.slice(0, Math.max(0, left)); left -= ds.length; return { y: b.y, ds, total: b.ds.length } }).filter(b => b.ds.length)
+  const nRest = shown.length - Math.min(lim, shown.length)
+  const moreRef = useRef(null)
+  useMoreOnScroll(moreRef, () => setLim(l => l + PAGE), [lim, nRest > 0, vis])
   const srcCnt = { '': found.length, kd: nKd, qs: found.length - nKd }
   /* Báo danh sách đang lọc lên Bảng điều khiển (cột trái cộng số theo bộ lọc); chỉ báo khi tập dự án / nhãn lọc đổi */
   const fltLb = [kdMa && src ? (SRCS.find(x => x[0] === src) || SRCS[0])[1] : '', time.k ? timeLb : '', tt, q ? '"' + query.trim() + '"' : ''].filter(Boolean).join(' · ')
@@ -148,15 +161,16 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   useEffect(() => { if (onFilter) onFilter({ groups: shownRef.current, label: fltLb, tt, ttCount, setTt }) }, [shownKey])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Số dòng + giá trị + nhà cung cấp của bản đang dùng (đọc thẳng dòng đang mở) hoặc bản mới nhất (projectStats, đếm 1 lần / phiên)
-     - chỉ Dạng thanh cần */
-  const { lines } = useQs()
+     - chỉ Dạng thanh cần, chỉ đếm các dòng đang vẽ (vẽ thêm thì đếm thêm), chỉ khi Bảng điều khiển đang hiện */
   const [, setStatVer] = useState(0)   // tăng mỗi khi đếm xong 1 dự án -> vẽ lại
+  const drawn = blocks.reduce((a, b) => a.concat(b.ds), [])
+  const drawnKey = view === 'bar' ? drawn.map(g => g.drafts[g.drafts.length - 1].maDA).join('|') : ''
   useEffect(() => {
-    if (view !== 'bar') return undefined
-    let alive = true
-    loadStats_(groups.map(g => g.drafts[g.drafts.length - 1]), () => { if (alive) setStatVer(v => v + 1) })
-    return () => { alive = false }
-  }, [groups, view])
+    if (view !== 'bar' || !vis) return undefined
+    const ctl = new AbortController()
+    loadStats_(drawn.map(g => g.drafts[g.drafts.length - 1]), () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal, front: true })
+    return () => ctl.abort()
+  }, [drawnKey, view, vis])   // eslint-disable-line react-hooks/exhaustive-deps
   const curSt = useMemo(() => {
     const ls = lines || []
     const m = {}
@@ -178,10 +192,17 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
       : <div className="qs-dash-project-grid">{ds.map(g => <ProjectCard key={g.drafts[0].maDA} group={g} curMa={curMa} />)}</div>)
   const list = blocks.map(b => (
     <div className="qs-dash-yblock" key={b.y || 'none'}>
-      {(years.length > 1 || !b.y) && <div className="qs-dash-yhead">{b.y ? 'Năm ' + b.y : 'Chưa rõ năm'} <span>{b.ds.length} dự án</span></div>}
+      {(years.length > 1 || !b.y) && <div className="qs-dash-yhead">{b.y ? 'Năm ' + b.y : 'Chưa rõ năm'} <span>{b.total} dự án</span></div>}
       {listOf(b.ds)}
     </div>
   ))
+  if (nRest > 0) {
+    list.push(
+      <div key="more" ref={moreRef} style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+        <button type="button" className="qs-dash-view" onClick={() => setLim(l => l + PAGE)}>Xem thêm ({nRest} dự án)</button>
+      </div>
+    )
+  }
 
   return (
     <div className="qs-dash-list">

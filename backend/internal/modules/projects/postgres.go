@@ -81,9 +81,9 @@ func (r *pgRepo) ListProjDataKV(ctx context.Context, maDA string) ([]*omap.Map, 
 	return r.db.Select(ctx, "du_an_data", database.SelectOpt{Select: "khoa,gia_tri", Filter: database.Eq("ma_da", maDA), Limit: 50})
 }
 
-// settingsNotProj: khoá cai_dat_cong_ty của module khác, không trả qua getProjData (kdAiConfig: cấu hình AI Kinh doanh,
-// chỉ đọc qua /sales/ai-config có kiểm quyền).
-const settingsNotProj = "khoa=neq.kdAiConfig"
+// settingsNotProj: khoá cai_dat_cong_ty không trả qua getProjData (kdAiConfig: cấu hình AI Kinh doanh, chỉ đọc qua
+// /sales/ai-config có kiểm quyền; dezonDaNhap: danh sách link dự án đã nhập từ dezon.vn, chỉ lượt nhập dùng).
+const settingsNotProj = "khoa=neq.kdAiConfig&khoa=neq." + dzSeenKey
 
 // Không có công ty (super chưa chọn công ty): chỉ các dòng cong_ty_id NULL, bỏ lọc tự động.
 func (r *pgRepo) ListCompanySettings(ctx context.Context, khongCongTy bool) ([]*omap.Map, error) {

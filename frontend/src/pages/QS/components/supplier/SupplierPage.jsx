@@ -8,7 +8,7 @@ import * as api from '../../api/qsApi'
 import { qsToast as toast, qsConfirm } from '../common/dialogs'
 import { money, qbNorm_ } from '../../lib/format.js'
 import { spNodeCodeOf_, nodeName } from '../../lib/tree.js'
-import { statCache, loadStats_, onStatsReset } from '../project/projectStats'
+import { statCache, loadStats_, onStatsReset, STAT_AUTO_MAX, countAllOn, setCountAll } from '../project/projectStats'
 import '../project/gallery.css'
 import '../products/list/list.css'
 import './supplier.css'
@@ -138,7 +138,7 @@ function LogoPick({ onFile, children, className, title }) {
 
 export default function SupplierPage() {
   const L = useLogos()
-  const { products, projects } = useQs()
+  const { products, projects, panelVisible } = useQs()
   const [q, setQ] = useState('')
   const [nganhF, setNganhF] = useState({})
   const [open, setOpen] = useState(false)
@@ -151,13 +151,25 @@ export default function SupplierPage() {
   const nCol = cols[view] || COLS_DEF[view] || 5
   const [statVer, setStatVer] = useState(0)
   const ddRef = useRef(null)
+  /* "Dự án đang dùng" cần thương hiệu của mọi dự án: chỉ đếm khi trang Nhà cung cấp đang hiện (các tab luôn được mount,
+     trước đây mở QS là đếm hết dù đang ở tab khác); rời trang thì huỷ phần chưa đọc, quay lại đọc tiếp (số đã đếm nhớ trong phiên) */
+  const vis = panelVisible('dsncc')
+  const [rv, setRv] = useState(0)
+  /* Danh sách lớn (> STAT_AUTO_MAX dự án, vd sau khi nhập dezon.vn): không tự đọc mọi dự án, chờ người dùng bấm "Đếm"
+     hoặc mở trang chi tiết 1 nhà cung cấp (nhớ trong phiên, dùng chung với trang Đơn vị thiết kế) */
+  const big = (projects || []).length > STAT_AUTO_MAX
+  const [cntAll, setCntAllSt] = useState(countAllOn)
+  const countAllNow = () => { setCountAll(); setCntAllSt(true) }
+  const auto = !big || cntAll || countAllOn()   // trang kia đã bấm "Đếm" (trang này mount từ trước)
+  useEffect(() => onStatsReset(() => { setStatVer(v => v + 1); setRv(v => v + 1) }), [])
   useEffect(() => {
-    let alive = true
-    const run = () => loadStats_(projects || [], () => { if (alive) setStatVer(v => v + 1) })
-    run()
-    const off = onStatsReset(() => { if (alive) { setStatVer(v => v + 1); run() } })
-    return () => { alive = false; off() }
-  }, [projects])
+    if (!vis || !auto) return undefined
+    setStatVer(v => v + 1)   // số đã do trang khác đếm xong (loadStats_ không còn mã cần đọc nên không báo): projOf tính lại
+    const ctl = new AbortController()
+    loadStats_(projects || [], () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal })
+    return () => ctl.abort()
+  }, [projects, vis, rv, auto])
+  useEffect(() => { if (detail && !cntAll && !countAllOn()) countAllNow() }, [detail])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open) return undefined
     const down = e => { if (ddRef.current && !ddRef.current.contains(e.target)) setOpen(false) }
@@ -238,6 +250,10 @@ export default function SupplierPage() {
           </label>
         )}
         <span className="qs-pg-n">{shown.length} nhà cung cấp</span>
+        {!auto && (
+          <button type="button" className="qs-pg-chip" title={'Đọc dòng báo giá của ' + (projects || []).length + ' dự án để biết dự án nào dùng từng nhà cung cấp'}
+            onClick={countAllNow}>Đếm dự án đang dùng<small>{(projects || []).length}</small></button>
+        )}
         <div className="qs-pg-search qs-pg-mod">
           <Icon name="search" size={16} />
           <input placeholder="Tìm nhà cung cấp, nhà phân phối…" value={q} onChange={e => setQ(e.target.value)} />
@@ -273,7 +289,7 @@ export default function SupplierPage() {
                   <div className="qs-sup-name">{view === 'logo' && logo && <img className="mini" src={mediaUrl(logo)} alt="" />}{o.ten}</div>
                   <hr className="qs-sup-hr" />
                   <div className="qs-sup-tags">{ngs.length ? ngs.map(n => <span key={n} title={n + '. ' + nodeName(n)}>{nodeName(n)}</span>) : <i>Chưa rõ ngành hàng</i>}</div>
-                  <div className="qs-sup-meta"><span><b>[{o.sp.length}]</b> sản phẩm</span><span><b>[{statDone ? pj.length : '…'}]</b> dự án</span></div>
+                  <div className="qs-sup-meta"><span><b>[{o.sp.length}]</b> sản phẩm</span><span><b>[{statDone ? pj.length : auto ? '…' : '?'}]</b> dự án</span></div>
                   <div className="qs-sup-price">{o.max > 0 ? (o.min === o.max ? money(o.min) + ' đ' : money(o.min) + ' – ' + money(o.max) + ' đ') : 'Chưa có giá'}</div>
                 </div>
               </div>

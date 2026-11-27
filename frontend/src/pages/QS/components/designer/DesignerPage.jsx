@@ -10,7 +10,7 @@ import { qsToast as toast, qsConfirm, qsAsk } from '../common/dialogs'
 import SearchSelect from '../common/SearchSelect'
 import { importProjectForm, projInfoModal } from '../project/projectActions'
 import { MrootPortal } from '../common/Mroot'
-import { statCache, loadStats_ } from '../project/projectStats'
+import { statCache, loadStats_, STAT_AUTO_MAX, countAllOn, setCountAll } from '../project/projectStats'
 import { useNccInfo } from '../supplier/SupplierInfo'
 import '../project/gallery.css'
 import './designer.css'
@@ -94,7 +94,7 @@ const ini_ = t => s_(t).replace(/^(KTS|Ks|Kts)\.?\s+/i, '').split(/\s+/).filter(
 const loaiOf_ = l => (l === 'Kiến trúc sư' ? 'kts' : l === 'Công ty thiết kế' || l === 'Studio thiết kế' ? 'studio' : '')
 
 export default function DesignerPage() {
-  const { projects } = useQs()
+  const { projects, panelVisible } = useQs()
   const { info } = useNccInfo()
   const HS = useNtkInfo()
   const [form, setForm] = useState(null)        // hộp tạo / sửa hồ sơ: {id?, loai, ten, ...}
@@ -104,11 +104,22 @@ export default function DesignerPage() {
   const [detail, setDetail] = useState('')      // khoá (qbNorm_) của nhà thiết kế đang xem
   const [, setStatVer] = useState(0)
   const groups = useMemo(() => projectGroups(projects), [projects])
+  /* Chỉ đếm khi trang Đơn vị thiết kế đang hiện (các tab luôn được mount); rời trang thì huỷ phần chưa đọc */
+  const vis = panelVisible('dsntk')
+  /* Danh sách lớn (> STAT_AUTO_MAX dự án): không tự đọc mọi dự án, chờ người dùng bấm "Đếm" hoặc mở trang chi tiết
+     (nhớ trong phiên, dùng chung với trang Nhà cung cấp) */
+  const big = groups.length > STAT_AUTO_MAX
+  const [cntAll, setCntAllSt] = useState(countAllOn)
+  const countAllNow = () => { setCountAll(); setCntAllSt(true) }
+  const auto = !big || cntAll || countAllOn()   // trang kia đã bấm "Đếm" (trang này mount từ trước)
   useEffect(() => {
-    let alive = true
-    loadStats_(groups.map(g => g.drafts[g.drafts.length - 1]), () => { if (alive) setStatVer(v => v + 1) })
-    return () => { alive = false }
-  }, [groups])
+    if (!vis || !auto) return undefined
+    setStatVer(v => v + 1)   // số đã do trang khác đếm xong: vẽ lại
+    const ctl = new AbortController()
+    loadStats_(groups.map(g => g.drafts[g.drafts.length - 1]), () => { if (!ctl.signal.aborted) setStatVer(v => v + 1) }, { signal: ctl.signal })
+    return () => ctl.abort()
+  }, [groups, vis, auto])
+  useEffect(() => { if (detail && !cntAll && !countAllOn()) countAllNow() }, [detail])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Gom theo loại: {kts: Map, studio: Map}; mỗi mục {ten, projs[], brands{tên thương hiệu: 1}} */
   const all = { kts: {}, studio: {} }
@@ -241,6 +252,10 @@ export default function DesignerPage() {
             </button>
           ))}
         </div>
+        {!auto && (
+          <button type="button" className="qs-pg-chip" title={'Đọc dòng báo giá của ' + groups.length + ' dự án để biết nhà cung cấp từng nhà thiết kế đã dùng'}
+            onClick={countAllNow}>Đếm nhà cung cấp đã dùng<small>{groups.length}</small></button>
+        )}
         <button type="button" className="qs-pg-new" title="Tạo hồ sơ kiến trúc sư hoặc studio" onClick={newHs}><Icon name="plus" size={15} stroke={3} />Tạo hồ sơ</button>
         <div className="qs-pg-search qs-pg-mod">
           <Icon name="search" size={16} />

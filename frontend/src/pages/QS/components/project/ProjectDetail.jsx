@@ -7,7 +7,7 @@ import { mediaUrl } from '../../api/files'
 import { safeUrl_, money } from '../../lib/format.js'
 import { dezonUrl_, NEN_TANG, nenTangOf } from '../../lib/dashModel.js'
 import { qsToast as toast } from '../common/dialogs'
-import { HeroSlider, ImageManager } from './ProjectImages'
+import { HeroSlider, ImageManager, anhUrl_ } from './ProjectImages'
 import { nodeName } from '../../lib/tree.js'
 import { uploadRaw } from '../../api/files'
 import { qsAsk } from '../common/dialogs'
@@ -163,15 +163,22 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
   const related = (projects || []).filter(x => x.maDA !== p.maDA && ((s_(p.khachHang) && s_(x.khachHang) === s_(p.khachHang)) || (kv_(p) && kv_(x) === kv_(p))))
   /* Tab Dự án liên quan: đếm ảnh bìa / số ảnh / số dòng của các dự án liên quan (dùng chung statCache với Danh sách dự án) */
   const [, setRelVer] = useState(0)
-  const relKey = related.map(x => x.maDA).join('|')
+  /* Cùng khu vực có thể rất nhiều dự án (sau khi nhập dự án dezon.vn): vẽ + đếm relN dự án đầu, "Xem thêm" thì thêm REL_PAGE */
+  const REL_PAGE = 48
+  const [relN, setRelN] = useState(REL_PAGE)
+  useEffect(() => { setRelN(REL_PAGE) }, [p.maDA])
+  const relShown = related.length > relN ? related.slice(0, relN) : related
+  const relKey = relShown.map(x => x.maDA).join('|')
   useEffect(() => {
-    if (tab !== 'rel' || !related.length) return undefined
-    let alive = true
-    loadStats_(related, () => { if (alive) setRelVer(v => v + 1) })
-    return () => { alive = false }
+    if (tab !== 'rel' || !relShown.length) return undefined
+    const ctl = new AbortController()
+    loadStats_(relShown, () => { if (!ctl.signal.aborted) setRelVer(v => v + 1) }, { signal: ctl.signal, front: true })
+    return () => ctl.abort()
   }, [tab, relKey])   // eslint-disable-line react-hooks/exhaustive-deps
   const link = s_(p.linkDezon)
   const pics = anh || []
+  // ảnh có gắn phòng lưu dạng {url, phong}: lấy url trước khi đưa vào trình xem ảnh lớn (mediaUrl của object = link hỏng, ảnh trống)
+  const picUrls = pics.map(u => mediaUrl(anhUrl_(u)))
   async function saveAnh(list) {
     const old = anh
     setAnh(list)
@@ -477,7 +484,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
           {related.length ? (
             /* Thẻ như tab Dự án đang dùng của Nhà cung cấp: ảnh bìa, trạng thái, số sản phẩm, số ảnh, địa điểm · phân khúc · năm */
             <div className="qs-sup-pj">
-              {related.map(x => {
+              {relShown.map(x => {
                 const st = statCache[x.maDA] || {}
                 const tt = x.trangThai || 'Bản nháp'
                 const sub = [x.diaChi, x.phanKhuc, x.namHoanThien].filter(v => s_(v)).join(' · ')
@@ -497,6 +504,11 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
                   </button>
                 )
               })}
+              {related.length > relN && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+                  <button type="button" className="qs-pd-btn" onClick={() => setRelN(n => n + REL_PAGE)}>Xem thêm ({related.length - relN} dự án)</button>
+                </div>
+              )}
             </div>
           ) : <div className="qs-pd-empty">Không có dự án cùng khách hàng / khu vực.</div>}
         </div>
@@ -535,7 +547,7 @@ export default function ProjectDetail({ p, projects, onBack, onOpenBoc, onOpen }
           </div>
         </div>
       )}
-      {view && <ImgViewer src={view} gallery={pics.map(u => mediaUrl(u)).indexOf(view) >= 0 ? pics.map(u => mediaUrl(u)) : imgs} onClose={() => setView('')} />}
+      {view && <ImgViewer src={view} gallery={picUrls.indexOf(view) >= 0 ? picUrls : imgs} onClose={() => setView('')} />}
     </div>
   )
 }

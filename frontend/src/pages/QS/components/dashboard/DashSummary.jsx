@@ -20,7 +20,7 @@ const GRP_LS = 'qs_dash_grp'
 const loadPick_ = () => { try { const v = JSON.parse(localStorage.getItem(GRP_LS) || 'null'); return Array.isArray(v) ? v.map(String) : null } catch (e) { return null } }
 const savePick_ = v => { try { if (v) localStorage.setItem(GRP_LS, JSON.stringify(v)); else localStorage.removeItem(GRP_LS) } catch (e) { /* bỏ qua */ } }
 
-export default function DashSummary({ A, nDa, label, tt = '', ttCount = null, onTt = null }) {
+export default function DashSummary({ A, nDa, label, tt = '', ttCount = null, onTt = null, onSumAll = null }) {
   const ok = A.ready
   const neg = ok && A.ln < 0
   const vat = A.vats.size === 1 ? 'gồm VAT ' + [...A.vats][0] + '%' : 'gồm VAT'
@@ -130,7 +130,15 @@ export default function DashSummary({ A, nDa, label, tt = '', ttCount = null, on
             </button>
           )}
           {scope}</div>
-        {!ok && <div className="qs-sum-load"><i style={{ width: (nDa ? (A.done + A.fail) / nDa * 100 : 100) + '%' }} />Đang tính {A.done + A.fail}/{nDa} dự án…</div>}
+        {/* A.paused: nhiều dự án (vd sau khi nhập dự án dezon.vn) -> chưa tự đọc dòng của từng dự án, bấm "Tính tổng" mới đọc */}
+        {!ok && A.paused && (
+          <div className="qs-sum-load" style={{ gap: 8 }}><i style={{ width: (nDa ? (A.done + A.fail) / nDa * 100 : 100) + '%' }} />
+            Mới cộng {A.done + A.fail}/{nDa} dự án
+            {onSumAll && <button type="button" className="qsc-btn blue" style={{ marginLeft: 'auto', height: 22, padding: '0 10px', fontSize: 'inherit' }}
+              title="Đọc dòng báo giá của mọi dự án đang lọc để cộng tổng (nhiều dự án nên có thể mất một lúc)" onClick={onSumAll}>Tính tổng</button>}
+          </div>
+        )}
+        {!ok && !A.paused && <div className="qs-sum-load"><i style={{ width: (nDa ? (A.done + A.fail) / nDa * 100 : 100) + '%' }} />Đang tính {A.done + A.fail}/{nDa} dự án…</div>}
         {ok && A.fail > 0 && <div className="qs-sum-warn"><Icon name="alert" size={13} />{A.fail} dự án chưa tải được, chưa cộng vào tổng</div>}
 
         <div className="qs-sm-hero">

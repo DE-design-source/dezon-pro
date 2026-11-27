@@ -2,6 +2,7 @@
 # Sao lưu QS Pro đang chạy trong Docker (infra/deploy):
 #   - database ra file .dump (pg_dump định dạng custom): qspro-<thời điểm>.dump
 #   - kho ảnh / tài liệu (volume uploads, /app/uploads trong api) ra file nén: qspro-files-<thời điểm>.tar.gz
+#     (trừ dezonvn/ - ảnh nhập từ dezon.vn, tải lại được)
 #   - tệp chat (bucket MinIO) chép thêm vào thư mục qspro-media/ (mc mirror, không có bản theo thời điểm)
 #   bash infra/scripts/backup-db.sh
 # Lưu ở BACKUP_DIR (mặc định /opt/qspro-backups), xoá bản cũ hơn BACKUP_KEEP_DAYS ngày (mặc định 14).
@@ -31,7 +32,9 @@ echo "$(date '+%F %T') Đã sao lưu: $OUT ($(du -h "$OUT" | cut -f1))"
 
 # Kho file: container tạm từ image api (--no-deps: không đụng db / migrate), đọc volume uploads.
 # Chạy được cả khi api đang chạy lẫn đang tắt (lúc restore-db.sh đã dừng backend).
-docker compose run --rm --no-deps -T --entrypoint tar api -C /app/uploads -czf - . > "$FILES_OUT.tmp"
+# Bỏ thư mục dezonvn/: ảnh nhập từ website dezon.vn (POST /api/v1/projects/import-dezonvn), vài GB và tải lại được -
+# sau khi khôi phục, chạy lại lượt nhập (Admin) thì ảnh còn thiếu được tải lại đúng đường dẫn cũ.
+docker compose run --rm --no-deps -T --entrypoint tar api -C /app/uploads --exclude=./dezonvn -czf - . > "$FILES_OUT.tmp"
 [ -s "$FILES_OUT.tmp" ] || { rm -f "$FILES_OUT.tmp"; echo "$(date '+%F %T') LỖI: bản sao lưu file rỗng" >&2; exit 1; }
 mv "$FILES_OUT.tmp" "$FILES_OUT"
 chmod 600 "$FILES_OUT"

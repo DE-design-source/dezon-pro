@@ -31,6 +31,8 @@ type Deps struct {
 	Notifier contracts.Notifier
 	Admins   contracts.AdminLister
 	Repo     Repository
+	// Files: kho file (*storage.Client) - ảnh nhập từ dezon.vn (service_dezonvn.go); để trống thì ảnh giữ link dezon.vn.
+	Files ImageStore
 }
 
 // Service: nghiệp vụ dự án.
@@ -47,6 +49,8 @@ type Service struct {
 	now      func() string  // nowIso()
 	genMa    func() string  // genMaDA_()
 	random   func() float64 // Math.random()
+	dz       *dezonImporter // nhập dự án từ dezon.vn
+	dzOK     bool           // có database (hoặc repo giả của test) để chạy lượt nhập
 }
 
 var _ contracts.ProjectReader = (*Service)(nil)
@@ -58,7 +62,8 @@ func New(d Deps) *Service {
 		repo = NewRepository(d.DB)
 	}
 	s := &Service{repo: repo, db: d.DB, cfg: d.Cfg, catalog: d.Catalog, lines: d.Lines, users: d.Users, userFmt: d.UserFmt,
-		notifier: d.Notifier, admins: d.Admins, now: jsval.NowISO, random: rand.Float64}
+		notifier: d.Notifier, admins: d.Admins, now: jsval.NowISO, random: rand.Float64,
+		dz: newDezonImporter(d.Files), dzOK: d.DB != nil || d.Repo != nil}
 	s.genMa = func() string { return genMaDA(time.Now(), s.random()) }
 	return s
 }

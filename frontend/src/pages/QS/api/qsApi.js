@@ -49,6 +49,9 @@ export const listProjectEditRequests = (maDA, status, signal) =>
   get('/project-edit-requests', { ...(maDA ? { maDA } : {}), ...(status ? { status } : {}) }, signal)
 export const resolveProjectEditRequest = (id, approve, lyDo, signal) =>
   post('/project-edit-requests/' + enc(id) + '/resolve', withLyDo({ approve: truthy(approve) }, lyDo), signal)
+/* Nhập toàn bộ dự án của dezon.vn (chỉ bản Go, admin/super): opts = {limit?, dryRun?} -> trạng thái job; GET đọc trạng thái hiện tại */
+export const importDezonvn = (opts, signal) => post('/projects/import-dezonvn', opts || {}, signal)
+export const getImportDezonvn = signal => get('/projects/import-dezonvn', null, signal)
 
 /* ---- Dòng bóc tách ---- */
 export const getLines = (maDA, signal) => get('/projects/' + enc(maDA) + '/lines', null, signal)
