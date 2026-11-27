@@ -21,7 +21,7 @@ const num = n => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
    Luôn 1 hàng (định dạng + thao tác bảng + cột/xem), phần thừa cuộn ngang.
    s: trạng thái hiện tại để tô nút; a: các thao tác (xem SheetBody) */
 export default function SheetToolbar({ s, a, formula }) {
-  /* s.hide: tên nút bảng này không dùng (vd. 'import') · s.extraTools: nút riêng của bảng, cuối thanh (Bóc tách: Vừa thêm...)
+  /* s.hide: tên nút bảng này không dùng (vd. 'import'; 'export' = ẩn In / Tải xuống khi không có quyền Xuất, N21) · s.extraTools: nút riêng của bảng, cuối thanh (Bóc tách: Vừa thêm...)
      · s.leadTools: nút riêng đặt đầu thanh (Bóc tách: cập nhật giá) */
   const on = name => !(s.hide && s.hide.has(name))
   const wrapOn = s.wrapOn !== undefined ? s.wrapOn : !s.fmt.nowrap
@@ -106,7 +106,7 @@ export default function SheetToolbar({ s, a, formula }) {
         <Icon name="chevronDown" size={15} />
       </label>
       <Sep />
-      <Btn icon="printer" title="In bảng" onClick={a.print} /><Btn icon="download" title={on('csv') ? 'Tải xuống file CSV (mở bằng Excel)' : 'Xuất Excel'} onClick={a.download} />
+      {on('export') && <><Btn icon="printer" title="In bảng" onClick={a.print} /><Btn icon="download" title={on('csv') ? 'Tải xuống file CSV (mở bằng Excel)' : 'Xuất Excel'} onClick={a.download} /></>}
     </>
   )
   /* 2 nút lịch sử (Vừa thêm của bảng + Lịch sử thao tác): nhóm riêng bên trái, ngay sau đóng băng cột */

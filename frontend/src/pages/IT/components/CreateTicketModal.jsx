@@ -14,7 +14,7 @@ const DEFAULT_ROLES = [
 const AV = ['#2E7DD6', '#0E9F9A', '#8B3FD9', '#D9822B', '#C2185B', '#1E8E5A']
 const avatarColor = k => AV[[...String(k || '')].reduce((h, ch) => h + ch.charCodeAt(0), 0) % AV.length]
 const deptLabel = e => e.department || (e.it ? 'IT' : 'Khác')
-const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.it ? 'Phòng IT' : 'Nhân viên')
+const roleLabel = e => (e.role === 'admin' ? 'Quản trị' : e.role === 'super' ? 'Quản trị hệ thống' : e.role === 'subadmin' ? 'Admin' : e.it ? 'Phòng IT' : 'Nhân viên')
 
 const Avatar = ({ e, size = 22 }) => <span className="it-ct-avatar" style={{ background: avatarColor(e.username), width: size, height: size, fontSize: size * 0.38 }}>{initials(e.name)}</span>
 

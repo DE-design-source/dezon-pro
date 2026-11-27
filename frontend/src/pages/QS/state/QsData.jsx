@@ -28,9 +28,12 @@
 import { useEffect } from 'react'
 import {
   useQsStore, attach, detach, selectProject, setNode, setHmNode, reloadProducts, reloadLines, reloadProjects,
-  createProject, updateProject, deleteProject, duplicateProject, addLine, addBlankLine, updateLine, deleteLines,
-  moveLine, reorderLines, syncProj, newTmpId, showTab, consumeIntent,
+  syncProj, newTmpId, showTab, consumeIntent,
 } from './store'
+/* Ghi qua qsGuard: kiểm quyền N21 (Module QS > Tab > Thao tác) trước khi gọi store */
+import {
+  createProject, updateProject, deleteProject, duplicateProject, addLine, addBlankLine, updateLine, deleteLines, moveLine, reorderLines,
+} from './qsGuard'
 import { projDataSet_ } from './projData'
 import { qsToast, qsConfirm, qsAsk } from '../components/common/dialogs'
 

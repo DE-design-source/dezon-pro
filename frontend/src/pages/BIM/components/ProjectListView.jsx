@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icon } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 const NEW_PROJECT = '__new__'
 const EMPTY_FORM = { project: NEW_PROJECT, fileName: '', newName: '', newCode: '', newClient: '' }
@@ -61,6 +62,7 @@ function AddFileLinkModal({ projects, onClose, onSubmit }) {
 
 /* Danh sách dự án đã đồng bộ từ Dezon Bim */
 export default function ProjectListView({ visible, projects, onOpen, onUnlink, onAddFileLink }) {
+  const { can } = useAccess()
   const [modalOpen, setModalOpen] = useState(false)
 
   function handleSubmit(form) {
@@ -81,11 +83,13 @@ export default function ProjectListView({ visible, projects, onOpen, onUnlink, o
           <p className="bim-desc" style={{ maxWidth: 480 }}>Danh sách dự án đã đồng bộ từ Dezon Bim. Chọn một dự án để vào Objects, Level, Room/Space, BOQ...</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
-          <button className="bim-btn-ghost" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onUnlink}>Ngắt liên kết</button>
-          <button className="bim-btn-dark" style={{ padding: '9px 14px', fontSize: 12.5 }} onClick={() => setModalOpen(true)}>
-            <Icon name="plus" stroke="#fff" sw={2.6} />
-            Thêm liên kết file SketchUp
-          </button>
+          {can('bim', 'main', 'delete') && <button className="bim-btn-ghost" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onUnlink}>Ngắt liên kết</button>}
+          {can('bim', 'main', 'create') && (
+            <button className="bim-btn-dark" style={{ padding: '9px 14px', fontSize: 12.5 }} onClick={() => setModalOpen(true)}>
+              <Icon name="plus" stroke="#fff" sw={2.6} />
+              Thêm liên kết file SketchUp
+            </button>
+          )}
         </div>
       </div>
 

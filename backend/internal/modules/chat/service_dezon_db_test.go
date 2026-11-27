@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"qspro-backend/internal/modules/access"
 	"qspro-backend/internal/shared/actor"
 	"qspro-backend/internal/shared/omap"
 )
@@ -65,7 +66,7 @@ func newDezonEnv(t *testing.T) *dezonEnv {
 		t.Fatalf("database thử chưa chạy migration 0045 (go run ./cmd/migrate --url=...): %v", err)
 	}
 	u := dbUsers{e.pool}
-	e.s.users, e.s.userFmt = u, u
+	e.s.users, e.s.access = u, access.New(access.Deps{DB: e.s.db})
 	d := &dezonEnv{env: e}
 	t.Cleanup(func() { // chạy TRƯỚC dọn của env (LIFO): xoá công ty kéo theo users (fk on delete cascade)
 		ctx := context.Background()

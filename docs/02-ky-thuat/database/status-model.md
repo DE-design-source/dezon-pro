@@ -83,7 +83,7 @@ Cùng mô hình cho công tác: `work_items.is_approved`, đổi qua `ctDuyet`; 
 
 | Cột | Giá trị | Ghi chú |
 |---|---|---|
-| `users.role` | `super` (1), `admin` (1), `staff` (7) | Có CHECK. Chỉ super cấp được `super`; luôn giữ ít nhất một admin mỗi công ty |
+| `users.role` | `super` (1), `admin` (1), `staff` (7) | Có CHECK. Chỉ super cấp được `super`; luôn giữ ít nhất một admin mỗi công ty. Từ 0053 (2026-11-27, M14.7) thêm `subadmin` (nhãn "Admin"): chỉ quản lý tài khoản nhân viên công ty mình trong phạm vi quyền của chính mình; không tính là admin khi giữ admin cuối cùng |
 | `users.is_active`, `companies.is_active` | boolean | Kiểm khi đăng nhập và mỗi request |
 | `products.status` (`trang_thai`) | `Đang kinh doanh` (1.092), rỗng (1) | Chữ tự do; nhập hàng loạt mặc định `Đang kinh doanh` |
 | `products.sector` (`nganh`) | `den` (677), `vs` (267), `son` (149); code có thêm `ct` | Không CHECK (đã bỏ để thêm ngành không phải sửa database) |

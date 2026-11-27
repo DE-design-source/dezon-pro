@@ -143,13 +143,14 @@ func (s *Service) SetSpDuyet(ctx context.Context, a *actor.Actor, keys any, appr
 }
 
 // SetSpDuyetGated = setSpDuyet của auth (A:565-569): cần quyền duyệt; approve !== false (thiếu / null = duyệt).
+// Chỉ bản Go (M14.6): quyền duyệt theo phân cấp của SpApprovalRights, không theo spPerms_.
 func (s *Service) SetSpDuyetGated(ctx context.Context, a *actor.Actor, keys any, approve any) (*omap.Map, error) {
-	_, duyet, _, err := s.SpPerms(ctx, a)
+	duyet, _, err := s.SpApprovalRights(ctx, a)
 	if err != nil {
 		return nil, err
 	}
 	if !duyet {
-		return nil, apperr.New("Tài khoản không có quyền duyệt sản phẩm")
+		return nil, apperr.New(msgKhongDuyet)
 	}
 	return s.SetSpDuyet(ctx, a, keys, approve != false)
 }

@@ -6,6 +6,7 @@ import { useQsStore } from '../../state/store'
 import { canTab } from '../../../../services/workSession'
 import { dashSearch_, TT_DU_AN, groupStatus_, groupYear_ } from '../../lib/dashModel.js'
 import { openProjDlg } from '../project/projectActions'
+import { useQsCan } from '../../state/qsAccess'
 import { usePhuTrach, setPhuTrach, ptRoles_ } from './ptStore'
 import { statCache, loadStats_ } from '../project/projectStats'
 import ProjectCard from './ProjectCard'
@@ -79,6 +80,7 @@ const fmtD_ = s => (s ? s.split('-').reverse().join('/') : '…')
    bộ lọc trạng thái (Tất cả / Đang báo giá / Đang thực hiện / Đã thực hiện) vẽ ở thẻ Biên lợi nhuận (DashSummary) - MarkUp 2026-11-12 16:43. */
 export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
   const [query, setQuery] = useState('')
+  const canCreate = useQsCan()('duan', 'create')   // N21: QS > Dự án > Thêm
   const [view, setViewSt] = useState(readView_)
   const setView = v => { setViewSt(v); saveLs_(VIEW_LS, v) }
   const [cols, setCols] = useState(readCols_)
@@ -270,7 +272,7 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
             </button>
           ))}
         </div>
-        <button type="button" className="qs-dash-create" title="Tạo dự án" aria-label="Tạo dự án" onClick={() => (onCreate ? onCreate() : openProjDlg('create'))}><Icon name="plus" size={14} /><span className="lf">Tạo dự án</span></button>
+        {canCreate && <button type="button" className="qs-dash-create" title="Tạo dự án" aria-label="Tạo dự án" onClick={() => (onCreate ? onCreate() : openProjDlg('create'))}><Icon name="plus" size={14} /><span className="lf">Tạo dự án</span></button>}
       </div>
       <div className="qs-dash-list-body">
         {shown.length
@@ -281,7 +283,7 @@ export default function ProjectList({ groups, curMa, onCreate, onFilter }) {
                 : time.k && groups.length ? `Không có dự án tạo trong ${timeLb.toLowerCase()}.`
                 : kdMa && src && groups.length ? `Không có dự án ${src === 'kd' ? 'từ Kinh doanh' : 'từ phòng QS'}.`
                 : tt && groups.length ? 'Không có dự án nào thuộc loại đang chọn.'
-                : <>Chưa có dự án. Bấm <b>Tạo dự án</b> để bắt đầu.</>}
+                : canCreate ? <>Chưa có dự án. Bấm <b>Tạo dự án</b> để bắt đầu.</> : 'Chưa có dự án nào bạn được xem. Nhờ quản trị viên cấp quyền tạo dự án hoặc thêm bạn vào dự án.'}
             </div>
           )}
       </div>

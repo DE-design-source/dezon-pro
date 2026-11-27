@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { statsSummary } from '../../../data/dashboardData'
+import { useAccess } from '../../../services/accessService'
 
 /* Các icon SVG dùng trong bài viết (giống NEWS_ICONS / ICON_* của bản HTML) */
 const NEWS_ICONS = {
@@ -45,6 +46,7 @@ function PostComment({ c }) {
 
 /* Một bài viết trong bảng tin (giống renderPost). Nhãn "Bài viết đã ghim" nằm ngoài thẻ, như bản HTML */
 export default function PostCard({ post: p }) {
+  const { can } = useAccess()
   // Giữ logic cũ của trang React: bấm "Xem thêm" thì ẩn liên kết đi
   const [expanded, setExpanded] = useState(false)
   const accent = `var(--${p.color})`
@@ -70,9 +72,11 @@ export default function PostCard({ post: p }) {
                 : <><span>·</span><span className="db-post-badge" style={{ background: tint, color: accent }}>{p.badge}</span></>}
             </div>
           </div>
-          <button className="db-post-menu-btn">
-            <svg width="18" height="18" {...lineIcon} strokeWidth="1.75">{ICON_DOTS}</svg>
-          </button>
+          {(can('newsfeed', 'tintuc', 'edit') || can('newsfeed', 'tintuc', 'delete')) && (
+            <button className="db-post-menu-btn">
+              <svg width="18" height="18" {...lineIcon} strokeWidth="1.75">{ICON_DOTS}</svg>
+            </button>
+          )}
         </div>
 
         <div className="db-post-body">

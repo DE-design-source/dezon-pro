@@ -25,6 +25,7 @@ import HanhChinhTab from './components/HanhChinhTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import WorkGate from '../../components/ui/WorkGate'
 import { useWorkSession } from '../../services/workSession'
+import { useAccess as useN21Access } from '../../services/accessService'
 import * as hrApi from './api'
 
 /* Các phân hệ HR — perm: khoá quyền tương ứng trong ma trận phân quyền */
@@ -358,15 +359,18 @@ function ChamCongPage() {
   const log = useCallback((mod, action, target) => {
     writeAudit({ id: Date.now() + Math.random(), time: nowLabel(), user: user.name, role, module: mod, action, target, ip: '10.0.1.' + (user.id + 20) })
   }, [user, role])
+  /* Phân quyền 3 cấp (N21, module "hr", tab = phân hệ): giao với ma trận vai trò HR bên dưới.
+     Sơ đồ tổ chức không có trong ma trận vai trò: giữ điều kiện cũ (Hồ sơ nhân sự) và thêm quyền tab "org". */
+  const n21 = useN21Access()
   const access = useMemo(() => {
     const perms = (sys ? security.perms[role] : me.perms) || {}
     const scope = ROLES[role].scope
     return {
       role, user, log,
-      can: (mod, action) => (perms[mod] || []).includes(action),
+      can: (mod, action) => (perms[mod === 'org' ? 'employees' : mod] || []).includes(action) && n21.can('hr', mod, action),
       inScope: makeScope(scope, user),
     }
-  }, [security.perms, role, user, log, sys, me])
+  }, [security.perms, role, user, log, sys, me, n21.ready, n21.grants]) // eslint-disable-line react-hooks/exhaustive-deps
   const scoped = employees.filter(access.inScope)
 
   function switchRole(r) {
@@ -570,6 +574,12 @@ function ChamCongPage() {
 
   const current = MODULES.find(m => m.key === module)
   const allowed = m => !m.perm || access.can(m.perm, 'view')
+  // N21: phân hệ không được xem thì ẩn khỏi thanh phân hệ; đang mở phân hệ bị ẩn -> sang phân hệ được xem đầu tiên
+  const shownMods = MODULES.filter(m => n21.can('hr', m.key))
+  const shownKey = shownMods.map(m => m.key).join(',')
+  useEffect(() => {
+    if (shownMods.length && !shownMods.some(m => m.key === module)) setModule(shownMods[0].key)
+  }, [shownKey, module]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Hàng phân hệ trên header: tự thu gọn theo chỗ trống thật (không cắt mất tab cuối) */
   const modNavRef = useRef(null)
@@ -600,7 +610,7 @@ function ChamCongPage() {
           <div className="cc-header-icon"><Icon name="users" size={16} /></div>
           <span className="cc-header-title">Nhân sự (HR)</span>
           <nav className="hdr-tabs cc-hdr-mods" aria-label="Phân hệ HR" ref={modNavRef}>
-            {MODULES.map(m => (
+            {shownMods.map(m => (
               <button key={m.key} className={`cc-mod${module === m.key ? ' active' : ''}${allowed(m) ? '' : ' locked'}`} onClick={() => setModule(m.key)} title={allowed(m) ? '' : 'Vai trò hiện tại không có quyền'}>
                 <Icon name={allowed(m) ? m.icon : 'lock'} size={15} /><span className="cc-mod-full">{m.label}</span><span className="cc-mod-short">{m.short || m.label}</span>
                 {m.key === 'attendance' && pending > 0 && access.can('attendance', 'approve') && <span className="cc-mod-badge">{pending}</span>}
@@ -626,7 +636,8 @@ function ChamCongPage() {
               <b>{loadState === 'loading' ? 'Đang tải dữ liệu HR…' : 'Không tải được dữ liệu HR'}</b>
               {loadState !== 'loading' && <><span>{loadState}</span><button className="cc-btn" onClick={reload}>Thử lại</button></>}
             </div>
-          ) : current.perm && !allowed(current) ? <NoAccess /> : <>
+          ) : !n21.can('hr', current.key) ? <NoAccess text="Tài khoản chưa được cấp quyền xem phân hệ HR này. Nhờ quản trị viên cấp quyền." />
+            : current.perm && !allowed(current) ? <NoAccess /> : <>
             {module === 'employees' && (
               <EmployeesModule
                 employees={scoped} openId={openEmp} onOpen={setOpenEmp} concurrentOf={concurrentOf}
@@ -649,7 +660,7 @@ function ChamCongPage() {
             {module === 'recruit' && <RecruitModule recruit={recruit} setRecruit={setRecruit} onHire={hireCandidate} toast={toast} nextEmpCode={nextEmpCode} defaultManagerOf={defaultManagerOf} employees={employees} onOpenEmployee={openEmployee} />}
             {module === 'performance' && <PerformanceModule employees={employees} perf={perf} setPerf={setPerf} toast={toast} />}
             {module === 'security' && <SecurityModule employees={employees} security={security} setSecurity={setSecurity} audit={audit} toast={toast} />}
-            {module === 'admin' && <div className="cc-legacy"><HanhChinhTab /></div>}
+            {module === 'admin' && <div className="cc-legacy"><HanhChinhTab canCreate={n21.can('hr', 'admin', 'create')} /></div>}
           </>}
         </div>
 

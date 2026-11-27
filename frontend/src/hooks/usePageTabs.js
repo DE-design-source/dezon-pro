@@ -1,9 +1,13 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { PAGE_TABS } from '../data/pageTabs'
+import { can, useAccess } from '../services/accessService'
+import { useWorkSession } from '../services/workSession'
 
 /* Module (tab đầu trang) người dùng ẩn trong từng trang chính (Cài đặt > Hiển thị):
    localStorage "siteflow-page-tabs-hidden" = {đường dẫn trang: [khoá tab]}. Dùng chung cho các trang và trang Cài đặt
-   (đổi bên này bên kia vẽ lại ngay, kể cả tab trình duyệt khác). Chỉ ẩn khỏi thanh tab, không đổi quyền.
-   Mỗi trang luôn còn ít nhất 1 tab hiện. Danh sách tab của từng trang: data/pageTabs.js. */
+   (đổi bên này bên kia vẽ lại ngay, kể cả tab trình duyệt khác). Chỉ ẩn thêm khỏi thanh tab, không đổi quyền.
+   Tab không có quyền xem (Phân quyền 3 cấp N21, accessService.can(module, tab, 'view')) luôn bị ẩn, không bật lại được.
+   Mỗi trang luôn còn ít nhất 1 tab được xem đang hiện. Danh sách tab của từng trang: data/pageTabs.js. */
 const KEY = 'siteflow-page-tabs-hidden'
 const NONE = []
 
@@ -31,7 +35,7 @@ function save(next) {
   emit()
 }
 
-/* Bật / tắt 1 tab của trang; allKeys = mọi khoá tab của trang (không cho ẩn tab cuối cùng còn hiện) */
+/* Bật / tắt 1 tab của trang; allKeys = khoá tab được xem của trang (không cho ẩn tab cuối cùng còn hiện) */
 export function togglePageTab(path, key, allKeys) {
   const h = cur[path] || NONE
   let list
@@ -55,10 +59,40 @@ export function showAllPageTabs(path) {
 export function useAllPageTabsHidden() {
   return useSyncExternalStore(subscribe, () => cur, () => cur)
 }
-/* Khoá các tab đang ẩn của 1 trang */
+const pageOf = path => PAGE_TABS.find(p => p.path === path)
+/* Khoá tab của trang (data/pageTabs.js) mà tài khoản được xem, đúng thứ tự thanh tab; trang không có trong PAGE_TABS -> [] */
+export function viewablePageTabKeys(path) {
+  const pg = pageOf(path)
+  if (!pg) return []
+  return pg.tabs.map(t => t[0]).filter(k => !pg.module || can(pg.module, k, 'view'))
+}
+/* Vẽ lại khi quyền thực / phiên đổi; trả khoá phụ thuộc cho useMemo */
+function useAccessKey() {
+  const s = useWorkSession()
+  const a = useAccess()
+  return [a.ready, a.grants, s.me, s.congTy]
+}
+/* Khoá tab được xem của 1 trang (Cài đặt > Hiển thị chỉ liệt kê các tab này) */
+export function useViewablePageTabs(path) {
+  const dep = useAccessKey()
+  return useMemo(() => viewablePageTabKeys(path), [path, ...dep]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+/* Khoá các tab phải ẩn của 1 trang = tab không có quyền xem + tab người dùng ẩn.
+   Người dùng ẩn hết các tab được xem (quyền đổi sau khi ẩn) thì bỏ phần người dùng ẩn để còn tab hiện */
 export function usePageTabsHidden(path) {
   const all = useAllPageTabsHidden()
-  return all[path] || NONE
+  const user = all[path] || NONE
+  const dep = useAccessKey()
+  return useMemo(() => {
+    const pg = pageOf(path)
+    if (!pg || !pg.module) return user
+    const keys = pg.tabs.map(t => t[0])
+    const ok = viewablePageTabKeys(path)
+    const noView = keys.filter(k => ok.indexOf(k) < 0)
+    if (!noView.length) return user
+    const keep = ok.some(k => user.indexOf(k) < 0) ? user.filter(k => noView.indexOf(k) < 0) : NONE
+    return noView.concat(keep)
+  }, [path, user, ...dep]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /* Tab đang mở bị ẩn -> chuyển sang tab hiện đầu tiên (keys = thứ tự tab của trang) */

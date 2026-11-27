@@ -15,7 +15,10 @@ export function fmtDateTime_(v) {
 /* Trạng thái đơn mua hàng -> lớp màu badge */
 export const PUR_CLS = { 'Đã duyệt': 'approved', 'Từ chối': 'rejected', 'Chờ duyệt': 'pending', 'Đã gửi': 'pending' }
 export const DRQ_LBL = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' }
-export const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Admin công ty', staff: 'Nhân viên' }
+/* subadmin (nhãn "Admin", M14.7): quản lý tài khoản nhân viên trong phạm vi quyền của mình; admin = quản trị công ty */
+export const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', subadmin: 'Admin', staff: 'Nhân viên' }
+/* Lớp màu badge vai trò (.qsa-role.<lớp>, admin.css) */
+export const roleCls_ = r => (r === 'super' ? 'sup' : r === 'admin' ? 'adm' : r === 'subadmin' ? 'sub' : 'stf')
 export const DX_TEN_ = { ck: 'Đề xuất chiết khấu', tt: 'Đề xuất thanh toán' }
 export const DX_ICO_ = { ck: 'gauge', tt: 'money' }
 /* Lý do xoá / lý do từ chối yêu cầu xoá: tối đa 500 ký tự (máy chủ cũng kiểm, M15.2) */

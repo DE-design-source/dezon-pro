@@ -23,7 +23,7 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-// Tab = khoá quyền trong users.perms và cong_ty.tinh_nang (giao diện: PERM_TABS).
+// Tab = khoá module trong phân quyền 3 cấp (= khoá cũ trong users.perms và cong_ty.tinh_nang; giao diện: PERM_TABS).
 const Tab = "kinhdoanh"
 
 var (
@@ -59,9 +59,10 @@ type Deps struct {
 	Lines    contracts.LineReader
 	Projects contracts.ProjectReader
 	Delivery contracts.DeliveryFromLead
-	Notifier contracts.Notifier // báo người vừa được giao phụ trách khách hàng; nil = không báo
-	AI       AIClient           // Gemini (GEMINI_API_KEY); nil = phân tích khách hàng theo quy tắc
-	Files    RecordingStore     // kho file (UPLOAD_DIR) lưu file ghi âm hội thoại; nil = không nhận file ghi âm
+	Notifier contracts.Notifier      // báo người vừa được giao phụ trách khách hàng; nil = không báo
+	AI       AIClient                // Gemini (GEMINI_API_KEY); nil = phân tích khách hàng theo quy tắc
+	Files    RecordingStore          // kho file (UPLOAD_DIR) lưu file ghi âm hội thoại; nil = không nhận file ghi âm
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21); nil = không ai ngoài super được vào
 	Repo     Repository
 }
 
@@ -77,6 +78,7 @@ type Service struct {
 	ai       AIClient
 	files    RecordingStore
 	goAI     func(fn func()) // chạy AI nền cho hội thoại (mặc định goroutine; test chạy thẳng)
+	access   contracts.AccessChecker
 	db       *database.DB
 	now      func() time.Time
 	readKeys []readKey // khoá API chỉ đọc (SALES_READ_KEYS, apikey.go)
@@ -93,7 +95,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = newPgRepo(d.DB)
 	}
-	s := &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, ai: d.AI, files: d.Files, db: d.DB, now: time.Now,
+	s := &Service{repo: repo, users: d.Users, userFmt: d.UserFmt, lines: d.Lines, projects: d.Projects, delivery: d.Delivery, notifier: d.Notifier, access: d.Access, ai: d.AI, files: d.Files, db: d.DB, now: time.Now,
 		goAI: func(fn func()) { go fn() }}
 	if d.Cfg != nil {
 		s.readKeys = parseReadKeys(d.Cfg.SalesReadKeys)
@@ -201,10 +203,19 @@ func nameChanged(old, out *omap.Map) bool {
 	return false
 }
 
-// allow: giống canTab('kinhdoanh') của giao diện. Super phải "xem như" 1 công ty (không thì thấy lẫn mọi công ty và
-// không có công ty để gắn dòng mới); công ty có danh sách tính năng mà thiếu tab -> không ai được; admin được;
-// nhân viên cần được cấp tab.
-func (s *Service) allow(ctx context.Context, a *actor.Actor) error {
+// Tab của module kinhdoanh ghi được khách hàng (phân quyền 3 cấp N21): Pipeline; 2 bảng con Dự án (Thiết kế / Thi công) cũng
+// thêm thẻ (= khách hàng) và chuyển cột (= sửa) - giao diện KinhDoanh.jsx. Xoá chỉ ở Pipeline.
+var (
+	tabsLeadWrite  = []string{"pipeline", "design-board", "construction-board"}
+	tabsLeadDelete = []string{"pipeline"}
+	actionVN       = map[string]string{"create": "thêm", "edit": "sửa", "delete": "xoá"}
+)
+
+// allow: super phải "xem như" 1 công ty (không thì thấy lẫn mọi công ty và không có công ty để gắn dòng mới); còn lại hỏi
+// phân quyền 3 cấp (N21, contracts.AccessChecker) thao tác action ở module kinhdoanh - tab trong tabs, không truyền = tab bất
+// kỳ (đọc). Chưa có dòng phân quyền = như cũ (canTab('kinhdoanh') của giao diện): công ty có danh sách tính năng mà thiếu tab
+// -> không ai được; admin được; nhân viên cần được cấp tab.
+func (s *Service) allow(ctx context.Context, a *actor.Actor, action string, tabs ...string) error {
 	if a == nil {
 		return apperr.E(401, "Chưa đăng nhập", "NOAUTH")
 	}
@@ -218,47 +229,40 @@ func (s *Service) allow(ctx context.Context, a *actor.Actor) error {
 	if a.IsSuper() {
 		return nil
 	}
-	ct, err := s.repo.Company(ctx, t)
-	if err != nil {
-		return err
+	if isReadKey(a) { // khoá API chỉ đọc (apikey.go): readKeyAuth đã chặn đường / phương thức khác
+		if action == "view" {
+			return nil
+		}
+		return apperr.Forbidden(MsgReadOnlyKey)
 	}
-	if ct != nil && !coTinhNang(ct.Val("tinh_nang"), Tab) {
-		return apperr.Forbidden("Công ty chưa được cấp tính năng Kinh doanh")
-	}
-	if a.IsAdmin() {
-		return nil
-	}
-	u, err := s.users.GetByID(ctx, a.UID)
-	if err != nil {
-		return err
-	}
-	if u != nil {
-		for _, p := range s.userFmt.PermsArr(u.Val("perms")) {
-			if p == Tab {
-				return nil
+	if s.access != nil {
+		if len(tabs) == 0 {
+			tabs = []string{""}
+		}
+		for _, tab := range tabs {
+			ok, err := s.access.Can(ctx, a, Tab, tab, action)
+			if err != nil || ok {
+				return err
 			}
 		}
+		if tabs[0] != "" { // vào được Kinh doanh nhưng thiếu thao tác ở tab ghi
+			if ok, err := s.access.Can(ctx, a, Tab, "", "view"); err != nil || ok {
+				if err != nil {
+					return err
+				}
+				return apperr.Forbidden("Tài khoản không có quyền " + actionVN[action] + " khách hàng ở Kinh doanh")
+			}
+		}
+	}
+	if a.IsAdmin() {
+		return apperr.Forbidden("Công ty chưa được cấp tính năng Kinh doanh")
 	}
 	return apperr.Forbidden("Tài khoản không có quyền vào Kinh doanh")
 }
 
-// coTinhNang = ctHasFeature_: danh sách tính năng rỗng = được mọi tab.
-func coTinhNang(v any, tab string) bool {
-	co := false
-	for _, x := range strings.Split(jsval.Str(v), ",") {
-		if x = jsval.Trim(x); x != "" {
-			if x == tab {
-				return true
-			}
-			co = true
-		}
-	}
-	return !co
-}
-
 // ListLeads: mọi khách hàng của công ty + tổng báo giá QS (chưa VAT) của dự án đã gắn.
 func (s *Service) ListLeads(ctx context.Context, a *actor.Actor) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	rows, err := s.repo.ListLeads(ctx)
@@ -307,7 +311,7 @@ func (s *Service) getQuote(ctx context.Context, r *omap.Map) (any, error) {
 
 // CreateLead: thêm khách hàng. body theo khoá của giao diện (xem fields).
 func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if !body.Has("name") {
@@ -347,7 +351,7 @@ func (s *Service) CreateLead(ctx context.Context, a *actor.Actor, body *omap.Map
 
 // UpdateLead: sửa một phần (chỉ khoá có trong body) - dùng cho cả kéo-thả giai đoạn, bảng con, người phụ trách, sửa form.
 func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	old, err := s.repo.GetLead(ctx, id)
@@ -397,7 +401,7 @@ func (s *Service) UpdateLead(ctx context.Context, a *actor.Actor, id float64, bo
 // DeleteLead: xoá khách hàng (lịch sử chăm sóc xoá theo, khoá ngoại cascade) và gỡ dự án triển khai đã gắn (dự án đã có
 // dữ liệu thì giữ, bỏ liên kết, hiện như dự án tạo tay).
 func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "delete", tabsLeadDelete...); err != nil {
 		return nil, err
 	}
 	// gỡ dự án triển khai trước (khoá ngoại chỉ set null), cùng transaction với lệnh xoá
@@ -433,7 +437,7 @@ func (s *Service) DeleteLead(ctx context.Context, a *actor.Actor, id float64) (a
 
 // ListActivities: lịch sử chăm sóc, mới nhất trước.
 func (s *Service) ListActivities(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if l, err := s.repo.GetLead(ctx, id); err != nil || l == nil {
@@ -532,7 +536,7 @@ func (s *Service) notifyAssigned(ctx context.Context, a *actor.Actor, old, out *
 // ListStaff: tài khoản của công ty để giao phụ trách khách hàng (phiếu "Nhân sự KD phụ trách").
 // sales = vào được Kinh doanh (admin, hoặc được cấp tab); người có quyền xếp trước, rồi theo tên.
 func (s *Service) ListStaff(ctx context.Context, a *actor.Actor) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	rows, err := s.repo.ListStaff(ctx)
@@ -581,7 +585,7 @@ func (s *Service) ListStaff(ctx context.Context, a *actor.Actor) (any, error) {
 
 // AddActivity: ghi 1 lần chăm sóc. Người viết lấy từ body.by (tên hiển thị), thiếu thì tên đăng nhập.
 func (s *Service) AddActivity(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if l, err := s.repo.GetLead(ctx, id); err != nil || l == nil {

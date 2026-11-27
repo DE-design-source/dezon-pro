@@ -43,6 +43,7 @@ function AddCardRow({ onCommit }) {
   )
 }
 
+/* N21: không có onSetSub (không có quyền Sửa) -> không kéo thẻ; không có onAddCard (không có quyền Thêm) -> ẩn "Thêm thẻ" */
 export default function SubBoard({ leads, parentStage, subStages, subLabel, subColor, onSetSub, onAddCard }) {
   const [draggingId, setDraggingId] = useState(null)
   const [hoverSub, setHoverSub] = useState(null)
@@ -58,14 +59,14 @@ export default function SubBoard({ leads, parentStage, subStages, subLabel, subC
             key={sub}
             className={`kd-stage-col${hoverSub === sub ? ' drop-hover' : ''}`}
             style={{ minWidth: 230 }}
-            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (hoverSub !== sub) setHoverSub(sub) }}
-            onDragLeave={() => setHoverSub(cur => (cur === sub ? null : cur))}
-            onDrop={e => {
+            onDragOver={onSetSub ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (hoverSub !== sub) setHoverSub(sub) } : undefined}
+            onDragLeave={onSetSub ? () => setHoverSub(cur => (cur === sub ? null : cur)) : undefined}
+            onDrop={onSetSub ? e => {
               e.preventDefault()
               setHoverSub(null)
               setDraggingId(null)
               onSetSub(e.dataTransfer.getData('text/plain'), sub)
-            }}
+            } : undefined}
           >
             <div style={{ height: 4, borderRadius: 4, background: color, marginBottom: 8 }} />
             <div className="kd-stage-head">
@@ -77,10 +78,10 @@ export default function SubBoard({ leads, parentStage, subStages, subLabel, subC
                 <div
                   key={l.id}
                   className={`kd-lead-card${draggingId === l.id ? ' dragging' : ''}`}
-                  draggable
-                  onDragStart={e => { e.dataTransfer.setData('text/plain', l.id); e.dataTransfer.effectAllowed = 'move'; setDraggingId(l.id) }}
-                  onDragEnd={() => setDraggingId(null)}
-                  style={{ cursor: 'grab', borderLeft: `3px solid ${color}`, minHeight: 74, boxSizing: 'border-box' }}
+                  draggable={!!onSetSub}
+                  onDragStart={onSetSub ? e => { e.dataTransfer.setData('text/plain', l.id); e.dataTransfer.effectAllowed = 'move'; setDraggingId(l.id) } : undefined}
+                  onDragEnd={onSetSub ? () => setDraggingId(null) : undefined}
+                  style={{ cursor: onSetSub ? 'grab' : 'default', borderLeft: `3px solid ${color}`, minHeight: 74, boxSizing: 'border-box' }}
                 >
                   <div title={l.name} style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
                   <div title={l.type} style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.type}</div>
@@ -88,7 +89,7 @@ export default function SubBoard({ leads, parentStage, subStages, subLabel, subC
                 </div>
               ))}
             </div>
-            <AddCardRow onCommit={name => onAddCard(name, parentStage, sub)} />
+            {onAddCard && <AddCardRow onCommit={name => onAddCard(name, parentStage, sub)} />}
           </div>
         )
       })}

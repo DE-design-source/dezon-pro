@@ -377,6 +377,11 @@ func (s *Service) RefreshFrom(ctx context.Context, token, ip string) (*AuthResul
 	if err != nil {
 		return nil, err
 	}
+	// quyền Chat của tài khoản Dezon Pro gắn với token: kiểm trước transaction (xem dezonRefreshPre)
+	pre, err := s.dezonRefreshPre(ctx, hashToken(token))
+	if err != nil {
+		return nil, err
+	}
 	var biz error
 	var uid, did, revoked int64
 	var me *MeDTO
@@ -421,9 +426,13 @@ func (s *Service) RefreshFrom(ctx context.Context, token, ip string) (*AuthResul
 			return err
 		}
 		// tài khoản gắn Dezon Pro: tài khoản Dezon Pro bị khoá / xoá / thu quyền chat -> xoá thiết bị, client đăng xuất
-		if ok, err := s.dezonRefreshOK(ctx, tx, uid); err != nil || !ok {
+		if ok, stale, err := s.dezonRefreshOK(ctx, tx, uid, pre); err != nil || !ok {
 			if err != nil {
 				return err
+			}
+			if stale {
+				biz = errRefreshRace
+				return nil
 			}
 			biz, revoked = errRefreshInvalid, did
 			_, err := tx.Exec(ctx, `delete from chat_devices where id = $1`, did)

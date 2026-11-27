@@ -6,7 +6,7 @@ import { cardStyle, titleStyle, descStyle, primaryBtnStyle, Field } from './shar
 /* Tab "Tài khoản" — tài khoản Dezon Pro (chung với QS) đang đăng nhập, đọc từ /auth/me (services/workSession).
    Tự sửa được Họ tên + Email (PATCH /auth/me); tên đăng nhập, vai trò, phòng ban, công ty chỉ admin đổi (Cài đặt > Admin).
    Đổi mật khẩu: /auth/change-password (đổi xong các phiên khác của tài khoản bị đăng xuất). */
-const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', subadmin: 'Admin', staff: 'Nhân viên' }
 const readOnly = { readOnly: true, style: { padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'inherit', cursor: 'default' } }
 const ghostBtn = { border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', padding: '9px 16px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
 // chữ đầu của từ đầu + từ cuối: "Trần Anh" -> "TA", "Nguyễn Văn A" -> "NA"

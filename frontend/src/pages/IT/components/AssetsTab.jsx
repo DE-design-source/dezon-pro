@@ -54,7 +54,8 @@ function AssetFields({ draft, set, listId, autoFocus }) {
 
 const bodyOf = d => ({ name: d.name.trim(), type: d.type.trim(), owner: d.owner.trim(), status: d.status, note: d.note.trim() })
 
-export default function AssetsTab({ canManage }) {
+/* canCreate / canEdit / canDelete: phân quyền 3 cấp (N21, module it, tab thietbi) */
+export default function AssetsTab({ canManage, canCreate = true, canEdit = true, canDelete = true }) {
   const [assets, setAssets] = useState([])
   const [loading, setLoading] = useState(!!canManage)
   const [loadErr, setLoadErr] = useState('')
@@ -220,10 +221,12 @@ export default function AssetsTab({ canManage }) {
             </button>
           ))}
         </div>
-        <button type="button" className="it-as-add" onClick={openAdd} disabled={adding}>
-          <svg {...iconProps} width="13" height="13" strokeWidth="2.6"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          Thêm thiết bị
-        </button>
+        {canCreate && (
+          <button type="button" className="it-as-add" onClick={openAdd} disabled={adding}>
+            <svg {...iconProps} width="13" height="13" strokeWidth="2.6"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Thêm thiết bị
+          </button>
+        )}
       </div>
 
       {msg && (
@@ -256,7 +259,7 @@ export default function AssetsTab({ canManage }) {
       ) : !assets.length ? (
         <div className="it-as-state">
           <div>Chưa có thiết bị nào.</div>
-          {!adding && <button type="button" className="it-as-btn primary" onClick={openAdd}>Thêm thiết bị đầu tiên</button>}
+          {!adding && canCreate && <button type="button" className="it-as-btn primary" onClick={openAdd}>Thêm thiết bị đầu tiên</button>}
         </div>
       ) : !shown.length ? (
         <div className="it-as-state">
@@ -297,7 +300,7 @@ export default function AssetsTab({ canManage }) {
                     </td>
                     <td data-label="Loại">{a.type || <span className="it-as-nil">-</span>}</td>
                     <td data-label="Người / vị trí">{a.owner || <span className="it-as-nil">-</span>}</td>
-                    <td data-label="Trạng thái"><StatusSelect value={a.status} disabled={busy} onChange={v => changeStatus(a, v)} /></td>
+                    <td data-label="Trạng thái"><StatusSelect value={a.status} disabled={busy || !canEdit} onChange={v => changeStatus(a, v)} /></td>
                     <td className="it-as-act">
                       {confirmId === a.id ? (
                         <span className="it-as-confirm">
@@ -307,12 +310,16 @@ export default function AssetsTab({ canManage }) {
                         </span>
                       ) : (
                         <span className="it-as-icons">
-                          <button type="button" className="it-as-ic" title="Sửa" aria-label={'Sửa ' + a.name} onClick={() => startEdit(a)} disabled={busy}>
-                            <svg {...iconProps} width="13" height="13"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                          </button>
-                          <button type="button" className="it-as-ic del" title="Xoá" aria-label={'Xoá ' + a.name} onClick={() => { setEditId(null); setConfirmId(a.id) }} disabled={busy}>
-                            <svg {...iconProps} width="13" height="13"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg>
-                          </button>
+                          {canEdit && (
+                            <button type="button" className="it-as-ic" title="Sửa" aria-label={'Sửa ' + a.name} onClick={() => startEdit(a)} disabled={busy}>
+                              <svg {...iconProps} width="13" height="13"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button type="button" className="it-as-ic del" title="Xoá" aria-label={'Xoá ' + a.name} onClick={() => { setEditId(null); setConfirmId(a.id) }} disabled={busy}>
+                              <svg {...iconProps} width="13" height="13"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg>
+                            </button>
+                          )}
                         </span>
                       )}
                     </td>

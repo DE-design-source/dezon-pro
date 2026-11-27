@@ -187,7 +187,8 @@ function ApptSheet({ init, seed, focus, people, me, onClose, onSave }) {
 
 const firstPhone = s => { const m = String(s || '').match(/\+?\d[\d\s.-]{7,}\d/); return m ? m[0].replace(/[^\d+]/g, '').replace(/^\+84/, '0') : '' }
 
-export default function CdNext({ lead, me, interactions, people }) {
+/* readOnly (N21: không có quyền Sửa): chỉ xem lịch hẹn, ẩn nút đặt / dời / xong / huỷ / xoá lịch và mục chuẩn bị */
+export default function CdNext({ lead, me, interactions, people, readOnly }) {
   const leadId = lead ? lead.id : ''
   const key = String(leadId)
   const [appts, setAppts] = useState([])
@@ -234,7 +235,7 @@ export default function CdNext({ lead, me, interactions, people }) {
   // chuyển lịch hẹn cũ của kdOptions vào database: từng mục, bỏ qua mục đã có (cùng ngày + giờ + tiêu đề), xong thì xoá khỏi kdOptions.
   // Mục lỗi (try/catch riêng) giữ lại trong kdOptions, các mục sau vẫn chuyển tiếp; lần mở sau thử lại mục lỗi.
   useEffect(() => {
-    if (!loaded || err || !legacy.length || migrating.has(key)) return
+    if (readOnly || !loaded || err || !legacy.length || migrating.has(key)) return
     migrating.add(key)
     let cancelled = false
     ;(async () => {
@@ -332,12 +333,12 @@ export default function CdNext({ lead, me, interactions, people }) {
         <em>{[weekdayOf(a.date), a.start, modeLabel(a.mode), a.place, (a.members || []).join(', ')].filter(Boolean).join(' · ')}</em>
       </span>
       {tag && <span className="cd-next-tag">{tag[0]}</span>}
-      <span className="cd-next-ra">
+      {!readOnly && <span className="cd-next-ra">
         {(a.status || 'planned') === 'planned' && <button type="button" title="Đánh dấu đã xong" aria-label="Đánh dấu đã xong" onClick={() => setStatus(a, 'done')}><Ic d={IC_CHECK} size={13} /></button>}
         {(a.status || 'planned') !== 'planned' && <button type="button" title="Mở lại lịch hẹn" aria-label="Mở lại lịch hẹn" onClick={() => patch(a, { status: 'planned' })}><Ic d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" size={13} /></button>}
         <button type="button" title="Dời / sửa lịch hẹn" aria-label="Dời / sửa lịch hẹn" onClick={() => setSheet({ init: a })}><Ic d={IC_EDIT} size={13} /></button>
         <button type="button" title="Xoá lịch hẹn" aria-label="Xoá lịch hẹn" onClick={() => del(a)}><Ic d={IC_X} size={13} /></button>
-      </span>
+      </span>}
     </li>
   )
   const followRow = (f, i, late) => (
@@ -345,10 +346,10 @@ export default function CdNext({ lead, me, interactions, people }) {
       {dayBox(f.date)}
       <span className="cd-next-rt"><b>{f.note}</b><em>{weekdayOf(f.date)} · Hẹn chăm sóc tiếp{f.from.by ? ' · ' + f.from.by : ''}</em></span>
       <span className="cd-next-tag">{late ? 'Quá hạn' : 'Hẹn tiếp'}</span>
-      <span className="cd-next-ra">
+      {!readOnly && <span className="cd-next-ra">
         <button type="button" title="Đặt thành lịch hẹn" aria-label="Đặt thành lịch hẹn"
           onClick={() => setSheet({ init: null, seed: { date: late ? today : f.date, title: f.from.nextNote || f.from.title } })}><Ic d={IC_CAL} size={13} /></button>
-      </span>
+      </span>}
     </li>
   )
   const hasList = others.length || overdueRest.length || follow.length || followLate.length
@@ -367,12 +368,12 @@ export default function CdNext({ lead, me, interactions, people }) {
               <button type="button" className="cd-next-new" title="Thao tác lịch hẹn" aria-label="Thao tác lịch hẹn" aria-expanded={menu} onClick={() => setMenu(v => !v)}>⋯</button>
               {menu && (
                 <span className="cd-next-pop" role="menu">
-                  <button type="button" role="menuitem" onClick={() => { setMenu(false); setSheet({ init: next, focus: 'date' }) }}>Dời lịch / sửa lịch</button>
+                  {!readOnly && <button type="button" role="menuitem" onClick={() => { setMenu(false); setSheet({ init: next, focus: 'date' }) }}>Dời lịch / sửa lịch</button>}
                   <button type="button" role="menuitem" onClick={() => { setMenu(false); zalo(next) }}
                     title={(phone ? 'Mở Zalo ' + phone + ' và ' : 'Khách chưa có số điện thoại - chỉ ') + 'chép sẵn tin nhắc lịch hẹn'}>{copied ? 'Đã chép tin nhắc' : 'Nhắc khách qua Zalo'}</button>
-                  <button type="button" role="menuitem" onClick={() => { setMenu(false); setStatus(next, 'done') }}>Đánh dấu đã xong</button>
-                  <button type="button" role="menuitem" onClick={() => { setMenu(false); setStatus(next, 'cancelled') }}>Huỷ lịch</button>
-                  <button type="button" role="menuitem" className="danger" onClick={() => { setMenu(false); del(next) }}>Xoá lịch</button>
+                  {!readOnly && <button type="button" role="menuitem" onClick={() => { setMenu(false); setStatus(next, 'done') }}>Đánh dấu đã xong</button>}
+                  {!readOnly && <button type="button" role="menuitem" onClick={() => { setMenu(false); setStatus(next, 'cancelled') }}>Huỷ lịch</button>}
+                  {!readOnly && <button type="button" role="menuitem" className="danger" onClick={() => { setMenu(false); del(next) }}>Xoá lịch</button>}
                   {next.by && <em>Đặt bởi {next.by}</em>}
                 </span>
               )}
@@ -402,7 +403,7 @@ export default function CdNext({ lead, me, interactions, people }) {
         ) : (
           <div className="cd-next-none">
             {!loaded ? 'Đang tải lịch hẹn…' : err || 'Chưa có lịch hẹn sắp tới với khách hàng này.'}
-            {loaded && <button type="button" className="cd-cbtn-or" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={13} />Đặt lịch hẹn</button>}
+            {loaded && !readOnly && <button type="button" className="cd-cbtn-or" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={13} />Đặt lịch hẹn</button>}
           </div>
         )}
       </div>
@@ -410,7 +411,7 @@ export default function CdNext({ lead, me, interactions, people }) {
       {next && !open && (
         <div className="cd-next-b cd-next-b-fold">
           {hasList ? <button type="button" className="cd-next-past" onClick={toggle}>Xem {listCount} lịch khác{overdueRest.length + followLate.length ? ' (' + (overdueRest.length + followLate.length) + ' quá hạn)' : ''}</button> : null}
-          <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>
+          {!readOnly && <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>}
         </div>
       )}
 
@@ -421,7 +422,7 @@ export default function CdNext({ lead, me, interactions, people }) {
               <span>Tham gia</span>
               <span className="cd-next-mem">
                 <b>{(next.members || []).join(', ') || '—'}</b>
-                <ApptMembers list={next.members || []} people={ppl} onChange={m => patch(next, { members: m })} />
+                {!readOnly && <ApptMembers list={next.members || []} people={ppl} onChange={m => patch(next, { members: m })} />}
               </span>
             </div>
             <div className="cd-ckv"><span>Địa điểm</span><b>{next.place || '—'}</b></div>
@@ -432,15 +433,15 @@ export default function CdNext({ lead, me, interactions, people }) {
             <span className="cd-prep-t">Chuẩn bị</span>
             {prep.map((p, i) => (
               <div key={i} className={'cd-prep-i' + (p.done ? ' on' : '')}>
-                <button type="button" className="cd-cchk" role="checkbox" aria-checked={!!p.done} onClick={() => togglePrep(i)}>{p.done ? '✓' : ''}</button>
-                <span onClick={() => togglePrep(i)}>{p.text}</span>
-                <button type="button" className="cd-prep-x" title="Bỏ mục chuẩn bị" aria-label="Bỏ mục chuẩn bị" onClick={() => delPrep(i)}><Ic d={IC_X} size={12} /></button>
+                <button type="button" className="cd-cchk" role="checkbox" aria-checked={!!p.done} disabled={readOnly} onClick={() => togglePrep(i)}>{p.done ? '✓' : ''}</button>
+                <span onClick={readOnly ? undefined : () => togglePrep(i)}>{p.text}</span>
+                {!readOnly && <button type="button" className="cd-prep-x" title="Bỏ mục chuẩn bị" aria-label="Bỏ mục chuẩn bị" onClick={() => delPrep(i)}><Ic d={IC_X} size={12} /></button>}
               </div>
             ))}
-            <input className="cd-prep-in" value={prepText} placeholder="+ Thêm việc cần chuẩn bị (Enter)" aria-label="Thêm việc cần chuẩn bị"
-              onChange={e => setPrepText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); addPrep() } }} />
+            {!readOnly && <input className="cd-prep-in" value={prepText} placeholder="+ Thêm việc cần chuẩn bị (Enter)" aria-label="Thêm việc cần chuẩn bị"
+              onChange={e => setPrepText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); addPrep() } }} />}
           </div>
-          <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>
+          {!readOnly && <button type="button" className="cd-cbtn-or cd-next-add" onClick={() => setSheet({ init: null })}><Ic d={IC_CAL} size={14} />+ Tạo lịch mới</button>}
         </div>
       )}
 
@@ -468,7 +469,7 @@ export default function CdNext({ lead, me, interactions, people }) {
         </div>
       )}
 
-      {sheet && (
+      {sheet && !readOnly && (
         <ApptSheet key={sheet.init ? sheet.init.id : 'new'} init={sheet.init} seed={sheet.seed} focus={sheet.focus} people={ppl} me={me}
           onClose={() => setSheet(null)} onSave={saveSheet} />
       )}

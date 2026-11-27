@@ -35,7 +35,8 @@
    "cong_ty_id": "company_id",
    "email": "email",
    "phong_ban": "department",
-   "ui_prefs": "ui_preferences"
+   "ui_prefs": "ui_preferences",
+   "duoc_duyet_sp": "has_product_approval"
   }
  },
  "phien_dang_nhap": {
@@ -1605,6 +1606,18 @@
    "ghi_chu": "note",
    "nguoi_tao": "created_by",
    "ngay_tao": "created_at",
+   "cap_nhat": "updated_at"
+  }
+ },
+ "phan_quyen": {
+  "table": "access_grants",
+  "columns": {
+   "id": "id",
+   "cong_ty_id": "company_id",
+   "tai_khoan_id": "user_id",
+   "quyen": "grants",
+   "nguoi_cap": "granted_by",
+   "nguoi_sua": "updated_by",
    "cap_nhat": "updated_at"
   }
  }

@@ -55,7 +55,8 @@ function NotifBadge({ leadId }) {
   )
 }
 
-export default function CdHeader({ lead: l, onBack, onMove }) {
+/* readOnly (N21: không có quyền Sửa): sao Mức độ chỉ xem, các bước giai đoạn không bấm chuyển được */
+export default function CdHeader({ lead: l, onBack, onMove, readOnly }) {
   const geoMap = useKdMap('geo')
   const projNameMap = useKdMap('projName')
   const id = String(l.id)
@@ -85,7 +86,7 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
       <div className="cd-h-id">
         <span className="cd-h-name" title={title !== l.name ? 'Khách hàng: ' + l.name : l.name}>{title}</span>
         {sub && <span className="cd-h-sub">{sub}</span>}
-        <span className="cd-h-rate"><span>Mức độ</span><RatingStars id={id} /></span>
+        <span className="cd-h-rate"><span>Mức độ</span><RatingStars id={id} readOnly={readOnly} /></span>
       </div>
       {/* Có Quản lý: hiện tên Quản lý, dòng dưới là những người phụ trách; chưa có Quản lý: người phụ trách chính như cũ */}
       {mgrName ? (
@@ -113,7 +114,7 @@ export default function CdHeader({ lead: l, onBack, onMove }) {
         <div className="cd-steps">
           {FLOW.map((s, i) => (
             <button key={s} type="button" className={'cd-step' + (i < cur ? ' done' : '') + (i === cur ? ' now' : '')}
-              onClick={() => onMove(l.id, s)} title={'Chuyển sang "' + STAGE_LABEL[s] + '"'}>
+              onClick={readOnly ? undefined : () => onMove(l.id, s)} disabled={readOnly} title={readOnly ? STAGE_LABEL[s] : 'Chuyển sang "' + STAGE_LABEL[s] + '"'}>
               {i < FLOW.length - 1 && <i className="cd-step-line" />}
               <span className="cd-step-dot">{i < cur ? '✓' : i + 1}</span>
               <span className="cd-step-lbl">{SHORT[s] || STAGE_LABEL[s]}</span>

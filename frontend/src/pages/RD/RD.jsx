@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './RD.css'
 import { useTheme } from '../../hooks/useTheme'
 import { PROJECTS, STAGE_LABEL, IDEAS, IDEA_STATUS, isActiveProject, initialsOf } from '../../data/rdData'
@@ -6,6 +6,7 @@ import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { RD_TABS } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 
 function Kpi({ label, value, valueColor, children }) {
   return (
@@ -43,8 +44,13 @@ export default function RD() {
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/rd')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module rd)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/rd')
+  const noViewKey = RD_TABS.filter(t => !can('rd', t.key)).map(t => t.key).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
   useTabFallback(tabHidden, pageTab, RD_TABS.map(t => t.key), setPageTab)
+  const noTab = RD_TABS.every(t => !can('rd', t.key))
 
   const activeProjects = PROJECTS.filter(isActiveProject).length
 
@@ -70,7 +76,8 @@ export default function RD() {
         </button>
       </div>
 
-      <div className="rd-scroll" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
+      {noTab && <div className="rd-scroll"><span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem trang R&amp;D. Nhờ quản trị viên cấp quyền.</span></div>}
+      <div className="rd-scroll" style={pageTab === 'nhansu' || !can('rd', 'main') ? { display: 'none' } : undefined}>
         <div className="rd-content">
           <div className="rd-kpi-grid">
             <Kpi label="Dự án R&D đang triển khai" value={activeProjects}>
@@ -143,7 +150,7 @@ export default function RD() {
         </div>
       </div>
 
-      {pageTab === 'nhansu' && (
+      {pageTab === 'nhansu' && can('rd', 'nhansu') && (
         <div className="rd-scroll">
           <DeptStaff units={['rnd']} />
         </div>

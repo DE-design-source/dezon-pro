@@ -2,7 +2,8 @@
    và vẫn ghi 1 bước hoàn tác cho các trường đã đổi (D12).
    Port: tkApplyEdits_ PUB/boc.js:974-992 (qua bocActions.applyEdits) · btLineGhiO_ bangtinh.js:676-690 (dán / xoá nhiều ô) ·
    btDoiHang_ bangtinh.js:506-524 (kéo dòng / tầng) · taiFile_ app.js:48-54 (POST /export/bang, tên file do bên gọi đặt). */
-import { getState, histOf, setHist, isTmp, lineOf_, updateLine, moveLine } from '../../state/store'
+import { getState, histOf, setHist, isTmp, lineOf_ } from '../../state/store'
+import { updateLine, moveLine } from '../../state/qsGuard'
 import { downloadPost } from '../../api/files'
 import { tkFieldsFor_, recalcLine_ } from '../../lib/calc.js'
 import { floorsList, CHUA_PHAN_TANG } from '../../lib/sheetModel.js'

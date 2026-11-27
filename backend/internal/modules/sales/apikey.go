@@ -32,6 +32,15 @@ type readKey struct {
 	sum  [32]byte
 }
 
+// readKeyUser: tiền tố username của actor dựng từ khoá chỉ đọc (actor không có uid). allow cho actor này đọc ("view"),
+// không hỏi phân quyền 3 cấp (N21: khoá không phải tài khoản, không có dòng phân quyền / users.perms).
+const readKeyUser = "apikey:"
+
+// isReadKey: actor do readKeyAuth dựng (phiên thật luôn có uid).
+func isReadKey(a *actor.Actor) bool {
+	return a != nil && a.UID == nil && strings.HasPrefix(a.U, readKeyUser)
+}
+
 // readKeyPaths: route (c.FullPath) khoá chỉ đọc được gọi, chỉ với GET.
 var readKeyPaths = map[string]bool{"/api/v1/sales/leads": true, "/api/v1/sales/staff": true}
 
@@ -89,7 +98,7 @@ func (s *Service) readKeyAuth() gin.HandlerFunc {
 			response.Fail(c, 403, MsgReadOnlyKey, "READONLY_KEY")
 			return
 		}
-		a := &actor.Actor{U: "apikey:" + k.name, R: "admin", CT: k.ct}
+		a := &actor.Actor{U: readKeyUser + k.name, R: "admin", CT: k.ct}
 		actor.Set(c, a)
 		c.Request = c.Request.WithContext(middleware.RequestContext(c.Request, a))
 	}

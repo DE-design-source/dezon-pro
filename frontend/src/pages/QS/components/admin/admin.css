@@ -68,7 +68,15 @@ html[data-theme="dark"] .qsa-warn{border-color:#5c4718;}
 .qsa-role.sup{background:var(--qs-tint); color:#7c3aed;}
 html[data-theme="dark"] .qsa-role.adm{color:#a5b4fc;}
 html[data-theme="dark"] .qsa-role.sup{color:var(--qs);}
-.qsa-permcol{white-space:normal; max-width:280px;}
+/* Admin (subadmin, M14.7): quản lý tài khoản nhân viên - màu riêng, khác quản trị công ty và nhân viên */
+.qsa-role.sub{background:#e0f2fe; color:#0369a1;}
+html[data-theme="dark"] .qsa-role.sub{background:rgba(56,189,248,.16); color:#7dd3fc;}
+.qsa-permcol{white-space:nowrap; max-width:280px;}
+.qsa-permsum{display:inline-flex; align-items:center; gap:4px; max-width:100%; overflow:hidden;}
+.qsa-permsum .qsa-permchip{margin:0; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsa-permmore{flex:none; font-size:10.5px; font-weight:650; color:var(--text-muted); background:var(--surface-alt); border-radius:6px; padding:2px 6px;}
+.qsa-urow{cursor:pointer;}
+.qsa-urow:focus-visible{outline:2px solid var(--dash-accent); outline-offset:-2px;}
 .qsa-permchip{display:inline-block; font-size:10.5px; background:var(--dash-accent-tint); color:#4f46e5; border-radius:6px; padding:2px 7px; margin:1px 0;}
 html[data-theme="dark"] .qsa-permchip{color:#a5b4fc;}
 .qsa-st-ok{color:var(--success); font-size:12px; font-weight:600; white-space:nowrap;}
@@ -202,10 +210,19 @@ html[data-theme="dark"] .qsa-permchip{color:#a5b4fc;}
 .qsa-rd i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:1px; line-height:1.5;}
 
 /* ---------- Thẻ Thông tin công ty (CompanyCard, M17.1) + ô Màu chính (M17.2) ---------- */
-.qsa-co{display:grid; grid-template-columns:260px minmax(0, 1fr); gap:18px; align-items:start;}
-.qsa-co-logo .qsco-logo-box{height:132px;}
-.qsa-co-han{display:flex; align-items:center; min-height:35px; padding:0 2px;}
-.qsa-co-ft{display:flex; justify-content:flex-end; gap:9px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border);}
+/* Hạn dùng chỉ xem: ô xám cao bằng ô nhập, khoá = chỉ quản trị hệ thống gia hạn */
+.qsa-co-han{display:flex; align-items:center; justify-content:space-between; gap:8px; height:38px; padding:0 11px; border:1px solid var(--border); border-radius:9px; background:var(--surface-alt); color:var(--text-muted);}
+/* Thẻ Thông tin công ty: Nhận diện | Liên hệ cạnh nhau trên màn rộng, xếp dọc khi hẹp */
+.qsa-co2{display:grid; grid-template-columns:minmax(0, 1.7fr) minmax(0, 1fr); gap:0 32px;}
+.qsa-co2 > .qsco-grp + .qsco-grp{margin-top:0; padding-top:0; border-top:none; padding-left:32px; border-left:1px dashed var(--border);}
+.qsa-co2 .qsa-co-lh{grid-template-columns:1fr;}
+@media (max-width: 1200px){
+  .qsa-co2{grid-template-columns:minmax(0, 1fr);}
+  .qsa-co2 > .qsco-grp + .qsco-grp{margin-top:18px; padding:16px 0 0; border-left:none; border-top:1px dashed var(--border);}
+  .qsa-co2 .qsa-co-lh{grid-template-columns:1fr 1fr;}
+}
+/* Hoàn tác / Lưu thay đổi ở góc phải dòng tiêu đề thẻ */
+.qsa-co-ft{display:flex; align-items:center; gap:8px; margin-left:auto;}
 .qsa-mau-row{display:flex; align-items:center; gap:8px;}
 .qsa-mau input.qsa-mau-pick, .qsco-f input.qsa-mau-pick{flex:none; width:40px; height:34px; padding:2px; border:1px solid var(--border); border-radius:8px; background:var(--surface); cursor:pointer;}
 .qsa-mau input.qsa-mau-hex, .qsco-f input.qsa-mau-hex{flex:none; width:120px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-transform:none;}
@@ -214,7 +231,6 @@ html[data-theme="dark"] .qsa-permchip{color:#a5b4fc;}
 
 @media (max-width: 900px){
   .qsa-stats{grid-template-columns:minmax(0, 1fr);}
-  .qsa-co{grid-template-columns:1fr;}
   .qsa-grid2, .qsa-seg, .qsa-perms{grid-template-columns:1fr;}
   .qsa-rq{flex-wrap:wrap;}
 }
@@ -260,3 +276,187 @@ html[data-theme="dark"] .qsa-tblwrap:hover, html[data-theme="dark"] .qsa-tblwrap
 /* Mô tả vai trò ở mục Tài khoản siêu quản trị viên (N17) */
 .qsa-super-note{margin:0 0 12px; padding:10px 14px; border:1px solid var(--border); border-left:3px solid var(--dash-accent, var(--primary)); border-radius:10px; background:var(--surface); font-size:12.5px; line-height:1.55; color:var(--text-muted);}
 .qsa-super-note b{color:var(--text);}
+
+/* Hộp chi tiết tài khoản (UserDetail.jsx) */
+.qsa-ud-hd{display:flex; align-items:center; gap:12px; padding:4px 0 14px; border-bottom:1px solid var(--border);}
+.qsa-ud-av{flex:none; width:46px; height:46px; border-radius:50%; background:var(--dash-accent-tint); color:var(--dash-accent); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700;}
+.qsa-ud-av.adm{background:var(--qs-tint); color:#7c3aed;}
+html[data-theme="dark"] .qsa-ud-av.adm{color:var(--qs);}
+.qsa-ud-t{flex:1; min-width:0;}
+.qsa-ud-t b{display:block; font-size:15px; font-weight:650; color:var(--text);}
+.qsa-ud-t span{display:block; font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsa-ud-info{display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; padding:14px 0; border-bottom:1px solid var(--border);}
+.qsa-ud-info > div{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.qsa-ud-info i{font-style:normal; font-size:11px; color:var(--text-muted);}
+.qsa-ud-info b{font-size:12.5px; font-weight:600; color:var(--text);}
+.qsa-ud-perm{padding:14px 0 4px;}
+.qsa-ud-ph{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:650; color:var(--text); margin-bottom:10px;}
+.qsa-ud-cnt{font-size:11px; font-weight:650; color:var(--dash-accent); background:var(--dash-accent-tint); border-radius:99px; padding:1px 9px;}
+.qsa-ud-full{font-size:12.5px;}
+.qsa-ud-grp{display:grid; grid-template-columns:110px minmax(0, 1fr); gap:10px; align-items:start; padding:6px 0;}
+.qsa-ud-gt{font-size:11.5px; font-weight:600; color:var(--text-muted); padding-top:3px;}
+.qsa-ud-chips{display:flex; flex-wrap:wrap; gap:5px;}
+.qsa-ud-chip{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:550; border:1px solid var(--border); color:var(--text-muted); border-radius:99px; padding:2px 9px; opacity:.65;}
+.qsa-ud-chip.on{opacity:1; background:var(--dash-accent-tint); color:var(--dash-accent); border-color:var(--dash-accent-border); font-weight:600;}
+@media (max-width: 640px){
+  .qsa-ud-info{grid-template-columns:1fr;}
+  .qsa-ud-grp{grid-template-columns:1fr; gap:4px;}
+}
+
+/* Thanh trên bảng Tài khoản: Thêm tài khoản | Cột hiển thị n/N + bộ cột (UserColPicker.jsx) */
+.qsa-ubar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.qsa-colmod{position:relative; display:inline-flex; align-items:center; height:34px; padding:0 4px 0 2px; border:1px solid var(--border); border-radius:99px; background:var(--surface);}
+.qsa-colmod-b{display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 10px 0 12px; border:none; border-radius:99px; background:transparent; color:var(--text); font:inherit; font-size:12.5px; font-weight:650; cursor:pointer; white-space:nowrap;}
+.qsa-colmod-b b{font-weight:650; color:var(--dash-accent);}
+.qsa-colmod-b svg{color:var(--text-muted);}
+.qsa-colmod-b:hover, .qsa-colmod-b.on{background:var(--dash-accent-tint);}
+.qsa-colmod-sep{width:1px; height:18px; background:var(--border);}
+.qsa-colmod-i{width:30px; height:28px; margin-left:2px; border:none; border-radius:99px; background:transparent; color:var(--text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer;}
+.qsa-colmod-i:hover, .qsa-colmod-i.on{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsa-colmod-b:focus-visible, .qsa-colmod-i:focus-visible{outline:2px solid var(--dash-accent); outline-offset:1px;}
+.qsa-colmod-pop{position:absolute; top:calc(100% + 6px); right:0; z-index:20; min-width:220px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 32px rgba(15,23,42,.16); padding:6px;}
+.qsa-colmod-it{display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:8px; font-size:12.5px; color:var(--text); cursor:pointer;}
+.qsa-colmod-it:hover{background:var(--surface-alt);}
+.qsa-colmod-it input{accent-color:var(--dash-accent);}
+.qsa-colmod-it.fixed{color:var(--text-muted); cursor:default;}
+.qsa-colmod-ft{border-top:1px solid var(--border); margin-top:4px; padding:6px 4px 2px; display:flex; justify-content:flex-end;}
+.qsa-colmod-ft button{border:none; background:transparent; color:var(--dash-accent); font:inherit; font-size:12px; font-weight:600; cursor:pointer; padding:3px 6px; border-radius:6px;}
+.qsa-colmod-ft button:hover{background:var(--dash-accent-tint);}
+.qsa-colmod-pop.right{min-width:160px;}
+.qsa-colmod-pre{width:100%; display:flex; align-items:center; gap:8px; padding:7px 9px; border:none; border-radius:8px; background:transparent; color:var(--text); font:inherit; font-size:12.5px; text-align:left; cursor:pointer;}
+.qsa-colmod-pre i{width:12px;}
+.qsa-colmod-pre:hover{background:var(--surface-alt);}
+.qsa-colmod-pre.on{color:var(--dash-accent); font-weight:650;}
+/* Thẻ Tài khoản không cắt menu Cột hiển thị khi bảng ít dòng (bảng vẫn cuộn ngang trong .qsa-tblwrap) */
+.qsa-card[data-card="users"]{overflow:visible;}
+
+/* Yêu cầu / Nhật ký theo công ty (CoScope.jsx): chọn công ty -> đầu mục công ty + dải nhân viên để lọc */
+.qsa-cs-hint{display:flex; align-items:center; gap:7px; margin:4px 0 12px; font-size:12.5px; color:var(--text-muted);}
+.qsa-cs-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px;}
+.qsa-cs-card{display:flex; align-items:center; gap:12px; padding:14px 14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .15s;}
+.qsa-cs-card:hover{border-color:var(--dash-accent); box-shadow:0 6px 18px rgba(20,40,80,.08);}
+.qsa-cs-card:focus-visible{outline:2px solid var(--dash-accent); outline-offset:2px;}
+.qsa-cs-card.off{opacity:.7;}
+.qsa-cs-lg{display:block; height:40px; width:auto; max-width:80px; object-fit:contain; border-radius:6px; flex:none;}
+.qsa-cs-ini{width:40px; height:40px; border-radius:8px; background:var(--surface-alt); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex:none;}
+.qsa-cs-t{flex:1; min-width:0;}
+.qsa-cs-t b{display:block; font-size:13.5px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsa-cs-t i{display:block; font-style:normal; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.qsa-cs-n{flex:none; font-size:11.5px; color:var(--text-muted);}
+.qsa-cs-n b{color:var(--text); font-weight:650;}
+.qsa-cs-go{flex:none; color:var(--text-muted);}
+.qsa-cs-card:hover .qsa-cs-go{color:var(--dash-accent);}
+.qsa-cs-scope{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 16px; margin-top:4px;}
+.qsa-cs-hd{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.qsa-cs-hd .qsa-cs-lg{height:32px;}
+.qsa-cs-hd .qsa-cs-ini{width:32px; height:32px; font-size:14px;}
+.qsa-cs-name{font-size:15px; font-weight:650; color:var(--text);}
+.qsa-cs-cnt{font-size:11px; font-weight:600; color:var(--text-muted); background:var(--surface-alt); border-radius:99px; padding:2px 9px;}
+.qsa-cs-users{display:flex; flex-wrap:wrap; gap:6px; margin-top:11px; padding-top:11px; border-top:1px dashed var(--border);}
+.qsa-cs-u{display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 11px 0 4px; border:1px solid var(--border); border-radius:99px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; font-weight:550; cursor:pointer; white-space:nowrap;}
+.qsa-cs-u:first-child{padding:0 11px;}
+.qsa-cs-u:hover{border-color:var(--dash-accent-border);}
+.qsa-cs-u.on{background:var(--dash-accent); border-color:var(--dash-accent); color:#fff;}
+.qsa-cs-u:focus-visible{outline:2px solid var(--dash-accent); outline-offset:2px;}
+.qsa-cs-av{width:20px; height:20px; border-radius:50%; background:var(--dash-accent-tint); color:var(--dash-accent); display:inline-flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700;}
+.qsa-cs-av.adm{background:var(--qs-tint); color:#7c3aed;}
+html[data-theme="dark"] .qsa-cs-av.adm{color:var(--qs);}
+.qsa-cs-u.on .qsa-cs-av{background:rgba(255,255,255,.22); color:#fff;}
+.qsa-cs-card .qsa-cs-lg{width:40px; height:40px; max-width:none; object-fit:contain;}
+.qsa-cs-note{margin:10px 2px 0; font-size:11.5px; color:var(--text-muted);}
+
+/* Hộp Thêm / Sửa tài khoản dạng từng bước (UserModal.jsx, dùng khung .qsco-* của hộp Tạo công ty) */
+.qsa-um2-roles{grid-template-columns:1fr 1fr; gap:12px;}
+.qsa-um2-roles .qsa-seg-i{padding:16px 16px; border-radius:12px;}
+.qsa-um2-hint{display:block; margin:8px 2px 0;}
+.qsa-um2-subs{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px;}
+.qsa-um2-subs .qsa-sub{margin-top:10px;}
+.qsa-sub.dis{opacity:.55;}
+.qsa-um2-em{max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:550 !important;}
+.qsco-f input:disabled{background:var(--surface-alt); color:var(--text-muted);}
+@media (max-width: 640px){ .qsa-um2-roles, .qsa-um2-subs{grid-template-columns:1fr;} }
+/* 3 vai trò Nhân viên / Admin / Quản trị công ty: 3 cột bằng nhau, màn hẹp xếp dọc */
+.qsa-um2-roles.c3{grid-template-columns:repeat(3, minmax(0, 1fr));}
+.qsa-um2-roles.c3 .qsa-seg-i{padding:14px 14px;}
+@media (max-width: 760px){ .qsa-um2-roles.c3{grid-template-columns:1fr;} }
+
+/* Chi tiết tài khoản: cùng khung + cỡ với hộp Sửa tài khoản (.qsco-dlg / .qsco-wz): trái = người + thông tin, phải = quyền */
+.qsa-ud-dlg .qsco-wz-side{gap:12px;}
+.qsa-ud-dlg .qsa-ud-hd{padding:0; border-bottom:none;}
+.qsa-ud-dlg .qsa-ud-t b{white-space:normal; line-height:1.3;}
+.qsa-ud-dlg .qsa-ud-info{grid-template-columns:1fr; gap:0; padding:4px 0 0; border-bottom:none; border-top:1px solid var(--border);}
+.qsa-ud-dlg .qsa-ud-info > div{flex-direction:row; align-items:baseline; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px dashed var(--border);}
+.qsa-ud-dlg .qsa-ud-info > div:last-child{border-bottom:none;}
+.qsa-ud-dlg .qsa-ud-info i{flex:none;}
+.qsa-ud-dlg .qsa-ud-info b, .qsa-ud-dlg .qsa-ud-info > div > span{text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.qsa-ud-dlg .qsco-sec-h h4{display:flex; align-items:center; gap:8px;}
+.qsa-ud-dlg .qsa-ud-grp{grid-template-columns:120px minmax(0, 1fr); padding:8px 0;}
+.qsa-ud-dlg .qsa-ud-grp + .qsa-ud-grp{border-top:1px dashed var(--border);}
+.qsa-ud-dlg .qsa-ud-chip{font-size:11.5px; padding:3px 10px;}
+.qsa-um2 .qsco-feat-b.qsa-um2-c4{grid-template-columns:repeat(4, minmax(0, 1fr));}
+@media (max-width: 1100px){ .qsa-um2 .qsco-feat-b.qsa-um2-c4{grid-template-columns:repeat(3, minmax(0, 1fr));} }
+@media (max-width: 640px){ .qsa-um2 .qsco-feat-b.qsa-um2-c4{grid-template-columns:1fr 1fr;} .qsco-fhint{white-space:normal; text-align:right; min-width:0;} }
+.qsa-cs-stat{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-size:11.5px; color:var(--text-muted); white-space:nowrap;}
+.qsa-cs-stat b{font-size:15px; font-weight:700; color:var(--text); margin-right:3px;}
+.qsa-cs-stat.wait{color:var(--text-muted);}
+.qsa-cs-pend{font-size:10.5px; font-weight:650; color:#b45309; background:var(--finance-tint, #fff3d6); border-radius:99px; padding:1px 8px;}
+html[data-theme="dark"] .qsa-cs-pend{color:var(--finance);}
+.qsa-cs-grid{grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));}
+.qsa-ro{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; white-space:nowrap;}
+.qsa-seg-i.dis{opacity:.5; cursor:not-allowed;}
+.qsa-um2-note{display:flex; align-items:center; gap:6px; margin:12px 2px 0; font-size:12px; color:var(--text-muted);}
+/* Admin được giao duyệt sản phẩm (M14.6) */
+.qsa-apr{display:inline-block; margin-left:6px; font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:20px; white-space:nowrap; background:var(--success-tint); color:var(--success); vertical-align:middle;}
+.qsa-rd.dis, .qsa-ck.dis{opacity:.55; cursor:not-allowed;}
+.qsa-rd-warn{display:block; font-style:normal; font-size:11px; color:var(--text-muted); margin-top:2px;}
+.qsa-um2-apr{margin-top:12px;}
+
+/* Ma trận phân quyền 3 cấp Module > Tab > Thao tác (AccessMatrix.jsx, N21) */
+.qsa-am{display:flex; flex-direction:column; gap:10px;}
+.qsa-am-bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.qsa-am-bar .qsco-all{margin-left:0;}
+.qsa-am-mode{height:34px; flex:none;}
+.qsa-am-mode .qsco-seg-b{padding:0 12px;}
+.qsa-am-note{display:flex; align-items:flex-start; gap:8px; padding:9px 12px; border:1px solid var(--dash-accent-border); background:var(--dash-accent-tint); border-radius:10px; font-size:12px; line-height:1.5; color:var(--text);}
+.qsa-am-note svg{flex:none; margin-top:2px; color:var(--dash-accent);}
+.qsa-am-note.warn{border-color:#f0c27a; background:var(--finance-tint, #fff3d6);}
+.qsa-am-note.warn svg{color:#b45309;}
+.qsa-am-scroll{border:1px solid var(--border); border-radius:12px; overflow:auto; max-height:calc((100vh - 330px) / var(--qs-zoom, .75)); min-height:180px;}
+.qsa-am-grid{min-width:600px;}
+.qsa-am-row{display:grid; grid-template-columns:minmax(150px, 1.7fr) repeat(6, minmax(46px, .55fr)) minmax(46px, .55fr); align-items:center; min-height:36px; border-bottom:1px solid var(--border);}
+.qsa-am-head{position:sticky; top:0; z-index:2; background:var(--dash-soft, var(--surface-alt)); font-size:11.5px; font-weight:650; color:var(--text-muted); min-height:34px;}
+.qsa-am-lbl{min-width:0; padding:0 12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-size:12.5px; color:var(--text);}
+.qsa-am-head .qsa-am-lbl{font-size:11.5px; color:var(--text-muted);}
+.qsa-am-c{display:flex; align-items:center; justify-content:center; min-width:0; text-align:center;}
+.qsa-am-hb{border:none; background:transparent; color:inherit; font:inherit; cursor:pointer; padding:3px 6px; border-radius:6px;}
+.qsa-am-hb:hover{background:var(--dash-accent-tint); color:var(--dash-accent);}
+.qsa-am-hb:focus-visible, .qsa-am-tg:focus-visible, .qsa-am-ck:focus-visible{outline:2px solid var(--dash-accent); outline-offset:1px;}
+.qsa-am-grp:last-child .qsa-am-row:last-child{border-bottom:none;}
+.qsa-am-mod{background:var(--surface);}
+.qsa-am-grp.open .qsa-am-mod{background:var(--surface-alt);}
+.qsa-am-tg{display:flex; align-items:center; gap:7px; height:100%; border:none; background:transparent; font:inherit; cursor:pointer;}
+.qsa-am-tg svg{flex:none; color:var(--text-muted);}
+.qsa-am-tg b{font-size:12.5px; font-weight:650; color:var(--text); overflow:hidden; text-overflow:ellipsis;}
+.qsa-am-n{flex:none; font-style:normal; font-size:10.5px; font-weight:650; color:var(--text-muted); background:var(--surface-alt); border-radius:99px; padding:1px 7px; font-variant-numeric:tabular-nums;}
+.qsa-am-n.on{color:var(--dash-accent); background:var(--dash-accent-tint);}
+.qsa-am-out{flex:none; font-style:normal; font-size:10.5px; color:var(--text-muted);}
+.qsa-am-grp.out .qsa-am-mod{opacity:.6;}
+.qsa-am-tab .qsa-am-lbl{padding-left:32px; color:var(--text-muted);}
+.qsa-am-na{color:var(--border); font-size:14px;}
+.qsa-am-ck{width:18px; height:18px; padding:0; border-radius:5px; border:1.5px solid var(--border); background:var(--surface); color:#fff; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .12s, border-color .12s;}
+.qsa-am-ck:hover:not(:disabled){border-color:var(--dash-accent);}
+.qsa-am-ck.on{background:var(--dash-accent); border-color:var(--dash-accent);}
+.qsa-am-ck.mixed{border-color:var(--dash-accent); background:var(--dash-accent-tint);}
+.qsa-am-ck.mixed::after{content:""; width:8px; height:2px; border-radius:1px; background:var(--dash-accent);}
+.qsa-am-ck.over{background:#d97706; border-color:#d97706;}
+.qsa-am-ck.dis{background:var(--surface-alt); border-style:dashed; opacity:.55; cursor:not-allowed;}
+.qsa-am-ck:disabled{cursor:default;}
+.qsa-am.ro .qsa-am-ck.on{background:var(--dash-accent-border); border-color:var(--dash-accent-border);}
+.qsa-am-err{padding:18px; font-size:12.5px; color:var(--text-muted); display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+/* Quyền thực theo module ở hộp Chi tiết tài khoản */
+.qsa-ud-chip i{font-style:normal; font-weight:500; opacity:.8;}
+.qsa-ud-mode{font-size:10.5px; font-weight:600; color:var(--text-muted); background:var(--surface-alt); border-radius:99px; padding:1px 8px;}
+@media (max-width: 640px){
+  .qsa-am-scroll{max-height:none;}
+  .qsa-am-mode{width:100%;}
+}

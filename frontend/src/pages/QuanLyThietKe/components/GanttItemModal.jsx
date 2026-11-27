@@ -41,7 +41,7 @@ function MultiPick({ value, onChange, options, placeholder, allowNew }) {
 }
 
 /* Hộp thoại tạo / sửa đề mục (giai đoạn) và công việc trên bảng Tiến độ */
-export default function GanttItemModal({ state, phases, assignees, onClose, onSaveTask, onDeleteTask, onSavePhase, onDeletePhase }) {
+export default function GanttItemModal({ state, phases, assignees, onClose, onSaveTask, onDeleteTask, onSavePhase, onDeletePhase, canDelete = true }) {
   const isTask = state?.kind === 'task'
   const editing = state?.mode === 'edit'
   const blankTask = () => ({ name: '', phaseId: state?.phaseId || phases[0]?.id || '', milestone: false, start: '', end: '', desc: '', depts: [], owners: [], progress: 0, critical: false })
@@ -143,7 +143,7 @@ export default function GanttItemModal({ state, phases, assignees, onClose, onSa
           {!isTask && editing && <p className="tk-gm-note full">Đề mục có {state.phase?.tasks.length || 0} công việc.</p>}
         </div>
         <div className="tk-gm-foot">
-          {editing && !(!isTask && CORE_PHASES.includes(state.phase?.name)) && (
+          {canDelete && editing && !(!isTask && CORE_PHASES.includes(state.phase?.name)) && (
             <button className="tk-gm-del" onClick={() => (isTask ? onDeleteTask(state.task.id) : onDeletePhase(state.phase.id))}>
               Xoá {isTask ? 'công việc' : 'đề mục'}
             </button>

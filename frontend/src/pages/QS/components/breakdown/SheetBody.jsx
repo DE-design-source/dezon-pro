@@ -84,7 +84,7 @@ function mapRows(groups, ids, fn, rid) {
      onDeleteRows(ids)          nút "Xoá dòng đang chọn": bảng cha tự xoá (hỏi lại) thay vì commit
      plainTools(a, s) -> node   Bảng thường: khối công cụ gọn thay cho thanh công cụ bảng tính + thanh công thức
      adderOpenKey               đổi giá trị = mở hộp "Thêm tầng / phòng"
-     addNode                    thay nút Thêm tầng / phòng + Hạng mục (chân bảng / góc phải thanh công cụ) bằng nút riêng của bảng */
+     addNode                    thay nút Thêm tầng / phòng + Hạng mục (chân bảng / góc phải thanh công cụ) bằng nút riêng của bảng; false = không có nút thêm */
 export default function SheetBody({
   sheet, plain, hiddenCols, onHiddenCols, panel, onPanel, favorites, targetName, onTarget, groupNames, onAddGroup, onAddRow, onAddBlank,
   full, onFull, dropMark, flash, onClearMark, dropHint, fileName,
@@ -533,7 +533,7 @@ export default function SheetBody({
 
   const togglePanel = name => onPanel(panel === name ? null : name)
   const wrapOn = wrapKey === 'wrap' ? !!anchorFmt.wrap : !anchorFmt.nowrap
-  const addTools = addNode || (
+  const addTools = addNode === false ? null : addNode || (
     <>
       <GroupAdder existing={new Set(groupNames)} onAdd={onAddGroup} openKey={adderOpenKey} />
       <button className="qs-bd-add-row" onClick={onAddBlank} title={'Thêm hạng mục' + (targetName ? ' vào ' + targetName : '')}><Icon name="plusCircle" size={16} />Hạng mục</button>

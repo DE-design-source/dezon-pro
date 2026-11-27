@@ -80,6 +80,7 @@ html[data-theme="dark"] .cd-score {
 
 .cd-sc-q { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.35; color: var(--cd-sc-text2); cursor: pointer;
   min-width: 0; background: none; border: 0; padding: 0; margin: 0; text-align: left; }
+.cd-sc-q:disabled { cursor: default; }
 .cd-sc-q:focus-visible { outline: 2px solid var(--cd-sc-navy); outline-offset: 2px; border-radius: 3px; }
 .cd-sc-box-ic { flex: none; width: 15px; height: 15px; margin-top: 1px; border-radius: 3px; border: 1.5px solid var(--cd-sc-box); background: var(--cd-sc-bg);
   color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; }

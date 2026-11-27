@@ -251,7 +251,7 @@ func (s *Service) recBusy(r *omap.Map) bool {
 
 // ListRecordings: hội thoại đã ghi của khách, mới nhất trước.
 func (s *Service) ListRecordings(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -270,7 +270,7 @@ func (s *Service) ListRecordings(ctx context.Context, a *actor.Actor, id float64
 
 // CreateRecording: lưu 1 hội thoại (file ghi âm tuỳ chọn + bản chép trực tiếp), tạo lần chăm sóc, rồi chạy AI nền nếu có.
 func (s *Service) CreateRecording(ctx context.Context, a *actor.Actor, id float64, up RecordingUpload) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	lead, err := s.leadOr404(ctx, id)
@@ -408,7 +408,7 @@ func (s *Service) recOr404(ctx context.Context, recID float64) (*omap.Map, error
 
 // UpdateRecording: sửa tay lời thoại (đổi người nói / sửa chữ) {lines}; ghi lại nội dung lần chăm sóc gắn kèm.
 func (s *Service) UpdateRecording(ctx context.Context, a *actor.Actor, recID float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	r, err := s.recOr404(ctx, recID)
@@ -460,7 +460,7 @@ func (s *Service) syncActivity(ctx context.Context, r *omap.Map) {
 // ReprocessRecording: chạy lại AI cho 1 hội thoại (file ghi âm đủ - cờ am_thanh_du lúc tạo - thì chép theo file ghi âm;
 // không thì theo bản chép trực tiếp, chỉ dùng file ghi âm khi không có bản chép).
 func (s *Service) ReprocessRecording(ctx context.Context, a *actor.Actor, recID float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	r, err := s.recOr404(ctx, recID)
@@ -491,7 +491,7 @@ func (s *Service) ReprocessRecording(ctx context.Context, a *actor.Actor, recID 
 
 // DeleteRecording: xoá hội thoại + file ghi âm (lần chăm sóc đã tạo giữ nguyên).
 func (s *Service) DeleteRecording(ctx context.Context, a *actor.Actor, recID float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "delete", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	r, err := s.recOr404(ctx, recID)

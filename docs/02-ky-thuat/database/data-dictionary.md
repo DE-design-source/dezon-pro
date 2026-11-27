@@ -42,7 +42,7 @@ Tài khoản đăng nhập, vai trò, quyền. 9 dòng.
 | `username` | `username` | text | không |  | CHECK | Login name, always lowercase | **Khoá nghiệp vụ**: Code coi là duy nhất TOÀN HỆ THỐNG nhưng DB chỉ unique theo (company_id, username). Đang có 1 cặp trùng. |
 | `full_name` | `ho_ten` | text | có | ''::text |  | Full name of the user ('' when not provided) |  |
 | `password_hash` | `password_hash` | text | không |  |  | bcrypt hash of the password | **NHẠY CẢM**: bcrypt; không trả về client (userOut). Thu hẹp các select * đang nạp cột này. |
-| `role` | `role` | text | không | 'staff'::text | CHECK | Access role: super (system admin), admin (company owner), staff |  |
+| `role` | `role` | text | không | 'staff'::text | CHECK | Access role: super (system admin), admin (company owner), subadmin (manages staff accounts within own rights), staff | Từ 0053 (2026-11-27, M14.7): thêm `subadmin` (nhãn giao diện "Admin"). |
 | `is_active` | `active` | boolean | không | true |  | False when the account is locked |  |
 | `created_at` | `created_at` | timestamp with time zone | không | now() |  | When the account was created |  |
 | `last_login_at` | `last_login` | timestamp with time zone | có |  |  | Time of the most recent successful login |  |

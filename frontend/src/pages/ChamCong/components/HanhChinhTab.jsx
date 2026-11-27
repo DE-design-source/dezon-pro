@@ -5,7 +5,7 @@ const DOC_COLS = { gridTemplateColumns: '1fr 2fr 1.1fr 1.2fr 1fr 1fr' }
 const CONTRACT_COLS = { gridTemplateColumns: '1.6fr 1.4fr 1.2fr 1fr 1fr' }
 const tint = c => ({ background: `var(--${c}-tint)`, color: `var(--${c})` })
 
-export default function HanhChinhTab() {
+export default function HanhChinhTab({ canCreate = true }) {
   return (
     <>
       <div className="cc-kpi-grid">
@@ -17,10 +17,10 @@ export default function HanhChinhTab() {
 
       <div className="cc-row-between">
         <span className="cc-section-title">Công văn — Văn bản nội bộ gần đây</span>
-        <button className="cc-btn-add">
+        {canCreate && <button className="cc-btn-add">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Thêm văn bản
-        </button>
+        </button>}
       </div>
 
       <div className="cc-card cc-table">

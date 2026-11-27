@@ -15,21 +15,26 @@ import (
 	"qspro-backend/internal/shared/qscore"
 )
 
-// Deps: Perms + Saver = materials (spPerms_, saveDbProduct). Repo để trống thì dùng DB.
+// Deps: Perms + Saver + Approval = materials (spPerms_, saveDbProduct, sản phẩm chưa duyệt). Repo để trống thì dùng DB.
+// Approval nil (test golden) -> không kiểm duyệt khi thêm dòng.
 type Deps struct {
-	DB    *database.DB
-	Cfg   *config.Config
-	Perms contracts.ProductPerms
-	Saver contracts.ProductSaver
-	Repo  Repository
+	DB       *database.DB
+	Cfg      *config.Config
+	Perms    contracts.ProductPerms
+	Saver    contracts.ProductSaver
+	Approval contracts.ApprovalChecker
+	Repo     Repository
+	Access   contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 // Service: nghiệp vụ dòng bóc tách.
 type Service struct {
-	repo  Repository
-	cfg   *config.Config
-	perms contracts.ProductPerms
-	saver contracts.ProductSaver
+	access   contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
+	repo     Repository
+	cfg      *config.Config
+	perms    contracts.ProductPerms
+	saver    contracts.ProductSaver
+	approval contracts.ApprovalChecker
 }
 
 var _ contracts.LineReader = (*Service)(nil)
@@ -40,7 +45,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = NewRepository(d.DB)
 	}
-	return &Service{repo: repo, cfg: d.Cfg, perms: d.Perms, saver: d.Saver}
+	return &Service{access: d.Access, repo: repo, cfg: d.Cfg, perms: d.Perms, saver: d.Saver, approval: d.Approval}
 }
 
 func bit(v any) float64 {
@@ -160,6 +165,27 @@ func (s *Service) AddLine(ctx context.Context, maDA any, product any, soLuong an
 		return nil, apperr.New("Cannot read properties of undefined (reading 'gia_ban_le')")
 	}
 	return lineToObj(res[0]), nil
+}
+
+// msgChuaDuyet: lỗi khi đưa sản phẩm chưa duyệt vào bóc tách (M14.6).
+const msgChuaDuyet = "Sản phẩm chưa được duyệt — không đưa vào bóc tách được"
+
+// AddLineGated (chỉ bản Go, roadmap M14.6): sản phẩm (theo mã product.ma) đang Chưa duyệt thì không thêm vào bóc tách -
+// chặn mọi đường thêm dòng mang sản phẩm (chọn ở Bóc tách, Ghi danh vào dự án, nhân bản dòng, nhập file). Dòng đã có không đổi.
+// Hàm lõi AddLine giữ như bản Node (test golden).
+func (s *Service) AddLineGated(ctx context.Context, maDA any, product any, soLuong any) (*omap.Map, error) {
+	if s.approval != nil {
+		if p := jsval.AsMap(product); p != nil {
+			chua, err := s.approval.ChuaDuyet(ctx, jsval.S(p.Val("ma")))
+			if err != nil {
+				return nil, err
+			}
+			if chua {
+				return nil, apperr.New(msgChuaDuyet)
+			}
+		}
+	}
+	return s.AddLine(ctx, maDA, product, soLuong)
 }
 
 // AddBlankLine (S:371-374): soLuong 0 nên dòng trống được lưu với số lượng 1 (Number(0) || 1).

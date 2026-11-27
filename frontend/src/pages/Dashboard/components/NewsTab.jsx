@@ -1,8 +1,10 @@
 import { NEWS_POSTS, NEWS_FILTERS } from '../../../data/dashboardData'
 import PostCard from './PostCard'
+import { useAccess } from '../../../services/accessService'
 
 /* Tab "Tin tức": tiêu đề, ô đăng tin, bộ lọc và danh sách bài viết */
 export default function NewsTab({ active, filter, onFilter }) {
+  const { can } = useAccess()
   const posts = NEWS_POSTS.filter(p => filter === 'all' || p.cat === filter)
 
   return (
@@ -17,7 +19,7 @@ export default function NewsTab({ active, filter, onFilter }) {
         </div>
       </div>
 
-      <div className="db-composer">
+      {can('newsfeed', 'tintuc', 'create') && <div className="db-composer">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="db-post-avatar" style={{ background: 'var(--primary-tint)', color: 'var(--primary)', borderColor: 'var(--primary)' }}>TA</div>
           <div className="db-composer-pill">Bạn có tin gì muốn chia sẻ?</div>
@@ -37,7 +39,7 @@ export default function NewsTab({ active, filter, onFilter }) {
             Đăng tin
           </button>
         </div>
-      </div>
+      </div>}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {NEWS_FILTERS.map(f => (

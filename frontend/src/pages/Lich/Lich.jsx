@@ -12,6 +12,7 @@ import CreateEventModal from './components/CreateEventModal'
 import EventDetailPopover from './components/EventDetailPopover'
 import SyncStatus from './components/SyncStatus'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
+import { useAccess } from '../../services/accessService'
 
 const VIEWS = [['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']]
 
@@ -30,7 +31,19 @@ function ensureTracked(list, name) {
   return [[...list, tracked], tracked]
 }
 
+const noop = () => {}
+
+/* Phân quyền 3 cấp (N21, module lich, tab main): không được xem thì không mở trang */
 export default function Lich() {
+  const { can } = useAccess()
+  if (!can('lich', 'main')) {
+    return <div className="lc-page"><div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem Lịch. Nhờ quản trị viên cấp quyền.</div></div>
+  }
+  return <LichPage />
+}
+
+function LichPage() {
+  const { can } = useAccess()
   const { theme, toggleTheme } = useTheme()
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(loadAiPanelWidth)
@@ -225,20 +238,22 @@ export default function Lich() {
                   <button className="lc-cal-today-btn" onClick={today}>Hôm nay</button>
                   <button className="lc-cal-icon-btn" title="Sau" onClick={next}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
                 </div>
-                <button className="lc-cal-create-btn" onClick={() => setModalOpen(true)}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  Tạo sự kiện
-                </button>
+                {can('lich', 'main', 'create') && (
+                  <button className="lc-cal-create-btn" onClick={() => setModalOpen(true)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    Tạo sự kiện
+                  </button>
+                )}
               </div>
             </div>
-            <WeekView hidden={view === 'month'} view={view} dayIdx={dayIdx} events={events} setEvents={setEvents} onOpenDetail={openDetail} />
+            <WeekView hidden={view === 'month'} view={view} dayIdx={dayIdx} events={events} setEvents={can('lich', 'main', 'edit') ? setEvents : noop} onOpenDetail={openDetail} />
             <MonthView hidden={view !== 'month'} onGotoDay={i => { setDayIdx(i); setView('day') }} />
           </div>
         </div>
       </div>
 
       <CreateEventModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={createEvent} events={events} />
-      <EventDetailPopover ref={popRef} detail={detail} onClose={() => setDetail(null)} onDelete={deleteDetailEvent} />
+      <EventDetailPopover ref={popRef} detail={detail} onClose={() => setDetail(null)} onDelete={can('lich', 'main', 'delete') ? deleteDetailEvent : null} canEdit={can('lich', 'main', 'edit')} />
 
       <Dezbot
         open={aiOpen}

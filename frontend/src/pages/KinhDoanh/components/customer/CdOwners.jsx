@@ -5,7 +5,8 @@ import { useKdOptions, saveKdOptions } from '../ShortlistSelect'
 
 /* Khối "Phụ trách" của trang khách hàng dạng dashboard: người phụ trách gom theo nhóm (assignees[].dept),
    người phụ trách chính (kinh doanh) tô nổi; nhóm có người luôn hiện đủ nhân viên; "+ Gán" chọn tài khoản công ty và lưu ngay,
-   "×" cuối tên gỡ người khỏi nhóm (lưu ngay). Không còn Thu gọn / Mở rộng, nút Sửa, dòng Phòng / Quản lý / Khởi tạo. */
+   "×" cuối tên gỡ người khỏi nhóm (lưu ngay). Không còn Thu gọn / Mở rộng, nút Sửa, dòng Phòng / Quản lý / Khởi tạo.
+   readOnly (N21: không có quyền Sửa): chỉ xem, ẩn "+ Gán" / "Đổi" (cả sửa / bỏ tên gợi ý kdOptions.ownerFree) và "×". */
 export const OWNER_GROUPS = [
   { key: 'kinhdoanh', label: 'Kinh doanh', color: '#D9661F', empty: 'Chưa có nhân sự kinh doanh' },
   { key: 'ctv', label: 'CTV Kinh doanh', color: '#1877F2', empty: 'Chưa có cộng tác viên' },
@@ -78,7 +79,7 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
     document.addEventListener('keydown', esc, true)
     return () => { off = true; document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc, true) }
   }, [open])
-  if (!onPatch) return <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button>
+  if (!onPatch) return onEdit ? <button type="button" className="cd-btn sm" onClick={onEdit} title={'Gán người nhóm ' + g.label}>+ Gán</button> : null
   const isMgr = g.key === 'quanly'
   const mine = isMgr ? (lead.manager ? [{ name: lead.manager }] : []) : (lead.assignees || []).filter(a => a && a.name && !isAdminKd(a) && deptOf(a) === g.key)
   // so tên bỏ dấu + gộp khoảng trắng: gõ "nguyen van an" coi như trùng "Nguyễn Văn An"
@@ -190,8 +191,10 @@ function AssignBtn({ g, lead, onPatch, onEdit }) {
 
 
 
-export default function CdOwners({ lead: l, onEdit, onPatch }) {
+export default function CdOwners({ lead: l, onEdit: onEditIn, onPatch: onPatchIn, readOnly }) {
   const [busyIdx, setBusyIdx] = useState(-1)
+  const onEdit = readOnly ? undefined : onEditIn
+  const onPatch = readOnly ? undefined : onPatchIn
   if (!l) return null
   /* i = vị trí trong l.assignees gốc (khớp leadOwner().idx) */
   const members = (l.assignees || []).map((a, i) => ({ a, i })).filter(x => x.a && x.a.name && !isAdminKd(x.a))

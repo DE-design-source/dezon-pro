@@ -13,6 +13,12 @@ import { money, spNorm_ } from './format.js'
 import { nodeName } from './tree.js'
 import { nganhCuaSP_, coSpec_, specNganh_ } from './productFields.js'
 
+/* Duyệt sản phẩm theo phân cấp (M14.6): SP chưa duyệt không hiện ở Bóc tách và không đưa vào dòng bóc tách được.
+   Dòng bóc tách đã có giữ nguyên -> tra cứu dòng cũ (spOfLine_, lnDiff_, giá...) vẫn dùng danh mục đầy đủ. */
+export const SP_CHUA_DUYET_BOC='Sản phẩm chưa được duyệt — không đưa vào bóc tách được';
+export function spBocOk_(p){ return !!(p && p.daDuyet); }
+export function spBocList_(products){ return (products||[]).filter(spBocOk_); }
+
 export const WATTS=['3W','5W','7W','9W','11W','12W','15W','17W','20W','25W'];
 export const KELVINS=[['2700K','#f0a500'],['3000K','#f08a00'],['4000K','#f2c200'],['5000K','#3b82f6']];
 export const ANGLES=['8°','12°','20°','22°','30°','38°','40°','50°','60°','12x60°','40x70°','30x60°','20x60°','35x70°','50x70°','50x80°','30x70°','50° Asymmetrical','10x30°'];
@@ -174,7 +180,8 @@ export function filteredProducts(st, specs){
   if(st.inProjKeys){ usedKeys=st.inProjKeys; }                 // đã chọn 1 dự án cụ thể ở "Đèn trong dự án"
   else if(st.onlyProject){ usedKeys=inProjKeys_(st.lines); }
   return spGroupVariants_((st.products||[]).filter(function(p){
-    if(st.fFav && !p.yeuThich) return false;                    // chỉ hiện SP đã lưu yêu thích
+    if(!spBocOk_(p)) return false;                              // chưa duyệt: không hiện ở Bóc tách
+    if(st.fFav && !p.yeuThich) return false;                   // chỉ hiện SP đã lưu yêu thích
     if(st.fCombo==='co'    && !(p.comboN>0)) return false;      // chỉ SP có sản phẩm đi kèm
     if(st.fCombo==='khong' &&  (p.comboN>0)) return false;      // chỉ SP đứng riêng
     if(hmucSel.length && hmucSel.indexOf(prodHmuc_(p, specs))<0) return false;

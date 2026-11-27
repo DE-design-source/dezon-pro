@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import './KinhDoanh.css'
 import { useTheme } from '../../hooks/useTheme'
@@ -27,6 +27,7 @@ import DeptStaff from '../../components/hr/DeptStaff'
 import WorkGate from '../../components/ui/WorkGate'
 import { usePageTabsHidden } from '../../hooks/usePageTabs'
 import { useWorkSession } from '../../services/workSession'
+import { useAccess } from '../../services/accessService'
 import * as kdApi from './api'
 
 const hintStyle = { fontSize: 11.5, color: 'var(--text-muted)' }
@@ -49,11 +50,26 @@ function KinhDoanhPage() {
   const meName = (me && (me.hoTen || me.username)) || ''
   const [nav0] = useState(readNav)
   const [tab, setTab] = useState(() => (typeof nav0.tab === 'string' && nav0.tab) || 'overview')
-  // tab ẩn ở Cài đặt > Hiển thị + tab chỉ cho quản trị; tab đang mở không được hiện thì sang tab hiện đầu tiên
-  // (không còn tab nào hiện -> về 'overview', không nhảy qua lại giữa 2 tab)
-  const tabHidden = usePageTabsHidden('/kinh-doanh')
   const isManager = !!me && (me.role === 'admin' || me.role === 'super')
-  const visibleTabs = SALES_TABS.filter(t => tabHidden.indexOf(t[0]) < 0 && (isManager || SALES_ADMIN_TABS.indexOf(t[0]) < 0))
+  /* Phân quyền 3 cấp (N21): tab xem được + nút Thêm / Sửa / Xoá theo quyền Kinh doanh > tab > thao tác.
+     Tab chỉ cho quản trị (SALES_ADMIN_TABS, vd Cấu hình AI) không có trong danh mục quyền: theo vai trò quản trị như cũ */
+  const acc = useAccess()
+  const kd = (t, a) => acc.can('kinhdoanh', t, a)
+  const tabOk = t => (SALES_ADMIN_TABS.indexOf(t) >= 0 ? isManager : kd(t, 'view'))
+  const denied = SALES_TABS.map(t => t[0]).filter(t => !tabOk(t))
+  const noTab = denied.length === SALES_TABS.length
+  const plView = tabOk('pipeline')
+  const plCreate = kd('pipeline', 'create')
+  const plEdit = kd('pipeline', 'edit')
+  const plDelete = kd('pipeline', 'delete')
+  // ghi lịch sử chăm sóc: máy chủ (sales AddActivity) cần quyền Thêm ở 1 trong các tab ghi khách (tabsLeadWrite)
+  const actCreate = ['pipeline', 'design-board', 'construction-board'].some(t => kd(t, 'create'))
+  // tab ẩn ở Cài đặt > Hiển thị, không có quyền xem hoặc chỉ cho quản trị; tab đang mở không được hiện thì sang tab hiện đầu tiên
+  // (không còn tab nào hiện -> về 'overview', không nhảy qua lại giữa 2 tab)
+  const tabHiddenUser = usePageTabsHidden('/kinh-doanh')
+  const deniedKey = denied.join(',')
+  const tabHidden = useMemo(() => (deniedKey ? [...tabHiddenUser, ...deniedKey.split(',')] : tabHiddenUser), [tabHiddenUser, deniedKey])
+  const visibleTabs = SALES_TABS.filter(t => tabHidden.indexOf(t[0]) < 0)
   useEffect(() => {
     if (visibleTabs.some(t => t[0] === tab)) return
     const next = visibleTabs.length ? visibleTabs[0][0] : 'overview'
@@ -218,7 +234,7 @@ function KinhDoanhPage() {
   }
   function moveLead(id, newStage) {
     const lead = leads.find(l => sameId(l.id, id))
-    if (!lead || lead.stage === newStage) return
+    if (!lead || lead.stage === newStage || !plEdit) return
     if (newStage === 'giao-ns') { setStaffReq(r => ({ open: true, leadId: lead.id, seq: r.seq + 1 })); return }
     /* Máy chủ tạo / ẩn dự án theo phòng nhận (sales deliveryKinds): cột Dự án (Thiết kế) / (Thi công) -> trang của cột,
        phiếu gửi Phòng Thiết kế / Thi công -> trang phòng đó; giai đoạn khác: gỡ */
@@ -232,7 +248,7 @@ function KinhDoanhPage() {
   const [delId, setDelId] = useState(null)
   const delLead = delId != null ? leads.find(l => sameId(l.id, delId)) : null
   function deleteLead(id) {
-    if (leads.find(l => sameId(l.id, id))) setDelId(id)
+    if (plDelete && leads.find(l => sameId(l.id, id))) setDelId(id)
   }
   function doDelete() {
     const lead = delLead
@@ -249,6 +265,7 @@ function KinhDoanhPage() {
   async function saveLead(input) {
     const { _geo: geo, _projName: projName, _investor: investor, _cdt: cdt, _attach: attach, _timeline: timeline, _land: land, ...data } = input   // Khu vực / Tỉnh-TP, Tên dự án: lưu riêng kdOptions.geo / .projName (máy chủ chưa có cột)
     const editing = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) : null
+    if (editing ? !plEdit : !plCreate) { alert('Bạn không có quyền ' + (editing ? 'sửa' : 'thêm') + ' khách hàng'); return }
     try {
       const saved = editing ? await kdApi.updateLead(editing.id, data) : await kdApi.createLead(data)
       const patch = {}
@@ -387,9 +404,10 @@ function KinhDoanhPage() {
     setWallet(wallet - cost)
   }
 
-  const panel = (name, gap) => ({ display: tab === name ? 'flex' : 'none', flexDirection: 'column', gap })
+  const panel = (name, gap) => ({ display: tab === name && tabOk(name) ? 'flex' : 'none', flexDirection: 'column', gap })
   const editingLead = leadModal.id ? leads.find(l => sameId(l.id, leadModal.id)) || null : null
   const detailLead = detail.id ? leads.find(l => sameId(l.id, detail.id)) || null : null
+  const showDetail = !!(detail.open && detailLead && plView)   // trang khách hàng thuộc tab Pipeline
   const handoffLead = handoff.leadId ? leads.find(l => sameId(l.id, handoff.leadId)) || null : null
 
   /* ---------- Lưu / khôi phục vị trí (sessionStorage 'kd-nav-state') ---------- */
@@ -564,13 +582,13 @@ function KinhDoanhPage() {
         <span style={{ fontSize: 14.5, fontWeight: 700 }}>Kinh doanh</span>
         <div className="hdr-tabs" role="tablist">
           {visibleTabs.map(([key, label]) => (
-            <button key={key} className={`kd-sales-tab${tab === key && !detail.open ? ' active' : ''}`} onClick={() => { setTab(key); setDetail(d => ({ ...d, open: false })) }}>{label}</button>
+            <button key={key} className={`kd-sales-tab${tab === key && !showDetail ? ' active' : ''}`} onClick={() => { setTab(key); setDetail(d => ({ ...d, open: false })) }}>{label}</button>
           ))}
         </div>
-        <button onClick={() => openLeadModal(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', background: 'var(--sales)', color: '#fff', padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit' }}>
+        {plCreate && <button onClick={() => openLeadModal(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', background: 'var(--sales)', color: '#fff', padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Thêm khách hàng tiềm năng
-        </button>
+        </button>}
         <NotifBell onOpen={openNotif} />
         <button title="Chuyển giao diện sáng/tối" onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           {theme === 'dark'
@@ -582,24 +600,30 @@ function KinhDoanhPage() {
       {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái đang chọn, giống bản HTML */}
       <div ref={scrollRef} onScroll={onPageScroll} style={{ flex: 1, padding: 'var(--page-gutter)', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden' }}>
         {/* Thêm / sửa khách hàng tiềm năng: trang đầy đủ thay chỗ nội dung tab (không còn hộp nổi) */}
-        <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open} lead={editingLead} me={meName} leads={leads} onClose={closeLeadModal} onSave={saveLead}
-          onOpenLead={id => { closeLeadModal(); setDetail({ open: true, id }) }} onMergeInto={mergeIntoLead} />
-        <div style={leadModal.open ? { display: 'none' } : { display: 'contents' }}>
-        {detail.open && detailLead && (
+        <LeadModal key={`lead-${leadModal.seq}`} open={leadModal.open && (editingLead ? plEdit : plCreate)} lead={editingLead} me={meName} leads={leads} onClose={closeLeadModal} onSave={saveLead}
+          onOpenLead={id => { closeLeadModal(); setDetail({ open: true, id }) }} onMergeInto={plEdit ? mergeIntoLead : undefined} />
+        <div style={leadModal.open && (editingLead ? plEdit : plCreate) ? { display: 'none' } : { display: 'contents' }}>
+        {noTab && acc.ready && (
+          <div style={{ background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 14, padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            Tài khoản chưa được cấp quyền xem tab nào của Kinh doanh. Nhờ quản trị viên cấp quyền.
+          </div>
+        )}
+        {showDetail && (
           <CustomerDashboard
             lead={detailLead}
             me={meName}
             interactions={interactions[detailLead.id] || []}
-            onAddInteraction={x => addInteraction(detailLead, x)}
+            onAddInteraction={plEdit && actCreate ? x => addInteraction(detailLead, x) : undefined}
             onBack={() => setDetail(d => ({ ...d, open: false }))}
-            onEdit={() => openLeadModal(detailLead.id)}
-            onMove={moveLead}
-            onSetCreated={d => setCreatedAt(detailLead.id, d)}
-            onPatch={changes => patchLead(detailLead.id, changes)}
+            onEdit={plEdit ? () => openLeadModal(detailLead.id) : undefined}
+            onMove={plEdit ? moveLead : undefined}
+            onSetCreated={plEdit ? d => setCreatedAt(detailLead.id, d) : undefined}
+            onPatch={plEdit ? changes => patchLead(detailLead.id, changes) : undefined}
             onOpenNotif={openNotif}
+            readOnly={!plEdit}
           />
         )}
-        <div style={detail.open && detailLead ? { display: 'none' } : { display: 'contents' }}>
+        <div style={showDetail ? { display: 'none' } : { display: 'contents' }}>
 
         {/* ================= TAB: TỔNG QUAN ================= */}
         <div style={panel('overview', 16)}>
@@ -610,28 +634,29 @@ function KinhDoanhPage() {
         <div className="kd-pl-panel" style={panel('pipeline', 14)}>
           <PipelineTab
             leads={filteredLeads} allLeads={leads} dept={dept} onDeptChange={setDept} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter}
-            scrollRef={scrollRef} onMove={moveLead} onDelete={deleteLead}
+            scrollRef={scrollRef} onMove={plEdit ? moveLead : undefined} onDelete={plDelete ? deleteLead : undefined}
             onOpenDetail={id => setDetail({ open: true, id })}
-            onEdit={id => openLeadModal(id)}
+            onEdit={plEdit ? id => openLeadModal(id) : undefined}
             onAddAssignee={addAssignee} onRemoveAssignee={removeAssignee}
+            readOnly={!plEdit}
           />
         </div>
 
         {/* ================= TAB: DỰ ÁN (THIẾT KẾ) ================= */}
         <div style={panel('design-board', 14)}>
           <div style={hintStyle}>Bảng Kanban kiểu Lark Base — kéo thả thẻ giữa các cột, hoặc bấm "+ Thêm thẻ" ở cuối mỗi cột để tạo nhanh.</div>
-          <SubBoard leads={leads} parentStage="thiet-ke" subStages={DESIGN_STAGES} subLabel={DESIGN_LABEL} subColor={DESIGN_COLOR} onSetSub={setLeadSub} onAddCard={addSubCard} />
+          <SubBoard leads={leads} parentStage="thiet-ke" subStages={DESIGN_STAGES} subLabel={DESIGN_LABEL} subColor={DESIGN_COLOR} onSetSub={kd('design-board', 'edit') ? setLeadSub : undefined} onAddCard={kd('design-board', 'create') ? addSubCard : undefined} />
         </div>
 
         {/* ================= TAB: DỰ ÁN (THI CÔNG) ================= */}
         <div style={panel('construction-board', 14)}>
           <div style={hintStyle}>Bảng Kanban kiểu Lark Task — kéo thả thẻ giữa các cột, hoặc bấm "+ Thêm thẻ" ở cuối mỗi cột để tạo nhanh.</div>
-          <SubBoard leads={leads} parentStage="thi-cong" subStages={CONSTRUCTION_STAGES} subLabel={CONSTRUCTION_LABEL} subColor={CONSTRUCTION_COLOR} onSetSub={setLeadSub} onAddCard={addSubCard} />
+          <SubBoard leads={leads} parentStage="thi-cong" subStages={CONSTRUCTION_STAGES} subLabel={CONSTRUCTION_LABEL} subColor={CONSTRUCTION_COLOR} onSetSub={kd('construction-board', 'edit') ? setLeadSub : undefined} onAddCard={kd('construction-board', 'create') ? addSubCard : undefined} />
         </div>
 
         {/* ================= TAB: NHIỆM VỤ & ĐIỂM THƯỞNG ================= */}
         <div style={panel('tasks', 16)}>
-          <TasksTab steps={steps} onCheckSubtask={checkSubtask} wallet={wallet} onRedeem={redeem} onOpenCreateTask={() => setTaskModal(m => ({ open: true, seq: m.seq + 1 }))} />
+          <TasksTab steps={steps} onCheckSubtask={kd('tasks', 'edit') ? checkSubtask : undefined} wallet={wallet} onRedeem={redeem} onOpenCreateTask={kd('tasks', 'create') ? () => setTaskModal(m => ({ open: true, seq: m.seq + 1 })) : undefined} />
         </div>
 
         {/* ================= TAB: NHÂN SỰ (từ HR) ================= */}

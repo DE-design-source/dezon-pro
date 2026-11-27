@@ -67,6 +67,10 @@ func (r *pgRepo) UserByEmailInCompanyExcept(ctx context.Context, email string, c
 	return nil, nil
 }
 
+func (r *pgRepo) CompanyAdmins(ctx context.Context) ([]*omap.Map, error) {
+	return r.db.Select(ctx, "users", database.SelectOpt{Select: "id,duoc_duyet_sp", Filter: "role=eq.admin", Order: "created_at.asc", Limit: 500})
+}
+
 func (r *pgRepo) InsertUser(ctx context.Context, row *omap.Map) ([]*omap.Map, error) {
 	return r.db.InsertOne(ctx, "users", row, database.Opt{NoScope: true})
 }

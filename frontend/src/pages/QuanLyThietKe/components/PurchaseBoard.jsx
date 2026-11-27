@@ -82,7 +82,7 @@ function SearchAdd({ placeholder, options, onPick }) {
 
 /* Trang chi tiết mua hàng dạng kanban — mở khi bấm công việc thuộc giai đoạn "Mua hàng & cung ứng".
    Mỗi đơn có người & phòng ban phụ trách; quy trình (các bước) chỉnh sửa / khởi tạo từ mẫu được cho từng công việc. */
-export default function PurchaseBoard({ task, items, open, projectName, meName, onClose, onMove, onUpdateItems, onSaveFlow }) {
+export default function PurchaseBoard({ task, items, open, projectName, meName, onClose, onMove, onUpdateItems, onSaveFlow, readOnly = false }) {
   const [pdView, pickView] = usePoView() // chế độ xem phiếu chi tiết đơn: default | columns | groups
   const [dragId, setDragId] = useState(null)
   const [overStage, setOverStage] = useState(null)
@@ -245,8 +245,8 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
             <h2>{task ? task.name : '—'}</h2>
           </div>
           <span className="tk-pb-grow" />
-          {task && <button className="tk-pb-btn primary" onClick={addItem} title="Tạo đơn mua hàng mới cho công việc này">{IcPlus}Thêm đơn mua hàng</button>}
-          {task && <button className="tk-pb-btn" onClick={() => openFlow(false)} title="Chỉnh sửa / khởi tạo quy trình mua hàng">{IcFlow}Quy trình</button>}
+          {task && !readOnly && <button className="tk-pb-btn primary" onClick={addItem} title="Tạo đơn mua hàng mới cho công việc này">{IcPlus}Thêm đơn mua hàng</button>}
+          {task && !readOnly && <button className="tk-pb-btn" onClick={() => openFlow(false)} title="Chỉnh sửa / khởi tạo quy trình mua hàng">{IcFlow}Quy trình</button>}
           <div className="tk-pb-bell-wrap">
             <button className={`tk-pb-btn icon${bellOpen ? ' on' : ''}`} onClick={() => setBellOpen(o => !o)} title="Thông báo đã gửi">
               {IcBell}{notes.length > 0 && <span className="tk-pb-badge">{notes.length}</span>}
@@ -303,14 +303,14 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
                     <span className="tk-pb-col-count">{cards.length}</span>
                     <span className="tk-pb-col-sum mono">{sum ? fmtMillion(sum) : ''}</span>
                   </div>
-                  <button className="tk-pb-col-owner" onClick={() => openFlow(false)} title={`Phụ trách: ${stepOwners(stage).join(', ') || 'chưa giao'}${stepDepts(stage).length ? ' · ' + stepDepts(stage).join(', ') : ''} — bấm để chỉnh quy trình`}>
+                  <button className="tk-pb-col-owner" onClick={() => { if (!readOnly) openFlow(false) }} title={`Phụ trách: ${stepOwners(stage).join(', ') || 'chưa giao'}${stepDepts(stage).length ? ' · ' + stepDepts(stage).join(', ') : ''} — bấm để chỉnh quy trình`}>
                     {stepOwners(stage).length
                       ? <span className="tk-pb-avatars">{stepOwners(stage).slice(0, 3).map(n => <Avatar key={n} name={n} size={18} />)}</span>
                       : <span className="tk-pb-col-noowner">{IcUsers}</span>}
                     <span>{stepOwners(stage).length ? (stepOwners(stage).length > 1 ? `${stepOwners(stage)[0]} +${stepOwners(stage).length - 1}` : stepOwners(stage)[0]) : 'Chưa giao người phụ trách'}{stepDepts(stage).length ? <em> · {stepDepts(stage).join(', ')}</em> : null}</span>
                   </button>
                   <div className="tk-pb-cards">
-                    {cards.length === 0 && (si === 0 && list.length === 0
+                    {cards.length === 0 && (si === 0 && list.length === 0 && !readOnly
                       ? <button type="button" className="tk-pb-empty add" onClick={addItem}>+ Thêm đơn mua hàng</button>
                       : <div className="tk-pb-empty">Kéo thả đơn vào đây</div>)}
                     {cards.map(it => {
@@ -323,7 +323,7 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
                           key={it.id}
                           className={`tk-pb-card${dragId === it.id ? ' dragging' : ''}${detailId === it.id ? ' selected' : ''}`}
                           style={{ borderLeftColor: stage.color }}
-                          draggable
+                          draggable={!readOnly}
                           onClick={() => { setDetailId(it.id); setPicker(null) }}
                           onDragStart={e => { setDragId(it.id); e.dataTransfer.effectAllowed = 'move' }}
                           onDragEnd={() => { setDragId(null); setOverStage(null) }}
@@ -353,7 +353,7 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
                 </div>
               )
             })}
-            {task && (
+            {task && !readOnly && (
               <button className="tk-pb-col tk-pb-addcol" onClick={() => openFlow(true)}>
                 {IcPlus}<b>Thêm bước quy trình</b><span>Chỉnh sửa, sắp xếp hoặc khởi tạo quy trình từ mẫu</span>
               </button>
@@ -365,7 +365,7 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
               <div className="tk-pb-detail-head">
                 <div><span className="mono tk-pb-code">{detail.code}</span><h3>{detail.item}</h3></div>
                 <span className="tk-pd-headbtns">
-                  <button className="tk-pb-btn icon" onClick={() => removeItem(detail)} title="Xoá đơn">{IcTrash}</button>
+                  {!readOnly && <button className="tk-pb-btn icon" onClick={() => removeItem(detail)} title="Xoá đơn">{IcTrash}</button>}
                   <button className="tk-pb-btn icon" onClick={() => setDetailId(null)} title="Đóng">{IcX}</button>
                 </span>
               </div>
@@ -392,12 +392,12 @@ export default function PurchaseBoard({ task, items, open, projectName, meName, 
                     <span key={n} className="tk-pb-chip">
                       <Avatar name={n} size={20} />
                       <span><b>{n}</b><em>{personOf(n)?.role || ''}</em></span>
-                      <button onClick={() => removeAssignee(detail, n)} title="Bỏ phụ trách">{IcX}</button>
+                      {!readOnly && <button onClick={() => removeAssignee(detail, n)} title="Bỏ phụ trách">{IcX}</button>}
                     </span>
                   ))}
                   {assigneesOf(detail).length === 0 && <span className="tk-pb-noone">Chưa có người phụ trách</span>}
                 </div>
-                {!picker
+                {readOnly ? null : !picker
                   ? <button className="tk-pb-btn ghost" onClick={() => setPicker({ q: '' })}>{IcPlus}Thêm người phụ trách</button>
                   : (
                     <div className="tk-pb-picker">

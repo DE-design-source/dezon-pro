@@ -5,7 +5,8 @@ import ProductThumb from '../common/ProductThumb'
 import ChangeInput from './ChangeInput'
 import NodePicker from './NodePicker'
 import { mediaUrl } from '../../api/files'
-import { updateLine, deleteLines, useQsStore } from '../../state/store'
+import { useQsStore } from '../../state/store'
+import { updateLine, deleteLines } from '../../state/qsGuard'
 import { COLS, visCols, colW } from '../../lib/columns.js'
 import { money } from '../../lib/format.js'
 import { ttBan_ } from '../../lib/calc.js'
@@ -129,8 +130,8 @@ export default function DetailEditor({ ctx, tk, nganh, onExport, exporting }) {
         <b>Bảng báo giá chi tiết</b><span className="qs-qt-sub">Đồng bộ Bóc tách</span>
         <span style={{ flex: 1 }} />
         <NodePicker ctx={ctx} small />
-        <button type="button" className="qs-qt-btn green" disabled={exporting} onClick={() => onExport('xlsx')}><Icon name="download" size={13} />{exporting ? 'Đang xuất…' : 'Excel'}</button>
-        <button type="button" className="qs-qt-btn red" onClick={() => onExport('pdf')}><Icon name="download" size={13} />PDF / In</button>
+        {onExport && <button type="button" className="qs-qt-btn green" disabled={exporting} onClick={() => onExport('xlsx')}><Icon name="download" size={13} />{exporting ? 'Đang xuất…' : 'Excel'}</button>}
+        {onExport && <button type="button" className="qs-qt-btn red" onClick={() => onExport('pdf')}><Icon name="download" size={13} />PDF / In</button>}
       </div>
       <div className="qs-qt-card-body">
         <div className="qs-qt-colchips dark">

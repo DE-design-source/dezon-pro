@@ -138,7 +138,7 @@ func apptOut(r *omap.Map) *omap.Map {
 
 // ListAppointments: lịch hẹn của khách, theo ngày / giờ tăng dần.
 func (s *Service) ListAppointments(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -157,7 +157,7 @@ func (s *Service) ListAppointments(ctx context.Context, a *actor.Actor, id float
 
 // AddAppointment: thêm lịch hẹn (date, title bắt buộc; status mặc định planned).
 func (s *Service) AddAppointment(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -209,7 +209,7 @@ func (s *Service) apptOr404(ctx context.Context, apptID float64) (*omap.Map, err
 
 // UpdateAppointment: sửa một phần (dời lịch, tick chuẩn bị, đánh dấu xong / huỷ...).
 func (s *Service) UpdateAppointment(ctx context.Context, a *actor.Actor, apptID float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	old, err := s.apptOr404(ctx, apptID)
@@ -243,7 +243,7 @@ func (s *Service) UpdateAppointment(ctx context.Context, a *actor.Actor, apptID 
 
 // DeleteAppointment: xoá lịch hẹn.
 func (s *Service) DeleteAppointment(ctx context.Context, a *actor.Actor, apptID float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "delete", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if _, err := s.apptOr404(ctx, apptID); err != nil {
@@ -330,7 +330,7 @@ func taskOut(r *omap.Map) *omap.Map {
 
 // ListTasks: task của khách - chưa xong trước, theo hạn (không hạn cuối).
 func (s *Service) ListTasks(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -349,7 +349,7 @@ func (s *Service) ListTasks(ctx context.Context, a *actor.Actor, id float64) (an
 
 // AddTask: thêm task (title bắt buộc; source 'ai' = tạo từ gợi ý của khối Phân tích AI).
 func (s *Service) AddTask(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -392,7 +392,7 @@ func (s *Service) taskOr404(ctx context.Context, taskID float64) (*omap.Map, err
 
 // UpdateTask: sửa một phần (tick xong, đổi hạn, người làm...). Gửi done trùng giá trị cũ thì giữ ngày xong cũ.
 func (s *Service) UpdateTask(ctx context.Context, a *actor.Actor, taskID float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	old, err := s.taskOr404(ctx, taskID)
@@ -420,7 +420,7 @@ func (s *Service) UpdateTask(ctx context.Context, a *actor.Actor, taskID float64
 
 // DeleteTask: xoá task.
 func (s *Service) DeleteTask(ctx context.Context, a *actor.Actor, taskID float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "delete", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if _, err := s.taskOr404(ctx, taskID); err != nil {

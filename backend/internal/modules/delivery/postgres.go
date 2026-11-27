@@ -12,7 +12,6 @@ import (
 // Repository: truy cập dữ liệu. Mọi bảng tk_* nằm trong TenantTables nên tự lọc theo công ty (bảng con xét qua tk_du_an).
 // Hàm theo bảng con (Children / Get / Insert / Update / Remove) luôn lọc thêm du_an_id: dòng phải thuộc đúng dự án.
 type Repository interface {
-	Company(ctx context.Context, id any) (*omap.Map, error)
 	ListProjects(ctx context.Context, kind string) ([]*omap.Map, error)
 	GetProject(ctx context.Context, id float64) (*omap.Map, error)
 	ProjectOfLead(ctx context.Context, leadID any, kind string) (*omap.Map, error)
@@ -42,11 +41,6 @@ func first(rows []*omap.Map, err error) (*omap.Map, error) {
 
 func of(project, item float64) string {
 	return database.Eq("du_an_id", project) + "&" + database.Eq("id", item)
-}
-
-func (r *pgRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
-	// NoScope: bảng companies không thuộc TenantTables; điều kiện id = công ty đang làm việc ghi ngay trong filter
-	return first(r.db.Select(ctx, "cong_ty", database.SelectOpt{Select: "tinh_nang", Filter: database.Eq("id", id), Limit: 1, NoScope: true}))
 }
 
 func (r *pgRepo) ListProjects(ctx context.Context, kind string) ([]*omap.Map, error) {

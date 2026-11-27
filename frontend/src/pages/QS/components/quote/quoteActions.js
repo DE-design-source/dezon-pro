@@ -6,7 +6,9 @@
    Dữ liệu ghi đúng khoá bản gốc (D8): projData bgCfg / bgHist / bgOrg / area, tờ bìa {stt, hangMuc, moTa, chiPhi}. */
 import * as api from '../../api/qsApi'
 import { saveBase64 } from '../../api/files'
-import { getState, syncProj, updateProject as storeUpdateProject, isAdminRole_ } from '../../state/store'
+import { getState, syncProj, isAdminRole_ } from '../../state/store'
+import { updateProject as storeUpdateProject } from '../../state/qsGuard'
+import { denyQs, qsCan } from '../../state/qsAccess'
 import { projDataSet_ } from '../../state/projData'
 import { qsToast as toast, qsConfirm, qsAsk } from '../common/dialogs'
 import { money, esc, pctIn_ } from '../../lib/format.js'
@@ -26,13 +28,16 @@ import { bgDocCss_, printCss_, bgChu_, bgFontHref_, fitA4_ } from './docCss'
 
 const curNow = () => getState().cur
 const pdNow = () => getState().projData || {}
+/* Phân quyền N21: QS > Xuất báo giá > Sửa (cấu hình, tờ bìa, diện tích, chốt phiên bản) / Xuất (Excel, In / PDF) */
+const noEdit = () => denyQs('export', 'edit')
+const noExport = () => denyQs('export', 'export')
 
 /* ---- Cấu hình báo giá theo dự án (projData.bgCfg) ---- */
 /* bgCfg của bản nháp đang mở (chưa gộp mặc định công ty) */
 export function bgCfgRaw() { return pdNow().bgCfg }
-export function bgOptSet(k, v) { projDataSet_('bgCfg', bgOptNew_(pdNow().bgCfg, k, v)) }
+export function bgOptSet(k, v) { if (noEdit()) return; projDataSet_('bgCfg', bgOptNew_(pdNow().bgCfg, k, v)) }
 /* Ghi nhiều khoá bgCfg trong 1 lần ({khoá: giá trị}, null = xoá khoá) */
-export function bgOptSetMany(m) { projDataSet_('bgCfg', Object.keys(m).reduce((c, k) => bgOptNew_(c, k, m[k]), pdNow().bgCfg)) }
+export function bgOptSetMany(m) { if (noEdit()) return; projDataSet_('bgCfg', Object.keys(m).reduce((c, k) => bgOptNew_(c, k, m[k]), pdNow().bgCfg)) }
 export function bgToggle(stt) { bgOptSet('an', bgToggleAn_(pdNow().bgCfg, stt)) }
 /* trả false khi màu quá nhạt (ô chọn màu phải về lại màu cũ) */
 export function bgMauDat(m) {
@@ -85,6 +90,7 @@ function coverLuuXong_(ma, ok, lan, conCho, tu = 0) {
   if (doi) bgOptSet('tay', tay)
 }
 export function coverEdit(i, field, value) {
+  if (noEdit()) return
   const rows = coverRowsOfCur(); if (!rows || !rows[i]) return
   const ma = curNow().maDA
   const nr = rows.slice(); const c = { ...nr[i] }
@@ -100,19 +106,23 @@ export function coverEdit(i, field, value) {
   coverLuu_(coverLuuXong_)
 }
 export function coverDel(i) {
+  if (noEdit()) return
   const rows = coverRowsOfCur(); if (!rows) return
   const nr = rows.slice(); nr.splice(i, 1)
   setCoverRows(curNow().maDA, nr); coverLuu_(coverLuuXong_)
 }
 export function coverAddBig() {
+  if (noEdit()) return
   const rows = coverRowsOfCur(); if (!rows) return
   setCoverRows(curNow().maDA, rows.concat([coverAddBig_(rows)])); coverLuu_(coverLuuXong_)
 }
 export function coverAddSmall() {
+  if (noEdit()) return
   const rows = coverRowsOfCur(); if (!rows) return
   setCoverRows(curNow().maDA, rows.concat([coverAddSmall_(rows)])); coverLuu_(coverLuuXong_)
 }
 export async function coverReload() {
+  if (noEdit()) return
   const ma = curNow() && curNow().maDA; if (!ma) return
   try {
     const cv = (await api.buildCoverFromTemplate(ma)) || []
@@ -121,6 +131,7 @@ export async function coverReload() {
   } catch (e) { toast('Lỗi: ' + e.message) }
 }
 export async function coverSave() {
+  if (noEdit()) return
   const ma = curNow() && curNow().maDA; if (!ma) return
   const rows = coverRowsOfCur() || []
   coverCancelPending()
@@ -135,6 +146,7 @@ export async function coverSave() {
 }
 /* Ô thông tin dự án trên tờ bìa (maBaoGia, khachHang, quyMo, tongDT, nhuCau, dtBaoGia, phanKhuc) */
 export function coverInfo(field, value) {
+  if (noEdit()) return
   const c = curNow(); if (!c) return
   // lỗi: báo rồi ném tiếp để ô nhập giữ chữ vừa gõ (bản gốc không vẽ lại khi lỗi)
   return storeUpdateProject(c.maDA, { [field]: value }).catch(e => { toast('Lỗi: ' + e.message); throw e })
@@ -148,6 +160,7 @@ export function areaLoad_(pd) {
   return d
 }
 export function areaSet(k, field, val) {
+  if (noEdit()) return
   const c = curNow(); if (!c) return
   const d = areaSetVal_(areaLoad_(), k, field, val)
   try { localStorage.setItem('qs_area_' + c.maDA, JSON.stringify(d)) } catch (e) { /* bỏ qua */ }
@@ -155,6 +168,7 @@ export function areaSet(k, field, val) {
 }
 export function areaApply() {
   const c = curNow(); if (!c) return
+  if (noEdit()) return
   const a = areaCompute_(areaLoad_()); const f = areaApplyFields_(a)
   syncProj({ ...c, ...f })
   api.updateProject(c.maDA, f).then(p => { if (p) syncProj(p) }).catch(e => toast('Lỗi: ' + e.message))
@@ -164,6 +178,8 @@ export function areaApply() {
 /* ---- Phiên bản ---- */
 /* lyDo: 'chot' | 'pdf' | 'excel'. Trùng nội dung bản cuối thì không lưu thêm. */
 export function bgChot(lyDo) {
+  if (lyDo === 'chot' && noEdit()) return null
+  if (lyDo !== 'chot' && !qsCan('export', 'edit')) return null   // chỉ có quyền Xuất: xuất được nhưng không ghi lịch sử phiên bản
   const m = freshModel()
   const c = m.ctx.cur; if (!c) return null
   const q = bgTong_(computeQuoteLocal(false, m.ctx).subtotal, m.ctx.bgCfg, c.vat, bgVatParts_(m.ctx))
@@ -181,6 +197,7 @@ export function bgChot(lyDo) {
 /* ---- In / PDF: cửa sổ riêng, CSS tài liệu đã đổi tên, ảnh URL tuyệt đối ---- */
 export function printDoc(pages, css) {
   const c = curNow(); if (!c) { toast('Chưa chọn dự án'); return }
+  if (noExport()) return
   if (!Array.isArray(pages)) {          // mỗi lần in nội dung mới = 1 phiên bản
     bgChot('pdf')
     const m = freshModel()
@@ -208,6 +225,7 @@ export function printDoc(pages, css) {
 /* ---- Xuất Excel (doExport 'xlsx'); 'pdf' = printDoc. Trả 'gia' khi người dùng muốn cập nhật giá trước. ---- */
 let dangXuat = false
 export async function doExport(fmt, lech) {
+  if (noExport()) return null
   const c0 = curNow(); if (!c0) { toast('Chưa chọn dự án'); return null }
   /* File xuất lấy giá ĐANG LƯU TRÊN DÒNG: danh mục đã đổi giá mà dòng chưa cập nhật thì hỏi trước */
   if (lech && lech.length) {

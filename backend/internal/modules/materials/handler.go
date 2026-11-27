@@ -29,72 +29,78 @@ import (
 // RegisterRPC: 20 hàm /api/:fn của module (REGISTRY, I:31-116). Hàm thuộc ACTOR_FNS (I:119-127) nhận actor;
 // deleteDbProduct, listDeleteRequests, resolveDeleteRequest thuộc ADMIN_FNS (I:130-135).
 // Tham số thiếu ở cuối = undefined (ArgU): setSpDuyet / setYeuThich coi thiếu và null là "bật".
+// Hàm ghi bọc accRPC (N21, access_gate.go), trừ setSpDuyet (duyệt sản phẩm M14.6, ngoài ma trận) và tải tệp lên.
 func (s *Service) RegisterRPC(reg *rpc.Registry) {
 	reg.Register("getProducts", rpc.Login, func(ctx context.Context, _ *actor.Actor, _ rpc.Args) (any, error) {
 		return s.GetProducts(ctx)
 	})
-	reg.Register("saveDbProduct", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("saveDbProduct", rpc.Login, s.accRPC("create", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.CreateProductGated(ctx, a, args.ArgU(0))
-	})
+	}))
 	reg.Register("uploadImage", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.UploadImage(ctx, args.ArgU(0), args.ArgU(1))
 	})
 	reg.Register("uploadFile", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.UploadFile(ctx, args.ArgU(0), args.ArgU(1))
 	})
-	reg.Register("deleteDbProduct", rpc.Admin, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("deleteDbProduct", rpc.Admin, s.accRPC("delete", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.DeleteDbProduct(ctx, a, args.ArgU(0))
-	})
+	}))
 	reg.Register("getDbProduct", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetDbProduct(ctx, args.ArgU(0))
 	})
-	reg.Register("updateDbProductTracked", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("updateDbProductTracked", rpc.Login, s.accRPC("edit", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.UpdateProductGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("setSpDuyet", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetSpDuyetGated(ctx, a, args.ArgU(0), args.ArgU(1))
 	})
-	reg.Register("setYeuThich", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("setYeuThich", rpc.Login, s.accRPC("edit", "QS", accQS, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetYeuThichGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("getCombo", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetCombo(ctx, args.ArgU(0))
 	})
-	reg.Register("setCombo", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("setCombo", rpc.Login, s.accRPC("edit", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetComboGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("getBienThe", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetBienThe(ctx, args.ArgU(0))
 	})
-	reg.Register("setBienThe", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("setBienThe", rpc.Login, s.accRPC("edit", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.SetBienTheGated(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("spMyPerms", rpc.Login, func(ctx context.Context, a *actor.Actor, _ rpc.Args) (any, error) {
 		return s.SpMyPerms(ctx, a)
 	})
 	reg.Register("getProductHistory", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetProductHistory(ctx, args.ArgU(0))
 	})
-	reg.Register("importParse", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("importParse", rpc.Login, s.accRPC("create", "QS > Nhập dữ liệu", accImport, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.ImportParse(ctx, args.ArgU(0), args.ArgU(1), args.ArgU(2))
-	})
-	reg.Register("importCommit", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("importCommit", rpc.Login, s.accRPC("create", "QS > Nhập dữ liệu", accImport, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.ImportGated(ctx, a, args.ArgU(0))
-	})
-	reg.Register("requestDeleteProducts", rpc.Login, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	}))
+	reg.Register("requestDeleteProducts", rpc.Login, s.accRPC("delete", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.RequestDeleteProducts(ctx, a, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("listDeleteRequests", rpc.Admin, func(ctx context.Context, a *actor.Actor, _ rpc.Args) (any, error) {
 		return s.ListDeleteRequests(ctx, a)
 	})
-	reg.Register("resolveDeleteRequest", rpc.Admin, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("resolveDeleteRequest", rpc.Admin, s.accRPC("delete", "QS > Danh sách sản phẩm", accProduct, func(ctx context.Context, a *actor.Actor, args rpc.Args) (any, error) {
 		return s.ResolveDeleteRequest(ctx, a, args.ArgU(0), args.ArgU(1), args.ArgU(2))
-	})
+	}))
 	// Route chỉ bản Go (roadmap M10.1): tạo bản sao riêng từ sản phẩm kho chung Dezon.
 	reg.RegisterGoRoute(rpc.GoRoute{
 		Name: "copySharedProduct", Method: "POST", Path: "/products/:key/private-copy", Perm: rpc.Login, Tag: "Sản phẩm",
 		Summary: "Tạo bản sao riêng (Chưa duyệt, không combo / biến thể) của sản phẩm kho chung Dezon cho công ty mình -> {ok, id, ma, ten}",
 		Fields:  []rpc.GoField{{Name: "key", In: "path", Type: "string", Required: true, Desc: "id dòng của sản phẩm trong kho chung Dezon"}},
+	})
+	// Route chỉ bản Go (roadmap M14.6): quyền duyệt sản phẩm theo phân cấp của tài khoản đang đăng nhập.
+	reg.RegisterGoRoute(rpc.GoRoute{
+		Name: "spApprovalRights", Method: "GET", Path: "/product-approval-rights", Perm: rpc.Login, Tag: "Sản phẩm",
+		Summary: "Quyền duyệt sản phẩm của tài khoản đang đăng nhập -> {duyet, giaoDuyet} (super luôn có; admin khi được super giao; nhân viên có sp_duyet thì duyệt được, không giao được)",
 	})
 }
 
@@ -109,7 +115,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.GetProducts(ctx(c))
 		response.Result(c, r, err)
 	})
-	p.POST("", login, func(c *gin.Context) {
+	p.POST("", login, s.accMW("create", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.CreateProductGated(ctx(c), actor.FromGin(c), middleware.Body(c))
 		response.Result(c, r, err)
 	})
@@ -117,11 +123,11 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.GetDbProduct(ctx(c), c.Param("key"))
 		response.Result(c, r, err)
 	})
-	p.PATCH("/:key", login, func(c *gin.Context) {
+	p.PATCH("/:key", login, s.accMW("edit", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.UpdateProductGated(ctx(c), actor.FromGin(c), c.Param("key"), middleware.Body(c))
 		response.Result(c, r, err)
 	})
-	p.DELETE("/:key", admin, func(c *gin.Context) {
+	p.DELETE("/:key", admin, s.accMW("delete", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.DeleteDbProduct(ctx(c), actor.FromGin(c), c.Param("key"))
 		response.Result(c, r, err)
 	})
@@ -129,7 +135,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.GetCombo(ctx(c), c.Param("key"))
 		response.Result(c, r, err)
 	})
-	p.PUT("/:key/combo", login, func(c *gin.Context) {
+	p.PUT("/:key/combo", login, s.accMW("edit", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.SetComboGated(ctx(c), actor.FromGin(c), c.Param("key"), bodyVal(c, "items"))
 		response.Result(c, r, err)
 	})
@@ -137,7 +143,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.GetBienThe(ctx(c), c.Param("key"))
 		response.Result(c, r, err)
 	})
-	p.PUT("/:key/variants", login, func(c *gin.Context) {
+	p.PUT("/:key/variants", login, s.accMW("edit", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.SetBienTheGated(ctx(c), actor.FromGin(c), c.Param("key"), bodyVal(c, "ids"))
 		response.Result(c, r, err)
 	})
@@ -146,7 +152,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		response.Result(c, r, err)
 	})
 	// route chỉ bản Go (M10.1), khai ở RegisterRPC
-	p.POST("/:key/private-copy", login, func(c *gin.Context) {
+	p.POST("/:key/private-copy", login, s.accMW("create", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.CopySharedProduct(ctx(c), actor.FromGin(c), c.Param("key"))
 		response.Result(c, r, err)
 	})
@@ -155,12 +161,17 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.SetSpDuyetGated(ctx(c), actor.FromGin(c), bodyVal(c, "keys"), bodyVal(c, "approve"))
 		response.Result(c, r, err)
 	})
-	v1.POST("/product-favorites", login, func(c *gin.Context) {
+	v1.POST("/product-favorites", login, s.accMW("edit", "QS", accQS), func(c *gin.Context) {
 		r, err := s.SetYeuThichGated(ctx(c), actor.FromGin(c), bodyVal(c, "keys"), bodyVal(c, "on"))
 		response.Result(c, r, err)
 	})
 	v1.GET("/product-permissions", login, func(c *gin.Context) {
 		r, err := s.SpMyPerms(ctx(c), actor.FromGin(c))
+		response.Result(c, r, err)
+	})
+	// route chỉ bản Go (M14.6), khai ở RegisterRPC
+	v1.GET("/product-approval-rights", login, func(c *gin.Context) {
+		r, err := s.SpApprovalRightsOut(ctx(c), actor.FromGin(c))
 		response.Result(c, r, err)
 	})
 	v1.POST("/uploads/images", login, func(c *gin.Context) {
@@ -171,17 +182,17 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.UploadFile(ctx(c), bodyVal(c, "base64"), bodyVal(c, "fileName"))
 		response.Result(c, r, err)
 	})
-	v1.POST("/product-imports/parse", login, func(c *gin.Context) {
+	v1.POST("/product-imports/parse", login, s.accMW("create", "QS > Nhập dữ liệu", accImport), func(c *gin.Context) {
 		r, err := s.ImportParse(ctx(c), bodyVal(c, "base64"), bodyVal(c, "ext"), bodyVal(c, "nganh"))
 		response.Result(c, r, err)
 	})
-	v1.POST("/product-imports/commit", login, func(c *gin.Context) {
+	v1.POST("/product-imports/commit", login, s.accMW("create", "QS > Nhập dữ liệu", accImport), func(c *gin.Context) {
 		r, err := s.ImportGated(ctx(c), actor.FromGin(c), bodyVal(c, "products"))
 		response.Result(c, r, err)
 	})
 
 	d := v1.Group("/product-delete-requests")
-	d.POST("", login, func(c *gin.Context) {
+	d.POST("", login, s.accMW("delete", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.RequestDeleteProducts(ctx(c), actor.FromGin(c), bodyVal(c, "items"), bodyVal(c, "lyDo"))
 		response.Result(c, r, err)
 	})
@@ -189,7 +200,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.ListDeleteRequests(ctx(c), actor.FromGin(c))
 		response.Result(c, r, err)
 	})
-	d.POST("/:id/resolve", admin, func(c *gin.Context) {
+	d.POST("/:id/resolve", admin, s.accMW("delete", "QS > Danh sách sản phẩm", accProduct), func(c *gin.Context) {
 		r, err := s.ResolveDeleteRequest(ctx(c), actor.FromGin(c), c.Param("id"), bodyVal(c, "approve"), bodyVal(c, "lyDo"))
 		response.Result(c, r, err)
 	})
@@ -197,7 +208,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 
 // RegisterRoot: route lẻ POST /export/san-pham (I:744-760) và POST /upload/file (I:763-778).
 func (s *Service) RegisterRoot(root *gin.RouterGroup) {
-	root.POST("/export/san-pham", s.exportSanPham)
+	root.POST("/export/san-pham", s.accMW("export", "QS", accQS), s.exportSanPham)
 	root.POST("/upload/file", s.uploadFileRoute)
 }
 

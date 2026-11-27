@@ -35,10 +35,12 @@ type Deps struct {
 	// DuyetDelay > 0 (chỉ bản Go): gom thao tác thêm / sửa SP của tài khoản không phải admin trong khoảng này rồi báo
 	// người duyệt 1 lần (notify_duyet.go). 0 = tắt (test golden không có thông báo này).
 	DuyetDelay time.Duration
+	Access     contracts.AccessChecker // phân quyền 3 cấp (N21, access_gate.go); nil = không kiểm (test golden đối chiếu Node)
 }
 
 // Service: nghiệp vụ danh mục sản phẩm.
 type Service struct {
+	access   contracts.AccessChecker // N21: cổng rpc / REST kiểm quyền (access_gate.go)
 	repo     Repository
 	cfg      *config.Config
 	aud      contracts.Auditor
@@ -75,7 +77,7 @@ func New(d Deps) *Service {
 	if repo == nil {
 		repo = NewRepository(d.DB)
 	}
-	return &Service{repo: repo, cfg: d.Cfg, aud: d.Auditor, users: d.Users, userFmt: d.UserFmt,
+	return &Service{access: d.Access, repo: repo, cfg: d.Cfg, aud: d.Auditor, users: d.Users, userFmt: d.UserFmt,
 		notifier: d.Notifier, admins: d.Admins, uploader: d.Uploader, db: d.DB,
 		cache: map[string][]any{}, cacheAt: map[string]float64{},
 		duyetDelay: d.DuyetDelay, duyetPend: map[string]*duyetBatch{}}

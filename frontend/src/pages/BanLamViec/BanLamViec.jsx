@@ -8,8 +8,10 @@ import AddTaskModal from './components/AddTaskModal'
 import DonTuModal from './components/DonTuModal'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import Icon from '../../components/ui/Icon'
+import { useAccess } from '../../services/accessService'
 
 export default function BanLamViec() {
+  const { can } = useAccess()
   const { theme, toggleTheme } = useTheme()
   const [tab, setTab] = useState('tongquan')
   const [tasks, setTasks] = useState(INITIAL_TASKS)
@@ -31,6 +33,7 @@ export default function BanLamViec() {
 
   /* ---------- Thao tác dữ liệu ---------- */
   function toggleTask(id) {
+    if (!can('banlamviec', 'main', 'edit')) return
     setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t))
   }
   function addTask(data) {
@@ -55,6 +58,11 @@ export default function BanLamViec() {
   const pendingRequests = requests.filter(r => requestStatus(r) === 'pending').length
 
   const panel = key => `blv-panel${tab === key ? ' active' : ''}`
+  // phân quyền 3 cấp (N21, module banlamviec, tab main)
+  const canCreate = can('banlamviec', 'main', 'create')
+  if (!can('banlamviec', 'main')) {
+    return <div className="blv-page"><div className="blv-body"><div className="blv-empty"><span>Tài khoản chưa được cấp quyền xem Bàn làm việc. Nhờ quản trị viên cấp quyền.</span></div></div></div>
+  }
 
   return (
     <div
@@ -110,13 +118,13 @@ export default function BanLamViec() {
         {/* Các tab luôn được mount (ẩn bằng class .active) để giữ vị trí cuộn */}
         <div className={panel('tongquan')}>
           <OverviewTab
-            tasks={tasks} onToggleTask={toggleTask} onAddTask={() => setTaskModalOpen(true)}
-            onRequestLeave={() => { setTab('dontu'); pickDonTuType('xinphep') }}
+            tasks={tasks} onToggleTask={toggleTask} onAddTask={canCreate ? () => setTaskModalOpen(true) : null}
+            onRequestLeave={canCreate ? () => { setTab('dontu'); pickDonTuType('xinphep') } : null}
             editing={editing} resetSignal={resetSignal}
           />
         </div>
         <div className={panel('dontu')}>
-          <DonTuTab requests={requests} onPickType={pickDonTuType} onCancelRequest={cancelRequest} openId={openRequestId} onOpen={setOpenRequestId} />
+          <DonTuTab requests={requests} onPickType={canCreate ? pickDonTuType : null} onCancelRequest={can('banlamviec', 'main', 'delete') ? cancelRequest : null} openId={openRequestId} onOpen={setOpenRequestId} />
         </div>
       </div>
 

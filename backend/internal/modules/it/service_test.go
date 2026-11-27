@@ -130,7 +130,7 @@ func (u *fakeUploader) Upload(ctx context.Context, buf []byte, path, contentType
 }
 
 func newSvc(f *fakeRepo, perms string) *Service {
-	s := New(Deps{Repo: f, Users: fakeUsers{perms, "An Nguyễn"}, UserFmt: fakeUsers{}})
+	s := New(Deps{Repo: f, Users: fakeUsers{perms, "An Nguyễn"}, UserFmt: fakeUsers{}, Access: legacyAccess{perms: perms}})
 	s.now = func() time.Time { return time.Date(2026, 10, 28, 20, 0, 0, 0, time.UTC) } // 29/10 giờ VN
 	return s
 }
@@ -175,6 +175,32 @@ func TestQuyenThanhVien(t *testing.T) {
 	ctx, a = ctxAs("u1", "super", nil)
 	if _, err := s.ListStaff(ctx, a); status(err) != 400 {
 		t.Errorf("super chưa xem như: %v, mong 400", err)
+	}
+}
+
+// Phân quyền 3 cấp (N21): dòng riêng chỉ cho xem yêu cầu -> thấy mọi yêu cầu nhưng không sửa, không vào thiết bị;
+// chưa nối Access -> chỉ thấy yêu cầu mình gửi.
+func TestQuyenITPhanQuyen(t *testing.T) {
+	f := newFake()
+	ctx, a := ctxAs("u1", "user", "ct-1")
+	if _, err := newSvc(f, "").CreateTicket(ctx, a, omap.Of("title", "Máy in kẹt giấy")); err != nil {
+		t.Fatal(err)
+	}
+	s := newSvc(f, "it")
+	s.access = legacyAccess{perms: "it", grant: omap.Of("it", omap.Of("main", []any{"view"}))}
+	r, err := s.ListTickets(ctx, a, false)
+	if err != nil || r.(*omap.Map).Val("canManage") != true {
+		t.Errorf("xem mọi yêu cầu: %v %v", r, err)
+	}
+	if _, err := s.UpdateTicket(ctx, a, 1, omap.Of("status", "dangxuly")); status(err) != 403 {
+		t.Errorf("sửa khi chỉ có quyền xem: %v, mong 403", err)
+	}
+	if _, err := s.ListAssets(ctx, a); status(err) != 403 {
+		t.Errorf("thiết bị ngoài dòng phân quyền: %v, mong 403", err)
+	}
+	s.access = nil
+	if r, err := s.ListTickets(ctx, a, false); err != nil || r.(*omap.Map).Val("canManage") != false {
+		t.Errorf("thiếu Access: %v %v", r, err)
 	}
 }
 
@@ -493,7 +519,7 @@ func TestCachLyCongTyIT_DB(t *testing.T) {
 	}
 	svcOf := func(ct any) (*Service, context.Context, *actor.Actor) {
 		ctx := tenant.With(bg, tenant.Ctx{Role: "admin", CongTyID: ct})
-		return New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}}), ctx, &actor.Actor{U: "zz", R: "admin", CT: ct}
+		return New(Deps{DB: db, Users: fakeUsers{}, UserFmt: fakeUsers{}, Access: legacyAccess{}}), ctx, &actor.Actor{U: "zz", R: "admin", CT: ct}
 	}
 	sa, ctxA, aA := svcOf(cts[0].Val("id"))
 	sb, ctxB, aB := svcOf(cts[1].Val("id"))

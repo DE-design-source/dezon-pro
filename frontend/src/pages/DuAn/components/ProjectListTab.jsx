@@ -91,7 +91,7 @@ export default function ProjectListTab({ onGoto }) {
             key={r.id}
             className="da-proj-grid da-proj-row"
             style={r.synced ? { borderTop: '1px solid var(--border)' } : (r.borderBottom ? { borderBottom: '1px solid var(--border)' } : undefined)}
-            onClick={() => { dv.select(r.id); onGoto(r.goto) }}
+            onClick={() => { dv.select(r.id); if (dv.can('create')) onGoto(r.goto) }}
           >
             <span className="da-proj-name" style={r.synced ? { display: 'flex', alignItems: 'center', gap: 7 } : undefined}>
               {r.name}

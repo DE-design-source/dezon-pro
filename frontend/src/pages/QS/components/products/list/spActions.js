@@ -4,13 +4,13 @@
    Sửa SP trong store: tạo object mới (bản gốc sửa tại chỗ S.products). Lỗi luôn báo bằng toast / hộp báo, không nuốt. */
 import * as api from '../../../api/qsApi'
 import { downloadPost } from '../../../api/files'
-import {
-  getState, setState, subscribe, addLine, updateLine, deleteLines, reloadProducts, refreshNotifCount, newTmpId,
-} from '../../../state/store'
+import { getState, setState, subscribe, reloadProducts, refreshNotifCount, newTmpId } from '../../../state/store'
+import { addLine, updateLine, deleteLines } from '../../../state/qsGuard'
 import { qsToast as toast, qsConfirm, qsAlert, qsAsk } from '../../common/dialogs'
 import { money } from '../../../lib/format.js'
 import { addProdSame_, addProdBuild_, addProdSl_, addProdFloor_, prodNode_ } from '../../../lib/calc.js'
 import { floorsList } from '../../../lib/sheetModel.js'
+import { spBocOk_, SP_CHUA_DUYET_BOC } from '../../../lib/catalogFilters.js'
 import { spKey_, spPatchLocal_, spNhomBienThe_, spValKey_, spEditRaw_ } from './spModel'
 import { LY_DO_MAX } from '../../admin/adminUtil'
 import { resetStats } from '../../project/projectStats'
@@ -178,6 +178,7 @@ export async function spExportXlsx(keys) {
 export function addProdObj(p, sl) {
   const st = S()
   if (!st.cur) { toast('Chưa chọn dự án — bấm Tạo dự án +'); return Promise.resolve(null) }
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return Promise.resolve(null) }   // M14.6: SP chưa duyệt không vào bóc tách
   sl = addProdSl_(sl)
   const fl = floorsList(st.cur, st.lines)
   const sf = st.selFloor
@@ -195,12 +196,15 @@ export function addProdObj(p, sl) {
 export function spAddManyToProject_(list) {
   const cur = S().cur
   if (!cur) { toast('Chưa chọn dự án'); return }
-  list.forEach(p => { addProdObj(p) })
-  toast(list.length > 1 ? ('Đã thêm ' + list.length + ' sản phẩm vào "' + cur.ten + '"')
-    : ('Đã thêm "' + (list[0].ten || '') + '" vào dự án'))
+  const ok = list.filter(spBocOk_), bo = list.length - ok.length   // SP chưa duyệt: bỏ qua, báo số đã bỏ
+  if (!ok.length) { toast(bo > 1 ? (bo + ' sản phẩm đã chọn đều chưa được duyệt — không đưa vào bóc tách được') : SP_CHUA_DUYET_BOC); return }
+  ok.forEach(p => { addProdObj(p) })
+  toast((ok.length > 1 ? ('Đã thêm ' + ok.length + ' sản phẩm vào "' + cur.ten + '"')
+    : ('Đã thêm "' + (ok[0].ten || '') + '" vào dự án')) + (bo ? (' · bỏ qua ' + bo + ' sản phẩm chưa duyệt') : ''))
 }
 export async function spAddToProject(p) {
   if (!S().cur) { toast('Chưa chọn dự án'); return }
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return }
   await addProdObj(p)
   resetStats([S().cur && S().cur.maDA])
 }
@@ -208,6 +212,7 @@ export async function spAddToProject(p) {
    Dự án đang mở: qua addProdObj (bảng cập nhật ngay). Dự án khác: đọc dòng của dự án đó, trùng SP cùng tầng / đề mục thì cộng
    số lượng, không thì thêm dòng mới ở "Chưa phân tầng" (giống addProdObj khi chưa chọn tầng). Trả {ok, fail}. */
 export async function spAddToProjects(p, maDAs, sl) {
+  if (!spBocOk_(p)) { toast(SP_CHUA_DUYET_BOC); return { ok: 0, fail: 1 } }
   sl = addProdSl_(sl)
   const st = S(), curMa = st.cur ? st.cur.maDA : ''
   let ok = 0
@@ -240,12 +245,15 @@ export async function spRemoveFromProject(l) {
 /* Thêm combo: SP chính + mọi SP đi kèm, số lượng × số bộ (pdAddCombo_ khi đang ở tab Danh sách SP) */
 export async function spAddCombo(chinh, list, bo) {
   if (!S().cur) { toast('Chưa chọn dự án'); return }
+  if (!spBocOk_(chinh)) { toast(SP_CHUA_DUYET_BOC); return }
+  const ok = (list || []).filter(spBocOk_), an = (list || []).length - ok.length   // SP đi kèm chưa duyệt: bỏ qua
   await addProdObj(chinh, bo)
-  for (let k = 0; k < list.length; k++) {
-    const x = list[k]
+  for (let k = 0; k < ok.length; k++) {
+    const x = ok[k]
     await addProdObj(x, (Number(x.comboSL) || 1) * bo)
   }
-  toast('Đã thêm ' + (bo > 1 ? (bo + ' bộ combo') : 'combo') + ': sản phẩm chính + ' + list.length + ' sản phẩm đi kèm')
+  toast('Đã thêm ' + (bo > 1 ? (bo + ' bộ combo') : 'combo') + ': sản phẩm chính + ' + ok.length + ' sản phẩm đi kèm'
+    + (an ? (' · bỏ qua ' + an + ' sản phẩm đi kèm chưa duyệt') : ''))
 }
 
 /* ---------- Sửa / xoá hàng loạt ---------- */
@@ -373,12 +381,16 @@ export async function spPrivateCopy(p) {
   } finally { delete pcBusy[key] }
 }
 
-/* Quyền sửa / duyệt (spLoadPerm_): lỗi -> coi như được cả hai, như bản gốc */
+/* Quyền sửa / duyệt (spLoadPerm_): {edit, duyet, duyetSp, giaoDuyet}.
+   edit / duyet = /product-permissions như bản gốc (lỗi -> coi như được; duyet giữ cho Phần thô / công tác).
+   duyetSp / giaoDuyet = quyền duyệt SẢN PHẨM theo phân cấp (M14.6, /product-approval-rights): lỗi -> KHÔNG được (fail closed). */
 export async function spLoadPerm_(signal) {
-  try { return (await api.spMyPerms(signal)) || { edit: true, duyet: true } } catch (e) {
-    if (e && e.name === 'QsAbortError') throw e
-    return { edit: true, duyet: true }
-  }
+  const abort = e => { if (e && e.name === 'QsAbortError') throw e }
+  const [pm, rt] = await Promise.all([
+    api.spMyPerms(signal).then(r => r || { edit: true, duyet: true }, e => { abort(e); return { edit: true, duyet: true } }),
+    api.getSpApprovalRights(signal).then(r => r || {}, e => { abort(e); return {} }),
+  ])
+  return { ...pm, duyetSp: rt.duyet === true, giaoDuyet: rt.giaoDuyet === true }
 }
 
 /* Combo của 1 SP (dùng chung cho dòng mở combo và modal chi tiết) */

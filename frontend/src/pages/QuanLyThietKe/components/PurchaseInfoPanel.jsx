@@ -10,7 +10,7 @@ import { PO_STAGES, STATUS_LABEL, avatarColor, initials, fmtFull, statusOf, fmtM
    Props: task, items (đơn mua hàng của công việc), open, projectName, meName, onClose(), onOpenBoard(), onUpdateItems(taskId, fn) */
 const assigneesOf = it => it.assignees || (it.owner ? [it.owner] : [])
 
-export default function PurchaseInfoPanel({ task, items, open, projectName, meName, onClose, onOpenBoard, onUpdateItems }) {
+export default function PurchaseInfoPanel({ task, items, open, projectName, meName, onClose, onOpenBoard, onUpdateItems, readOnly = false }) {
   // Đơn đang xem: 'auto' = mở thẳng phiếu chi tiết (đơn đầu tiên, chưa có đơn thì phiếu nháp), null = danh sách, còn lại = id đơn
   const [selId, setSelId] = useState('auto')
   const [draft, setDraft] = useState(null) // phiếu nháp khi công việc chưa có đơn: chỉ lưu khi sửa ô đầu tiên
@@ -34,7 +34,7 @@ export default function PurchaseInfoPanel({ task, items, open, projectName, meNa
   const st = task ? statusOf(task) : 'notstarted'
   const draftItem = task && (draft || newPoItem(list, stages, meName, task))
   const sel = !task || selId === null ? null
-    : selId === 'auto' ? (list[0] || draftItem)
+    : selId === 'auto' ? (list[0] || (readOnly ? null : draftItem))
       : list.find(it => it.id === selId) || (draftItem && draftItem.id === selId ? draftItem : null)
   const isDraft = !!sel && !list.some(it => it.id === sel.id)
   const wide = open && !!sel
@@ -107,7 +107,7 @@ export default function PurchaseInfoPanel({ task, items, open, projectName, meNa
               </span>
             </div>
             <button type="button" className="hb pri" onClick={onOpenBoard}>Mở bảng mua hàng</button>
-            {!isDraft && <button type="button" className="hb del ic" onClick={removeItem} title="Xoá đơn" aria-label="Xoá đơn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg></button>}
+            {!isDraft && !readOnly && <button type="button" className="hb del ic" onClick={removeItem} title="Xoá đơn" aria-label="Xoá đơn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg></button>}
           </div>
         )}
         {task && sel
@@ -149,8 +149,9 @@ export default function PurchaseInfoPanel({ task, items, open, projectName, meNa
           </section>
 
           <section className="tk-pi-sec">
-            <h4>Danh sách đơn <em>{list.length}</em><button type="button" className="tk-pi-add" onClick={addItem}>+ Thêm đơn mua hàng</button></h4>
-            {!list.length && <button type="button" className="tk-pi-empty" onClick={addItem}>Chưa có đơn mua hàng nào cho công việc này.<b>+ Thêm đơn mua hàng</b></button>}
+            <h4>Danh sách đơn <em>{list.length}</em>{!readOnly && <button type="button" className="tk-pi-add" onClick={addItem}>+ Thêm đơn mua hàng</button>}</h4>
+            {!list.length && readOnly && <div className="tk-pi-empty">Chưa có đơn mua hàng nào cho công việc này.</div>}
+            {!list.length && !readOnly && <button type="button" className="tk-pi-empty" onClick={addItem}>Chưa có đơn mua hàng nào cho công việc này.<b>+ Thêm đơn mua hàng</b></button>}
             <div className="tk-pi-list">
               {list.map(it => {
                 const s = stageOf(it.stage)

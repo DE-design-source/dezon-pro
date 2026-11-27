@@ -16,7 +16,7 @@ import { nodeName } from '../../lib/tree.js'
 import { coSpec_, nganhCuaSP_, dbLabelMaps_ } from '../../lib/productFields.js'
 import {
   filteredProducts, vsFilterModel_, vsFltOn_, vsFltNganh_, fltSecs_, activeFiltCount_, catActiveTags_, hmucOptions,
-  favCount_, catVarGroups_, spTenDay_, catVarLbl_, inProjKeys_,
+  favCount_, catVarGroups_, spTenDay_, catVarLbl_, inProjKeys_, spBocList_, spBocOk_,
 } from '../../lib/catalogFilters.js'
 import { catCbKey_, ccSpecTxt_, spSpecs_, spMauCss_, catVarMau_, ctSecsOfNode_, popMatch_ } from './catalog/catalogModel'
 import { useSpecs } from './catalog/useSpecs'
@@ -52,6 +52,7 @@ const LIMIT = 300      // bản gốc chỉ vẽ 300 thẻ đầu (app.js:1040),
 /* Cột trái tab Bóc tách: bộ lọc + danh mục sản phẩm THẬT (port PUB/app.js:463-1075, boc.js:1653-1726, phantho.js:574-610).
    Dữ liệu lấy từ useQs() (products, lines, projects, cur, node, congTac); trạng thái lọc ở catalog/filterStore (như S.f* của bản gốc).
    Props (giữ tương thích bản cũ):
+     noAdd                        true = ẩn nút + trên thẻ SP (không có quyền QS > Bóc tách > Thêm, N21)
      onAdd(product, opts?)        thêm 1 SP vào bảng (addProdObj). opts = {sl} khi thêm thành phần combo đúng số lượng đi kèm.
                                   Có thể trả Promise. Kéo thả: nơi thả (BreakdownTab) gọi onAdd(product, {tang, at, sl}).
      onOpen(product, opts?)       mở panel "Thông tin sản phẩm" cho SP này (showDetail luôn MỞ, không bật/tắt);
@@ -71,8 +72,10 @@ const LIMIT = 300      // bản gốc chỉ vẽ 300 thẻ đầu (app.js:1040),
 /* Bảng "Sản phẩm yêu thích" (nút ★ ở đầu cột): mọi SP yêu thích trong hạng mục đang chọn - bỏ các lọc khác */
 const FAV_SCOPE = { fWatt: {}, fKelvin: {}, fAngle: {}, fIP: {}, fCRI: {}, fVolt: {}, fBrand: '', fCombo: '', fVs: {}, min: '', max: '', q: '', fFav: true }
 
-export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, onDragProduct, onDragEnd, onOpenCt, activeCt, ptCount, ptFilters, ptLib, headTools = null }) {
-  const { products, lines, projects, cur, node, congTac, toast } = useQs()
+export default function CatalogPanel({ onAdd, noAdd = false, onOpen, activeId, width, dragId, onDragProduct, onDragEnd, onOpenCt, activeCt, ptCount, ptFilters, ptLib, headTools = null }) {
+  const { products: allProducts, lines, projects, cur, node, congTac, toast } = useQs()
+  /* Bóc tách chỉ thấy SP đã duyệt (M14.6): mọi bộ lọc / số đếm / danh sách tính trên danh mục đã gọt */
+  const products = useMemo(() => spBocList_(allProducts), [allProducts])
   const { specs, error: specErr } = useSpecs()
   const st = useFilters()
   const combos = useComboCache()
@@ -263,7 +266,7 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
         <div className="qs-bd-product-actions">
           <button className={`qs-bd-heart${p.yeuThich ? ' on' : ''}`} title={p.yeuThich ? 'Bỏ khỏi sản phẩm yêu thích' : 'Thêm vào sản phẩm yêu thích'}
             onClick={e => { e.stopPropagation(); catFav(p, !p.yeuThich) }}><Icon name="star" size={18} /></button>
-          <button className="qs-bd-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); onAdd(p) }}><Icon name="plus" size={16} stroke={2.8} /></button>
+          {!noAdd && <button className="qs-bd-add" title="Thêm vào bóc tách" onClick={e => { e.stopPropagation(); onAdd(p) }}><Icon name="plus" size={16} stroke={2.8} /></button>}
         </div>
         {(brand || p.comboN > 0 || kids.length > 0 || specsChips.length > 0) && (
           <div className="qs-bd-product-tags">
@@ -302,8 +305,10 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
       if (!c || c.loading) out.push(<div key={'c' + i} className="qs-bdc-ccnote">Đang tải sản phẩm đi kèm…</div>)
       else if (c.error) out.push(<div key={'c' + i} className="qs-bdc-ccnote err">Không tải được sản phẩm đi kèm: {c.error}</div>)
       else if (!c.list.length) out.push(<div key={'c' + i} className="qs-bdc-ccnote">Không có sản phẩm đi kèm.</div>)
+      else if (!c.list.some(spBocOk_)) out.push(<div key={'c' + i} className="qs-bdc-ccnote">Sản phẩm đi kèm chưa được duyệt — chưa đưa vào bóc tách được.</div>)
       else {
-        const ds = c.list
+        const ds = c.list.filter(spBocOk_)
+        const an = c.list.length - ds.length
         const tong = ds.reduce((a, x) => a + (Number(x.donGiaBan) || 0) * (Number(x.comboSL) || 1), 0)
         out.push(
           <ChildBox key={'c' + i} title="Sản phẩm đi kèm" n={ds.length}
@@ -312,7 +317,7 @@ export default function CatalogPanel({ onAdd, onOpen, activeId, width, dragId, o
               const phu = [x.thuongHieu, sl > 1 ? '×' + ptQty(sl) : '', ccSpecTxt_(x)].map(t => String(t || '').trim()).filter(Boolean).join(' · ')
               return { stt: (i + 1) + '.' + (j + 1), x, phu, gc: String(x.comboGhiChu || '').trim(), onOpen: () => open(x, { sl }), onAdd: () => addChild(x) }
             })}
-            foot={<div className="qs-bdc-ccfoot">Tổng combo · {ds.length} sản phẩm đi kèm <b>{money(tong)} đ</b></div>}
+            foot={<div className="qs-bdc-ccfoot">Tổng combo · {ds.length} sản phẩm đi kèm{an ? ' (ẩn ' + an + ' chưa duyệt)' : ''} <b>{money(tong)} đ</b></div>}
           />,
         )
       }

@@ -27,7 +27,7 @@ function StatusBadge({ className, style, children }) {
   )
 }
 
-export default function TaskDrawer({ task, open, comments, onClose, onAddComment, onConfirm }) {
+export default function TaskDrawer({ task, open, comments, onClose, onAddComment, onConfirm, canEdit = true, canComment = canEdit }) {
   const [input, setInput] = useState('')
   const [mention, setMention] = useState(null) // { items, active }
   const inputRef = useRef(null)
@@ -187,10 +187,10 @@ export default function TaskDrawer({ task, open, comments, onClose, onAddComment
               <div className="tk-drawer-note" style={{ marginBottom: 8 }}>
                 Đang chờ {task.assignee} (Kế toán) xác nhận ngày {task.finType === 'thu' ? 'thực thu' : 'thực chi'} thực tế.
               </div>
-              <button type="button" className="tk-comment-send-btn tk-confirm-btn" onClick={() => onConfirm(task)}>
+              {canEdit && <button type="button" className="tk-comment-send-btn tk-confirm-btn" onClick={() => onConfirm(task)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 Xác nhận đã thu/chi
-              </button>
+              </button>}
             </div>
           )}
           <div className="tk-d-field">
@@ -210,7 +210,7 @@ export default function TaskDrawer({ task, open, comments, onClose, onAddComment
             </div>
           </div>
         </div>
-        <div className="tk-comment-composer">
+        {canComment && <div className="tk-comment-composer">
           {mention && (
             <div className="tk-mention-menu" ref={menuRef}>
               {mention.items.map((m, i) => (
@@ -238,7 +238,7 @@ export default function TaskDrawer({ task, open, comments, onClose, onAddComment
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
           </div>
-        </div>
+        </div>}
       </div>
     </>
   )

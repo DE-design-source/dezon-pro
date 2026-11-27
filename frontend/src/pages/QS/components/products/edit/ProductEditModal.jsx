@@ -23,7 +23,7 @@ import './productEdit.css'
    mode: 'edit' (mặc định) = Cập nhật sản phẩm · 'variant' = Nhân bản thành biến thể cùng mã (spNhanBan_)
          'copy' = Sao chép thành sản phẩm mới (mã mới) · 'nbt' = chỉ mở "Tạo nhanh biến thể" (spNhieuBT_)
    Prop tuỳ chọn: product (object SP, nếu không thì tìm theo productKey trong danh mục),
-     canDuyet (bool; bỏ trống thì tự hỏi /product-permissions, lỗi thì coi như được duyệt, như sanpham.js:325-330). */
+     canDuyet (bool; bỏ trống thì tự hỏi /product-approval-rights (M14.6); đang tải / lỗi = KHÔNG được duyệt). */
 /* Lỗi trùng khoá của database (23505 - mã + biến thể đã có) -> câu dễ hiểu; lỗi khác giữ nguyên */
 function loiLuu_(e) {
   const m = String((e && e.message) || e)
@@ -135,12 +135,12 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
       api.getDbProduct(editKey, sig).catch(none), api.getProductHistory(p0.ma, sig).catch(none),
       api.getCombo(editKey, sig).catch(loi), api.getBienThe(editKey, sig).catch(loi),
       loadSpecs().catch(e => ({ __err: e })),
-      canDuyetProp === undefined ? api.spMyPerms(sig).catch(() => ({ edit: true, duyet: true })) : Promise.resolve(null),
+      canDuyetProp === undefined ? api.getSpApprovalRights(sig).catch(() => ({ duyet: false })) : Promise.resolve(null),
     ]).then(got => {
       if (!live) return
       const cOk = got[2] !== false, bOk = got[3] !== false
       if (!cOk || !bOk) qsToast('Không tải được ' + [cOk ? '' : 'sản phẩm đi kèm', bOk ? '' : 'nhóm biến thể'].filter(Boolean).join(' và ') + ' — phần này sẽ được GIỮ NGUYÊN khi lưu')
-      if (canDuyetProp === undefined) setPerm(got[5] ? !!got[5].duyet : true)
+      if (canDuyetProp === undefined) setPerm(!!(got[5] && got[5].duyet === true))
       const raw = got[0] && !got[0].__err ? got[0] : null
       if (!raw) {
         const m = got[0] && got[0].__err ? ' (' + got[0].__err.message + ')' : ''
@@ -475,7 +475,7 @@ function EditDialog({ p0, md, products, canDuyetProp, onClose, onSaved }) {
                 )}
                 <div className="qspe-actions">
                   <button type="button" className="qspe-btn ghost sm" onClick={() => close()}>Huỷ</button>
-                  {!moi && perm !== false && (
+                  {!moi && perm === true && (
                     <button type="button" className="qspe-btn ghost sm" disabled={!!saving} onClick={() => save(1)} title="Lưu thay đổi rồi đánh dấu Đã duyệt">
                       <QsIcon name="check" size={14} /> Lưu &amp; duyệt</button>
                   )}

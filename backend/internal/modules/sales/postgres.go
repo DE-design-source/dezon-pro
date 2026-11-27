@@ -13,7 +13,6 @@ import (
 // Repository: truy cập dữ liệu. kd_khach_hang / kd_cham_soc (+ 4 bảng con của 0053) nằm trong TenantTables nên mọi lệnh tự lọc theo công ty
 // (bảng con kd_cham_soc xét qua dòng cha).
 type Repository interface {
-	Company(ctx context.Context, id any) (*omap.Map, error)
 	ListLeads(ctx context.Context) ([]*omap.Map, error)
 	GetLead(ctx context.Context, id float64) (*omap.Map, error)
 	InsertLead(ctx context.Context, row *omap.Map) (*omap.Map, error)
@@ -77,11 +76,6 @@ func first(rows []*omap.Map, err error) (*omap.Map, error) {
 		return nil, err
 	}
 	return rows[0], nil
-}
-
-func (r *pgRepo) Company(ctx context.Context, id any) (*omap.Map, error) {
-	// NoScope: bảng companies không thuộc TenantTables; điều kiện id = công ty đang làm việc ghi ngay trong filter
-	return first(r.db.Select(ctx, "cong_ty", database.SelectOpt{Select: "tinh_nang", Filter: database.Eq("id", id), Limit: 1, NoScope: true}))
 }
 
 func (r *pgRepo) ListLeads(ctx context.Context) ([]*omap.Map, error) {

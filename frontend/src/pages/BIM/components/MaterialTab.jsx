@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { fmtNum } from '../../../data/bimData'
 import { Icon, SearchInput, StatusBadge, useFlash } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 export default function MaterialTab({ materials, onToggle, onAssign }) {
+  const { can } = useAccess()
   const [scanning, scan] = useFlash(800)
   const [syncing, sync] = useFlash(700)
   const [catalog, setCatalog] = useState('Sơn nội thất trắng mờ')
@@ -51,10 +53,12 @@ export default function MaterialTab({ materials, onToggle, onAssign }) {
           <input type="checkbox" className="bim-chk" checked={locked} onChange={e => setLocked(e.target.checked)} />
           Khóa liên kết thủ công
         </label>
-        <button className="bim-btn-dark" onClick={assign}>
-          <Icon name="link" stroke="#fff" />
-          <span>Gán cho {checkedCount} vật liệu</span>
-        </button>
+        {can('bim', 'main', 'edit') && (
+          <button className="bim-btn-dark" onClick={assign}>
+            <Icon name="link" stroke="#fff" />
+            <span>Gán cho {checkedCount} vật liệu</span>
+          </button>
+        )}
       </div>
     </>
   )

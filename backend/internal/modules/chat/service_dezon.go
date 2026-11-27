@@ -21,13 +21,13 @@ import (
 // CodeChatNoPerm: nhân viên chưa được quản trị viên cấp quyền "chat".
 const CodeChatNoPerm = "CHAT_NO_PERM"
 
-// PermChat: khoá quyền trong users.perms mở trang Chat cho nhân viên (admin / super luôn được).
+// PermChat: khoá module Chat trong phân quyền 3 cấp (= khoá cũ trong users.perms mở trang Chat cho nhân viên).
 const PermChat = "chat"
 
 var (
 	errChatNoPerm  = apperr.E(403, "Tài khoản chưa được cấp quyền Chat. Nhờ quản trị viên cấp quyền.", CodeChatNoPerm)
 	errDezonNoAuth = apperr.E(401, middleware.MsgNoAuth, middleware.CodeNoAuth)
-	errNoUsers     = errors.New("chat: chưa nối Deps.Users / Deps.UserFmt (internal/server/routes.go)")
+	errNoUsers     = errors.New("chat: chưa nối Deps.Users / Deps.Access (internal/server/routes.go)")
 )
 
 // DezonInput: thân POST /chat/auth/dezon (thiết bị như otp/verify).
@@ -58,17 +58,16 @@ func dezonName(fullName, username string) string {
 	return "Người dùng"
 }
 
-// dezonAllowed: admin / super luôn được; nhân viên cần quyền "chat" trong users.perms.
-func dezonAllowed(role string, perms []any) bool {
-	if role == "admin" || role == "super" {
-		return true
+// dezonAllowed: quyền xem module Chat theo phân quyền 3 cấp (N21, contracts.AccessChecker); super luôn được.
+// Chưa có dòng phân quyền = như cũ: admin luôn được, nhân viên cần quyền "chat" trong users.perms.
+func (s *Service) dezonAllowed(ctx context.Context, a *actor.Actor) (bool, error) {
+	if a.IsSuper() {
+		return true, nil
 	}
-	for _, p := range perms {
-		if p == PermChat {
-			return true
-		}
+	if s.access == nil {
+		return false, errNoUsers
 	}
-	return false
+	return s.access.Can(ctx, a, PermChat, "", "view")
 }
 
 // DezonLogin: người đã đăng nhập Dezon Pro (a) lấy phiên chat. Tìm tài khoản chat gắn với users.id, chưa có thì tạo (tên =
@@ -88,7 +87,7 @@ func (s *Service) DezonLogin(ctx context.Context, a *actor.Actor, in DezonInput)
 	}
 	devName := truncRunes(strings.ReplaceAll(strings.TrimSpace(in.Device.Name), "\x00", ""), 200)
 	ua, ip := devCleanUA(in.UserAgent, maxUserAgent), devCleanIP(in.ClientIP)
-	if s.users == nil || s.userFmt == nil {
+	if s.users == nil || s.access == nil {
 		return nil, errNoUsers
 	}
 	row, err := s.users.GetByID(ctx, a.UID)
@@ -102,7 +101,9 @@ func (s *Service) DezonLogin(ctx context.Context, a *actor.Actor, in DezonInput)
 	if qsID == "" {
 		return nil, errDezonNoAuth
 	}
-	if !dezonAllowed(jsval.AsString(row.Val("role")), s.userFmt.PermsArr(row.Val("perms"))) {
+	if ok, err := s.dezonAllowed(ctx, a); err != nil {
+		return nil, err
+	} else if !ok {
 		return nil, errChatNoPerm
 	}
 	if !s.dezonLimit.allow(dezonKey(qsID)) {
@@ -226,27 +227,61 @@ func dezonFriendMatesTx(ctx context.Context, tx pgx.Tx, uid int64, company strin
 	return err
 }
 
-// dezonRefreshOK: tài khoản chat uid còn được xoay refresh token? Tài khoản OTP / QR (qs_user_id null) luôn được; tài khoản
-// gắn Dezon Pro cần dòng users còn, đang hoạt động và dezonAllowed (như DezonLogin).
-func (s *Service) dezonRefreshOK(ctx context.Context, tx pgx.Tx, uid int64) (bool, error) {
-	var linked bool
-	var role, perms *string
+// dezonGrant: quyền Chat của tài khoản Dezon Pro gắn với 1 refresh token, kiểm NGOÀI transaction (dezonRefreshPre).
+// qsID / role = danh tính lúc kiểm ("" = token không gắn Dezon Pro, không thấy, hoặc tài khoản đã khoá / xoá).
+type dezonGrant struct {
+	qsID, role string
+	ok         bool
+}
+
+// dezonRefreshPre: đọc (không khoá) tài khoản Dezon Pro gắn với refresh token rồi hỏi AccessChecker - chạy TRƯỚC transaction
+// xoay token: AccessChecker đọc database bằng kết nối khác, gọi trong transaction thì giữ 2 kết nối cùng lúc (cạn pool khi
+// nhiều client làm mới cùng lúc).
+func (s *Service) dezonRefreshPre(ctx context.Context, tokenHash string) (dezonGrant, error) {
+	p, err := s.pool()
+	if err != nil {
+		return dezonGrant{}, err
+	}
+	var qsID, role *string
 	var active *bool
-	err := tx.QueryRow(ctx, `select c.qs_user_id is not null, u.role, coalesce(u.permissions, ''), u.is_active
-		from chat_users c left join users u on u.id = c.qs_user_id where c.id = $1`, uid).Scan(&linked, &role, &perms, &active)
+	err = p.QueryRow(ctx, `select u.id::text, u.role, u.is_active from chat_refresh_tokens t
+		join chat_devices d on d.id = t.device_id join chat_users c on c.id = d.user_id
+		left join users u on u.id = c.qs_user_id where t.token_hash = $1`, tokenHash).Scan(&qsID, &role, &active)
 	if noRows(err) {
-		return false, nil
+		return dezonGrant{}, nil
+	}
+	if err != nil {
+		return dezonGrant{}, err
+	}
+	if qsID == nil || role == nil || active == nil || !*active {
+		return dezonGrant{}, nil
+	}
+	ok, err := s.dezonAllowed(ctx, &actor.Actor{UID: *qsID, R: *role})
+	return dezonGrant{qsID: *qsID, role: *role, ok: ok}, err
+}
+
+// dezonRefreshOK: tài khoản chat uid còn được xoay refresh token? Tài khoản OTP / QR (qs_user_id null) luôn được; tài khoản
+// gắn Dezon Pro cần dòng users còn, đang hoạt động và dezonAllowed (như DezonLogin) - lấy từ pre (đã kiểm ngoài transaction).
+// stale = danh tính (tài khoản / vai trò) đổi giữa lúc kiểm và lúc khoá: không kết luận được, client thử lại.
+func (s *Service) dezonRefreshOK(ctx context.Context, tx pgx.Tx, uid int64, pre dezonGrant) (ok, stale bool, err error) {
+	var linked bool
+	var qsID, role *string
+	var active *bool
+	err = tx.QueryRow(ctx, `select c.qs_user_id is not null, u.id::text, u.role, u.is_active
+		from chat_users c left join users u on u.id = c.qs_user_id where c.id = $1`, uid).Scan(&linked, &qsID, &role, &active)
+	if noRows(err) {
+		return false, false, nil
 	}
 	if err != nil || !linked {
-		return err == nil, err
+		return err == nil, false, err
 	}
-	if role == nil || active == nil || !*active {
-		return false, nil
+	if qsID == nil || role == nil || active == nil || !*active {
+		return false, false, nil
 	}
-	if s.userFmt == nil {
-		return false, errNoUsers
+	if *qsID != pre.qsID || *role != pre.role {
+		return false, true, nil
 	}
-	return dezonAllowed(*role, s.userFmt.PermsArr(*perms)), nil
+	return pre.ok, false, nil
 }
 
 // dezonLimitPer: đổi phiên Dezon Pro lấy phiên chat - 30 lần / 10 phút / tài khoản Dezon Pro (mỗi lần tạo 1 thiết bị).

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './Dashboard.css'
 import { useTheme } from '../../hooks/useTheme'
 import { NF_TABS } from '../../data/dashboardData'
@@ -6,12 +6,20 @@ import NewsTab from './components/NewsTab'
 import RankTab from './components/RankTab'
 import Dezbot from './components/Dezbot'
 import NotificationBell from '../../components/layout/NotificationBell'
+import { useAccess } from '../../services/accessService'
 
 export default function Dashboard() {
   const { theme, toggleTheme } = useTheme()
   const [activeTab, setActiveTab] = useState('tintuc')
   const [filter, setFilter] = useState('all')
   const [rankPeriod, setRankPeriod] = useState('week')
+  // phân quyền 3 cấp (N21, module newsfeed): chỉ hiện tab được xem; tab đang mở bị ẩn -> sang tab được xem đầu tiên
+  const { can } = useAccess()
+  const tabs = NF_TABS.filter(t => can('newsfeed', t.key))
+  const tabKeys = tabs.map(t => t.key).join(',')
+  useEffect(() => {
+    if (tabs.length && !tabs.some(t => t.key === activeTab)) setActiveTab(tabs[0].key)
+  }, [tabKeys, activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="db-page">
@@ -19,7 +27,7 @@ export default function Dashboard() {
       <div className="db-topbar">
         {/* Hai tab chính nằm ngay trên thanh đầu trang (bên trái vốn để trống) để nội dung không bị đẩy xuống */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {NF_TABS.map(t => (
+          {tabs.map(t => (
             <button key={t.key} type="button" className={`db-newsfeed-tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>{t.label}</button>
           ))}
         </div>
@@ -41,8 +49,9 @@ export default function Dashboard() {
       <div className="db-content">
         <div className="db-feed-col">
           {/* Hai tab luôn được mount, ẩn/hiện bằng display như bản HTML */}
-          <NewsTab active={activeTab === 'tintuc'} filter={filter} onFilter={setFilter} />
-          <RankTab active={activeTab === 'nhiemvu'} period={rankPeriod} onPeriod={setRankPeriod} />
+          {!tabs.length && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Tài khoản chưa được cấp quyền xem Newsfeed. Nhờ quản trị viên cấp quyền.</div>}
+          <NewsTab active={activeTab === 'tintuc' && can('newsfeed', 'tintuc')} filter={filter} onFilter={setFilter} />
+          <RankTab active={activeTab === 'nhiemvu' && can('newsfeed', 'nhiemvu')} period={rankPeriod} onPeriod={setRankPeriod} />
         </div>
 
         <Dezbot />

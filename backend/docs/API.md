@@ -83,6 +83,8 @@ lỗi trả về giữ nguyên, nhưng phần đã ghi của thao tác được 
 - Chỉ admin (super cũng được): `adminListUsers`, `adminCreateUser`, `adminUpdateUser`, `adminSetPassword`, `adminSetActive`,
   `adminDeleteUser`, `getAuditLog`, `listDeleteRequests`, `resolveDeleteRequest`, `listPurchaseRequests`, `getPurchaseOrder`,
   `resolvePurchaseRequest`, `listDeXuat`, `getDeXuat`, `resolveDeXuat`, `deleteDbProduct`, `updateCongTy`.
+  Vai trò `subadmin` (nhãn "Admin", M14.7) KHÔNG qua nhóm này: `POST /api/admin*` vẫn trả 403 `Không có quyền (chỉ Admin)`;
+  subadmin quản lý tài khoản chỉ qua REST `/api/v1/users*` (mục 2.2).
 - Còn lại: chỉ cần đăng nhập.
 
 Danh sách hàm đang đăng ký trên server đang chạy: `Registry.Names()` (xem `internal/server/rpc`).
@@ -180,12 +182,12 @@ Quyền `admin` nghĩa là admin hoặc super. Test `TestRestRoutes` buộc bả
 | `POST` | `/reports/new-products` | `baoCaoNhapSP` | super |
 | `POST` | `/uploads/files-base64` | `uploadFile` | đăng nhập |
 | `POST` | `/uploads/images` | `uploadImage` | đăng nhập |
-| `GET` | `/users` | `adminListUsers` | admin |
-| `POST` | `/users` | `adminCreateUser` | admin |
-| `DELETE` | `/users/:id` | `adminDeleteUser` | admin |
-| `PATCH` | `/users/:id` | `adminUpdateUser` | admin |
-| `PUT` | `/users/:id/active` | `adminSetActive` | admin |
-| `PUT` | `/users/:id/password` | `adminSetPassword` | admin |
+| `GET` | `/users` | `adminListUsers` | admin; subadmin (chỉ REST, mục 2.2) |
+| `POST` | `/users` | `adminCreateUser` | admin; subadmin (chỉ REST, mục 2.2) |
+| `DELETE` | `/users/:id` | `adminDeleteUser` | admin; subadmin (chỉ REST, mục 2.2) |
+| `PATCH` | `/users/:id` | `adminUpdateUser` | admin; subadmin (chỉ REST, mục 2.2) |
+| `PUT` | `/users/:id/active` | `adminSetActive` | admin; subadmin (chỉ REST, mục 2.2) |
+| `PUT` | `/users/:id/password` | `adminSetPassword` | admin; subadmin (chỉ REST, mục 2.2) |
 | `GET` | `/work-items` | `ctList` | đăng nhập |
 | `POST` | `/work-items` | `ctSave` | đăng nhập |
 | `PATCH` | `/work-items/:id` | `ctUpdate` | đăng nhập |
@@ -263,8 +265,8 @@ Route chỉ bản Go hiện có (danh sách đầy đủ luôn ở `/api-docs.js
 | `GET` | `/my-proposals/:code` | `getMyDeXuat` | `rpc.Login` | purchasing | Chi tiết phiếu đề xuất của chính mình (M13.1) |
 | `POST` | `/work-items/import/parse` | `ctImportParse` | `rpc.Login` | estimates | Đọc file nhập công tác -> `{rows, loi}` (M5.1) |
 | `POST` | `/products/:key/private-copy` | `copySharedProduct` | `rpc.Login` | materials | Tạo bản sao riêng từ sản phẩm kho chung Dezon (M10.1) |
-| `POST` | `/projects/import-dezonvn` | `importDezonvn` | `rpc.Admin` | projects | Bắt đầu lượt nhập nền dự án từ website dezon.vn cho công ty đang làm việc, thân `{limit?: số (0 = tất cả), dryRun?: bool}` -> trạng thái lượt nhập; đang chạy -> 409; super chưa chọn công ty (`x-view-company`) -> 400. Xem mục "Nhập dự án từ dezon.vn" |
-| `GET` | `/projects/import-dezonvn` | `importDezonvnStatus` | `rpc.Admin` | projects | Trạng thái lượt nhập gần nhất của công ty (chưa chạy -> số 0, `running: false`) |
+| `POST` | `/projects/import-dezonvn` | `importDezonvn` | `rpc.Admin` | projects | Bắt đầu lượt nhập nền dự án từ website dezon.vn cho công ty đang làm việc, thân `{limit?: số (0 = tất cả), dryRun?: bool}` -> trạng thái lượt nhập; đang chạy -> 409; super chưa chọn công ty (`x-view-company`) -> 400. Phân quyền 3 cấp như tạo dự án: cần quyền Thêm ở QS > Dự án / Bóc tách / Danh sách dự án, thiếu -> 403. Xem mục "Nhập dự án từ dezon.vn" |
+| `GET` | `/projects/import-dezonvn` | `importDezonvnStatus` | `rpc.Admin` | projects | Trạng thái lượt nhập gần nhất của công ty (chưa chạy -> số 0, `running: false`); cần quyền Xem ở cùng các tab trên, thiếu -> 403 |
 | `POST` | `/companies/expiry-reminders` | `nhacGiaHan` | `rpc.Super` | companies | Nhắc gia hạn công ty trong ứng dụng: chạy thử / gửi tay (M17.3) |
 | `GET` | `/product-templates/dien-lanh` | `mauNhapDienLanh` | `rpc.Public` | categories | File mẫu nhập hàng loạt ngành Điện lạnh (`?hm=` hạng mục); bảng route gốc `/mau-nhap-*.xlsx` (`RootRoutes`) đóng băng nên ngành mới đi dưới `/api/v1` |
 | `GET` | `/system-defaults` | `getSystemDefaults` | `rpc.Login` | settings | Cài đặt mặc định toàn hệ thống `{appearance, general, display, updatedAt, updatedBy}` (mục chưa lưu = null; chưa migrate 0047 -> toàn null, ghi log) |
@@ -1197,6 +1199,47 @@ Tham số / kiểm tra mới trên route cũ (chi tiết ở `ARCHITECTURE.md` m
   (kể cả rỗng); `createProject` ghi khi khác rỗng.
 
 Tài liệu Swagger của 80 route cũ là dữ liệu đóng băng nên KHÔNG ghi các khoá mới này.
+
+### 2.2 Vai trò `subadmin` (nhãn giao diện "Admin", M14.7, migration 0057)
+
+`users.role` = `subadmin`: giữa nhân viên (`staff`) và quản trị công ty (`admin`). Quản lý tài khoản NHÂN VIÊN của công ty mình,
+chỉ trong phạm vi quyền thực của chính mình; quyền dữ liệu của chính nó tính như nhân viên (`access_grants` / `users.permissions`,
+giao với trần công ty). `actor.IsAdmin()` = false; `actor.CanManageStaff()` = admin hoặc subadmin (super cũng qua).
+
+- Middleware `middleware.RequireStaffManager()`: không token -> 401 `NOAUTH`; nhân viên -> 403 `{"error":"Không có quyền (chỉ Admin)"}`
+  (giống từng byte `RequireAdmin`); subadmin / admin / super qua. Route dùng nó vẫn khai `Perm: rpc.Admin`. Gắn ở nhóm `/users` và ở
+  `GET` / `PUT /users/:id/access`. Trong nhóm `/users`: `GET /users/product-approvers` gắn thêm `RequireAdmin()`,
+  `PUT /users/:id/product-approval` gắn `RequireAdmin()` + `RequireSuper()`; `GET /audit-log` giữ `RequireAdmin()` -> subadmin 403.
+- Cổng `/api/<fn>`: 80 hàm giữ nguyên quyền (`tests/fixtures/registry.json` đóng băng): subadmin gọi `adminListUsers`, `adminCreateUser`...
+  -> 403 `Không có quyền (chỉ Admin)`. `role` trong `/api-docs.json` (đóng băng) vẫn ghi `staff | admin | super`.
+- `GET /users`: subadmin chỉ thấy tài khoản `staff` của công ty mình + chính mình.
+- `POST /users`: subadmin chỉ tạo `staff` (gửi `role` khác `staff` -> 403 `Admin chỉ tạo / sửa được tài khoản nhân viên`); công ty
+  luôn là công ty của phiên, giới hạn số tài khoản theo gói vẫn áp. `perms` phải trong quyền của chính mình; thêm `da_duyet` khi chính
+  mình không có -> `Bạn chưa có quyền duyệt sửa thông tin dự án nên không cấp được quyền này cho nhân viên`; mức sản phẩm "sửa không
+  cần duyệt" (không `sp_edit`, không `sp_duyet`) khi chính mình chỉ có `sp_edit` -> `Bạn chỉ được sửa sản phẩm (chờ duyệt) nên không
+  cấp được quyền sửa sản phẩm không cần duyệt`; `sp_duyet` không cấp được (`duoc_duyet_sp` chỉ có hiệu lực với `role = admin`).
+  Tạo xong (và sau khi subadmin sửa `perms` của nhân viên) server ghi dòng `access_grants` với `granted_by` = subadmin nếu tài khoản
+  chưa có dòng, nên quyền của nhân viên luôn bị cắt theo quyền của subadmin.
+- `PATCH /users/:id`, `PUT /users/:id/password`, `PUT /users/:id/active`, `DELETE /users/:id`: chỉ tài khoản `staff` cùng công ty
+  (admin / subadmin khác -> `Admin chỉ tạo / sửa được tài khoản nhân viên`; super: không tìm thấy như trước). `role` chỉ giữ / đặt
+  `staff`. Nhân viên có quyền ma trận vượt quá subadmin -> 403 `Tài khoản này có quyền vượt quá quyền của bạn: <Module> > <Tab> > <Thao tác>`;
+  nhân viên có `sp_duyet` / `da_duyet` / mức sản phẩm mà subadmin không có -> 403
+  `Tài khoản này có quyền duyệt mà bạn không có nên bạn không quản lý được`.
+- Tự sửa chính mình: đổi `hoTen`, `email`, `phongBan` và đặt mật khẩu; khoá `perms` bị bỏ qua (không báo lỗi); `role` khác `subadmin`
+  -> `Không thể tự đổi vai trò của tài khoản đang đăng nhập`.
+- `GET /users/:id/access`: nhân viên cùng công ty hoặc chính mình. `PUT /users/:id/access`: chỉ nhân viên KHÁC cùng công ty
+  (chính mình / subadmin khác -> 403 `Admin chỉ phân quyền được cho tài khoản nhân viên khác trong công ty`; admin -> 403
+  `Chỉ quản trị hệ thống mới phân quyền được cho quản trị công ty` như trước); `grants: null` -> 403
+  `Admin phải chọn quyền cụ thể, không đặt được theo mặc định cũ`; quyền hiện có của người nhận vượt quá -> `Tài khoản này có quyền vượt
+  quá quyền của bạn: ...`; quyền muốn cấp vượt quá -> `Không cấp được quyền vượt quá quyền của bạn: ...` như admin.
+- `GET /access/me`: `grantable` của subadmin = quyền thực của chính nó (trần ma trận trong hộp tài khoản).
+- Dòng quyền do subadmin cấp (`granted_by` = subadmin) bị cắt theo quyền THỰC của subadmin (đệ quy lên admin; vòng lặp hoặc sâu
+  quá 3 cấp -> rỗng). Subadmin bị xoá / hạ vai trò / đổi vai trò -> các dòng nó đã cấp bị cắt theo quyền lúc đó (`FreezeGrantsBy`).
+- Subadmin KHÔNG: sửa thông tin công ty (`updateCongTy`) / trần quyền công ty (`/companies/:id/access` chỉ super), duyệt mua hàng,
+  đề xuất, yêu cầu xoá sản phẩm, `deleteDbProduct`, xem nhật ký; không tính là admin khi giữ admin cuối cùng của công ty; không nhận
+  thông báo / nhắc gia hạn dành cho admin.
+- Admin tạo / sửa / hạ subadmin được (`role: "subadmin"` ở `POST` / `PATCH /users`); chỉ super nâng lên `admin` như trước.
+- Database phải chạy 0053 TRƯỚC khi tạo subadmin, không thì lỗi ràng buộc `ck_users_role`.
 
 ## 3. Route khác
 

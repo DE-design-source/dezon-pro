@@ -45,6 +45,19 @@ func RequireLogin() gin.HandlerFunc { return require(false, false) }
 // RequireAdmin: admin hoặc super.
 func RequireAdmin() gin.HandlerFunc { return require(true, false) }
 
+// RequireStaffManager (M14.7): admin, super hoặc subadmin (route quản lý tài khoản nhân viên). Chặn giống hệt RequireAdmin:
+// chưa đăng nhập 401 NOAUTH, nhân viên 403 "Không có quyền (chỉ Admin)".
+func RequireStaffManager() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		a := actor.FromGin(c)
+		if a.CanManageStaff() {
+			return
+		}
+		st, msg, code := Deny(a, true, false)
+		response.Fail(c, st, msg, code)
+	}
+}
+
 // RequireSuper: chỉ quản trị hệ thống.
 func RequireSuper() gin.HandlerFunc { return require(false, true) }
 

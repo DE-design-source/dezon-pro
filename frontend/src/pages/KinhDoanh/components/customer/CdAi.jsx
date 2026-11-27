@@ -10,7 +10,8 @@ import { LiveCoachCards } from './CdLiveCoach'
 
 /* Khối AI của trang khách hàng (Customer Dashboard): 1 Timeline đề xuất · 2 Phân tích chiến lược · 3 Đề xuất hành động
    · Nguồn dữ liệu AI đã phân tích. Dữ liệu: customerApi getInsights / generateInsights (lưu database, máy chủ gọi Gemini
-   hoặc tự tính theo quy tắc). "Tạo task" -> addTask(source 'ai') rồi báo khối Danh sách Task tải lại. */
+   hoặc tự tính theo quy tắc). "Tạo task" -> addTask(source 'ai') rồi báo khối Danh sách Task tải lại.
+   readOnly (N21: không có quyền Sửa): chỉ xem bản phân tích, ẩn nút Phân tích / Sửa / Tạo task / Tải thêm dữ liệu nguồn. */
 
 const pad = n => String(n).padStart(2, '0')
 const isoOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
@@ -429,7 +430,7 @@ function ActionsForm({ act, ...p }) {
   )
 }
 
-export default function CdAi({ lead, interactions, live, onLive }) {
+export default function CdAi({ lead, interactions, live, onLive, readOnly }) {
   const id = lead && lead.id
   const timeline = useKdMap('timeline')[String(id)] || {}
   const start = /^\d{4}-\d{2}-\d{2}$/.test(String(timeline.start || '')) ? timeline.start : ''
@@ -493,7 +494,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
   }
 
   async function run(map) {
-    if (running || editing || id == null) return
+    if (readOnly || running || editing || id == null) return
     setRunning(true)
     try {
       const body = {}
@@ -512,7 +513,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
 
   async function onFiles(list) {
     const fs = Array.from(list || [])
-    if (!fs.length) return
+    if (readOnly || !fs.length) return
     setUploading(fs.length)
     const got = []; const bad = []
     for (const f of fs) {
@@ -532,7 +533,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
   }
 
   function startEdit(part) {
-    if (editing || running || uploading > 0 || !ins) return
+    if (readOnly || editing || running || uploading > 0 || !ins) return
     editBase.current = ins.generatedAt
     setEditing(part)
   }
@@ -555,7 +556,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
   }
   const reloadAfterConflict = () => { setEditing(null); load() }
   const formProps = part => ({ onSave: v => saveSection(part, v), onCancel: () => setEditing(null), onReload: reloadAfterConflict })
-  const editBtn = (part, label) => editing !== part && (
+  const editBtn = (part, label) => !readOnly && editing !== part && (
     <button type="button" className="cd-ai-btn sm cd-ai-editbtn" disabled={!!editing || running || uploading > 0}
       title={editing ? 'Đang sửa phần khác' : 'Sửa ' + label} aria-label={'Sửa ' + label} onClick={() => startEdit(part)}>
       <IcPen />Sửa
@@ -563,7 +564,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
   )
 
   async function makeTask(key, { title, when, note }) {
-    if (!title || made[key]) return
+    if (readOnly || !title || made[key]) return
     setMade(m => ({ ...m, [key]: 'busy' }))
     try {
       await addTask(id, { title, dueDate: parseDue(...when), note: note || '', source: 'ai' })
@@ -575,7 +576,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
       say('Không tạo được task: ' + ((e && e.message) || e), true)
     }
   }
-  const taskBtn = (k, task, small, icon) => (
+  const taskBtn = (k, task, small, icon) => !readOnly && (
     <button type="button" className={'cd-ai-btn' + (small ? ' sm' : '') + (made[k] === true ? ' done' : '')} disabled={!!made[k]}
       title={made[k] === true ? 'Đã tạo task' : 'Tạo task'} onClick={() => makeTask(k, task)}>
       {icon && <IcTask />}{made[k] === true ? 'Đã tạo task' : made[k] === 'busy' ? 'Đang tạo...' : 'Tạo task'}
@@ -603,7 +604,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
           Đã chỉnh tay{ins.editedBy ? ' bởi ' + ins.editedBy : ''}{atLabel(ins.editedAt) ? ' · ' + atLabel(ins.editedAt) : ''}
         </span>
       )}
-      {ins && !editing && (
+      {ins && !editing && !readOnly && (
         <button type="button" className="cd-ai-btn sm" disabled={busy} onClick={() => run()}>
           <IcRefresh spin={running} />{running ? 'Đang phân tích...' : 'Phân tích lại'}
         </button>
@@ -621,7 +622,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
     return (
       <div className={'cd-card cd-ai is-empty'}>
         <div className="cd-ai-top">{badge}{meta}
-          {!loading && !loadErr && !ins && (
+          {!loading && !loadErr && !ins && !readOnly && (
             <button type="button" className="cd-ai-btn primary cd-ai-now" disabled={running} onClick={() => run()}>
               <IcRefresh spin={running} />{running ? 'Đang phân tích...' : 'Phân tích ngay'}
             </button>
@@ -664,7 +665,7 @@ export default function CdAi({ lead, interactions, live, onLive }) {
 
   return (
     <div className="cd-card cd-ai">
-      {stale && (
+      {stale && !readOnly && (
         <div className="cd-ai-stale">
           <span>Dữ liệu đã đổi - Phân tích lại?</span>
           <button type="button" className="cd-ai-link" disabled={busy || !!editing} title={editing ? 'Lưu hoặc huỷ phần đang sửa trước' : ''} onClick={() => run()}>Phân tích lại</button>
@@ -777,9 +778,11 @@ export default function CdAi({ lead, interactions, live, onLive }) {
                   <span className="cd-ai-zalo-t">{main.zalo}</span>
                 </div>
               )}
-              <div className="cd-ai-row">
-                {taskBtn('main', { title: main.title, when: [main.priority], note: main.why })}
-              </div>
+              {!readOnly && (
+                <div className="cd-ai-row">
+                  {taskBtn('main', { title: main.title, when: [main.priority], note: main.why })}
+                </div>
+              )}
             </div>
           )}
           {side.length > 0 && (
@@ -805,11 +808,13 @@ export default function CdAi({ lead, interactions, live, onLive }) {
       <section className="cd-ai-src">
         <div className="cd-ai-src-h">
           <span className="cd-ai-cap">Nguồn dữ liệu AI đã phân tích ({sources.length})</span>
-          <button type="button" className="cd-ai-up" disabled={busy || !!editing} onClick={() => fileRef.current && fileRef.current.click()}
-            title="Tải tệp (báo giá, bản vẽ, ghi chú...) lên kho tệp, lưu vào Tệp đính kèm của khách rồi phân tích lại">
-            {uploading > 0 ? <IcRefresh spin /> : <IcUp />}{uploading > 0 ? 'Đang tải lên ' + uploading + ' tệp...' : 'Tải thêm dữ liệu nguồn'}
-          </button>
-          <input ref={fileRef} type="file" multiple accept={UP_ACCEPT} hidden onChange={e => onFiles(e.target.files)} />
+          {!readOnly && (<>
+            <button type="button" className="cd-ai-up" disabled={busy || !!editing} onClick={() => fileRef.current && fileRef.current.click()}
+              title="Tải tệp (báo giá, bản vẽ, ghi chú...) lên kho tệp, lưu vào Tệp đính kèm của khách rồi phân tích lại">
+              {uploading > 0 ? <IcRefresh spin /> : <IcUp />}{uploading > 0 ? 'Đang tải lên ' + uploading + ' tệp...' : 'Tải thêm dữ liệu nguồn'}
+            </button>
+            <input ref={fileRef} type="file" multiple accept={UP_ACCEPT} hidden onChange={e => onFiles(e.target.files)} />
+          </>)}
         </div>
         <span className="cd-ai-src-note">AI chỉ đọc tên và đường dẫn tệp</span>
         {sources.length ? (

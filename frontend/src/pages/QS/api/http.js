@@ -40,12 +40,12 @@ export function readViewAs() { try { return localStorage.getItem('qs_viewAs') ||
 export function writeViewAs(id) { try { if (id) localStorage.setItem('qs_viewAs', id); else localStorage.removeItem('qs_viewAs') } catch (e) { /* bỏ qua */ } }
 
 /* Header chung (apiHeaders_): Content-Type chỉ khi có thân, không thêm header nào khác (CORS chỉ cho 3 header) */
-export function authHeaders(hasBody) {
+export function authHeaders(hasBody, viewAs) {
   const h = {}
   if (hasBody) h['Content-Type'] = 'application/json'
   const t = readToken()
   if (t) h.Authorization = 'Bearer ' + t
-  const v = readViewAs()
+  const v = viewAs || readViewAs()   // viewAs: công ty riêng cho 1 request (opts.viewAs của request), chỉ super dùng được
   if (v) h['x-view-company'] = v
   return h
 }
@@ -113,7 +113,7 @@ const LOCK_FREE = /^\/(auth|chat|notifications)(\/|$)/
 
 /* request(method, path, {body, query, signal}) -> result (đã bóc {ok,result}) */
 export async function request(method, path, opts = {}) {
-  const { body, query, signal, noLog } = opts
+  const { body, query, signal, noLog, viewAs } = opts
   if (!API_BASE) throw new QsNotConfiguredError()
   if (writeLock && method !== 'GET' && method !== 'HEAD' && !LOCK_FREE.test(path)) {
     const e = new QsApiError(writeLock, 423)
@@ -126,7 +126,7 @@ export async function request(method, path, opts = {}) {
   try {
     res = await fetch(buildUrl(path, query), {
       method,
-      headers: authHeaders(hasBody),
+      headers: authHeaders(hasBody, viewAs),
       body: hasBody ? JSON.stringify(body) : undefined,
       signal,
     })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './BIM.css'
 import { useTheme } from '../../hooks/useTheme'
 import { BIM_STORAGE, INITIAL_PROJECTS, INITIAL_LEVELS, INITIAL_MATERIALS, answerTopic } from '../../data/bimData'
@@ -10,6 +10,7 @@ import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
 import { BIM_TABS } from '../../data/pageTabs'
 import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { useAccess } from '../../services/accessService'
 
 const DEFAULT_SUBTITLE = 'Không gian dữ liệu BIM liên kết SketchUp'
 
@@ -41,8 +42,13 @@ export default function BIM() {
   const [aiResizing, setAiResizing] = useState(false)
   const [pageTab, setPageTab] = useState('main') // main | nhansu
   // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
-  const tabHidden = usePageTabsHidden('/bim')
+  // + tab không được xem theo phân quyền 3 cấp (N21, module bim)
+  const { can } = useAccess()
+  const hiddenPref = usePageTabsHidden('/bim')
+  const noViewKey = BIM_TABS.filter(t => !can('bim', t.key)).map(t => t.key).join(',')
+  const tabHidden = useMemo(() => (noViewKey ? hiddenPref.concat(noViewKey.split(',')) : hiddenPref), [hiddenPref, noViewKey])
   useTabFallback(tabHidden, pageTab, BIM_TABS.map(t => t.key), setPageTab)
+  const noTab = BIM_TABS.every(t => !can('bim', t.key))
 
   const project = projects.find(p => p.code === projectCode) || null
   const subtitle = view === 'linked' && project ? `${project.name} · ${DEFAULT_SUBTITLE}` : DEFAULT_SUBTITLE
@@ -119,7 +125,8 @@ export default function BIM() {
       </div>
 
       {/* Cả 3 màn hình luôn được mount (ẩn bằng display) để giữ dữ liệu đã thao tác, giống bản HTML */}
-      <div className="bim-scroll" style={pageTab === 'nhansu' ? { display: 'none' } : undefined}>
+      {noTab && <div className="bim-scroll"><p className="bim-desc">Tài khoản chưa được cấp quyền xem trang BIM. Nhờ quản trị viên cấp quyền.</p></div>}
+      <div className="bim-scroll" style={pageTab === 'nhansu' || !can('bim', 'main') ? { display: 'none' } : undefined}>
         <UnlinkedView visible={view === 'unlinked'} onLinked={showList} />
         <ProjectListView visible={view === 'list'} projects={projects} onOpen={openProject} onUnlink={unlink} onAddFileLink={addFileLink} />
         <LinkedView
@@ -135,7 +142,7 @@ export default function BIM() {
         />
       </div>
 
-      {pageTab === 'nhansu' && (
+      {pageTab === 'nhansu' && can('bim', 'nhansu') && (
         <div className="bim-scroll">
           <DeptStaff units={['thietke']} note="Mô hình BIM do phòng Thiết kế thực hiện — nhân sự lấy theo phòng Thiết kế trong HR" />
         </div>

@@ -164,7 +164,7 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
           <button type="button" onClick={onResetStyle} style={{ width: '100%', border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', fontSize: 11.5, fontWeight: 600, padding: 7, borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }}>Khôi phục màu, font &amp; cỡ chữ mặc định</button>
         </Step>
 
-        <Step num="5" title="Xuất báo giá" desc="Mở hộp thoại in của trình duyệt — chọn “Lưu dưới dạng PDF” để lấy file.">
+        {onExport && <Step num="5" title="Xuất báo giá" desc="Mở hộp thoại in của trình duyệt — chọn “Lưu dưới dạng PDF” để lấy file.">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <div style={{ ...fieldLabel, marginBottom: 6 }}>Khổ giấy</div>
@@ -186,7 +186,7 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
             Xuất báo giá ({paperSize} · {orientLabel})
           </button>
-        </Step>
+        </Step>}
       </div>
 
       {/* vùng xem trước = 1 module (kiểu QS): thanh tiêu đề tóm tắt lựa chọn + thu phóng, thân là tờ báo giá */}
@@ -218,7 +218,8 @@ function QuoteBody({ catalog, camp, template, setTemplate, accent, setAccent, te
 }
 
 /* Tab "Báo giá" (renderQuoteTab của bản HTML) */
-export default function QuoteTab({ visible, catalog, campaigns, quoteCampaignId, renderKey, onSelectCampaign }) {
+/* N21: canExport = quyền Xuất ở Marketing > Báo giá; không có thì ẩn bước "Xuất báo giá" */
+export default function QuoteTab({ visible, catalog, campaigns, quoteCampaignId, renderKey, onSelectCampaign, canExport }) {
   /* Mẫu + tuỳ chỉnh giao diện giữ nguyên qua các lần dựng lại (biến toàn cục ở bản HTML) */
   const [template, setTemplate] = useState('modern')
   const [accent, setAccentState] = useState(() => loadStyle(ACCENT_KEY))
@@ -275,7 +276,7 @@ export default function QuoteTab({ visible, catalog, campaigns, quoteCampaignId,
             textColor={textColor} setTextColor={setTextColor}
             font={font} setFont={setFont}
             fontScale={fontScale} setFontScale={setFontScale}
-            onResetStyle={resetStyle} onExport={exportQuote}
+            onResetStyle={resetStyle} onExport={canExport ? exportQuote : undefined}
           />
         : <div style={{ display: 'flex', gap: 16, minHeight: 0 }} />}
 

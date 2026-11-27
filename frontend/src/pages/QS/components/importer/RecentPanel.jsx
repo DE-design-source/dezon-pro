@@ -7,6 +7,7 @@ import ProductEditModal from '../products/edit/ProductEditModal'
 import ImportStatsModal from './ImportStatsModal'
 import { useImp } from './importStore'
 import { useQsStore } from '../../state/store'
+import { useQsCan } from '../../state/qsAccess'
 import { pendingDel_, pendingEdit_, pendingCommit_, impFindSessionProduct_, impSyncSession_ } from './importLogic'
 
 /* Panel phải "Sản phẩm vừa nhập (phiên này)" (port impRecentList / impDateTime_ / impEditSession_, PUB/nhap.js:471-522, 664-692):
@@ -76,6 +77,7 @@ function HistoryList({ products, me, onEdit }) {
 export default function RecentPanel({ specs, onEditOpen, open, onOpen }) {
   const { navigate, products } = useQs()
   const me = useQsStore(s => s.me)
+  const canAdd = useQsCan()('import', 'create')   // N21: QS > Nhập dữ liệu > Thêm
   const [tab, setTab] = useState('phien')
   const pd = useImp(s => s.pending)
   const ps = useImp(s => s.sessionAdded)
@@ -162,7 +164,7 @@ export default function RecentPanel({ specs, onEditOpen, open, onOpen }) {
       )}
       <div className="qsi-rfoot">
         {pd.length ? <div className="qsi-rfoot-note"><b>{pd.length}</b> sản phẩm đang chờ — <b>chưa</b> lưu vào Database</div> : null}
-        <button className="qsi-btn qsi-blue qsi-block" disabled={!pd.length || committing} onClick={() => pendingCommit_()}>
+        <button className="qsi-btn qsi-blue qsi-block" disabled={!pd.length || committing || !canAdd} title={canAdd ? undefined : 'Chưa được cấp quyền Thêm ở QS > Nhập dữ liệu'} onClick={() => pendingCommit_()}>
           {committing ? (commitText || '⏳ Đang lưu vào Database…') : <><QsIcon name="plus" size={15} /> Thêm sản phẩm{pd.length ? ' (' + pd.length + ')' : ''}</>}</button>
       </div>
       {editP && (

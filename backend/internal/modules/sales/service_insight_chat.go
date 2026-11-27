@@ -186,7 +186,7 @@ func chatReply(text string) (string, *omap.Map) {
 // ChatInsight: body {messages: [{role: user|ai, text}], generatedAt?} -> {reply, proposal, engine, model}.
 // Đề xuất (proposal) luôn dựa trên bản phân tích mới nhất (generatedAt của proposal); không lưu gì.
 func (s *Service) ChatInsight(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	msgs, err := chatMessages(body)

@@ -10,9 +10,11 @@ import MaterialTab from './MaterialTab'
 import FilterTab from './FilterTab'
 import BoqTab from './BoqTab'
 import { ProductsTab, MaterialsCatalogTab } from './CatalogTabs'
+import { useAccess } from '../../../services/accessService'
 
 /* Bảng điều khiển của một dự án đã liên kết */
 export default function LinkedView({ visible, project, onBack, onUnlink, levels, onCreateLevel, materials, onToggleMaterial, onAssignMaterials }) {
+  const { can } = useAccess()
   const [tab, setTab] = useState('overview')
   const panel = key => `bim-panel${tab === key ? ' active' : ''}`
   const guid = project ? project.guid : '1c53e9d0-4a2f-4e91-8b3a-6f1d2c9bce92'
@@ -43,7 +45,7 @@ export default function LinkedView({ visible, project, onBack, onUnlink, levels,
             <Icon name="check" size={12} sw={3} />
             Đã liên kết
           </span>
-          <button className="bim-btn-ghost" style={{ padding: '8px 12px', fontSize: 12 }} title="Ngắt liên kết với file này" onClick={onUnlink}>Ngắt liên kết</button>
+          {can('bim', 'main', 'delete') && <button className="bim-btn-ghost" style={{ padding: '8px 12px', fontSize: 12 }} title="Ngắt liên kết với file này" onClick={onUnlink}>Ngắt liên kết</button>}
         </div>
       </div>
 

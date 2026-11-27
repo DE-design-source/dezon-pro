@@ -1101,7 +1101,7 @@ func insightOut(r *omap.Map) *omap.Map {
 
 // GetInsights: bản phân tích mới nhất -> {insight: ...|null}.
 func (s *Service) GetInsights(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -1126,7 +1126,7 @@ const stepHold = "\x00kd-step-hold"
 // nội dung hiện tại), ghi đè đúng dòng đó kèm editedBy / editedAt. body: {content: {actions, strategy, ideas, roadmap}, generatedAt?}.
 // Mảng risks / ideas / roadmap.steps gửi lên rỗng -> lưu rỗng.
 func (s *Service) UpdateInsight(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -1277,7 +1277,7 @@ func (s *Service) gather(ctx context.Context, a *actor.Actor, id float64, body *
 // GenerateInsights: lập phân tích mới (Gemini, lỗi / không có khoá -> quy tắc), lưu lại và trả {insight}.
 // body: {start?: yyyy-mm-dd khởi công dự kiến, extra?: [{name, url}] tài liệu bổ sung}.
 func (s *Service) GenerateInsights(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	in, err := s.gather(ctx, a, id, body)

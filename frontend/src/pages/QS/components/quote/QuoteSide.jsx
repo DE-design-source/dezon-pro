@@ -12,6 +12,7 @@ import { ttBan_ } from '../../lib/calc.js'
 import { setVatHm } from '../breakdown/sheet/bocActions'
 import { projDataSet_ } from '../../state/projData'
 import { getState } from '../../state/store'
+import { denyQs } from '../../state/qsAccess'
 import { COLS, COLSET, csQuickLabel_ } from '../../lib/columns.js'
 import { money, tkNum_ } from '../../lib/format.js'
 import { currentGroup, draftName_ } from '../../lib/dashModel.js'
@@ -955,6 +956,7 @@ function TkPanel({ ctx }) {
     if (!isFinite(n) || n < 0 || n > 100 || n === x.vp) return false
     if (!x.code) { toast('Dòng chưa có hạng mục - không đặt VAT riêng được'); return false }
     if (!await qsConfirm({ title: 'Cập nhật VAT ' + n + '% vào hạng mục "' + x.ten + '" trong bảng Bóc tách?', ok: 'Cập nhật' })) return false
+    if (denyQs('export', 'edit')) return false   // N21
     if (x.code === '3.1') projDataSet_('ptVat', n); else setVatHm(x.code, n)
     toast('Đã cập nhật VAT ' + n + '% cho ' + x.ten + ' (Bóc tách)')
   }
@@ -1072,8 +1074,8 @@ function TkPanel({ ctx }) {
 
 /* Cột trái của "Xem trước & Xuất" (bgSideHTML_ PUB/baogia.js:539-580): cảnh báo tờ bìa + 5 thẻ + 2 nút xuất cố định.
    m = quoteModel(...) của trạng thái hiện tại · pages = số trang · tk = cột Bóc tách {cols, order} · projects = danh sách dự án
-   onExport(fmt) · onHist() mở Lịch sử */
-export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) {
+   onExport(fmt) (null = không có quyền Xuất, ẩn nút) · onHist() mở Lịch sử · canEdit (false = ẩn nút Chốt, N21) */
+export default function QuoteSide({ m, pages, tk, projects, onExport, onHist, canEdit = true }) {
   const q = useQuoteUi()
   const ctx = m.ctx
   const vi = m.ver
@@ -1152,9 +1154,9 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
       <The id="ver" ten="Phiên bản báo giá" phu={(nhap || 'Bản nháp') + ' · ' + soDong + ' dòng đã bóc'}>
         <div className="qsq-ma" title="Mã báo giá · phiên bản. Sửa mã ở chế độ Chỉnh sửa (ô Mã báo giá số)"><span>Mã</span><b>{vi.ma}</b><em>v{vi.ver}</em></div>
         <div className="qsq-row2">
-          <button type="button" className="qs-qt-btn" disabled={vi.trung}
+          {canEdit && <button type="button" className="qs-qt-btn" disabled={vi.trung}
             title={vi.trung ? 'Nội dung chưa đổi so với bản đã chốt' : 'Lưu nội dung báo giá hiện tại thành 1 phiên bản'}
-            onClick={() => bgChot('chot')}><Icon name="check" size={14} />{vi.trung ? 'Đã chốt v' + vi.ver : 'Chốt v' + vi.ver}</button>
+            onClick={() => bgChot('chot')}><Icon name="check" size={14} />{vi.trung ? 'Đã chốt v' + vi.ver : 'Chốt v' + vi.ver}</button>}
           <button type="button" className="qs-qt-btn" title="Xem lại / so sánh các phiên bản đã chốt hoặc đã xuất" onClick={onHist}>
             <Icon name="layers" size={14} />Lịch sử{nHist ? ' (' + nHist + ')' : ''}</button>
         </div>
@@ -1370,11 +1372,11 @@ export default function QuoteSide({ m, pages, tk, projects, onExport, onHist }) 
           ))}
         </div>
       </div>
-      <div className="qsq-xuat">
+      {onExport && <div className="qsq-xuat">
         <button type="button" className="qs-qt-btn green" disabled={q.exporting} onClick={() => onExport('xlsx')}>
           <Icon name="download" size={15} />{q.exporting ? 'Đang xuất…' : 'Xuất Excel'}</button>
         <button type="button" className="qs-qt-btn red" onClick={() => onExport('pdf')}><Icon name="download" size={15} />Xuất PDF / In</button>
-      </div>
+      </div>}
     </aside>
     {dockOn && (
       <section className="qsq-card qsq-dock" aria-label={dockOn.ten}>

@@ -47,7 +47,7 @@ let S = {
   key: '',
   auth: 'init',          // init | unconfigured | checking | login | unreachable | ready
   loginMsg: '',
-  me: null, congTy: null, viewAs: readViewAs(),
+  me: null, congTy: null, viewAs: readViewAs(), viewAsCt: null,
   node: DEFAULT_NODE, hmNode: '', hmFrom: '',
   tab: 'boc', visSeq: {}, intents: {},
   ...dataInit(),
@@ -74,28 +74,89 @@ export function setCongTyLocal(r) {
 }
 
 /* ---------- Quyền (port canTab / firstAllowedTab_ / ctHasFeature_) ---------- */
+/* Super đang "Xem dữ liệu" 1 công ty: tính năng của công ty đó (null = không xem như / chưa nạp xong) - ẩn đúng những gì
+   người dùng công ty đó không thấy (tab QS + trang nghiệp vụ Kinh doanh / Thiết kế / Thi công / HR) */
+export function viewAsFeatures_() {
+  const c = S.viewAs && S.viewAsCt
+  return c && String(c.id) === String(S.viewAs) ? (c.tinhNang || []) : null
+}
+/* Bản nhớ trong máy {id, ten, tinhNang} của công ty đang xem: tải lại trang thì có ngay (không lộ module trong lúc chờ
+   GET /companies), rồi làm mới ở nền. Công ty không còn trong danh sách -> tinhNang rỗng = mọi tính năng (như công ty chưa đặt) */
+const VA_LS = 'qs_viewAsCt'
+const vaRead_ = () => { try { const o = JSON.parse(localStorage.getItem(VA_LS) || 'null'); return o && o.id != null && String(o.id) === String(readViewAs()) ? o : null } catch (e) { return null } }
+const vaWrite_ = o => { try { if (o) localStorage.setItem(VA_LS, JSON.stringify(o)); else localStorage.removeItem(VA_LS) } catch (e) { /* bỏ qua */ } }
+const vaOf_ = c => ({ id: c.id, ten: c.ten || '', tinhNang: Array.isArray(c.tinhNang) ? c.tinhNang : [] })
+function vaApply_(o) {
+  vaWrite_(o)
+  setState({ viewAsCt: o })
+  if (S.me && !canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
+}
+/* Có danh sách công ty mới (tab Công ty vừa tải / vừa lưu): cập nhật luôn tính năng công ty đang xem */
+export function viewAsCtFromList_(list) {
+  if (!S.viewAs || !S.me || S.me.role !== 'super') return
+  const c = (list || []).filter(x => String(x.id) === String(S.viewAs))[0]
+  if (c) vaApply_(vaOf_(c))
+}
+let vaSeq = 0
+function loadViewAsCt_(tries = 0) {
+  const id = S.viewAs
+  const seq = ++vaSeq
+  if (!id || !S.me || S.me.role !== 'super') { vaWrite_(null); if (S.viewAsCt) setState({ viewAsCt: null }); return }
+  if (!S.viewAsCt || String(S.viewAsCt.id) !== String(id)) { const o = vaRead_(); if (o) setState({ viewAsCt: o }) }
+  api.listCongTy().then(list => {
+    if (seq !== vaSeq || S.viewAs !== id) return
+    const c = (list || []).filter(x => String(x.id) === String(id))[0]
+    vaApply_(c ? vaOf_(c) : { id, ten: '', tinhNang: [] })
+  }, () => {
+    // lỗi mạng: thử lại (2s, 4s, 8s...); trong lúc đó trang dữ liệu chờ (PageGuard) nếu chưa có bản nhớ
+    if (seq === vaSeq && S.viewAs === id && tries < 5) setTimeout(() => { if (seq === vaSeq) loadViewAsCt_(tries + 1) }, 2000 * Math.pow(2, tries))
+  })
+}
+/* Super đang xem 1 công ty mà chưa biết tính năng của công ty đó (đang nạp lần đầu) -> trang dữ liệu chờ, không lộ module */
+export function viewAsPending_(me = S.me) {
+  return !!(me && me.role === 'super' && S.viewAs && !viewAsFeatures_())
+}
 export function ctHasFeature_(tab, me, congTy) {
   me = me || {}
-  if (me.role === 'super') return true
+  if (me.role === 'super') { const f = viewAsFeatures_(); return !f || !f.length || f.indexOf(tab) >= 0 }
   if (!congTy) return true
   const f = congTy.tinhNang || []
   if (!f.length) return true
   return f.indexOf(tab) >= 0
 }
 export function isAdminRole_(me) { const r = (me || {}).role; return r === 'admin' || r === 'super' }
+/* Vai trò 'subadmin' (nhãn "Admin"): chỉ quản lý tài khoản nhân viên của công ty mình; dữ liệu như nhân viên, isAdminRole_ vẫn false */
+export function isSubAdminRole_(me) { return (me || {}).role === 'subadmin' }
+export function canManageUsers_(me) { return isAdminRole_(me) || isSubAdminRole_(me) }
+/* Phân quyền 3 cấp (N21): services/accessService.js gắn hàm (me, tab) -> true / false theo quyền xem thực, null = chưa áp được
+   (chưa nạp, lỗi, super, tài khoản khác) -> canTab theo cách cũ. Gắn từ ngoài để store không import ngược accessService */
+let accessView = null
+export function setAccessView(fn) { accessView = fn }
+/* accessService gọi khi quyền thực nạp xong / đổi: tab QS đang mở không còn quyền xem thì sang tab được phép đầu tiên */
+export function accessChanged() {
+  setState(s => ({ accessVer: (s.accessVer || 0) + 1 }))
+  if (S.me && !canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
+}
+const tabAlias = tab => (tab === 'dsduan' || tab === 'dsntk' ? 'duan' : tab === 'dsncc' ? 'sanpham' : tab)
 export function canTab(tab, me = S.me, congTy = S.congTy) {
+  // N21: Danh sách dự án / Nhà cung cấp / Đơn vị thiết kế có quyền riêng trong bảng quyền; quyền cũ vẫn dùng chung tab (tabAlias)
+  if (tab !== 'congty' && tab !== 'admin' && accessView) {
+    const v = accessView(me, tab)
+    if (v !== null && v !== undefined) return v
+  }
+  return legacyCanTab(tab, me, congTy)
+}
+export function legacyCanTab(tab, me = S.me, congTy = S.congTy) {
   me = me || {}
-  if (tab === 'dsduan') tab = 'duan'          // trang Danh sách dự án dùng chung quyền tab Dự án
-  if (tab === 'dsncc') tab = 'sanpham'        // trang Nhà cung cấp dùng chung quyền Danh sách sản phẩm
-  if (tab === 'dsntk') tab = 'duan'           // trang Nhà thiết kế (KTS / studio của dự án) dùng chung quyền tab Dự án
+  tab = tabAlias(tab)   // dsduan / dsntk: trang Danh sách dự án, Nhà thiết kế dùng chung quyền tab Dự án; dsncc: Nhà cung cấp theo Danh sách sản phẩm
   if (tab === 'congty') return me.role === 'super'
-  if (tab === 'admin') return me.role === 'admin' || me.role === 'super'
+  if (tab === 'admin') return canManageUsers_(me)
   if (!ctHasFeature_(tab, me, congTy)) return false
   if (me.role === 'admin' || me.role === 'super') return true
   return (me.perms || []).indexOf(tab) >= 0
 }
 export function firstAllowedTab_(me = S.me, congTy = S.congTy) {
-  if (isAdminRole_(me)) return 'boc'
+  if (isAdminRole_(me) && ctHasFeature_('boc', me, congTy) && (!accessView || accessView(me, 'boc') !== false)) return 'boc'
   for (let i = 0; i < PERM_TABS.length; i++) if (canTab(PERM_TABS[i][0], me, congTy)) return PERM_TABS[i][0]
   return null
 }
@@ -169,6 +230,7 @@ export function startSession() {
   sessionPromise = api.me(ctl.signal).then(u => {
     resetForKey(true)
     setState({ me: u, congTy: u.congTy || null, auth: 'ready', loginMsg: '', viewAs: readViewAs() })
+    loadViewAsCt_()
     if (!canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
     startNotifPoll()
     return boot()
@@ -192,6 +254,7 @@ export function adoptSession(me, congTy) {
   if (S.key !== keyNow()) sessionPromise = null
   resetForKey(true)
   setState({ me, congTy: congTy || null, auth: 'ready', loginMsg: '', viewAs: readViewAs() })
+  loadViewAsCt_()
   if (!canTab(S.tab)) { const f = firstAllowedTab_(); if (f) setState({ tab: f }) }
   if (mounted) { startNotifPoll(); startSession() }
 }
@@ -200,14 +263,14 @@ export function adoptSession(me, congTy) {
 export const flushBeforeLogout = () => projDataFlush_()
 export function clearSession() {
   stopNotifPoll()
-  writeViewAs(''); writeSs('qs_cur', '')
+  writeViewAs(''); writeSs('qs_cur', ''); vaWrite_(null)
   try { localStorage.removeItem('qs_user') } catch (e) { /* bỏ qua */ }
   projDataReset_()
   cacheClear()   // bản đệm khởi động (bootCache.js) không để lại sau khi đăng xuất
   setWriteLock('')
   bootPromise = null; sessionPromise = null; editSeq = {}
   qsCloseDialogs()
-  setState({ key: '', ...dataInit(), me: null, congTy: null, viewAs: '', auth: 'login', loginMsg: '' })
+  setState({ key: '', ...dataInit(), me: null, congTy: null, viewAs: '', viewAsCt: null, auth: 'login', loginMsg: '' })
 }
 let appLogout = null
 export function setAppLogout(fn) { appLogout = fn }
@@ -238,13 +301,17 @@ if (typeof window !== 'undefined' && !window.__qsNoauthBound) {
 }
 
 /* Super "xem như" 1 công ty (PUB/congty.js:73-87) */
-export async function setViewAs(id) {
+export async function setViewAs(id, ct) {
   id = id || ''
   await projDataFlush_()   // hàng đợi phải đi với công ty CŨ: header x-view-company đọc lúc gửi
   writeViewAs(id)
   toast(id ? 'Đang xem dữ liệu công ty đã chọn' : 'Đã thoát chế độ xem')
   resetForKey(true)
-  setState({ viewAs: id })
+  // ct: công ty bấm "Xem dữ liệu" (tab Công ty đã có tinhNang) -> áp ngay, không chờ GET /companies
+  const o = id && ct && String(ct.id) === String(id) ? vaOf_(ct) : null
+  vaWrite_(o)
+  setState({ viewAs: id, viewAsCt: o })
+  loadViewAsCt_()
   return boot().catch(e => toast('Lỗi tải dữ liệu công ty: ' + e.message))
 }
 

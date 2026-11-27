@@ -35,7 +35,7 @@ export default function MaterialsTab({ materials, onStock }) {
               <button key={f.key} className={`sx-filter-chip${filter === f.key ? ' active' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</button>
             ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onStock && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button className="sx-add-btn" style={{ background: 'var(--success)' }} onClick={() => onStock('in')}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
               Nhập kho
@@ -44,7 +44,7 @@ export default function MaterialsTab({ materials, onStock }) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="5 12 12 19 19 12" /></svg>
               Xuất kho
             </button>
-          </div>
+          </div>}
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="sx-table">

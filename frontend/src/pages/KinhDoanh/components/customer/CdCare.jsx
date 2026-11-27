@@ -42,7 +42,8 @@ const SYS_IC = 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8
 const isLong = t => String(t).split('\n').length > 6
 const inTab = (x, tab, sub) => tab === 'all' || (tab === 'other' ? (sub ? x.type === sub : OTHER.indexOf(x.type) >= 0) : x.type === tab)
 
-export default function CdCare({ lead, me, interactions, onAddInteraction }) {
+/* readOnly (N21: không có quyền Sửa): chỉ xem lịch sử, ẩn ô ghi nhận nhanh / form ghi nhận */
+export default function CdCare({ lead, me, interactions, onAddInteraction, readOnly }) {
   const all = Array.isArray(interactions) ? interactions : []
   const [tab, setTab] = useState('all')
   const [sub, setSub] = useState('')            // tab Khác: lọc thêm 1 loại (meeting / site / zalo / email / quote)
@@ -139,7 +140,7 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
         )}
       </div>
 
-      {!form && (
+      {!form && !readOnly && (
         <div className="cd-care-quick">
           <span className="cd-care-qt" role="group" aria-label="Loại ghi nhận nhanh">
             {['call', 'note'].map(k => (
@@ -160,7 +161,7 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
         </div>
       )}
 
-      {form && (
+      {form && !readOnly && (
         <div className="cd-care-form" data-cd-busy="1">
           <b className="cd-care-form-t">Ghi nhận tương tác mới</b>
           <div className="cd-care-types">
@@ -204,7 +205,7 @@ export default function CdCare({ lead, me, interactions, onAddInteraction }) {
         <div className="cd-care-empty">
           <b>Chưa có tương tác nào{tab !== 'all' ? ' thuộc loại này' : ''}</b>
           <span>Ghi lại cuộc gọi, tin nhắn, buổi gặp… để cả nhóm theo dõi quá trình chăm sóc khách hàng.</span>
-          {!form && <button type="button" className="cd-cbtn-or" onClick={openForm}><Ic d={IC_PLUS} size={13} />Ghi nhận tương tác đầu tiên</button>}
+          {!form && !readOnly && <button type="button" className="cd-cbtn-or" onClick={openForm}><Ic d={IC_PLUS} size={13} />Ghi nhận tương tác đầu tiên</button>}
         </div>
       ) : (
         <ol className="cd-tl">

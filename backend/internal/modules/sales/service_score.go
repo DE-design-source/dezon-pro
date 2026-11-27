@@ -210,7 +210,7 @@ func scoreOut(row *omap.Map, now time.Time) *omap.Map {
 
 // GetScore: điểm 6 tiêu chí của khách (chưa chấm -> mọi câu chưa có).
 func (s *Service) GetScore(ctx context.Context, a *actor.Actor, id float64) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if _, err := s.leadOr404(ctx, id); err != nil {
@@ -247,7 +247,7 @@ func withHistory(old *omap.Map, at string, score float64) []any {
 // SaveScore: lưu câu trả lời (body.checks) và thêm 1 điểm lịch sử {at, score} khi điểm deal đổi (dùng cho "So với tuần trước").
 // 2 lần lưu đầu tiên cùng lúc: lần sau gặp trùng khoá chính (23505) thì đọc lại dòng vừa có rồi sửa.
 func (s *Service) SaveScore(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	checks, err := parseChecks(body.Val("checks"))

@@ -62,7 +62,8 @@ function TaskForm({ init, people, onCancel, onSave }) {
   )
 }
 
-export default function CdTasks({ lead, me, people }) {
+/* readOnly (N21: không có quyền Sửa): chỉ xem task, ẩn Thêm / Sửa / Xoá, không đánh dấu xong được */
+export default function CdTasks({ lead, me, people, readOnly }) {
   const leadId = lead ? lead.id : ''
   const [tasks, setTasks] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -102,6 +103,7 @@ export default function CdTasks({ lead, me, people }) {
     } catch (e) { alert('Không lưu được task: ' + ((e && e.message) || e)) }
   }
   const toggle = t => {
+    if (readOnly) return
     setTasks(list => list.map(x => (x.id === t.id ? { ...x, done: !t.done } : x)))
     updateTask(t.id, { done: !t.done }).then(after, fail)
   }
@@ -115,16 +117,16 @@ export default function CdTasks({ lead, me, people }) {
         <h3 className="cd-cc-t sm">Danh sách Task</h3>
         {tasks.length > 0 && <span className="cd-task-n">{open}/{tasks.length} chưa xong</span>}
       </div>
-      {edit === 'new' && <TaskForm people={ppl} onCancel={() => setEdit(null)} onSave={f => save(f, null)} />}
+      {edit === 'new' && !readOnly && <TaskForm people={ppl} onCancel={() => setEdit(null)} onSave={f => save(f, null)} />}
       {!loaded && <div className="cd-task-none">Đang tải task…</div>}
       {loaded && err && <div className="cd-task-none err">{err}</div>}
       {loaded && !err && !tasks.length && edit !== 'new' && (
         <div className="cd-task-none">Chưa có task nào cho khách hàng này.
-          <button type="button" className="cd-cbtn-or" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button>
+          {!readOnly && <button type="button" className="cd-cbtn-or" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button>}
         </div>
       )}
       {list.map(t => {
-        if (edit === t.id) return <TaskForm key={t.id} init={t} people={ppl} onCancel={() => setEdit(null)} onSave={f => save(f, t)} />
+        if (edit === t.id && !readOnly) return <TaskForm key={t.id} init={t} people={ppl} onCancel={() => setEdit(null)} onSave={f => save(f, t)} />
         const due = t.dueDate ? String(t.dueDate).slice(0, 10) : ''
         const late = due && !t.done && due < today
         const sub = [names(t).join(', '), t.note].filter(Boolean).join(' · ')
@@ -142,16 +144,16 @@ export default function CdTasks({ lead, me, people }) {
               {sub && <span className="cd-task-s">{sub}</span>}
             </div>
             {pill && <span className={'cd-task-due ' + pill[1]}>{pill[0]}</span>}
-            <span className="cd-task-a">
+            {!readOnly && <span className="cd-task-a">
               <button type="button" title="Sửa task" aria-label="Sửa task" onClick={() => setEdit(t.id)}><Ic d={IC_EDIT} size={13} /></button>
               <button type="button" title="Xoá task" aria-label="Xoá task" onClick={() => del(t)}><Ic d={IC_X} size={13} /></button>
-            </span>
-            <button type="button" className="cd-cchk lg" role="checkbox" aria-checked={!!t.done} title={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'} onClick={() => toggle(t)}>{t.done ? '✓' : ''}</button>
+            </span>}
+            <button type="button" className="cd-cchk lg" role="checkbox" aria-checked={!!t.done} title={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'} disabled={readOnly} onClick={() => toggle(t)}>{t.done ? '✓' : ''}</button>
           </div>
         )
       })}
       {/* đã có task: nút thêm nằm cuối danh sách (người dùng yêu cầu bỏ nút ở góc trên thẻ, MarkUp 2026-11-22) */}
-      {loaded && !err && tasks.length > 0 && edit !== 'new' && (
+      {loaded && !err && tasks.length > 0 && edit !== 'new' && !readOnly && (
         <div className="cd-task-add"><button type="button" className="cd-cbtn-or" onClick={() => setEdit('new')}><Ic d={IC_PLUS} size={13} />Thêm task</button></div>
       )}
     </section>

@@ -18,13 +18,16 @@ import (
 	"qspro-backend/internal/shared/tenant"
 )
 
-// fakeSessions: token "u" / "a" / "s" -> user / admin / super; "err" -> lỗi kiểm tra phiên.
+// fakeSessions: token "u" / "a" / "s" -> user / admin / super; "m" -> subadmin (M14.7, chỉ dùng ở test riêng);
+// "err" -> lỗi kiểm tra phiên.
 type fakeSessions struct{}
 
 func (fakeSessions) SessionActor(_ context.Context, tok string) (*actor.Actor, error) {
 	switch tok {
 	case "u":
 		return &actor.Actor{UID: "uid-u", U: "user", R: "staff", CT: "ct-1", Exp: 1}, nil
+	case "m":
+		return &actor.Actor{UID: "uid-m", U: "subadmin", R: "subadmin", CT: "ct-1", Exp: 1}, nil
 	case "a":
 		return &actor.Actor{UID: "uid-a", U: "admin", R: "admin", CT: "ct-1", Exp: 1}, nil
 	case "s":

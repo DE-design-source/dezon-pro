@@ -45,6 +45,10 @@ func DefaultPerms() *omap.Map {
 	)
 }
 
+// n21Tabs: tab của module hr trong phân quyền 3 cấp (N21, access/catalog.json). 6 tab đầu trùng phân hệ HR của ma trận vai
+// trò (hrModules), org = Sơ đồ tổ chức (vai trò: employees), admin = Hành chính.
+var n21Tabs = []string{"employees", "org", "attendance", "payroll", "recruit", "performance", "security", "admin"}
+
 // access: người đang dùng HR.
 type access struct {
 	a     *actor.Actor
@@ -53,7 +57,12 @@ type access struct {
 	me    *omap.Map // hồ sơ gắn với tài khoản (nil với admin chưa gắn hồ sơ)
 	perms *omap.Map // ma trận quyền của công ty
 	mask  bool      // ẩn lương mặc định
+	// n21: quyền phân quyền 3 cấp theo tab hr -> thao tác; nil = không giới hạn (super, chưa nối Access)
+	n21 map[string]map[string]bool
 }
+
+// n21ok: phân quyền 3 cấp cho thao tác action ở tab hr.
+func (x *access) n21ok(tab, action string) bool { return x.n21 == nil || x.n21[tab][action] }
 
 func (x *access) meID() float64 {
 	if x.me == nil {
@@ -62,8 +71,13 @@ func (x *access) meID() float64 {
 	return jsval.ToNumber(x.me.Val("id"))
 }
 
-// can: quyền thao tác trên phân hệ.
+// can: quyền thao tác trên phân hệ = vai trò HR và phân quyền 3 cấp (tab cùng tên).
 func (x *access) can(module, action string) bool {
+	return x.n21ok(module, action) && x.roleCan(module, action)
+}
+
+// roleCan: quyền thao tác trên phân hệ theo ma trận vai trò HR.
+func (x *access) roleCan(module, action string) bool {
 	if x.role == "sysadmin" {
 		return true
 	}
@@ -104,9 +118,16 @@ func (x *access) deptNeed(dept any) error {
 }
 
 // need: lỗi 403 khi thiếu quyền.
-func (x *access) need(module, action string) error {
-	if !x.can(module, action) {
+func (x *access) need(module, action string) error { return x.needAt(module, module, action) }
+
+// needAt: vai trò HR có quyền ở phân hệ module và phân quyền 3 cấp có thao tác ở tab hr (vd Sơ đồ tổ chức: vai trò theo
+// employees, phân quyền theo tab org).
+func (x *access) needAt(module, tab, action string) error {
+	if !x.roleCan(module, action) {
 		return apperr.Forbidden("Vai trò HR của bạn không có quyền này")
+	}
+	if !x.n21ok(tab, action) {
+		return apperr.Forbidden("Tài khoản chưa được cấp quyền này ở HR - nhờ quản trị viên cấp quyền")
 	}
 	return nil
 }
@@ -172,12 +193,51 @@ func (s *Service) gate(ctx context.Context, a *actor.Actor, module, action strin
 	if x.scope == "" {
 		return nil, apperr.Forbidden("Vai trò HR không hợp lệ")
 	}
+	if x.n21, err = s.n21Of(ctx, a); err != nil {
+		return nil, err
+	}
 	if module != "" {
 		if err := x.need(module, action); err != nil {
 			return nil, err
 		}
 	}
 	return x, nil
+}
+
+// hrRank: hạng vai trò HR (rộng hơn = cao hơn), cho HRRoleRank.
+var hrRank = map[string]int{"employee": 1, "manager": 2, "hradmin": 3, "sysadmin": 4}
+
+// HRRoleRank (contracts.HRRoleReader, M14.7): hạng vai trò HR của tài khoản userID theo hồ sơ hr_nhan_vien gắn với nó (công ty
+// đang làm việc, như gate): sysadmin 4, hradmin 3, manager 2, employee 1; chưa gắn hồ sơ / vai trò lạ 0.
+func (s *Service) HRRoleRank(ctx context.Context, userID any) (int, error) {
+	if !jsval.Truthy(userID) {
+		return 0, nil
+	}
+	rows, err := s.db.Select(ctx, "hr_nhan_vien", database.SelectOpt{Select: "vai_tro_hr", Filter: database.Eq("tai_khoan_id", userID), Limit: 1})
+	if err != nil || len(rows) == 0 {
+		return 0, err
+	}
+	return hrRank[jsval.Str(rows[0].Val("vai_tro_hr"))], nil
+}
+
+// n21Of: phân quyền 3 cấp của a theo tab hr -> thao tác (AccessChecker; quyền thực tính 1 lần mỗi request). Super / chưa nối
+// Access -> nil (không giới hạn).
+func (s *Service) n21Of(ctx context.Context, a *actor.Actor) (map[string]map[string]bool, error) {
+	if s.access == nil || a.IsSuper() {
+		return nil, nil
+	}
+	out := map[string]map[string]bool{}
+	for _, t := range n21Tabs {
+		out[t] = map[string]bool{}
+		for _, act := range allActions {
+			ok, err := s.access.Can(ctx, a, Tab, t, act)
+			if err != nil {
+				return nil, err
+			}
+			out[t][act] = ok
+		}
+	}
+	return out, nil
 }
 
 // gateAll: gate + thao tác cấp công ty (phạm vi toàn công ty).

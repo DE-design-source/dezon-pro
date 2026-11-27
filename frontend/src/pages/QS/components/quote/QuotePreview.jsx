@@ -5,6 +5,7 @@ import { bgDocW_ } from '../../lib/quote.js'
 import { docScreenCss, bgFontHref_, fitA4_, balanceCols_ } from './docCss'
 import { hDoGhi_, hChoGhi_ } from './docModel'
 import { useQuoteUi, bgGoPage, bgSetZoom_, bgSetView, setColW, setQ } from './quoteState'
+import { useQsCan } from '../../state/qsAccess'
 import { bgColDrop } from './quoteActions'
 import { qsToast as toastMsg, qsConfirm } from '../common/dialogs'
 import { tuyGop_, tuyLuuToanBo } from './tuyMau'
@@ -21,12 +22,13 @@ const ZOOMS = [['fit', 'Vừa khung'], ['75', '75%'], ['100', '100%'], ['125', '
    có nút Xuất Excel / PDF ngay trên thanh); Chỉnh sửa = sang chế độ sửa tờ bìa / bảng */
 export function ModeSeg() {
   const q = useQuoteUi()
+  const canEdit = useQsCan()('export', 'edit')   // N21: không có quyền Sửa thì chỉ còn Xem trước
   const xem = () => (q.bgView === 'doc' ? setQ(s => ({ bgFull: !s.bgFull })) : bgSetView('doc'))
   return (
     <div className="qs-qt-mode">
       <button type="button" className={q.bgView === 'doc' ? 'on' : ''} onClick={xem}
         title={q.bgView === 'doc' ? (q.bgFull ? 'Thoát xem toàn khung' : 'Xem toàn khung (ẩn cột thiết lập) để kiểm tra trước khi xuất') : 'Xem trước trang báo giá'}><Icon name="eye" size={14} />Xem trước &amp; Xuất</button>
-      <button type="button" className={q.bgView === 'edit' ? 'on' : ''} onClick={() => bgSetView('edit')}><Icon name="sliders" size={14} />Chỉnh sửa</button>
+      {canEdit && <button type="button" className={q.bgView === 'edit' ? 'on' : ''} onClick={() => bgSetView('edit')}><Icon name="sliders" size={14} />Chỉnh sửa</button>}
     </div>
   )
 }

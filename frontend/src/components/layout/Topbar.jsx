@@ -6,7 +6,7 @@ import { useSidebar } from '../../hooks/useSidebar'
 import NotificationBell from './NotificationBell'
 import { useWorkSession } from '../../services/workSession'
 
-const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', staff: 'Nhân viên' }
+const ROLE_LBL = { super: 'Quản trị hệ thống', admin: 'Quản trị công ty', subadmin: 'Admin', staff: 'Nhân viên' }
 // chữ đầu của từ đầu + từ cuối: "Trần Anh" -> "TA"
 const initials = s => { const w = String(s || '').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase() }
 const menuItem = { display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: 'var(--text)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }

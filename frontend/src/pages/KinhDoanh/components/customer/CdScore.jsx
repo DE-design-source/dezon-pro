@@ -5,7 +5,8 @@ import './score.css'
 import './scoreai2.css'
 
 /* Khối "Chỉ số đánh giá": điểm deal, cập nhật (liên hệ) gần nhất, so với tuần trước + 6 tiêu chí × 4 câu.
-   Bấm câu -> đổi ngay trên giao diện (tính lại cùng công thức với máy chủ), lưu sau ~400ms; lỗi thì trả lại như cũ. */
+   Bấm câu -> đổi ngay trên giao diện (tính lại cùng công thức với máy chủ), lưu sau ~400ms; lỗi thì trả lại như cũ.
+   readOnly (N21: không có quyền Sửa): chỉ xem, các câu không bấm được. */
 const SAVE_DELAY = 400
 
 const pad = n => String(n).padStart(2, '0')
@@ -54,7 +55,7 @@ function StatusPill({ status }) {
 
 const copyChecks = c => Object.fromEntries(Object.entries(c || {}).map(([k, v]) => [k, Array.isArray(v) ? v.slice() : []]))
 
-export default function CdScore({ lead, interactions }) {
+export default function CdScore({ lead, interactions, readOnly }) {
   const leadId = lead && lead.id
   const [data, setData] = useState(null)
   const [checks, setChecks] = useState({})
@@ -137,6 +138,7 @@ export default function CdScore({ lead, interactions }) {
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
   const toggle = (key, i) => {
+    if (readOnly) return
     const cur = checksRef.current[key] || []
     const n = Math.max(cur.length, 4)
     const arr = Array.from({ length: n }, (_, j) => !!cur[j])
@@ -196,7 +198,7 @@ export default function CdScore({ lead, interactions }) {
           <div className="cd-sc-stat"><span>So với tuần trước</span><b className={'cd-sc-delta ' + deltaView.cls}>{loading ? '--' : deltaView.text}</b></div>
           <div className="cd-sc-crit">
             <span className="cd-sc-box-title">{(sc.list.length || 6) + ' tiêu chí đánh giá'}</span>
-            <span className="cd-sc-hint">Bấm từng câu để đánh dấu có hoặc chưa · <span className="cd-sc-req">*</span> câu bắt buộc, chưa có thì thành điểm liệt sẽ không được tính điểm</span>
+            <span className="cd-sc-hint">{readOnly ? '' : 'Bấm từng câu để đánh dấu có hoặc chưa · '}<span className="cd-sc-req">*</span> câu bắt buộc, chưa có thì thành điểm liệt sẽ không được tính điểm</span>
           </div>
         </div>
       </div>
@@ -215,7 +217,7 @@ export default function CdScore({ lead, interactions }) {
             </div>
             <div className="cd-sc-qs">
               {(c.items || []).map((it, i) => (
-                <button key={i} type="button" role="checkbox" aria-checked={!!c.on[i]} className={'cd-sc-q' + (c.on[i] ? ' is-on' : '')} onClick={() => toggle(c.key, i)}>
+                <button key={i} type="button" role="checkbox" aria-checked={!!c.on[i]} className={'cd-sc-q' + (c.on[i] ? ' is-on' : '')} disabled={!!readOnly} onClick={() => toggle(c.key, i)}>
                   <span className="cd-sc-box-ic" aria-hidden="true">{c.on[i] ? '✓' : ''}</span>
                   <span>{it.text}{it.required ? <span className="cd-sc-req"> *</span> : null}</span>
                 </button>

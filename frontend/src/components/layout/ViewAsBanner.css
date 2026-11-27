@@ -1,0 +1,9 @@
+/* Dải "Đang xem dữ liệu của ..." (ViewAsBanner.jsx), cùng màu với .qsco-viewbar của tab Công ty */
+.va-bar{flex:none; display:flex; align-items:center; gap:9px; margin:8px 12px 0; padding:8px 14px; background:#fff8e6; border:1px solid #f5d78e; border-radius:10px; font-size:13px; color:var(--text, #161a22);}
+.va-bar svg{flex:none; color:#c68a12;}
+.va-bar b{color:#5d440c;}
+.va-bar-x{margin-left:auto; height:28px; padding:0 12px; border:1px solid var(--border, #e4e7ec); border-radius:8px; background:var(--surface, #fff); color:var(--text, #161a22); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap;}
+.va-bar-x:hover{border-color:#c68a12; color:#5d440c;}
+html[data-theme="dark"] .va-bar{background:var(--finance-tint, #2b2412); border-color:#5c4718;}
+html[data-theme="dark"] .va-bar b{color:var(--finance, #f5c35a);}
+@media (max-width: 640px){ .va-bar{flex-wrap:wrap;} .va-bar-x{margin-left:0;} }

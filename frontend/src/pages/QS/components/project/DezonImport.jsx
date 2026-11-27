@@ -2,12 +2,13 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import Icon from '../../../../components/ui/Icon'
 import { MrootPortal } from '../common/Mroot'
 import { useQsStore, isAdminRole_, toast, getState, setState, subscribe as subscribeStore } from '../../state/store'
+import { useQsCan } from '../../state/qsAccess'
 import { resetStats } from './projectStats'
 import { safeUrl_ } from '../../lib/format.js'
 import * as api from '../../api/qsApi'
 import './dezonImport.css'
 
-/* Nút "Nhập từ Dezon.vn" (chỉ admin / super) + hộp nhập toàn bộ dự án của dezon.vn vào Danh sách dự án.
+/* Nút "Nhập từ Dezon.vn" (chỉ admin / super có quyền QS > Dự án > Thêm) + hộp nhập toàn bộ dự án của dezon.vn vào Danh sách dự án.
    Job chạy trên server (POST /projects/import-dezonvn), hộp hỏi trạng thái 2 giây / lần (GET cùng đường dẫn).
    Đóng hộp không dừng job: bộ hỏi trạng thái nằm ngoài component, vẫn chạy tới khi job xong rồi nạp lại danh sách dự án. */
 
@@ -207,12 +208,13 @@ export function DezonImportModal({ onClose }) {
   )
 }
 
-/* Nút đặt cạnh "Nhập dự án" ở trang Danh sách dự án; người không phải admin / super không thấy */
+/* Nút đặt cạnh "Nhập dự án" ở trang Danh sách dự án; chỉ admin / super có quyền QS > Dự án > Thêm (N21, như tạo dự án) mới thấy */
 export default function DezonImportButton() {
   const me = useQsStore(s => s.me)
+  const canCreate = useQsCan()('duan', 'create')
   const [open, setOpen] = useState(false)
   const st = useJob()
-  if (!isAdminRole_(me)) return null
+  if (!isAdminRole_(me) || !canCreate) return null
   return (
     <>
       <button type="button" className="qs-pg-new qs-dzi-open" title="Nhập toàn bộ dự án đăng trên dezon.vn vào danh sách" onClick={() => setOpen(true)}>

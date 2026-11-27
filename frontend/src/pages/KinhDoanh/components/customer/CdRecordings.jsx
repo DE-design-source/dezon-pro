@@ -7,7 +7,8 @@ import './recordings.css'
    Máy chủ lưu ghi âm + bản chữ trực tiếp rồi nhờ Gemini tách giọng Nhân viên / Khách ở nền (status 'processing' -> 'done' | 'failed');
    khối tự hỏi lại mỗi 4 giây khi còn bản đang xử lý, xong thì báo 'activities' để Cập nhật chăm sóc tải lại.
    Bấm nhãn người nói trên 1 câu để đổi Nhân viên <-> Khách (lưu ngay, máy chủ ghi lại cả mục chăm sóc).
-   Khách chưa có hội thoại nào thì ẩn cả khối. Tải lại khi có 'recordings' (Live vừa lưu) hoặc 'activities'. */
+   Khách chưa có hội thoại nào thì ẩn cả khối. Tải lại khi có 'recordings' (Live vừa lưu) hoặc 'activities'.
+   readOnly (N21: không có quyền Sửa): chỉ nghe / đọc, không đổi người nói, ẩn nút Thử lại / Phân tích lại / Xoá. */
 
 const SHOW = 3
 const POLL_MS = 4000
@@ -25,7 +26,7 @@ const REC_STALE_MS = 10 * 60 * 1000
 const isStale = r => r.status === 'processing' && Date.now() - Date.parse(r.updatedAt) > REC_STALE_MS
 const isBusy = r => r.status === 'processing' && !isStale(r)
 
-export default function CdRecordings({ lead }) {
+export default function CdRecordings({ lead, readOnly }) {
   const leadId = lead ? String(lead.id) : ''
   const [recs, setRecs] = useState([])
   const [all, setAll] = useState(false)
@@ -80,7 +81,7 @@ export default function CdRecordings({ lead }) {
   /* Mỗi bản chỉ 1 lần đổi người nói đang gửi (các lần gửi chồng nhau có thể mất 1 lần đổi);
      lỗi thì tải lại từ máy chủ thay vì trả về bản chụp cũ */
   const flip = (r, i) => {
-    if (busy[r.id]) return
+    if (readOnly || busy[r.id]) return
     const lines = linesOf(r).map((x, j) => (j === i ? { ...x, who: x.who === 'kh' ? 'nv' : 'kh' } : x))
     setErr(r.id, ''); setB(r.id, 'flip')
     setRecs(ls => ls.map(x => (x.id === r.id ? { ...x, lines } : x)))
@@ -96,14 +97,14 @@ export default function CdRecordings({ lead }) {
     }).finally(() => { if (alive.current) setB(r.id, '') })
   }
   const redo = r => {
-    if (busy[r.id]) return
+    if (readOnly || busy[r.id]) return
     setB(r.id, 'reprocess'); setErr(r.id, '')
     reprocessRecording(r.id).then(saved => { if (alive.current) put(saved) }, e => {
       if (alive.current) setErr(r.id, 'Không phân tích lại được: ' + ((e && e.message) || 'lỗi'))
     }).finally(() => { if (alive.current) setB(r.id, '') })
   }
   const remove = r => {
-    if (busy[r.id]) return
+    if (readOnly || busy[r.id]) return
     if (!window.confirm('Xoá hội thoại đã ghi này? File ghi âm sẽ bị xoá; mục trong Cập nhật chăm sóc vẫn được giữ.')) return
     setB(r.id, 'delete'); setErr(r.id, '')
     deleteRecording(r.id).then(() => {
@@ -147,7 +148,7 @@ export default function CdRecordings({ lead }) {
               ) : r.status === 'failed' || stale ? (
                 <span className="cd-rec-st fail">
                   <span>Chưa tách được giọng{r.error ? ': ' + r.error : stale ? ': Xử lý quá lâu (máy chủ có thể đã khởi động lại)' : ''}</span>
-                  <button type="button" className="cd-link-btn acc" disabled={!!b} onClick={() => redo(r)}>{b === 'reprocess' ? 'Đang gửi…' : 'Thử lại'}</button>
+                  {!readOnly && <button type="button" className="cd-link-btn acc" disabled={!!b} onClick={() => redo(r)}>{b === 'reprocess' ? 'Đang gửi…' : 'Thử lại'}</button>}
                 </span>
               ) : r.engine === 'gemini' ? (
                 <span className="cd-rec-st ok" title={r.model ? 'Mô hình: ' + r.model : undefined}>AI đã tách giọng</span>
@@ -167,8 +168,8 @@ export default function CdRecordings({ lead }) {
                         return (
                           <div key={i} className={'cd-rec-row ' + w}>
                             <div className="cd-rec-meta">
-                              <button type="button" className="cd-rec-tag" disabled={proc || !!b}
-                                title={proc ? 'Đợi AI xử lý xong rồi sửa' : b === 'flip' ? 'Đang lưu lần đổi trước…' : 'Sai người nói? Bấm để đổi'} onClick={() => flip(r, i)}>{label(w)}</button>
+                              <button type="button" className="cd-rec-tag" disabled={readOnly || proc || !!b}
+                                title={readOnly ? undefined : proc ? 'Đợi AI xử lý xong rồi sửa' : b === 'flip' ? 'Đang lưu lần đổi trước…' : 'Sai người nói? Bấm để đổi'} onClick={() => flip(r, i)}>{label(w)}</button>
                               <span>[{clock(x.at)}]</span>
                             </div>
                             <div className="cd-rec-bub">{x.t}</div>
@@ -179,10 +180,12 @@ export default function CdRecordings({ lead }) {
                   ) : (
                     <p className="cd-none">{proc ? 'Bản chữ sẽ hiện khi AI xử lý xong.' : 'Chưa có câu nào.'}</p>
                   )}
-                  <div className="cd-rec-act">
-                    <button type="button" className="cd-btn sm" disabled={proc || !!b} onClick={() => redo(r)}>{b === 'reprocess' ? 'Đang gửi…' : 'Phân tích lại'}</button>
-                    <button type="button" className="cd-btn sm cd-rec-del" disabled={!!b} onClick={() => remove(r)}>{b === 'delete' ? 'Đang xoá…' : 'Xoá'}</button>
-                  </div>
+                  {!readOnly && (
+                    <div className="cd-rec-act">
+                      <button type="button" className="cd-btn sm" disabled={proc || !!b} onClick={() => redo(r)}>{b === 'reprocess' ? 'Đang gửi…' : 'Phân tích lại'}</button>
+                      <button type="button" className="cd-btn sm cd-rec-del" disabled={!!b} onClick={() => remove(r)}>{b === 'delete' ? 'Đang xoá…' : 'Xoá'}</button>
+                    </div>
+                  )}
                 </>
               )}
               {errs[r.id] && <p className="cd-rec-err" role="alert">{errs[r.id]}</p>}

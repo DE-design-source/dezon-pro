@@ -88,10 +88,13 @@ func landParse(text string) (*omap.Map, error) {
 }
 
 // ReadLandCert: body {url: "/files/..." của ảnh sổ đỏ đã tải lên} -> {docType, area, width, length, shapeNote, plotNo,
-// mapSheet, purpose, address, note, model}. Không gắn với khách nào (đọc được cả lúc đang thêm khách mới, chưa có mã).
+// mapSheet, purpose, address, note, model}. Không gắn với khách nào (đọc được cả lúc đang thêm khách mới, chưa có mã)
+// -> cần quyền sửa hoặc thêm khách hàng (N21).
 func (s *Service) ReadLandCert(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
-		return nil, err
+	if err := s.allow(ctx, a, "edit", tabsLeadWrite...); err != nil {
+		if s.allow(ctx, a, "create", tabsLeadWrite...) != nil {
+			return nil, err
+		}
 	}
 	u := strings.TrimSpace(jsval.Str(body.Val("url")))
 	ext := strings.ToLower(u[strings.LastIndex(u, ".")+1:])

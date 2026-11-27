@@ -17,6 +17,7 @@ import { useSpecs } from '../breakdown/catalog/useSpecs'
 import { MrootPortal } from '../common/Mroot'
 import { spAddToProject } from '../products/list/spActions'
 import { useNccInfo, IntroTab, PartnerTab, CatalogueTab } from './SupplierInfo'
+import { denyQs } from '../../state/qsAccess'
 
 /* Trang "Nhà cung cấp" (cùng kiểu trang Danh sách dự án): nhà cung cấp = thương hiệu trong danh mục sản phẩm
    (khớp chip "Nhà cung cấp" của Danh sách dự án). Thẻ: ảnh ghép 4 sản phẩm, ngành hàng, số sản phẩm, khoảng giá, số dự án đang dùng.
@@ -43,6 +44,7 @@ function useLogos() {
     api.getProjData('__cty').then(d => { logoCache = (d && d.nccLogo && typeof d.nccLogo === 'object') ? d.nccLogo : {}; setLogos(logoCache) }, () => {})
   }, [])
   async function save(next) {
+    if (denyQs('dsncc', 'edit')) return   // N21: Nhà cung cấp dùng quyền QS > Danh sách sản phẩm
     const old = logoCache || {}
     logoCache = next; setLogos(next)
     try { await api.setProjData('__cty', 'nccLogo', next) } catch (e) { logoCache = old; setLogos(old); toast('Lỗi lưu logo: ' + ((e && e.message) || e)) }

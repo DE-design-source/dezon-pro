@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './DuAn.css'
 import { useTheme } from '../../hooks/useTheme'
 import { MembersProvider } from './components/ProjectMembers'
@@ -10,10 +10,9 @@ import * as DU_AN_DATA from '../../data/duAnData'
 import NhiemVuTab from './components/NhiemVuTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
 import DeptStaff from '../../components/hr/DeptStaff'
-import WorkGate from '../../components/ui/WorkGate'
-import { DeliveryProvider } from '../QuanLyThietKe/delivery'
+import { DeliveryProvider, DeliveryGate, useDelivery } from '../QuanLyThietKe/delivery'
 import { DA_TABS } from '../../data/pageTabs'
-import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { usePageTabsHidden } from '../../hooks/usePageTabs'
 
 /* Tab đầu trang: data/pageTabs.js (dùng chung với Cài đặt > Hiển thị) */
 const MAIN_TABS = DA_TABS
@@ -33,7 +32,7 @@ function initialRoute() {
 
 /* Dữ liệu lưu trên máy chủ (kind "construction"): cần đăng nhập */
 export default function DuAn() {
-  return <WorkGate tab="thicong" title="Quản lý dự án"><DeliveryProvider kind="construction"><DuAnPage /></DeliveryProvider></WorkGate>
+  return <DeliveryGate kind="construction" title="Quản lý dự án"><DeliveryProvider kind="construction"><DuAnPage /></DeliveryProvider></DeliveryGate>
 }
 
 function DuAnPage() {
@@ -56,9 +55,17 @@ function DuAnPage() {
     setTab(name)
   }
 
-  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  // tab được xem (phân quyền N21) trừ tab ẩn ở Cài đặt > Hiển thị (ẩn hết thì vẫn hiện tab được xem);
+  // tab đang mở không còn trong danh sách thì sang tab hiện đầu tiên
+  const dv = useDelivery()
   const tabHidden = usePageTabsHidden('/du-an')
-  useTabFallback(tabHidden, tab, MAIN_TABS.map(t => t.key), goToTab)
+  const allowedTabs = MAIN_TABS.filter(t => dv.can(t.key))
+  const shownTabs = allowedTabs.some(t => tabHidden.indexOf(t.key) < 0) ? allowedTabs.filter(t => tabHidden.indexOf(t.key) < 0) : allowedTabs
+  const shownKey = shownTabs.map(t => t.key).join(',')
+  useEffect(() => {
+    if (shownTabs.length && !shownTabs.some(t => t.key === tab)) goToTab(shownTabs[0].key)
+  }, [shownKey, tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  const allowed = key => allowedTabs.some(t => t.key === key)
 
   const panelStyle = key => ({ display: tab === key ? 'flex' : 'none' })
 
@@ -74,7 +81,7 @@ function DuAnPage() {
           </div>
           <span className="da-header-title">Quản lý dự án</span>
           <div className="hdr-tabs" role="tablist">
-            {MAIN_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            {shownTabs.map(t => (
               <button key={t.key} className={`da-proj-tab${tab === t.key ? ' active' : ''}`} onClick={() => goToTab(t.key)}>{t.label}</button>
             ))}
           </div>
@@ -87,21 +94,31 @@ function DuAnPage() {
 
         {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái khi chuyển tab, giống bản HTML */}
         <div className="da-content">
-          <div className="da-panel" style={panelStyle('tiendo')}>
-            <div className="tk-page tk-embed"><GanttTab active={tab === 'tiendo'} data={DU_AN_DATA} /></div>
-          </div>
-          <div className="da-panel-scroll" style={panelStyle('list')}>
-            <ProjectListTab onGoto={goToTab} />
-          </div>
-          <div className="da-panel-scroll" style={panelStyle('create')}>
-            <SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} />
-          </div>
-          <div className="da-panel-scroll" style={panelStyle('nhiemvu')}>
-            <NhiemVuTab gtab={gtab} onGtabChange={setGtab} />
-          </div>
-          <div className="da-panel-scroll" style={panelStyle('nhansu')}>
-            <DeptStaff units={['cco']} title="Khối thi công (CCO)" />
-          </div>
+          {allowed('tiendo') && (
+            <div className="da-panel" style={panelStyle('tiendo')}>
+              <div className="tk-page tk-embed"><GanttTab active={tab === 'tiendo'} data={DU_AN_DATA} /></div>
+            </div>
+          )}
+          {allowed('list') && (
+            <div className="da-panel-scroll" style={panelStyle('list')}>
+              <ProjectListTab onGoto={goToTab} />
+            </div>
+          )}
+          {allowed('create') && (
+            <div className="da-panel-scroll" style={panelStyle('create')}>
+              <SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} />
+            </div>
+          )}
+          {allowed('nhiemvu') && (
+            <div className="da-panel-scroll" style={panelStyle('nhiemvu')}>
+              <NhiemVuTab gtab={gtab} onGtabChange={setGtab} />
+            </div>
+          )}
+          {allowed('nhansu') && (
+            <div className="da-panel-scroll" style={panelStyle('nhansu')}>
+              <DeptStaff units={['cco']} title="Khối thi công (CCO)" />
+            </div>
+          )}
         </div>
 
         <Dezbot

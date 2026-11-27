@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './QuanLyThietKe.css'
 import { useTheme } from '../../hooks/useTheme'
 import { MembersProvider } from './components/ProjectMembers'
@@ -8,10 +8,9 @@ import GanttTab from './components/GanttTab'
 import NhanSuTab from './components/NhanSuTab'
 import TaskGameTab from './components/TaskGameTab'
 import Dezbot, { loadAiPanelWidth } from './components/Dezbot'
-import WorkGate from '../../components/ui/WorkGate'
-import { DeliveryProvider } from './delivery'
+import { DeliveryProvider, DeliveryGate, useDelivery } from './delivery'
 import { TK_TABS } from '../../data/pageTabs'
-import { usePageTabsHidden, useTabFallback } from '../../hooks/usePageTabs'
+import { usePageTabsHidden } from '../../hooks/usePageTabs'
 
 /* Tab đầu trang: data/pageTabs.js (dùng chung với Cài đặt > Hiển thị) */
 const MAIN_TABS = TK_TABS
@@ -31,7 +30,7 @@ function initialRoute() {
 
 /* Dữ liệu lưu trên máy chủ (kind "design"): cần đăng nhập */
 export default function QuanLyThietKe() {
-  return <WorkGate tab="thietke" title="Quản lý thiết kế"><DeliveryProvider kind="design"><QuanLyThietKePage /></DeliveryProvider></WorkGate>
+  return <DeliveryGate kind="design" title="Quản lý thiết kế"><DeliveryProvider kind="design"><QuanLyThietKePage /></DeliveryProvider></DeliveryGate>
 }
 
 function QuanLyThietKePage() {
@@ -54,9 +53,17 @@ function QuanLyThietKePage() {
     setTab(name)
   }
 
-  // tab ẩn ở Cài đặt > Hiển thị; tab đang mở bị ẩn thì sang tab hiện đầu tiên
+  // tab được xem (phân quyền N21) trừ tab ẩn ở Cài đặt > Hiển thị (ẩn hết thì vẫn hiện tab được xem);
+  // tab đang mở không còn trong danh sách thì sang tab hiện đầu tiên
+  const dv = useDelivery()
   const tabHidden = usePageTabsHidden('/quan-ly-thiet-ke')
-  useTabFallback(tabHidden, tab, MAIN_TABS.map(t => t.key), goToTab)
+  const allowedTabs = MAIN_TABS.filter(t => dv.can(t.key))
+  const shownTabs = allowedTabs.some(t => tabHidden.indexOf(t.key) < 0) ? allowedTabs.filter(t => tabHidden.indexOf(t.key) < 0) : allowedTabs
+  const shownKey = shownTabs.map(t => t.key).join(',')
+  useEffect(() => {
+    if (shownTabs.length && !shownTabs.some(t => t.key === tab)) goToTab(shownTabs[0].key)
+  }, [shownKey, tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  const allowed = key => allowedTabs.some(t => t.key === key)
 
   const panelStyle = key => ({ display: tab === key ? 'flex' : 'none' })
 
@@ -72,7 +79,7 @@ function QuanLyThietKePage() {
           </div>
           <span className="tk-header-title">Quản lý thiết kế</span>
           <div className="hdr-tabs" role="tablist">
-            {MAIN_TABS.filter(t => tabHidden.indexOf(t.key) < 0).map(t => (
+            {shownTabs.map(t => (
               <button key={t.key} className={`tk-proj-tab${tab === t.key ? ' active' : ''}`} onClick={() => goToTab(t.key)}>{t.label}</button>
             ))}
           </div>
@@ -85,21 +92,31 @@ function QuanLyThietKePage() {
 
         {/* Các tab luôn được mount (ẩn bằng display) để giữ trạng thái khi chuyển tab, giống bản HTML */}
         <div className="tk-content">
-          <div className="tk-panel" style={panelStyle('tiendo')}>
-            <GanttTab active={tab === 'tiendo'} />
-          </div>
-          <div className="tk-panel-scroll" style={panelStyle('list')}>
-            <ProjectListTab onGoto={goToTab} />
-          </div>
-          <div className="tk-panel-scroll" style={panelStyle('create')}>
-            <SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} />
-          </div>
-          <div className="tk-panel-scroll" style={panelStyle('nhiemvu')}>
-            <TaskGameTab gtab={gtab} onGtabChange={setGtab} />
-          </div>
-          <div className="tk-panel-scroll" style={panelStyle('nhansu')}>
-            <NhanSuTab />
-          </div>
+          {allowed('tiendo') && (
+            <div className="tk-panel" style={panelStyle('tiendo')}>
+              <GanttTab active={tab === 'tiendo'} />
+            </div>
+          )}
+          {allowed('list') && (
+            <div className="tk-panel-scroll" style={panelStyle('list')}>
+              <ProjectListTab onGoto={goToTab} />
+            </div>
+          )}
+          {allowed('create') && (
+            <div className="tk-panel-scroll" style={panelStyle('create')}>
+              <SetupTab sub={createSub} onSubChange={setCreateSub} onGoto={goToTab} />
+            </div>
+          )}
+          {allowed('nhiemvu') && (
+            <div className="tk-panel-scroll" style={panelStyle('nhiemvu')}>
+              <TaskGameTab gtab={gtab} onGtabChange={setGtab} />
+            </div>
+          )}
+          {allowed('nhansu') && (
+            <div className="tk-panel-scroll" style={panelStyle('nhansu')}>
+              <NhanSuTab />
+            </div>
+          )}
         </div>
 
         <Dezbot

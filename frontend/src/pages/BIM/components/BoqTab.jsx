@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icon, SectionHead, StatusBadge, useFlash } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 function DataRow({ label, value, last, strong, padding }) {
   return (
@@ -11,6 +12,7 @@ function DataRow({ label, value, last, strong, padding }) {
 }
 
 export default function BoqTab() {
+  const { can } = useAccess()
   const [reloading, reload] = useFlash(700)
   const [generating, generate] = useFlash(900)
   const [updated, setUpdated] = useState(false)
@@ -36,10 +38,12 @@ export default function BoqTab() {
           <DataRow label="Product có đơn giá" value="74 / 81" padding="10px 4px" />
           <DataRow label="Mức VAT" value="8%" padding="10px 4px" last />
         </div>
-        <button className="bim-btn-dark" onClick={() => generate(() => setUpdated(true))}>
-          <Icon html={'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'} size={15} stroke="#fff" />
-          <span>{generating ? 'Đang tạo bảng...' : 'Tạo / Cập nhật bảng'}</span>
-        </button>
+        {can('bim', 'main', 'edit') && (
+          <button className="bim-btn-dark" onClick={() => generate(() => setUpdated(true))}>
+            <Icon html={'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'} size={15} stroke="#fff" />
+            <span>{generating ? 'Đang tạo bảng...' : 'Tạo / Cập nhật bảng'}</span>
+          </button>
+        )}
         <button className="bim-btn-ghost" onClick={() => alert('Bảng BOQ rời sẽ mở trong Dezon Bim Workspace (trình duyệt).')}>
           <Icon html={'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'} size={15} />
           Mở bảng BOQ rời

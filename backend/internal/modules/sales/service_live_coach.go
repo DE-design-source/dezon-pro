@@ -77,7 +77,7 @@ func (s *Service) liveKnowOut(text, at, by string, a *actor.Actor) *omap.Map {
 
 // GetLiveKnowledge: kiến thức bán hàng cho gợi ý khi Live -> {text, updatedAt, updatedBy, canEdit, maxLength, aiEnabled}.
 func (s *Service) GetLiveKnowledge(ctx context.Context, a *actor.Actor) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	t, at, by, err := s.liveKnowledge(ctx)
@@ -89,7 +89,7 @@ func (s *Service) GetLiveKnowledge(ctx context.Context, a *actor.Actor) (any, er
 
 // SaveLiveKnowledge: body {text} (rỗng = xoá). Chỉ quản trị công ty.
 func (s *Service) SaveLiveKnowledge(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if !a.IsAdmin() {
@@ -209,7 +209,7 @@ func liveParse(text string) (*omap.Map, error) {
 
 // LiveSuggest: body {lines: [{who, t, at}], elapsedSec} -> {stage, insight, answers, ask, missing, engine, model, at}.
 func (s *Service) LiveSuggest(ctx context.Context, a *actor.Actor, id float64, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "create", tabsLeadWrite...); err != nil {
 		return nil, err
 	}
 	lines, err := liveLines(body)

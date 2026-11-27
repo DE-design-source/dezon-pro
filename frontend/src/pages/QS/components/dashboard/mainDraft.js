@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import * as api from '../../api/qsApi'
 import { qsToast } from '../common/dialogs'
+import { denyQs } from '../../state/qsAccess'
 
 /* Bản chính của dự án (MarkUp 2026-11-19): mỗi dự án (nhóm bản nháp cùng tên) chọn 1 bản nháp làm bản chính.
    Dữ liệu công ty '__cty' khoá daBanChinh {mã bản nháp: 1}; khoá theo mã bản nháp (không theo bản đầu như daPhuTrach)
@@ -25,6 +26,7 @@ export function useMainDrafts() {
 
 /* Đặt maDA làm bản chính của nhóm (groupMas = mã mọi bản nháp trong dự án); bấm lại bản đang là chính = bỏ chọn */
 export async function setMainDraft(maDA, groupMas) {
+  if (denyQs('duan', 'edit')) return   // N21: QS > Dự án > Sửa
   const old = map
   const n = { ...map }
   const was = !!n[maDA]

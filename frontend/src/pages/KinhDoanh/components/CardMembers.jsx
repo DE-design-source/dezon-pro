@@ -45,6 +45,7 @@ function MemberPopover({ lead, onAdd, onRemove, onClose }) {
   )
 }
 
+/* Không có onAdd (N21: không có quyền Sửa): chỉ hiện avatar, không có nút thêm / popover */
 export default function CardMembers({ lead, open, onToggle, onClose, onAdd, onRemove }) {
   const assignees = lead.assignees || []
   const shown = assignees.slice(0, 3)
@@ -57,10 +58,10 @@ export default function CardMembers({ lead, open, onToggle, onClose, onAdd, onRe
         ))}
         {extra > 0 && <span className="kd-pjm-more" title={`${extra} người khác`}>+{extra}</span>}
       </div>
-      <button type="button" className="kd-pjm-add-btn" title="Thêm người phụ trách" onClick={e => { e.stopPropagation(); onToggle(lead.id) }}>
+      {onAdd && <button type="button" className="kd-pjm-add-btn" title="Thêm người phụ trách" onClick={e => { e.stopPropagation(); onToggle(lead.id) }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
-      {open && <MemberPopover lead={lead} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />}
+      </button>}
+      {open && onAdd && <MemberPopover lead={lead} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />}
     </div>
   )
 }

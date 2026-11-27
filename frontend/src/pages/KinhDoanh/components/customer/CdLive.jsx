@@ -48,7 +48,12 @@ const IcMic = () => (
 const fmtSize = b => (b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB')
 const MAX_AUDIO = 20000000   // byte, giới hạn máy chủ nhận
 
-export default function CdLive({ lead, me, onClose }) {
+/* readOnly (N21: không có quyền Sửa): không hiện khối, không bật micro / không lưu bản ghi (createRecording cần quyền Thêm) */
+export default function CdLive(props) {
+  return props.readOnly ? null : <LiveBody {...props} />
+}
+
+function LiveBody({ lead, me, onClose }) {
   const id = lead && lead.id
   const meName = String(me || '').trim()
   const draft = useRef(readLiveDraft(id, meName)).current

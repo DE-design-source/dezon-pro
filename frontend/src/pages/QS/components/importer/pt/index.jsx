@@ -7,6 +7,7 @@ import { ptLibrary_, ctHangMucList_ } from '../NganhSel'
 import CtEditModal from '../../phantho/CtEditModal'
 import { useQs } from '../../../state/QsData'
 import { useQsStore } from '../../../state/store'
+import { denyQs } from '../../../state/qsAccess'
 import { congTacActions } from '../../../state/useCongTac'
 import * as api from '../../../api/qsApi'
 import { mediaUrl } from '../../../api/files'
@@ -107,7 +108,7 @@ export default function ImportPt() {
   }
   async function commit() {
     const st = ctGet()
-    if (st.committing) return
+    if (st.committing || denyQs('import', 'create')) return   // N21: QS > Nhập dữ liệu > Thêm
     // dòng nhập từ file còn lỗi (chan) ở lại danh sách chờ cho tới khi mở trong form và bấm Cập nhật
     const ds = st.pending.filter(x => !x.chan)
     if (!ds.length) { qsToast(st.pending.length ? 'Các công tác chờ đều còn lỗi — mở từng thẻ, sửa rồi bấm Cập nhật' : 'Chưa có công tác nào chờ lưu'); return }

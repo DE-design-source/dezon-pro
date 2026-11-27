@@ -189,6 +189,9 @@
 .qspl-act.undo{color:var(--finance);}
 .qspl-act.del:hover{background:var(--danger-tint); color:var(--danger);}
 .qspl-act.pcopy{color:var(--dash-accent);}
+.qspl-act.off, .qspl-pc-add.off{opacity:.35; cursor:not-allowed;}   /* SP chưa duyệt: không ghi danh vào dự án được (M14.6) */
+.qspl-act.off:hover{background:transparent;}
+.qspl-pc-add.off:hover{filter:none;}
 
 /* ---------- Phân trang ---------- */
 .qspl-pgbar{display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 14px; border-top:1px solid var(--border); background:var(--dash-soft);}

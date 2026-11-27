@@ -138,6 +138,14 @@ type ProductPerms interface {
 	SpPerms(ctx context.Context, a *actor.Actor) (edit, duyet, admin bool, err error)
 }
 
+// ApprovalChecker - chủ: materials (chỉ bản Go, roadmap M14.6: sản phẩm chưa duyệt không vào bóc tách).
+//
+// ChuaDuyet: mã sản phẩm ma (trim) có trong danh mục của công ty trong ctx mà KHÔNG dòng nào đã duyệt -> true.
+// ma rỗng, không thấy sản phẩm (dòng tự nhập, mã của kho chung) -> false. Lỗi database trả nguyên.
+type ApprovalChecker interface {
+	ChuaDuyet(ctx context.Context, ma string) (bool, error)
+}
+
 // ProductSaver - chủ: materials. saveDbProduct (S:503-560).
 //
 //   - a có thể nil (saveLineAsProduct không kèm actor, S:956): khi đó không đóng dấu nguoi_tao / nguoi_sua, lịch sử ghi "ẩn danh".
@@ -264,4 +272,52 @@ type DeliveryFromLead interface {
 	EnsureFromLead(ctx context.Context, a *actor.Actor, lead *omap.Map, valueVnd float64, kind string) (bool, error)
 	RenameFromLead(ctx context.Context, old, lead *omap.Map) error
 	DetachFromLead(ctx context.Context, leadID any, kind string, leadDeleted bool) error
+}
+
+// AccessChecker - chủ: access (chỉ bản Go, roadmap N21: phân quyền 3 cấp Module > Tab > Thao tác).
+//
+// Can: người đăng nhập a có thao tác action ("view" | "create" | "edit" | "delete" | "approve" | "export"; "" = "view")
+// ở tab của module không, theo quyền thực (trần công ty ∩ quyền của tài khoản ∩ quyền của admin đã cấp; chưa phân quyền
+// = cách cũ theo companies.features / users.permissions). tab "" hoặc "*" = ở ít nhất 1 tab của module.
+// a == nil -> false; super -> true (không đọc database); module / thao tác lạ -> false. Lỗi database trả nguyên.
+// Khoá module / tab: backend/internal/modules/access/catalog.json.
+//
+// LegacyAny: a chưa phân quyền theo N21 (không có dòng riêng, công ty không có dòng trần) và xem được ít nhất 1 tab của
+// module -> true; super / a nil -> false. Cổng ghi của QS dùng để giữ cách cũ (đăng nhập + vào được QS là ghi được).
+type AccessChecker interface {
+	Can(ctx context.Context, a *actor.Actor, module, tab, action string) (bool, error)
+	LegacyAny(ctx context.Context, a *actor.Actor, module string) (bool, error)
+}
+
+// AccessGranter - chủ: access (chỉ bản Go, N21). Gọi từ users (cửa ngõ Admin*Gated).
+//
+//   - CheckLegacyPerms: admin công ty / subadmin (a không phải super) cấp users.perms cho nhân viên - phần quyền perms cấp
+//     THÊM so với cur (nil khi tạo mới), giao trần công ty, phải nằm trong quyền thực của a; không thì lỗi 403 tiếng Việt.
+//     perms / cur: mảng của client hoặc chuỗi "a,b". a nil / super -> nil.
+//   - FreezeGrantsBy: gọi TRƯỚC khi tài khoản admin công ty / subadmin adminID bị xoá / đổi vai trò / chuyển công ty - cắt
+//     dòng phân quyền của nhân viên do tài khoản này cấp theo quyền thực cuối của nó (giới hạn không mất theo người cấp).
+//     Không phải admin / subadmin -> nil.
+//   - CheckUserWithin (M14.7): subadmin a quản lý tài khoản targetID - toàn bộ quyền thực (N21) của đích phải nằm trong quyền
+//     thực của a; không thì lỗi 403 tiếng Việt. a nil / không phải subadmin -> nil.
+//   - PinGrantedBy (M14.7): sau khi subadmin a tạo / sửa perms tài khoản userID - đích chưa có dòng phân quyền riêng thì ghi
+//     dòng theo quyền thực hiện tại (không vượt quyền của a) với người cấp = a, để a giới hạn quyền đích về sau.
+//     a không phải subadmin / đích đã có dòng -> nil.
+//   - ReleaseGrantsBy (M14.7): gọi SAU khi tài khoản admin công ty granterID đã bị hạ xuống subadmin - dòng phân quyền nhân
+//     viên do nó cấp chuyển người cấp sang a, để quyền thực của nhân viên không bị giới hạn thêm theo quyền subadmin (đã cắt
+//     sẵn bằng FreezeGrantsBy). a nil / tài khoản không phải subadmin -> nil.
+type AccessGranter interface {
+	CheckLegacyPerms(ctx context.Context, a *actor.Actor, cur, perms any) error
+	FreezeGrantsBy(ctx context.Context, adminID any) error
+	CheckUserWithin(ctx context.Context, a *actor.Actor, targetID any) error
+	PinGrantedBy(ctx context.Context, a *actor.Actor, userID any) error
+	ReleaseGrantsBy(ctx context.Context, a *actor.Actor, granterID any) error
+}
+
+// HRRoleReader - chủ: hr (chỉ bản Go, M14.7). Gọi từ users (subTargetGate: subadmin không quản lý tài khoản có vai trò HR
+// cao hơn mình).
+//
+//   - HRRoleRank: hạng vai trò HR của tài khoản userID (hr_nhan_vien.vai_tro_hr của hồ sơ gắn tài khoản, công ty đang làm
+//     việc): sysadmin 4, hradmin 3, manager 2, employee 1; chưa gắn hồ sơ / vai trò lạ 0. Lỗi database trả nguyên.
+type HRRoleReader interface {
+	HRRoleRank(ctx context.Context, userID any) (int, error)
 }

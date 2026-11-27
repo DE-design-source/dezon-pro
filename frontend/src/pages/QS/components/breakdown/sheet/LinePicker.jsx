@@ -3,7 +3,7 @@ import Pop from './Pop'
 import Icon from '../../../../../components/ui/Icon'
 import { MrootPortal } from '../../common/Mroot'
 import { money } from '../../../lib/format.js'
-import { nhomOptions } from '../../../lib/catalogFilters.js'
+import { nhomOptions, spBocOk_ } from '../../../lib/catalogFilters.js'
 import { pickProduct, createProductFromLine } from './bocActions'
 
 /* Chọn sản phẩm cho 1 dòng (openPick / drawPick PUB/boc.js:713-736): tìm theo tên + mã + thương hiệu, tối đa 60 kết quả,
@@ -13,7 +13,8 @@ export default function LinePicker({ anchor, line, products, onClose }) {
   const [creating, setCreating] = useState(false)
   if (creating) return <CreateProductDialog line={line} products={products} onClose={onClose} />
   const ql = q.toLowerCase()
-  const list = (products || []).filter(p => !ql || (p.ten + ' ' + p.ma + ' ' + p.thuongHieu).toLowerCase().indexOf(ql) >= 0).slice(0, 60)
+  // chỉ SP đã duyệt (M14.6)
+  const list = (products || []).filter(p => spBocOk_(p) && (!ql || (p.ten + ' ' + p.ma + ' ' + p.thuongHieu).toLowerCase().indexOf(ql) >= 0)).slice(0, 60)
   return (
     <Pop anchor={anchor} width={380} className="qs-tk-pick" onClose={onClose}>
       <input className="qs-tk-pickq" autoFocus placeholder="Tìm sản phẩm…" value={q} onChange={e => setQ(e.target.value)} />

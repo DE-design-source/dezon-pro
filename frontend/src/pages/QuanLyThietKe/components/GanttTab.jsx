@@ -79,6 +79,14 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
     PURCHASE_PHASE_ID = null,
   } = data
   const dv = useDelivery()
+  /* Phân quyền N21 tab Tiến độ: Tạo = thêm đề mục / công việc / bình luận; Xoá = xoá đề mục / công việc;
+     Sửa = sửa đề mục / công việc, kéo giãn, nhân sự đề mục, đơn mua hàng, xác nhận thu chi.
+     Không có quyền -> ẩn nút; need() báo thiếu quyền (lệnh ghi của DeliveryProvider cũng tự chặn) */
+  const canEdit = dv.can('tiendo', 'edit')
+  const canCreate = dv.can('tiendo', 'create')
+  const canDelete = dv.can('tiendo', 'delete')
+  const need = (action = 'edit') => dv.need('tiendo', action)
+  const canOpenEdit = canEdit || canDelete   // hộp sửa đề mục / công việc có cả nút Xoá
   /* Sửa nhanh liên tiếp (kéo đơn rồi giao người, thêm / bớt thành viên đề mục): áp ngay vào giao diện, lần sửa sau tính từ giá trị
      vừa gửi chứ không từ dữ liệu máy chủ chưa nạp lại; lệnh cùng khoá gửi lần lượt. Khoá 't<id>' = công việc, 'ph<id>' = đề mục. */
   const [optim, setOptim] = useState({})
@@ -243,7 +251,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
   }
   /* Mẫu: xoá hết đề mục (trống) hoặc dựng lại tiến độ mẫu, ngày dời theo hôm nay như bản cũ dời theo mốc 21/09/2026 */
   async function applyTemplate(v) {
-    if (!dv.currentId) return
+    if (!dv.currentId || !need('create') || (phases.length > 0 && !need('delete'))) return
     if (v === 'blank') {
       if (phases.length && !window.confirm('Bắt đầu từ trống sẽ xoá toàn bộ đề mục & công việc hiện tại. Tiếp tục?')) return
     } else if (v === 'sample') {
@@ -264,7 +272,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
 
   function updatePhaseMembers(phaseId, fn) {
     const ph = phases.find(p => p.id === phaseId)
-    if (ph) sendLatest('ph' + phaseId, { members: ph.members || [] }, cur => ({ members: fn(cur.members) }), patch => dv.updatePhase(phaseId, patch))
+    if (ph && need()) sendLatest('ph' + phaseId, { members: ph.members || [] }, cur => ({ members: fn(cur.members) }), patch => dv.updatePhase(phaseId, patch))
   }
   function toggleCollapsed(phaseId) {
     setCollapsed(prev => {
@@ -296,7 +304,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
     setBoard(b => ({ ...b, open: false }))
     setSelectedTaskId(null)
   }
-  const sendTask = (taskId, patchFn) => sendLatest('t' + taskId, { purchaseItems: purchaseItems[taskId] || [] }, patchFn, patch => dv.updateTask(taskId, patch))
+  const sendTask = (taskId, patchFn) => (!need() ? Promise.resolve(null) : sendLatest('t' + taskId, { purchaseItems: purchaseItems[taskId] || [] }, patchFn, patch => dv.updateTask(taskId, patch)))
   const setPurchaseItems = (taskId, fn) => sendTask(taskId, cur => ({ purchaseItems: fn(cur.purchaseItems) }))
   /* Lưu quy trình (các bước kanban); remap != null: đơn ở bước bị bỏ chuyển về bước đầu, gửi cùng 1 lệnh */
   const savePurchaseFlow = (taskId, steps, remap) => sendTask(taskId, cur => (remap ? { purchaseFlow: steps, purchaseItems: remap(cur.purchaseItems) } : { purchaseFlow: steps }))
@@ -307,6 +315,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
     dv.addComment(taskId, text)
   }
   function confirmFinance(task) {
+    if (!need()) return
     const input = prompt(`Nhập ngày ${task.finType === 'thu' ? 'thực thu' : 'thực chi'} thực tế (YYYY-MM-DD):`, task.planStart)
     if (!input) return
     if (isNaN(parseD(input).getTime())) { alert('Ngày không hợp lệ. Vui lòng nhập theo định dạng YYYY-MM-DD.'); return }
@@ -483,12 +492,12 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
         >
           <div className="tk-fill" style={{ width: `${t.progress}%` }} />
           {!isNarrow && <span className="tk-bar-label">{t.progress}%</span>}
-          <div
+          {canEdit && <div
             className="tk-bar-resize"
             title="Kéo để mở rộng/thu hẹp thời gian"
             onMouseDown={e => startBarResize(e, t, x1)}
             onClick={e => e.stopPropagation()}
-          />
+          />}
         </div>
         {isNarrow && <span className="tk-bar-label-outside" style={{ left: x1 + w + 6 }}>{t.progress}%</span>}
         {comments[t.id]?.length > 0 && (
@@ -594,12 +603,14 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
           {[...phases].reverse().map(p => (
             <button key={p.id} className={`tk-chip${phaseFilter === p.id ? ' active' : ''}`} onClick={() => setPhaseFilter(p.id)}>{p.name}</button>
           ))}
-          <button className="tk-chip tk-chip-add" onClick={() => setItemModal({ kind: 'phase', mode: 'create' })}>+ Thêm đề mục</button>
-          <select className="tk-tpl-select" value="" onChange={e => applyTemplate(e.target.value)} title="Khởi tạo tiến độ">
-            <option value="">Khởi tạo…</option>
-            <option value="blank">Bắt đầu từ trống (tự tạo đề mục)</option>
-            <option value="sample">Dùng tiến độ mẫu (chung cư)</option>
-          </select>
+          {canCreate && <button className="tk-chip tk-chip-add" onClick={() => setItemModal({ kind: 'phase', mode: 'create' })}>+ Thêm đề mục</button>}
+          {canCreate && (canDelete || phases.length === 0) && <>
+            <select className="tk-tpl-select" value="" onChange={e => applyTemplate(e.target.value)} title="Khởi tạo tiến độ">
+              <option value="">Khởi tạo…</option>
+              <option value="blank">Bắt đầu từ trống (tự tạo đề mục)</option>
+              <option value="sample">Dùng tiến độ mẫu (chung cư)</option>
+            </select>
+          </>}
           <span className="tk-spacer" />
           <div className="tk-legend">
             <div className="tk-li"><span className="tk-sw" style={{ background: 'var(--done)' }} />Hoàn thành</div>
@@ -644,16 +655,16 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
                       {shown.map((m, i) => <span key={i} className="tk-avatar" style={{ background: avatarColor(m.name) }} title={`${m.name} — ${m.role}`}>{initials(m.name)}</span>)}
                       {extra > 0 && <span className="tk-avatar-more" title={`${extra} người khác`}>+{extra}</span>}
                     </div>
-                    <button className="tk-add-member-btn" title="Thêm nhân sự" onClick={e => { e.stopPropagation(); setOpenPhasePop(id => id === phase.id ? null : phase.id) }}>
+                    {canEdit && <button className="tk-add-member-btn" title="Thêm nhân sự" onClick={e => { e.stopPropagation(); setOpenPhasePop(id => id === phase.id ? null : phase.id) }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
-                    </button>
-                    <span className="tk-phase-actions" onClick={e => e.stopPropagation()}>
-                      <button title="Thêm công việc vào đề mục" onClick={() => openNewTask(phase.id)}>+</button>
-                      <button title="Đổi tên đề mục" onClick={() => setItemModal({ kind: 'phase', mode: 'edit', phase })}>✎</button>
-                      {!CORE_PHASES.includes(phase.name) && <button className="del" title="Xoá đề mục" onClick={() => deletePhase(phase.id)}>×</button>}
-                    </span>
+                    </button>}
+                    {(canCreate || canOpenEdit) && <span className="tk-phase-actions" onClick={e => e.stopPropagation()}>
+                      {canCreate && <button title="Thêm công việc vào đề mục" onClick={() => openNewTask(phase.id)}>+</button>}
+                      {canOpenEdit && <button title="Đổi tên đề mục" onClick={() => setItemModal({ kind: 'phase', mode: 'edit', phase })}>✎</button>}
+                      {canDelete && !CORE_PHASES.includes(phase.name) && <button className="del" title="Xoá đề mục" onClick={() => deletePhase(phase.id)}>×</button>}
+                    </span>}
                     <span className="tk-phase-meta">{doneCount}/{phase.tasks.length}</span>
-                    {openPhasePop === phase.id && (
+                    {canEdit && openPhasePop === phase.id && (
                       <PhaseMemberPopover
                         phase={phases.find(p => p.id === phase.id)}
                         onAdd={m => updatePhaseMembers(phase.id, list => [...list, m])}
@@ -678,7 +689,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
                           {t.critical && <span className="tk-crit-dot" title="Đường găng" />}
                           {nameIcon}{t.name}
                           {comments[t.id]?.length > 0 && <span className="tk-comment-flag-inline" title="Có bình luận"><CommentFlagIcon /></span>}
-                          <button className="tk-task-edit" title="Sửa công việc" onClick={e => { e.stopPropagation(); openEditTask(phase.id, t) }}>✎</button>
+                          {canOpenEdit && <button className="tk-task-edit" title="Sửa công việc" onClick={e => { e.stopPropagation(); openEditTask(phase.id, t) }}>✎</button>}
                         </div>
                         <div className="tk-t-dates mono">{dateCell}</div>
                         <div className="tk-t-assignee">
@@ -693,15 +704,15 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
                     )
                   })}
                   {!isCollapsed && (
-                    <div className="tk-row-task tk-row-add" onClick={() => openNewTask(phase.id)}>
-                      <div className="tk-t-name">+ Thêm công việc</div>
+                    <div className="tk-row-task tk-row-add" onClick={canCreate ? () => openNewTask(phase.id) : undefined}>
+                      <div className="tk-t-name">{canCreate ? '+ Thêm công việc' : ''}</div>
                     </div>
                   )}
                 </Fragment>
               )
             })}
-            <div className="tk-row-phase tk-row-add-phase" onClick={() => setItemModal({ kind: 'phase', mode: 'create' })}>
-              + Thêm đề mục{phases.length === 0 ? ' — chưa có đề mục nào, bấm để tạo đề mục đầu tiên' : ''}
+            <div className="tk-row-phase tk-row-add-phase" onClick={canCreate ? () => setItemModal({ kind: 'phase', mode: 'create' }) : undefined}>
+              {canCreate ? `+ Thêm đề mục${phases.length === 0 ? ' — chưa có đề mục nào, bấm để tạo đề mục đầu tiên' : ''}` : (phases.length === 0 ? 'Chưa có đề mục nào.' : '')}
             </div>
           </div>
           <div
@@ -743,7 +754,8 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
       </div>
 
       <GanttItemModal
-        state={itemModal}
+        state={itemModal && (itemModal.mode === 'create' ? canCreate : canOpenEdit) ? itemModal : null}
+        canDelete={canDelete}
         phases={phases}
         assignees={knownAssignees}
         onClose={() => setItemModal(null)}
@@ -760,6 +772,8 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
         onClose={closeDrawer}
         onAddComment={addComment}
         onConfirm={confirmFinance}
+        canEdit={canEdit}
+        canComment={canCreate}
       />
       <PurchaseInfoPanel
         task={pinfo.taskId ? phases.flatMap(p => p.tasks).find(t => t.id === pinfo.taskId) : null}
@@ -768,6 +782,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
         projectName={dv.current ? currentProject.name + (currentProject.maDA ? ' - [' + currentProject.maDA + ']' : '') : ''}
         meName={dv.meName}
         onUpdateItems={setPurchaseItems}
+        readOnly={!canEdit}
         onClose={closePinfo}
         onOpenBoard={openBoardFromPinfo}
       />
@@ -781,6 +796,7 @@ export default function GanttTab({ active, data = QLTK_DATA }) {
         onMove={movePurchaseItem}
         onUpdateItems={setPurchaseItems}
         onSaveFlow={savePurchaseFlow}
+        readOnly={!canEdit}
       />
     </>
   )

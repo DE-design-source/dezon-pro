@@ -9,6 +9,7 @@ import (
 
 	"qspro-backend/internal/config"
 	"qspro-backend/internal/middleware"
+	"qspro-backend/internal/modules/access"
 	"qspro-backend/internal/modules/auth"
 	"qspro-backend/internal/modules/categories"
 	"qspro-backend/internal/modules/chat"
@@ -116,7 +117,16 @@ func (s *Server) modules() []Module {
 
 	sys := system.New(system.Deps{DB: d.DB, Cfg: d.Cfg})
 
-	usersSvc := users.New(users.Deps{DB: d.DB, Cfg: d.Cfg})
+	// Phân quyền 3 cấp (N21): accessSvc cài contracts.AccessChecker (Module > Tab > Thao tác) và contracts.AccessGranter,
+	// không gọi module khác; dựng đầu tiên để module nào cần kiểm quyền chi tiết nhận qua Deps (Access: users - perms admin /
+	// subadmin cấp không vượt quyền người cấp + cắt quyền nhân viên khi xoá / hạ admin, subadmin + subadmin chỉ quản lý nhân
+	// viên không vượt quyền mình (CheckUserWithin) và ghim người cấp khi tạo / sửa nhân viên (PinGrantedBy); sales, delivery, hr, it, chat, purchasing và các
+	// module QS - projects, takeoff, estimates, quotations, materials)
+	accessSvc := access.New(access.Deps{DB: d.DB, Cfg: d.Cfg})
+	// HR dựng trước users: subadmin không quản lý tài khoản có vai trò HR cao hơn mình (HR: contracts.HRRoleReader, M14.7)
+	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc})
+
+	usersSvc := users.New(users.Deps{DB: d.DB, Cfg: d.Cfg, Access: accessSvc, HR: hrSvc})
 	// notifications dựng trước companies: nhắc gia hạn (M17.3) lấy admin đang hoạt động qua Admins
 	notifSvc := notifications.New(notifications.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, Auditor: usersSvc})
 	compSvc := companies.New(companies.Deps{DB: d.DB, Cfg: d.Cfg, UserCreator: usersSvc, UserFormatter: usersSvc, Auditor: usersSvc,
@@ -130,45 +140,44 @@ func (s *Server) modules() []Module {
 	catSvc := categories.New(categories.Deps{})
 	filesSvc := files.New(files.Deps{Cfg: d.Cfg})
 	matSvc := materials.New(materials.Deps{DuyetDelay: time.Minute, DB: d.DB, Cfg: d.Cfg, Auditor: usersSvc, Users: usersSvc, UserFmt: usersSvc,
-		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage})
-	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc})
+		Notifier: notifSvc, Admins: notifSvc, Uploader: d.Storage, Access: accessSvc})
+	takeoffSvc := takeoff.New(takeoff.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Saver: matSvc, Approval: matSvc, Access: accessSvc})
 	projSvc := projects.New(projects.Deps{DB: d.DB, Cfg: d.Cfg, Catalog: matSvc, Lines: takeoffSvc, Users: usersSvc, UserFmt: usersSvc,
-		Notifier: notifSvc, Admins: notifSvc, Files: d.Storage})
+		Notifier: notifSvc, Admins: notifSvc, Files: d.Storage, Access: accessSvc})
 	quoteSvc := quotations.New(quotations.Deps{DB: d.DB, Cfg: d.Cfg, Lines: takeoffSvc, Projects: projSvc, Media: filesSvc,
-		Files: d.Storage})
-	estSvc := estimates.New(estimates.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Auditor: usersSvc})
+		Files: d.Storage, Access: accessSvc})
+	estSvc := estimates.New(estimates.Deps{DB: d.DB, Cfg: d.Cfg, Perms: matSvc, Auditor: usersSvc, Access: accessSvc})
 	purchSvc := purchasing.New(purchasing.Deps{DB: d.DB, Cfg: d.Cfg, PurchaseNotifier: notifSvc, Notifier: notifSvc,
-		Users: usersSvc, Auditor: usersSvc})
+		Users: usersSvc, Auditor: usersSvc, Access: accessSvc})
 	reportsSvc := reports.New(reports.Deps{DB: d.DB, Cfg: d.Cfg})
 	// Kinh doanh -> Quản lý thiết kế / Quản lý dự án: khách gửi tới phòng nào thì có dự án triển khai ở trang phòng đó (DeliveryFromLead)
-	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Projects: projSvc})
+	delivSvc := delivery.New(delivery.Deps{DB: d.DB, Cfg: d.Cfg, Projects: projSvc, Access: accessSvc})
 	salesSvc := sales.New(sales.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Lines: takeoffSvc, Projects: projSvc,
-		Delivery: delivSvc, Notifier: notifSvc, AI: salesAI(d.Cfg), Files: d.Storage})
+		Delivery: delivSvc, Notifier: notifSvc, AI: salesAI(d.Cfg), Files: d.Storage, Access: accessSvc})
 	// đổi họ tên tài khoản -> tên người phụ trách đã lưu ở Kinh doanh đổi theo (users dựng trước sales nên nối bằng setter)
 	usersSvc.SetRenameListener(salesSvc)
-	// Chat (tài khoản theo số điện thoại / email, hoặc gắn tài khoản Dezon Pro: POST /chat/auth/dezon đọc users qua Users / UserFmt). Gateway WebSocket một tiến trình (realtime.Hub)
+	// Chat (tài khoản theo số điện thoại / email, hoặc gắn tài khoản Dezon Pro: POST /chat/auth/dezon đọc users qua Users / UserFmt, quyền vào Chat qua Access). Gateway WebSocket một tiến trình (realtime.Hub)
 	// hỏi nghiệp vụ qua chatSvc (Backend) và chatSvc đẩy tin qua hub (Gateway): vòng này cắt bằng SetGateway.
 	// Tắt server: hub báo client "reconnect" + đóng TRƯỚC http.Server.Shutdown (không theo dõi kết nối đã hijack);
 	// bộ chạy phân phối + worker push dừng SAU, khi request REST đang dở đã xong (tin hệ thống của chúng vẫn phân phối + push).
 	chatSvc := chat.New(chat.Deps{DB: d.DB, Cfg: d.Cfg, Mail: chatMail(d.Cfg), Push: chatPush(d.Cfg),
-		Media: chatMedia(d.Cfg, s), Users: usersSvc, UserFmt: usersSvc})
+		Media: chatMedia(d.Cfg, s), Users: usersSvc, Access: accessSvc})
 	chatHub := realtime.NewHub(realtime.Options{Backend: chatSvc, OriginPatterns: wsOrigins(d.Cfg.CORSOrigins)})
 	chatSvc.SetGateway(chatHub)
 	s.OnShutdownFirst(chatHub.Drain) // chỉ đóng kết nối; bộ chạy phân phối dừng trong chatSvc.Shutdown (sau HTTP)
 	s.OnShutdown(chatSvc.Shutdown)
 	s.chatSched = chatSvc.StartScheduler // worker tin hẹn giờ: cmd/api bật qua Server.StartChatScheduler
-	hrSvc := hr.New(hr.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc})
 	// cài đặt mặc định toàn hệ thống (super lưu, mọi tài khoản đăng nhập đọc), không gọi module khác
 	settingsSvc := settings.New(settings.Deps{DB: d.DB, Cfg: d.Cfg})
 	// IT: yêu cầu hỗ trợ + thiết bị; báo người được giao qua Notifier, ảnh đính kèm lưu vào kho file
-	itSvc := it.New(it.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Notifier: notifSvc, Uploader: d.Storage})
+	itSvc := it.New(it.Deps{DB: d.DB, Cfg: d.Cfg, Users: usersSvc, UserFmt: usersSvc, Notifier: notifSvc, Uploader: d.Storage, Access: accessSvc})
 	// job nền (cmd/api/main.go) lấy qua Server.Reports() / Server.Expiry()
 	s.reports = reportsSvc
 	s.expiry = compSvc
 
 	return []Module{
 		sys,
-		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc, settingsSvc, itSvc,
+		usersSvc, compSvc, authSvc, notifSvc, catSvc, filesSvc, matSvc, takeoffSvc, projSvc, quoteSvc, estSvc, purchSvc, reportsSvc, salesSvc, delivSvc, chatSvc, hrSvc, settingsSvc, itSvc, accessSvc,
 	}
 }
 

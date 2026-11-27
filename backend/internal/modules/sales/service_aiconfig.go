@@ -181,7 +181,7 @@ func (s *Service) aiConfOut(ctx context.Context, c aiConf, a *actor.Actor) *omap
 
 // GetAiConfig: hướng dẫn AI đang dùng + mặc định + quy tắc cố định + lịch sử.
 func (s *Service) GetAiConfig(ctx context.Context, a *actor.Actor) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	c, err := s.loadAiConf(ctx)
@@ -194,7 +194,7 @@ func (s *Service) GetAiConfig(ctx context.Context, a *actor.Actor) (any, error) 
 // SaveAiConfig: body {instructions, model?}. instructions rỗng / trùng mặc định -> quay về mặc định;
 // model thiếu / null = giữ, "" = mặc định máy chủ. Bản tuỳ chỉnh cũ (hướng dẫn hoặc model) đẩy vào history.
 func (s *Service) SaveAiConfig(ctx context.Context, a *actor.Actor, body *omap.Map) (any, error) {
-	if err := s.allow(ctx, a); err != nil {
+	if err := s.allow(ctx, a, "view"); err != nil {
 		return nil, err
 	}
 	if !a.IsAdmin() {
@@ -242,7 +242,7 @@ func (s *Service) SaveAiConfig(ctx context.Context, a *actor.Actor, body *omap.M
 
 // aiDraft: dữ liệu khách leadId + hướng dẫn nháp (body.instructions; thiếu / null = bản đang lưu) -> system, prompt.
 func (s *Service) aiDraft(ctx context.Context, a *actor.Actor, body *omap.Map) (in *insightIn, rules *omap.Map, system, prompt string, err error) {
-	if err = s.allow(ctx, a); err != nil {
+	if err = s.allow(ctx, a, "view"); err != nil {
 		return
 	}
 	if !a.IsAdmin() {

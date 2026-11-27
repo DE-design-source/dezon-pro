@@ -67,7 +67,7 @@ function UnitsView({ company, setCompany, employees, units, heads, extraMembers,
   const wrapRef = useRef(null)
   const orgRef = useRef(null)
   const onDown = usePan(wrapRef)
-  const editable = can('employees', 'edit')
+  const editable = can('org', 'edit')
   // Thu phóng vừa khung: so độ rộng thật của cây (ở 100%) với khung hiển thị
   const fit = () => {
     const w = wrapRef.current, o = orgRef.current
@@ -752,7 +752,7 @@ function PeopleView({ employees, units, heads, extraMembers, onOpen }) {
 /* ================= Sơ đồ tập đoàn: chỉ các công ty (mẹ → con; thành viên độc lập đứng riêng) ================= */
 function GroupView({ employees, units, heads, onPick, onCreateUnit }) {
   const { can } = useAccess()
-  const editable = can('employees', 'edit')
+  const editable = can('org', 'edit')
   const [addOpen, setAddOpen] = useState(false)
   const wrapRef = useRef(null)
   const orgRef = useRef(null)

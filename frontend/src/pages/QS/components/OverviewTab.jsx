@@ -4,7 +4,6 @@ import { dashTotals_, cpTong_ } from '../lib/totals.js'
 import { nodeName } from '../lib/tree.js'
 import { projectGroups } from '../lib/dashModel.js'
 import { statCache, loadStats_, STAT_AUTO_MAX } from './project/projectStats'
-import StatusView from './common/StatusView'
 import ProjectList from './dashboard/ProjectList'
 import DashSummary from './dashboard/DashSummary'
 import QuickActions from './dashboard/QuickActions'
@@ -125,7 +124,7 @@ export default function OverviewTab() {
 
   return (
     <>
-      {!has && <StatusView kind="empty" icon="layers" title="Chưa chọn bản nháp" message="Chọn một bản nháp bên dưới để xem tổng quan — hoặc tạo dự án mới." />}
+      {/* chưa chọn bản nháp: không chèn thẻ báo trống to (đẩy cả trang xuống); thẻ Tổng quan + Danh sách dự án bên dưới tự đủ */}
       {has && !pd.ready && (
         <div className={`qsc-note qs-dash-pd${pd.err ? ' err' : ''}`} role={pd.err ? 'alert' : 'status'}>
           <span>{pd.err

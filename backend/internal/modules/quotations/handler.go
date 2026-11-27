@@ -23,21 +23,22 @@ var (
 	_ contracts.MediaDownloader = Deps{}.Media
 )
 
-// RegisterRPC: 4 hàm /api/:fn của module (index.js REGISTRY). Không hàm nào thuộc ACTOR_FNS, tất cả chỉ cần đăng nhập.
+// RegisterRPC: 4 hàm /api/:fn của module (index.js REGISTRY). Không hàm nào thuộc ACTOR_FNS, tất cả chỉ cần đăng nhập;
+// saveCover / exportBaoGia bọc accRPC (N21, access_gate.go).
 func (s *Service) RegisterRPC(reg *rpc.Registry) {
-	reg.Register("saveCover", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("saveCover", rpc.Login, s.accRPC("edit", "QS > Xuất báo giá", accQuote, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.SaveCover(ctx, args.ArgU(0), args.ArgU(1))
-	})
+	}))
 	reg.Register("buildCoverFromTemplate", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.BuildCoverFromTemplate(ctx, args.ArgU(0))
 	})
 	reg.Register("getCoverOrInit", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.GetCoverOrInit(ctx, args.ArgU(0))
 	})
-	reg.Register("exportBaoGia", rpc.Login, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
+	reg.Register("exportBaoGia", rpc.Login, s.accRPC("export", "QS > Xuất báo giá", accQuote, func(ctx context.Context, _ *actor.Actor, args rpc.Args) (any, error) {
 		return s.ExportBaoGia(ctx, args.ArgU(0), args.ArgU(1), args.ArgU(2), args.ArgU(3), args.ArgU(4), args.ArgU(5),
 			args.ArgU(6), args.ArgU(7), args.ArgU(8)) // tham số 9 (opts) chỉ bản Go
-	})
+	}))
 }
 
 // RegisterRoutes: REST /api/v1 (PORTING_MAP mục A). :id là mã dự án; các tham số còn lại lấy từ thân JSON theo tên tham số.
@@ -51,12 +52,12 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 		r, err := s.BuildCoverFromTemplate(c.Request.Context(), c.Param("id"))
 		response.Result(c, r, err)
 	})
-	p.PUT("/:id/cover", func(c *gin.Context) {
+	p.PUT("/:id/cover", s.accMW("edit", "QS > Xuất báo giá", accQuote), func(c *gin.Context) {
 		b := readSaveCoverBody(c)
 		r, err := s.SaveCover(c.Request.Context(), c.Param("id"), b.Rows)
 		response.Result(c, r, doiLoiChiPhiAm(err, b.Rows))
 	})
-	p.POST("/:id/quotation/export", func(c *gin.Context) {
+	p.POST("/:id/quotation/export", s.accMW("export", "QS > Xuất báo giá", accQuote), func(c *gin.Context) {
 		b := readExportBody(c)
 		r, err := s.ExportBaoGia(c.Request.Context(), c.Param("id"), b.Cols, b.Format, b.Nodes, b.PhanTho, b.AnMuc, b.Tong, b.Org, b.Opts)
 		response.Result(c, r, err)
@@ -65,7 +66,7 @@ func (s *Service) RegisterRoutes(v1 *gin.RouterGroup) {
 
 // RegisterRoot: route lẻ POST /export/bang (index.js:780-794).
 func (s *Service) RegisterRoot(root *gin.RouterGroup) {
-	root.POST("/export/bang", s.exportBang)
+	root.POST("/export/bang", s.accMW("export", "QS", accQS), s.exportBang)
 }
 
 // ETag yếu của Express cho res.send(Buffer).

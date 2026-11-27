@@ -5,6 +5,7 @@ import * as api from '../../api/qsApi'
 import { qsToast as toast, qsConfirm } from '../common/dialogs'
 import { safeUrl_ } from '../../lib/format.js'
 import { prodDocs_ } from '../../lib/productFields.js'
+import { denyQs } from '../../state/qsAccess'
 
 /* 3 tab hồ sơ nhà cung cấp ở trang chi tiết: Giới thiệu · Đối tác ("Được tin dùng bởi") · Catalogue.
    Dữ liệu công ty 'nccInfo' = {thương hiệu: {gioiThieu, xuatXu, website, dienThoai, email, diaChi,
@@ -19,6 +20,7 @@ export function useNccInfo() {
   }, [])
   /* Ghi đè 1 phần hồ sơ của 1 thương hiệu; lỗi thì trả lại bản cũ */
   async function patch(ten, part) {
+    if (denyQs('dsncc', 'edit')) return false   // N21: Nhà cung cấp dùng quyền QS > Danh sách sản phẩm
     const old = infoCache || {}
     const next = { ...old, [ten]: { ...(old[ten] || {}), ...part } }
     infoCache = next; setInfo(next)

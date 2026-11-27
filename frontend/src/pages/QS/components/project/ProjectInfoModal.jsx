@@ -12,6 +12,7 @@ import {
   addDraftForCur, saveProjectShared, saveDraftInfo, saveProgress, removeProject,
 } from './projectActions'
 import { escOnTop_ } from './projectShell'
+import { useQsCan } from '../../state/qsAccess'
 import './project.css'
 
 /* Hộp "Thông tin dự án" (port projInfoModal / projInfoInner_, PUB/app.js:2117-2172; shot modal-project-info.png).
@@ -23,6 +24,7 @@ const s = v => (v == null ? '' : String(v))
 
 export default function ProjectInfoModal({ onClose }) {
   const { cur, projects, selectProject } = useQs()
+  const qsCan = useQsCan()   // N21: QS > Dự án > Thêm (bản nháp); sửa / xoá chặn ở projectActions
   const [ver, setVer] = useState(0)   // tăng sau mỗi lần lưu -> dựng lại form từ dữ liệu mới (như projModalRefresh_)
   const closeRef = useRef(onClose)
   const ovRef = useRef(null)
@@ -61,7 +63,7 @@ export default function ProjectInfoModal({ onClose }) {
                     <Icon name="fileText" size={12} />{draftName_(d, i)}
                   </button>
                 ))}
-                <button type="button" className="qs-pi-tab add" onClick={addDraftForCur}><Icon name="plus" size={13} />Thêm bản nháp</button>
+                {qsCan('duan', 'create') && <button type="button" className="qs-pi-tab add" onClick={addDraftForCur}><Icon name="plus" size={13} />Thêm bản nháp</button>}
               </div>
             </div>
             <button type="button" className="qsc-x" onClick={onClose}>✕</button>
@@ -132,16 +134,17 @@ function ReportCard({ gr, cur }) {
   )
 }
 
-function Field({ label, value, onChange, type, wide, children }) {
+function Field({ label, value, onChange, type, wide, ro, children }) {
   return (
     <label className={`qs-field${wide ? ' qs-pi-wide' : ''}`}>
       <span>{label}</span>
-      {children || <input type={type || 'text'} value={value} onChange={e => onChange(e.target.value)} />}
+      {children || <input type={type || 'text'} value={value} readOnly={ro} onChange={e => onChange(e.target.value)} />}
     </label>
   )
 }
 
 function SharedCard({ p, onSaved }) {
+  const canE = useQsCan()('duan', 'edit')   // N21: không có quyền Sửa = chỉ xem
   const [f, setF] = useState({ ten: s(p.ten), kienTrucSu: s(p.kienTrucSu), khachHang: s(p.khachHang), sdt: s(p.sdt), diaChi: s(p.diaChi), linkDezon: s(p.linkDezon) })
   const [busy, setBusy] = useState(false)
   const set = k => v => setF(x => ({ ...x, [k]: v }))
@@ -152,14 +155,14 @@ function SharedCard({ p, onSaved }) {
       <div className="qs-pi-card-b">
         <p className="qs-pi-note">Áp dụng cho tất cả bản nháp của dự án này.</p>
         <div className="qs-pi-grid">
-          <Field label="Tên dự án" value={f.ten} onChange={set('ten')} />
-          <Field label="Kiến trúc sư" value={f.kienTrucSu} onChange={set('kienTrucSu')} />
-          <Field label="Khách hàng" value={f.khachHang} onChange={set('khachHang')} />
-          <Field label="Số điện thoại" value={f.sdt} onChange={set('sdt')} />
-          <Field label="Địa chỉ" value={f.diaChi} onChange={set('diaChi')} />
+          <Field label="Tên dự án" value={f.ten} onChange={set('ten')} ro={!canE} />
+          <Field label="Kiến trúc sư" value={f.kienTrucSu} onChange={set('kienTrucSu')} ro={!canE} />
+          <Field label="Khách hàng" value={f.khachHang} onChange={set('khachHang')} ro={!canE} />
+          <Field label="Số điện thoại" value={f.sdt} onChange={set('sdt')} ro={!canE} />
+          <Field label="Địa chỉ" value={f.diaChi} onChange={set('diaChi')} ro={!canE} />
           <Field label="Link dự án trên Dezon" wide>
             <div className="qs-pi-link">
-              <input type="url" placeholder="https://dezon.vn/…" value={f.linkDezon} onChange={e => set('linkDezon')(e.target.value)} />
+              <input type="url" placeholder="https://dezon.vn/…" value={f.linkDezon} readOnly={!canE} onChange={e => set('linkDezon')(e.target.value)} />
               {p.linkDezon ? (
                 <a className="qsc-btn" href={safeUrl_(dezonUrl_(p.linkDezon))} target="_blank" rel="noopener noreferrer" title="Mở bài dự án trên dezon.vn">
                   <Icon name="link" size={14} />Mở
@@ -168,15 +171,18 @@ function SharedCard({ p, onSaved }) {
             </div>
           </Field>
         </div>
-        <div className="qs-pi-save">
+        {canE && <div className="qs-pi-save">
           <button type="button" className="qsc-btn blue" disabled={busy} onClick={save}><Icon name="check" size={15} />Lưu thông tin dự án</button>
-        </div>
+        </div>}
       </div>
     </div>
   )
 }
 
 function DraftCard({ p, idx, many, onSaved }) {
+  const can = useQsCan()
+  const canDel = can('duan', 'delete')
+  const canE = can('duan', 'edit')   // N21: không có quyền Sửa = chỉ xem
   const [f, setF] = useState({
     tenBanNhap: s(p.tenBanNhap), trangThai: s(p.trangThai), vat: s(p.vat), maBaoGia: s(p.maBaoGia), quyMo: s(p.quyMo),
     tongDT: s(p.tongDT), dtBaoGia: s(p.dtBaoGia), nhuCau: s(p.nhuCau), phanKhuc: s(p.phanKhuc), ghiChu: s(p.ghiChu),
@@ -195,41 +201,41 @@ function DraftCard({ p, idx, many, onSaved }) {
         <h3>Thông tin bản nháp — {draftName_(p, idx)}</h3>
         <span className="qs-pi-badge">{p.maDA}</span>
         <span style={{ flex: 1 }} />
-        {many && <button type="button" className="qsc-btn" onClick={() => removeProject(p.maDA)}><Icon name="trash" size={13} />Xoá bản nháp</button>}
+        {many && canDel && <button type="button" className="qsc-btn" onClick={() => removeProject(p.maDA)}><Icon name="trash" size={13} />Xoá bản nháp</button>}
       </div>
       <div className="qs-pi-card-b">
         <div className="qs-pi-grid">
-          <Field label="Tên bản nháp" value={f.tenBanNhap} onChange={set('tenBanNhap')} />
+          <Field label="Tên bản nháp" value={f.tenBanNhap} onChange={set('tenBanNhap')} ro={!canE} />
           <Field label="Trạng thái">
-            <select value={tt} onChange={e => set('trangThai')(e.target.value)}>
+            <select value={tt} disabled={!canE} onChange={e => set('trangThai')(e.target.value)}>
               {TRANG_THAI.map(o => <option key={o}>{o}</option>)}
             </select>
           </Field>
-          <Field label="VAT (%)" type="number" value={f.vat} onChange={set('vat')} />
-          <Field label="Mã báo giá" value={f.maBaoGia} onChange={set('maBaoGia')} />
-          <Field label="Quy mô" value={f.quyMo} onChange={set('quyMo')} />
-          <Field label="Tổng DT XD (m²)" value={f.tongDT} onChange={set('tongDT')} />
-          <Field label="DT báo giá (m²)" value={f.dtBaoGia} onChange={set('dtBaoGia')} />
-          <Field label="Nhu cầu" value={f.nhuCau} onChange={set('nhuCau')} />
-          <Field label="Phân khúc" value={f.phanKhuc} onChange={set('phanKhuc')} />
+          <Field label="VAT (%)" type="number" value={f.vat} onChange={set('vat')} ro={!canE} />
+          <Field label="Mã báo giá" value={f.maBaoGia} onChange={set('maBaoGia')} ro={!canE} />
+          <Field label="Quy mô" value={f.quyMo} onChange={set('quyMo')} ro={!canE} />
+          <Field label="Tổng DT XD (m²)" value={f.tongDT} onChange={set('tongDT')} ro={!canE} />
+          <Field label="DT báo giá (m²)" value={f.dtBaoGia} onChange={set('dtBaoGia')} ro={!canE} />
+          <Field label="Nhu cầu" value={f.nhuCau} onChange={set('nhuCau')} ro={!canE} />
+          <Field label="Phân khúc" value={f.phanKhuc} onChange={set('phanKhuc')} ro={!canE} />
           <Field label="Hiện trạng" wide>
-            <textarea className="qs-pi-ht" placeholder="Hiện trạng công trình / mặt bằng (in trên tờ bìa báo giá)" value={f.hienTrang}
+            <textarea className="qs-pi-ht" placeholder="Hiện trạng công trình / mặt bằng (in trên tờ bìa báo giá)" value={f.hienTrang} readOnly={!canE}
               onChange={e => set('hienTrang')(e.target.value)} />
           </Field>
         </div>
         <label className="qs-field qs-pi-gc">
           <span>Ghi chú</span>
-          <textarea placeholder="Ghi chú cho bản nháp này" value={f.ghiChu} onChange={e => set('ghiChu')(e.target.value)} />
+          <textarea placeholder="Ghi chú cho bản nháp này" value={f.ghiChu} readOnly={!canE} onChange={e => set('ghiChu')(e.target.value)} />
         </label>
         <div className="qs-pi-prog">
           <span className="qs-pi-prog-l">Tiến độ</span>
-          <input type="range" min="0" max="100" value={prog} onChange={e => setProg(Number(e.target.value) || 0)} />
+          <input type="range" min="0" max="100" value={prog} disabled={!canE} onChange={e => setProg(Number(e.target.value) || 0)} />
           <b>{prog}%</b>
-          <button type="button" className="qsc-btn" onClick={() => saveProgress(prog)}>Cập nhật</button>
+          {canE && <button type="button" className="qsc-btn" onClick={() => saveProgress(prog)}>Cập nhật</button>}
         </div>
-        <div className="qs-pi-save">
+        {canE && <div className="qs-pi-save">
           <button type="button" className="qsc-btn blue" disabled={busy} onClick={save}><Icon name="check" size={15} />Lưu bản nháp</button>
-        </div>
+        </div>}
       </div>
     </div>
   )

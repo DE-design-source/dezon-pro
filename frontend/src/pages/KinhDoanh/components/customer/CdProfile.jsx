@@ -98,7 +98,8 @@ function Row({ k, children }) {
   return <div className="cd-row"><span>{k}</span><span className="cd-row-v">{children}</span></div>
 }
 
-export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
+/* readOnly (N21: không có quyền Sửa ở Kinh doanh > Pipeline): ẩn nút Sửa, công tắc Xác nhận Lead chỉ xem */
+export default function CdProfile({ lead: l, me, onEdit, onSetCreated, readOnly }) {
   const [reveal, setReveal] = useState({})
   const [suaNgay, setSuaNgay] = useState(false)
   const geoMap = useKdMap('geo')
@@ -150,6 +151,7 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
           const v = verifiedMap[String(l.id)]
           const on = !!v
           const flip = () => {
+            if (readOnly) return
             if (on && !window.confirm('Bỏ xác nhận "Lead có nhu cầu, liên hệ được"' + (v.by ? ' (do ' + v.by + ' xác nhận)' : '') + '?')) return
             const m = { ...verifiedMap }
             if (on) delete m[String(l.id)]
@@ -159,7 +161,7 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
           const when = on && v.at ? new Date(v.at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
           return (
             <span className={'pf2-vf' + (on ? ' on' : '')}>
-              <button type="button" role="switch" aria-checked={on} className="pf2-sw" onClick={flip}
+              <button type="button" role="switch" aria-checked={on} className="pf2-sw" onClick={flip} disabled={readOnly}
                 title={on ? 'Bỏ xác nhận Lead có nhu cầu, liên hệ được' : 'Gạt để xác nhận Lead có nhu cầu, liên hệ được'}><i /></button>
               {on
                 ? <span className="pf2-vf-t" title={'Đã xác nhận Lead có nhu cầu, liên hệ được - bởi ' + (v.by || '') + (when ? ' lúc ' + when : '')}><b>✓</b> Đã xác nhận</span>
@@ -171,7 +173,7 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
           )
         })()}
         <span className="cd-fold-sp" />
-        <button type="button" className="cd-btn sm pf2-edit" onClick={onEdit} title="Sửa thông tin khách hàng"><Ic d={PEN} size={12} /><span>Sửa</span></button>
+        {onEdit && <button type="button" className="cd-btn sm pf2-edit" onClick={onEdit} title="Sửa thông tin khách hàng"><Ic d={PEN} size={12} /><span>Sửa</span></button>}
       </div>
       <div className="pf2-body">
       <div className="pf2-page">
@@ -260,7 +262,7 @@ export default function CdProfile({ lead: l, me, onEdit, onSetCreated }) {
                 <a key={i} className="cd-file" href={mediaUrl(it.url)} target="_blank" rel="noopener noreferrer" title={it.name}><Ic d={FILE_IC} /><span>{it.name}</span></a>
               )) : <em className="cd-none">Chưa có tệp</em>}
             </div>
-            <button type="button" className="cd-btn sm cd-fold-edit" onClick={onEdit}><Ic d={PEN} size={12} />Sửa / thêm tài liệu</button>
+            {onEdit && <button type="button" className="cd-btn sm cd-fold-edit" onClick={onEdit}><Ic d={PEN} size={12} />Sửa / thêm tài liệu</button>}
           </div>
       </aside>
       </div>

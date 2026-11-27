@@ -5,6 +5,7 @@ import { DezonChip } from '../project/PCard'
 import { projInfoModal, removeProjectGroup, addDraft, pickProject } from '../project/projectActions'
 import { fmtDate, money, qbNorm_ } from '../../lib/format.js'
 import DraftItem from './DraftItem'
+import { useQsCan } from '../../state/qsAccess'
 
 /* Hai chế độ xem thêm của Danh sách dự án (chế độ "Thẻ" là ProjectCard). Cùng props với ProjectCard:
    group {name, khachHang, sdt, linkDezon, drafts[]}, curMa = mã bản nháp đang mở. Mọi thao tác dùng lại projectActions / DraftItem. */
@@ -114,6 +115,7 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
   const key = g.drafts[0].maDA
   const hasCur = g.drafts.some(d => d.maDA === curMa)
   const [open, setOpen] = useState(hasCur)
+  const qsCan = useQsCan()   // N21: QS > Dự án > Thêm / Xoá
   const last = g.drafts[g.drafts.length - 1]
   const stop = e => e.stopPropagation()
   const ncc = (st && st.ncc) || []
@@ -138,9 +140,9 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
           {hasCur ? <span className="qs-dash-row-open ph" aria-hidden="true">Mở</span>  /* giữ chỗ để nút link / xoá thẳng cột */
             : <button type="button" className="qs-dash-row-open" title="Mở bản nháp mới nhất ở Bóc tách" onClick={e => { stop(e); pickProject(last.maDA) }}>Mở</button>}
           <DezonChip p={{ linkDezon: g.linkDezon, maDA: key }} cls="qs-dash-link" label={false} />
-          <button type="button" className="qs-dash-row-del" title="Xoá cả dự án này (mọi bản nháp)" onClick={e => { stop(e); removeProjectGroup(key) }}>
+          {qsCan('duan', 'delete') && <button type="button" className="qs-dash-row-del" title="Xoá cả dự án này (mọi bản nháp)" onClick={e => { stop(e); removeProjectGroup(key) }}>
             <Icon name="trash" size={13} />
-          </button>
+          </button>}
         </div>
         <div className="qs-dash-row-2 qs-dash-row-val" title={hasCur ? 'Bản nháp đang dùng' : 'Bản nháp mới nhất'}>
           {st ? (st.n ? <><b>{money(st.tong)} đ</b><small>{st.n} dòng sản phẩm</small></> : <span className="nil">Chưa có báo giá</span>) : <span className="nil">Đang đếm…</span>}
@@ -162,12 +164,12 @@ export function ProjectRow({ group: g, curMa, kd, st, pt, users, canEditPt, onPt
           {/* bọc từng bản nháp để vẽ đường nối cây cha - con từ biểu tượng dự án xuống từng bản nháp (.qs-dash-tree-i) */}
           {g.drafts.map((d, i) => <div key={d.maDA} className="qs-dash-tree-i"><DraftItem draft={d} index={i} active={d.maDA === curMa} groupMas={g.drafts.map(x => x.maDA)} /></div>)}
           {/* "Thêm bản nháp" là 1 nhánh cuối của cây, đồng cấp với các bản nháp: biểu tượng (+) thay biểu tượng tệp */}
-          <div className="qs-dash-tree-i">
+          {qsCan('duan', 'create') && <div className="qs-dash-tree-i">
             <button type="button" className="qs-dash-draft qs-dash-add-row" onClick={() => addDraft(key)}>
               <span className="qs-dash-draft-icon"><Icon name="plus" size={15} stroke={2.4} /></span>
               <span className="qs-dash-draft-name">Thêm bản nháp</span>
             </button>
-          </div>
+          </div>}
         </div>
       )}
     </div>

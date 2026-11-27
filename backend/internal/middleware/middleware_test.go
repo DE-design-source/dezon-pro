@@ -69,6 +69,40 @@ func TestRBACAndTenant(t *testing.T) {
 	}
 }
 
+// M14.7: RequireStaffManager cho subadmin / admin / super qua, chặn giống hệt RequireAdmin; RequireAdmin vẫn chặn subadmin.
+func TestRequireStaffManager(t *testing.T) {
+	who := map[string]*actor.Actor{
+		"u": {UID: "1", U: "u", R: "staff", CT: "c1"},
+		"m": {UID: "4", U: "m", R: "subadmin", CT: "c1"},
+		"a": {UID: "2", U: "a", R: "admin", CT: "c1"},
+		"s": {UID: "3", U: "s", R: "super"},
+	}
+	fake := func(c *gin.Context) { actor.Set(c, who[c.GetHeader("X-Who")]) }
+	e := engine(fake)
+	ok := func(c *gin.Context) { response.OK(c, "ok") }
+	e.GET("/staff", RequireStaffManager(), ok)
+	e.GET("/admin", RequireAdmin(), ok)
+	const okBody = `{"ok":true,"result":"ok"}`
+	cases := []struct {
+		path, who string
+		status    int
+		body      string
+	}{
+		{"/staff", "", 401, `{"error":"Chưa đăng nhập","code":"NOAUTH"}`},
+		{"/staff", "u", 403, `{"error":"Không có quyền (chỉ Admin)"}`},
+		{"/staff", "m", 200, okBody},
+		{"/staff", "a", 200, okBody},
+		{"/staff", "s", 200, okBody},
+		{"/admin", "m", 403, `{"error":"Không có quyền (chỉ Admin)"}`},
+	}
+	for _, c := range cases {
+		w := hit(e, "GET", c.path, "", map[string]string{"X-Who": c.who})
+		if w.Code != c.status || w.Body.String() != c.body {
+			t.Errorf("%s who=%q: got %d %s, want %d %s", c.path, c.who, w.Code, w.Body.String(), c.status, c.body)
+		}
+	}
+}
+
 func TestBearerAndBody(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
 	r.Header.Set("Authorization", "BEARER   abc.def")

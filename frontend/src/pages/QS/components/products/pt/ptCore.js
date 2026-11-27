@@ -10,6 +10,7 @@ import {
 import { nodeName } from '../../../lib/tree.js'
 import { getState } from '../../../state/store'
 import { projDataSet_ } from '../../../state/projData'
+import { denyQs, lineTab } from '../../../state/qsAccess'
 import { qsToast } from '../../common/dialogs'
 
 export function lsJson_(k, def) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? def : v } catch (e) { return def } }
@@ -111,6 +112,7 @@ export function ptVals_() {
 }
 /* ptPersist: lưu máy + projData (phanTho, ptVat) */
 export function ptPersist_(phanTho, ptVat) {
+  if (denyQs(lineTab('edit'), 'edit')) return   // N21: ghi bảng Phần thô của dự án
   const S = getState(), k = ptKey(S.cur && S.cur.maDA)
   let v = Number(ptVat); if (!isFinite(v)) v = 0
   lsSet_(k, JSON.stringify(phanTho)); lsSet_(k + '_vat', String(v))

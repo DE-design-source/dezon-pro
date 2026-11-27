@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { INITIAL_ISSUES, ISSUE_COLS, PRIO_LABEL, ISSUE_ASSIGNEES, nameInitials } from '../../../data/bimData'
 import { Icon, SectionHead, SearchInput } from './shared'
+import { useAccess } from '../../../services/accessService'
 
 const META_ICONS = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
@@ -79,6 +80,7 @@ function CreateIssueModal({ open, onClose, onSubmit }) {
 }
 
 export default function IssuesTab() {
+  const { can } = useAccess()
   const [issues, setIssues] = useState(INITIAL_ISSUES)
   const [seq, setSeq] = useState(42)
   const [query, setQuery] = useState('')
@@ -100,8 +102,8 @@ export default function IssuesTab() {
     <>
       <SectionHead eyebrow="Phối hợp BCF" title="Issues của dự án" desc="Theo dõi vấn đề theo model, vị trí, người phụ trách và lịch sử trao đổi.">
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="bim-btn-ghost"><Icon html={'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'} />Xuất BCF</button>
-          <button className="bim-btn-dark" onClick={() => setModalOpen(true)}><Icon name="plus" stroke="#fff" sw={2.6} />Tạo Issue</button>
+          {can('bim', 'main', 'export') && <button className="bim-btn-ghost"><Icon html={'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'} />Xuất BCF</button>}
+          {can('bim', 'main', 'create') && <button className="bim-btn-dark" onClick={() => setModalOpen(true)}><Icon name="plus" stroke="#fff" sw={2.6} />Tạo Issue</button>}
         </div>
       </SectionHead>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

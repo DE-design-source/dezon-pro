@@ -2,10 +2,12 @@ import { NAV_MAIN, NAV_BOTTOM } from '../../../data/navigation'
 import { useNavHidden, toggleNavHidden, setNavHidden, NAV_LOCKED } from '../../../hooks/useNavHidden'
 import { cardStyle, titleStyle, descStyle, RowText, ToggleSwitch } from './shared'
 import { PAGE_TABS } from '../../../data/pageTabs'
-import { useAllPageTabsHidden, togglePageTab, showAllPageTabs } from '../../../hooks/usePageTabs'
+import { useAllPageTabsHidden, togglePageTab, showAllPageTabs, viewablePageTabKeys } from '../../../hooks/usePageTabs'
+import { useWorkSession } from '../../../services/workSession'
 
 /* Tab "Hiển thị" — bật / tắt từng tab chính trên menu bên trái và từng module (tab đầu trang) trong các trang chính
-   theo nhu cầu của người dùng (lưu trên máy này) */
+   theo nhu cầu của người dùng (lưu trên máy này). Chỉ ẩn thêm: chỉ liệt kê trang / tab tài khoản được xem
+   (Phân quyền 3 cấp N21, workSession.canPage + accessService.can) */
 function NavIcon({ pathData }) {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
@@ -52,7 +54,12 @@ const chip = on => ({
 })
 function PageTabsCard() {
   const all = useAllPageTabsHidden()
-  const nHidden = Object.keys(all).reduce((n, p) => n + all[p].length, 0)
+  const { canPage } = useWorkSession()   // vẽ lại cả khi quyền thực nạp xong / đổi
+  // trang được vào + tab được xem; mỗi trang chỉ đếm / bật tắt trong các tab được xem
+  const pages = PAGE_TABS.filter(pg => canPage(pg.module))
+    .map(pg => { const ok = viewablePageTabKeys(pg.path); return { ...pg, tabs: pg.tabs.filter(t => ok.indexOf(t[0]) >= 0) } })
+    .filter(pg => pg.tabs.length)
+  const nHidden = pages.reduce((n, pg) => n + pg.tabs.filter(t => (all[pg.path] || []).indexOf(t[0]) >= 0).length, 0)
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -61,8 +68,8 @@ function PageTabsCard() {
         <button type="button" style={linkBtn} disabled={!nHidden} onClick={() => showAllPageTabs()}>Hiện tất cả</button>
       </div>
       <p style={descStyle}>Bật / tắt từng tab trên thanh đầu trang của các trang chính (vd Marketing: Chiến dịch, Danh mục, Báo giá…). Bấm vào tab để ẩn / hiện; mỗi trang luôn giữ ít nhất 1 tab. Chỉ ẩn khỏi thanh tab, không đổi quyền. Lưu trên máy / trình duyệt này.</p>
-      {PAGE_TABS.map(pg => {
-        const h = all[pg.path] || []
+      {pages.map(pg => {
+        const h = (all[pg.path] || []).filter(k => pg.tabs.some(t => t[0] === k))
         const keys = pg.tabs.map(t => t[0])
         const shown = keys.filter(k => h.indexOf(k) < 0).length
         return (
@@ -94,6 +101,9 @@ function PageTabsCard() {
 
 export default function DisplayTab() {
   const hidden = useNavHidden()
+  const { canPage } = useWorkSession()
+  const navMain = NAV_MAIN.filter(it => canPage(it.perm))
+  const navBottom = NAV_BOTTOM.filter(it => canPage(it.perm))
   return (
     <>
       <div style={cardStyle}>
@@ -105,8 +115,8 @@ export default function DisplayTab() {
         </div>
       </div>
       <PageTabsCard />
-      <NavGroup title="Tab chính" items={NAV_MAIN} hidden={hidden} />
-      <NavGroup title="Tiện ích" items={NAV_BOTTOM} hidden={hidden} />
+      <NavGroup title="Tab chính" items={navMain} hidden={hidden} />
+      {navBottom.length > 0 && <NavGroup title="Tiện ích" items={navBottom} hidden={hidden} />}
     </>
   )
 }
